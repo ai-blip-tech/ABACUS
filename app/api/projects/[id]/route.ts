@@ -2,6 +2,36 @@ import { env } from "cloudflare:workers";
 import { currentUser, ensureStore, storage, tenantStoragePrefix } from "@/lib/auth";
 
 type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string };
+type SavedPlanParameter = { name: string; value: string };
+type SavedPlanItem = {
+  id: string;
+  kind: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  rotation: number;
+  rugShape?: "rectangular" | "round";
+  referenceAsset?: string;
+  referenceImage?: string;
+  referenceImages?: string[];
+  referenceName?: string;
+  referenceProductId?: string;
+  referenceArticle?: string;
+  referenceUrl?: string;
+  referencePrice?: number;
+  referenceOldPrice?: number;
+  referenceCategory?: string;
+  referenceSubtype?: string;
+  referenceColor?: string;
+  referenceMaterial?: string;
+  referenceHeightMm?: number | null;
+  referenceDescription?: string;
+  referenceParameters?: SavedPlanParameter[];
+};
+type SavedSurfaceReference = { name: string; asset?: string; image?: string };
+type SavedPlanCamera = { x: number; y: number; height: number; rotation: number };
 type SavedState = {
   version: number;
   interiorAsset?: string;
@@ -14,6 +44,11 @@ type SavedState = {
   prompt?: string;
   preserved?: string[];
   creativity?: string;
+  planItems?: SavedPlanItem[];
+  planRoom?: { width: number; length: number };
+  planFloorReference?: SavedSurfaceReference | null;
+  planWallReference?: SavedSurfaceReference | null;
+  planCamera?: SavedPlanCamera | null;
 };
 
 const validProjectId = (id: string) => /^[a-zA-Z0-9-]{12,100}$/.test(id);
@@ -27,6 +62,18 @@ function hydrateState(projectId: string, state: SavedState) {
     interiorImage: state.interiorAsset ? assetUrl(projectId, state.interiorAsset) : "",
     generatedImage: state.generatedAsset ? assetUrl(projectId, state.generatedAsset) : "",
     historyVersions: (state.historyVersions || []).map((version) => ({ ...version, image: assetUrl(projectId, version.asset) })),
+    planItems: (state.planItems || []).map(({ referenceAsset, ...item }) => ({
+      ...item,
+      referenceImage: referenceAsset ? assetUrl(projectId, referenceAsset) : item.referenceImage,
+    })),
+    planFloorReference: state.planFloorReference ? {
+      name: state.planFloorReference.name,
+      image: state.planFloorReference.asset ? assetUrl(projectId, state.planFloorReference.asset) : state.planFloorReference.image || "",
+    } : null,
+    planWallReference: state.planWallReference ? {
+      name: state.planWallReference.name,
+      image: state.planWallReference.asset ? assetUrl(projectId, state.planWallReference.asset) : state.planWallReference.image || "",
+    } : null,
   };
 }
 
@@ -36,6 +83,17 @@ function dataUrlToBytes(value: string) {
   const binary = atob(match[2]);
   return { contentType: match[1], bytes: Uint8Array.from(binary, (character) => character.charCodeAt(0)) };
 }
+
+const finiteNumber = (value: unknown, fallback: number, minimum = -Infinity, maximum = Infinity) => typeof value === "number" && Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : fallback;
+const shortText = (value: unknown, maximum = 240) => typeof value === "string" ? value.slice(0, maximum) : "";
+const storedImageUrl = (value: unknown) => typeof value === "string" && (/^https?:\/\//i.test(value) || value.startsWith("/api/projects/")) ? value.slice(0, 4000) : undefined;
+const planSurfaceReference = (value: unknown, asset: string, collectImage: (asset: string, image: unknown) => void): SavedSurfaceReference | null => {
+  if (!value || typeof value !== "object") return null;
+  const reference = value as Record<string, unknown>;
+  collectImage(asset, reference.image);
+  const image = storedImageUrl(reference.image);
+  return { name: shortText(reference.name, 200) || "Референс", ...(typeof reference.image === "string" && reference.image.startsWith("data:") ? { asset } : image ? { image } : {}) };
+};
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await currentUser(request);
@@ -75,6 +133,57 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     collectImage(asset, item.image);
     return [{ id: typeof item.id === "string" ? item.id.slice(0, 120) : crypto.randomUUID(), name: typeof item.name === "string" ? item.name.slice(0, 160) : "Визуализация", generated: Boolean(item.generated), asset }];
   });
+  const planItems: SavedPlanItem[] = (Array.isArray(draft.planItems) ? draft.planItems.slice(0, 100) : []).flatMap((entry, index) => {
+    if (!entry || typeof entry !== "object") return [];
+    const item = entry as Record<string, unknown>;
+    const referenceAsset = `plan-item-${index}`;
+    collectImage(referenceAsset, item.referenceImage);
+    const referenceImage = storedImageUrl(item.referenceImage);
+    const parameters: SavedPlanParameter[] = (Array.isArray(item.referenceParameters) ? item.referenceParameters.slice(0, 40) : []).flatMap((parameter) => {
+      if (!parameter || typeof parameter !== "object") return [];
+      const candidate = parameter as Record<string, unknown>;
+      const name = shortText(candidate.name, 160);
+      const value = shortText(candidate.value, 600);
+      return name && value ? [{ name, value }] : [];
+    });
+    return [{
+      id: shortText(item.id, 120) || crypto.randomUUID(),
+      kind: shortText(item.kind, 40) || "decor",
+      name: shortText(item.name, 240) || "Предмет",
+      x: finiteNumber(item.x, 0, 0, 100),
+      y: finiteNumber(item.y, 0, 0, 100),
+      width: finiteNumber(item.width, 500, 50, 20000),
+      depth: finiteNumber(item.depth, 500, 50, 20000),
+      rotation: finiteNumber(item.rotation, 0, 0, 360),
+      ...(item.rugShape === "round" || item.rugShape === "rectangular" ? { rugShape: item.rugShape } : {}),
+      ...(typeof item.referenceImage === "string" && item.referenceImage.startsWith("data:") ? { referenceAsset } : referenceImage ? { referenceImage } : {}),
+      referenceImages: (Array.isArray(item.referenceImages) ? item.referenceImages : []).map(storedImageUrl).filter((image): image is string => Boolean(image)).slice(0, 20),
+      referenceName: shortText(item.referenceName, 240) || undefined,
+      referenceProductId: shortText(item.referenceProductId, 160) || undefined,
+      referenceArticle: shortText(item.referenceArticle, 160) || undefined,
+      referenceUrl: storedImageUrl(item.referenceUrl),
+      referencePrice: typeof item.referencePrice === "number" && Number.isFinite(item.referencePrice) ? item.referencePrice : undefined,
+      referenceOldPrice: typeof item.referenceOldPrice === "number" && Number.isFinite(item.referenceOldPrice) ? item.referenceOldPrice : undefined,
+      referenceCategory: shortText(item.referenceCategory, 240) || undefined,
+      referenceSubtype: shortText(item.referenceSubtype, 240) || undefined,
+      referenceColor: shortText(item.referenceColor, 240) || undefined,
+      referenceMaterial: shortText(item.referenceMaterial, 400) || undefined,
+      referenceHeightMm: item.referenceHeightMm === null ? null : typeof item.referenceHeightMm === "number" && Number.isFinite(item.referenceHeightMm) ? item.referenceHeightMm : undefined,
+      referenceDescription: shortText(item.referenceDescription, 5000) || undefined,
+      referenceParameters: parameters.length ? parameters : undefined,
+    }];
+  });
+  const planRoomInput = draft.planRoom && typeof draft.planRoom === "object" ? draft.planRoom as Record<string, unknown> : {};
+  const planRoom = { width: finiteNumber(planRoomInput.width, 6000, 500, 30000), length: finiteNumber(planRoomInput.length, 4500, 500, 30000) };
+  const planFloorReference = planSurfaceReference(draft.planFloorReference, "plan-floor", collectImage);
+  const planWallReference = planSurfaceReference(draft.planWallReference, "plan-wall", collectImage);
+  const cameraInput = draft.planCamera && typeof draft.planCamera === "object" ? draft.planCamera as Record<string, unknown> : null;
+  const planCamera: SavedPlanCamera | null = cameraInput ? {
+    x: finiteNumber(cameraInput.x, 50, 0, 100),
+    y: finiteNumber(cameraInput.y, 50, 0, 100),
+    height: finiteNumber(cameraInput.height, 1500, 300, 3000),
+    rotation: finiteNumber(cameraInput.rotation, 0, -360, 360),
+  } : null;
   if (!images.size) return Response.json({ error: "Добавьте интерьер перед сохранением проекта." }, { status: 400 });
   try {
     await Promise.all([...images.entries()].map(async ([asset, image]) => {
@@ -97,6 +206,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     prompt: typeof draft.prompt === "string" ? draft.prompt.slice(0, 4000) : "",
     preserved: Array.isArray(draft.preserved) ? draft.preserved.filter((item): item is string => typeof item === "string").slice(0, 12) : [],
     creativity: typeof draft.creativity === "string" ? draft.creativity.slice(0, 80) : "Средняя",
+    planItems,
+    planRoom,
+    planFloorReference,
+    planWallReference,
+    planCamera,
   };
   const now = new Date().toISOString();
   const existing = await env.DB.prepare("SELECT id FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first();
