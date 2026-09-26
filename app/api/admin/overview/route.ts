@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ error: "Недостаточно прав." }, { status: 403 });
   await ensureStore();
   const users = await database.prepare(`
-    SELECT users.id, users.email, users.role, users.created_at, users.last_login_at,
+    SELECT users.id, users.email, users.global_role AS role, users.created_at, users.last_login_at,
       COUNT(generations.id) AS generations,
       COALESCE(SUM(generations.input_tokens), 0) AS input_tokens,
       COALESCE(SUM(generations.output_tokens), 0) AS output_tokens,

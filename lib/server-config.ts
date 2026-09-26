@@ -1,4 +1,4 @@
-const PLACEHOLDER_SECRETS = new Set(["replace-me", "changeme", "your-key-here", ""]);
+const PLACEHOLDER_SECRETS = new Set(["replace-me", "changeme", "your-key-here", "your-openai-api-key", "your-roboflow-api-key", ""]);
 
 function configuredSecret(value: string | undefined) {
   const secret = value?.trim() || "";

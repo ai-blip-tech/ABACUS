@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { access, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const root = new URL("../", import.meta.url);
+const root = fileURLToPath(new URL("../", import.meta.url));
 
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -30,7 +31,7 @@ test("production build is standard Next.js for Node", async () => {
 
 test("application source has no Cloudflare runtime imports", async () => {
   const sourceRoots = ["app", "lib"];
-  const files = (await Promise.all(sourceRoots.map((directory) => sourceFiles(join(root.pathname, directory))))).flat();
+  const files = (await Promise.all(sourceRoots.map((directory) => sourceFiles(join(root, directory))))).flat();
   const matches = [];
   for (const file of files) {
     const source = await readFile(file, "utf8");
@@ -54,6 +55,8 @@ test("image generation is configurable and rejects placeholder secrets", async (
   assert.match(modelSource, /gpt-image-2\.5-sunburst/);
   assert.match(modelSource, /OPENAI_IMAGE_MODEL/);
   assert.match(configSource, /replace-me/);
+  assert.match(configSource, /your-openai-api-key/);
+  assert.match(configSource, /your-roboflow-api-key/);
   assert.match(generateSource, /openAIKey\(\)/);
   assert.match(generateSource, /imageModel\(\)/);
 });
