@@ -37,8 +37,6 @@ pm2 save
 OPENAI_API_KEY=sk-proj-...
 OPENAI_IMAGE_MODEL=gpt-image-2.5-sunburst
 ROBOFLOW_API_KEY=
-ADMIN_EMAIL=
-ADMIN_PASSWORD=
 ROOM_DESIGN_DATA_DIR=/var/lib/room-design
 COOKIE_SECURE=true
 ```
@@ -89,6 +87,26 @@ curl -s http://127.0.0.1:3000/api/health
 Файл окружения должен находиться в корне проекта, который указан как `cwd` в
 `ecosystem.config.cjs`.
 
+## Глобальный администратор
+
+Глобальная роль Room Design хранится в `users.global_role` и не связана с
+ролью пользователя в отдельном tenant. Tenant-роли `member`, `admin` и `owner`
+хранятся только в `tenant_memberships`.
+
+Создайте глобального администратора интерактивной командой:
+
+```bash
+npm run create-admin
+```
+
+Команда запросит email, имя, фамилию и пароль с подтверждением. Ввод пароля не
+отображается в терминале. Глобальному администратору не создаётся membership ни
+в `tenant_norrmobler`, ни в каком-либо другом tenant.
+
+Миграция удаляет только прежнюю автоматически созданную связку глобального
+администратора с `tenant_norrmobler`. Явно назначенные роли в других tenant не
+изменяются, кроме переименования legacy-роли `tenant_admin` в `admin`.
+
 ## Nginx
 
 ```nginx
@@ -119,6 +137,7 @@ server {
 - `npm run build` — production-сборка;
 - `npm start` — обычный production-запуск;
 - `npm run start:pm2` — запуск через PM2;
+- `npm run create-admin` — интерактивное создание глобального администратора;
 - `npm test` — сборка и проверки Node-конфигурации;
 - `npm run lint` — статическая проверка.
 GitHub workflow test: Codex branch and Pull Request
