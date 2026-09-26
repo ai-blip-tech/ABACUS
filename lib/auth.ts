@@ -1,4 +1,4 @@
-import { database, objectStorage } from "@/lib/server-runtime";
+import { database, objectStorage } from "./server-runtime.ts";
 
 const DEFAULT_TENANT_ID = "tenant_norrmobler";
 const DEFAULT_TENANT_SLUG = "norrmobler";
