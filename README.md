@@ -121,3 +121,4 @@ server {
 - `npm run start:pm2` — запуск через PM2;
 - `npm test` — сборка и проверки Node-конфигурации;
 - `npm run lint` — статическая проверка.
+GitHub workflow test: Codex branch and Pull Request
