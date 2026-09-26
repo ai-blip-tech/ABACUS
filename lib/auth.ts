@@ -1,4 +1,5 @@
 import { database, objectStorage } from "./server-runtime.ts";
+import { ensureBillingStore } from "./billing.ts";
 
 const DEFAULT_TENANT_ID = "tenant_norrmobler";
 const DEFAULT_TENANT_SLUG = "norrmobler";
@@ -115,6 +116,7 @@ export function ensureStore() {
       database.prepare("CREATE INDEX IF NOT EXISTS idx_projects_tenant_user_updated ON projects(tenant_id, user_id, updated_at DESC)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_ai_jobs_tenant_user ON ai_jobs(tenant_id, user_id, created_at DESC)"),
     ]);
+    await ensureBillingStore();
   })();
   return setup;
 }
@@ -154,7 +156,7 @@ export async function currentUser(request: Request): Promise<AppUser | null> {
   const token = cookieValue(request);
   if (!token) return null;
   const row = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, tenant_memberships.role AS tenantRole FROM sessions JOIN users ON users.id = sessions.user_id LEFT JOIN tenant_memberships ON tenant_memberships.tenant_id = sessions.tenant_id AND tenant_memberships.user_id = users.id WHERE sessions.token_hash = ? AND sessions.tenant_id = ? AND sessions.expires_at > ?").bind(await sha256(token), tenant.id, new Date().toISOString()).first<AuthIdentityRow>();
-  if (!row || (row.role !== "admin" && !row.tenantRole)) return null;
+  if (!row) return null;
   return userRecord(row, tenant);
 }
 
@@ -175,14 +177,15 @@ export async function register(request: Request, email: string, password: string
   await d1().batch([
     d1().prepare("INSERT INTO users (id, email, password_hash, password_salt, password_algorithm, password_iterations, global_role, first_name, last_name, phone, company_role, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(user.id, user.email, secured.hash, secured.salt, secured.algorithm, secured.iterations, user.role, user.firstName, user.lastName, user.phone, user.companyRole, now, now),
     d1().prepare("INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at) VALUES (?, ?, ?, ?)").bind(tenant.id, user.id, user.tenantRole, now),
+    d1().prepare("INSERT INTO auth_identities (id, user_id, provider, provider_user_id, provider_email, created_at, updated_at) VALUES (?, ?, 'password', ?, ?, ?, ?)").bind(crypto.randomUUID(), user.id, user.id, user.email, now, now),
   ]);
   return user;
 }
 
 export async function login(request: Request, email: string, password: string) {
   const tenant = await tenantForRequest(request);
-  const user = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, users.password_hash, users.password_salt, users.password_algorithm, users.password_iterations, tenant_memberships.role AS tenantRole FROM users LEFT JOIN tenant_memberships ON tenant_memberships.user_id = users.id AND tenant_memberships.tenant_id = ? WHERE users.email = ?").bind(tenant.id, normalizeEmail(email)).first<AuthIdentityRow>();
-  if (!user || (user.role !== "admin" && !user.tenantRole)) throw new Error("Неверный email или пароль.");
+  const user = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, users.password_hash, users.password_salt, users.password_algorithm, users.password_iterations, tenant_memberships.role AS tenantRole FROM users JOIN auth_identities ON auth_identities.user_id = users.id AND auth_identities.provider = 'password' LEFT JOIN tenant_memberships ON tenant_memberships.user_id = users.id AND tenant_memberships.tenant_id = ? WHERE users.email = ?").bind(tenant.id, normalizeEmail(email)).first<AuthIdentityRow>();
+  if (!user) throw new Error("Неверный email или пароль.");
   if (!await passwordMatches(password, { hash: user.password_hash, salt: user.password_salt, algorithm: user.password_algorithm, iterations: user.password_iterations })) throw new Error("Неверный email или пароль.");
   await d1().prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
   return userRecord(user, tenant)!;
@@ -232,9 +235,27 @@ export async function requireAdmin(request: Request) {
   return user;
 }
 
-export async function recordGeneration(user: AppUser, values: { operation: string; prompt: string; outputKey: string; contentType: string; bytes: number; inputTokens?: number | null; outputTokens?: number | null; totalTokens?: number | null }) {
+export async function requireGlobalAdmin(request: Request) {
+  const user = await currentUser(request);
+  return user?.role === "admin" ? user : null;
+}
+
+export async function requireTenantUser(request: Request) {
+  const user = await currentUser(request);
+  return user?.tenantRole ? user : null;
+}
+
+export async function userForRequest(request: Request, userId: string) {
+  const tenant = await tenantForRequest(request);
+  const row = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, tenant_memberships.role AS tenantRole FROM users LEFT JOIN tenant_memberships ON tenant_memberships.user_id = users.id AND tenant_memberships.tenant_id = ? WHERE users.id = ?").bind(tenant.id, userId).first<AuthIdentityRow>();
+  return userRecord(row, tenant);
+}
+
+export async function recordGeneration(user: AppUser, values: { id?: string; operation: string; prompt: string; outputKey: string; contentType: string; bytes: number; inputTokens?: number | null; outputTokens?: number | null; totalTokens?: number | null; tokenTransactionId?: string | null; tokenCost?: number | null; bruttoCoefficientSnapshot?: number | null }) {
   await ensureStore();
-  await d1().prepare("INSERT INTO generations (id, user_id, tenant_id, operation, prompt, output_key, content_type, bytes, input_tokens, output_tokens, total_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), user.id, user.tenantId, values.operation, values.prompt.slice(0, 2000), values.outputKey, values.contentType, values.bytes, values.inputTokens ?? null, values.outputTokens ?? null, values.totalTokens ?? null, new Date().toISOString()).run();
+  const id = values.id || crypto.randomUUID();
+  await d1().prepare("INSERT INTO generations (id, user_id, tenant_id, operation, prompt, output_key, content_type, bytes, input_tokens, output_tokens, total_tokens, token_transaction_id, token_cost, brutto_coefficient_snapshot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, user.id, user.tenantId, values.operation, values.prompt.slice(0, 2000), values.outputKey, values.contentType, values.bytes, values.inputTokens ?? null, values.outputTokens ?? null, values.totalTokens ?? null, values.tokenTransactionId ?? null, values.tokenCost ?? null, values.bruttoCoefficientSnapshot ?? null, new Date().toISOString()).run();
+  return id;
 }
 
 export const tenantStoragePrefix = (user: AppUser) => `tenants/${user.tenantSlug}/users/${user.id}`;

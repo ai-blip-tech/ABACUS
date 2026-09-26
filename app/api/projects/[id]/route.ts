@@ -1,4 +1,4 @@
-import { currentUser, ensureStore, storage, tenantStoragePrefix } from "@/lib/auth";
+import { ensureStore, requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 
 type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string };
@@ -96,7 +96,7 @@ const planSurfaceReference = (value: unknown, asset: string, collectImage: (asse
 };
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await currentUser(request);
+  const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
   const { id } = await params;
   if (!validProjectId(id)) return Response.json({ error: "Некорректный проект." }, { status: 400 });
@@ -110,7 +110,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await currentUser(request);
+  const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
   await ensureStore();
   const { id } = await params;

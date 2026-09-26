@@ -37,6 +37,11 @@ pm2 save
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_IMAGE_MODEL=gpt-image-2.5-sunburst
 ROBOFLOW_API_KEY=your-roboflow-api-key
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=https://example.com/api/auth/google/callback
+PAYMENT_PROVIDER=mock
+PAYMENT_MOCK_WEBHOOK_SECRET=your-random-webhook-secret
 ROOM_DESIGN_DATA_DIR=/var/lib/room-design
 COOKIE_SECURE=true
 ```
@@ -46,6 +51,10 @@ COOKIE_SECURE=true
 проекта. `OPENAI_IMAGE_MODEL` по умолчанию равен
 `gpt-image-2.5-sunburst`, но вынесен в окружение, чтобы модель можно было
 сменить без изменения кода.
+
+Google Sign-In автоматически отключён, если `GOOGLE_CLIENT_ID` или
+`GOOGLE_CLIENT_SECRET` отсутствует. Mock-платежи предназначены только для
+разработки; production provider подключается через `PaymentProvider`.
 
 ## Постоянные данные
 

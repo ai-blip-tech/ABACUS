@@ -1,9 +1,9 @@
-import { currentUser, storage, tenantStoragePrefix } from "@/lib/auth";
+import { requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
 
 const valid = (value: string) => /^[a-zA-Z0-9-]{1,100}$/.test(value);
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string; asset: string }> }) {
-  const user = await currentUser(request);
+  const user = await requireTenantUser(request);
   if (!user) return new Response("Требуется вход.", { status: 401 });
   const { id, asset } = await params;
   if (!valid(id) || !valid(asset)) return new Response("Некорректный ресурс.", { status: 400 });

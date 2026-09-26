@@ -46,6 +46,8 @@ async function insertUser({ id, email, password, iterations, membership }) {
       password_iterations, global_role, first_name, last_name, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, 'user', ?, ?, ?)
   `).bind(id, email, credential.hash, credential.salt, credential.algorithm, credential.iterations, "Test", "User", now).run();
+  await database.prepare("INSERT INTO auth_identities (id, user_id, provider, provider_user_id, provider_email, created_at, updated_at) VALUES (?, ?, 'password', ?, ?, ?, ?)")
+    .bind(`identity-${id}`, id, id, email, now, now).run();
   if (membership) {
     await database.prepare("INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at) VALUES (?, ?, 'member', ?)")
       .bind("tenant_norrmobler", id, now).run();
@@ -66,6 +68,8 @@ test("global admin without membership can login, restore a session, and pass req
   assert.equal(current?.role, "admin");
   assert.equal(current?.tenantRole, null);
   assert.equal(requiredAdmin?.email, adminEmail);
+  assert.equal((await auth.requireGlobalAdmin(sessionRequest))?.id, requiredAdmin?.id);
+  assert.equal(await auth.requireTenantUser(sessionRequest), null);
 
   const membership = await database.prepare("SELECT COUNT(*) AS count FROM tenant_memberships WHERE user_id = ?")
     .bind(admin.id).first();
@@ -82,7 +86,21 @@ test("legacy member with 100000 PBKDF2 iterations can login", async () => {
   assert.equal(user.tenantRole, "member");
 });
 
-test("ordinary global user without tenant membership cannot login to a tenant context", async () => {
+test("ordinary global user can login globally but cannot use tenant-scoped authorization", async () => {
   await insertUser({ id: "orphan-user", email: orphanEmail, password: legacyPassword, iterations: 100_000, membership: false });
-  await assert.rejects(auth.login(request(), orphanEmail, legacyPassword), /Неверный email или пароль/);
+  const user = await auth.login(request(), orphanEmail, legacyPassword);
+  assert.equal(user.tenantRole, null);
+  const token = await auth.createSession(user);
+  assert.equal((await auth.currentUser(request(token)))?.email, orphanEmail);
+  assert.equal(await auth.requireTenantUser(request(token)), null);
+});
+
+test("tenant admin role does not grant global admin authorization", async () => {
+  const email = "tenant-admin@example.test";
+  await insertUser({ id: "tenant-admin", email, password: legacyPassword, iterations: 100_000, membership: true });
+  await database.prepare("UPDATE tenant_memberships SET role = 'admin' WHERE user_id = 'tenant-admin'").run();
+  const user = await auth.login(request(), email, legacyPassword);
+  const token = await auth.createSession(user);
+  assert.equal((await auth.requireAdmin(request(token)))?.id, "tenant-admin");
+  assert.equal(await auth.requireGlobalAdmin(request(token)), null);
 });

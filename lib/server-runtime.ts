@@ -1,13 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
 type QueryResult<T = Record<string, unknown>> = { success: true; results: T[]; meta: { changes: number | bigint } };
 
 class NodeBoundStatement {
-  constructor(private readonly database: DatabaseSync, private readonly sql: string, private readonly values: any[] = []) {}
-  bind(...values: any[]) { return new NodeBoundStatement(this.database, this.sql, values); }
+  constructor(private readonly database: DatabaseSync, private readonly sql: string, private readonly values: SQLInputValue[] = []) {}
+  bind(...values: SQLInputValue[]) { return new NodeBoundStatement(this.database, this.sql, values); }
   async run(): Promise<QueryResult> {
     const statement = this.database.prepare(this.sql);
     const result = statement.run(...this.values);
@@ -43,6 +43,17 @@ class NodeDatabase {
       const results = statements.map((statement) => statement.execute());
       this.database.exec("COMMIT");
       return results;
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  transaction<T>(work: (database: DatabaseSync) => T): T {
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const result = work(this.database);
+      this.database.exec("COMMIT");
+      return result;
     } catch (error) {
       this.database.exec("ROLLBACK");
       throw error;

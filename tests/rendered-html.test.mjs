@@ -68,11 +68,11 @@ test("health endpoint reports image-generation readiness without exposing a secr
   assert.doesNotMatch(healthSource, /OPENAI_API_KEY/);
 });
 
-test("admin brutto coefficient is 2.2", async () => {
+test("admin brutto coefficient is loaded from global settings", async () => {
   const adminSource = await readFile(new URL("../app/api/admin/overview/route.ts", import.meta.url), "utf8");
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.match(adminSource, /BRUTTO_MULTIPLIER\s*=\s*2\.2/);
-  assert.match(pageSource, /\*\s*2\.2/);
+  assert.match(adminSource, /getGlobalSettings/);
+  assert.match(adminSource, /brutto_coefficient/);
+  assert.doesNotMatch(adminSource, /BRUTTO_MULTIPLIER\s*=/);
 });
 
 test("planogram keeps menus readable, rugs below furniture, and supports bedside tables", async () => {

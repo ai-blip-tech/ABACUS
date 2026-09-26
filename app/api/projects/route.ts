@@ -1,15 +1,15 @@
-import { currentUser, ensureStore } from "@/lib/auth";
+import { ensureStore, requireTenantUser } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 
 export async function GET(request: Request) {
-  const user = await currentUser(request);
+  const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
   const projects = await database.prepare("SELECT id, name, project_type, description, created_at, updated_at FROM projects WHERE tenant_id = ? AND user_id = ? AND state_json IS NOT NULL ORDER BY updated_at DESC LIMIT 24").bind(user.tenantId, user.id).all();
   return Response.json({ projects: projects.results });
 }
 
 export async function POST(request: Request) {
-  const user = await currentUser(request);
+  const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
   await ensureStore();
   const body = await request.json().catch(() => ({})) as { name?: unknown; projectType?: unknown; description?: unknown };

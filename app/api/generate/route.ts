@@ -1,9 +1,11 @@
-import { currentUser, recordGeneration, storage, tenantStoragePrefix } from "@/lib/auth";
+import { recordGeneration, requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
+import { refundAiTokens, reserveAiTokens } from "@/lib/billing";
 import { imageModel } from "@/lib/image-model";
 import { openAIKey } from "@/lib/server-config";
+import { database } from "@/lib/server-runtime";
 
 async function generateResponse(request: Request) {
-  const user = await currentUser(request);
+  const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Войдите или зарегистрируйтесь, чтобы запускать генерации." }, { status: 401 });
   const apiKey = openAIKey();
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
@@ -123,6 +125,22 @@ async function generateResponse(request: Request) {
     return new Blob([await sample.arrayBuffer()], { type: sample.headers.get("content-type") || "image/jpeg" });
   };
 
+  const operation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
+  if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first()) {
+    return Response.json({ error: "Эта AI-операция уже выполнена." }, { status: 409 });
+  }
+  let reservation: Awaited<ReturnType<typeof reserveAiTokens>>;
+  try {
+    reservation = await reserveAiTokens(user.id, operation, operationId, `ai-reserve:${user.id}:${operationId}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Недостаточно токенов.";
+    return Response.json({ error: message }, { status: message.includes("Недостаточно") ? 402 : 400 });
+  }
+  const refundReservation = async (reason: string) => {
+    if (reservation.transaction) await refundAiTokens(user.id, operationId, reservation.quote.tokenCost, reason);
+  };
+
   let response: Response;
   try {
     if (body.planRender?.planImage) {
@@ -213,6 +231,7 @@ async function generateResponse(request: Request) {
       });
     }
   } catch (error) {
+    await refundReservation("Возврат после технической ошибки подготовки AI-операции");
     return Response.json({ error: error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: 400 });
   }
   const responseText = await response.text();
@@ -224,20 +243,25 @@ async function generateResponse(request: Request) {
     // Keep the response actionable without exposing provider internals.
   }
   if (!response.ok) {
+    await refundReservation("Возврат после ошибки AI-провайдера");
     console.error("Image edit failed", { status: response.status, operation: body.replacement ? "replace" : body.placement ? "place" : "generate", message: result.error?.message });
     return Response.json({ error: result.error?.message || `Сервис генерации временно недоступен (код ${response.status}). Попробуйте ещё раз.` }, { status: response.status });
   }
 
   const encodedImage = result.data?.[0]?.b64_json;
-  if (!encodedImage) return Response.json({ error: "Изображение не вернулось от модели." }, { status: 502 });
+  if (!encodedImage) {
+    await refundReservation("Возврат: AI-провайдер не вернул изображение");
+    return Response.json({ error: "Изображение не вернулось от модели." }, { status: 502 });
+  }
 
   const binary = Uint8Array.from(atob(encodedImage), (character) => character.charCodeAt(0));
-  const operation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
   const outputKey = `${tenantStoragePrefix(user)}/generations/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.webp`;
   try {
     await storage().put(outputKey, binary, { httpMetadata: { contentType: "image/webp" } });
-    await recordGeneration(user, { operation, prompt: body.prompt || "", outputKey, contentType: "image/webp", bytes: binary.byteLength, inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens, totalTokens: result.usage?.total_tokens });
+    const tokenTransaction = reservation.transaction as { id?: string } | null;
+    await recordGeneration(user, { id: operationId, operation, prompt: body.prompt || "", outputKey, contentType: "image/webp", bytes: binary.byteLength, inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens, totalTokens: result.usage?.total_tokens, tokenTransactionId: tokenTransaction?.id || null, tokenCost: reservation.quote.tokenCost, bruttoCoefficientSnapshot: reservation.quote.bruttoCoefficient });
   } catch (error) {
+    await refundReservation("Возврат после ошибки сохранения результата AI-операции");
     return Response.json({ error: error instanceof Error ? error.message : "Не удалось сохранить результат генерации." }, { status: 503 });
   }
   return new Response(binary, { headers: { "Content-Type": "image/webp", "Cache-Control": "no-store" } });
