@@ -45,6 +45,14 @@ const equal = (left: string, right: string) => {
   return diff === 0;
 };
 
+async function passwordMatches(password: string, credential: { hash?: string; salt?: string; algorithm?: string; iterations?: number }) {
+  if (credential.algorithm !== PASSWORD_ALGORITHM || !credential.hash || !credential.salt) return false;
+  const iterations = credential.iterations;
+  if (typeof iterations !== "number" || !Number.isInteger(iterations) || iterations < 100_000) return false;
+  const secured = await passwordHash(password, credential.salt, iterations);
+  return equal(secured.hash, credential.hash);
+}
+
 const d1 = () => {
   return database;
 };
@@ -174,9 +182,8 @@ export async function register(request: Request, email: string, password: string
 export async function login(request: Request, email: string, password: string) {
   const tenant = await tenantForRequest(request);
   const user = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, users.password_hash, users.password_salt, users.password_algorithm, users.password_iterations, tenant_memberships.role AS tenantRole FROM users LEFT JOIN tenant_memberships ON tenant_memberships.user_id = users.id AND tenant_memberships.tenant_id = ? WHERE users.email = ?").bind(tenant.id, normalizeEmail(email)).first<AuthIdentityRow>();
-  if (!user || (user.role !== "admin" && !user.tenantRole) || user.password_algorithm !== PASSWORD_ALGORITHM || !user.password_hash || !user.password_salt) throw new Error("Неверный email или пароль.");
-  const secured = await passwordHash(password, user.password_salt, user.password_iterations || 100_000);
-  if (!equal(secured.hash, user.password_hash)) throw new Error("Неверный email или пароль.");
+  if (!user || (user.role !== "admin" && !user.tenantRole)) throw new Error("Неверный email или пароль.");
+  if (!await passwordMatches(password, { hash: user.password_hash, salt: user.password_salt, algorithm: user.password_algorithm, iterations: user.password_iterations })) throw new Error("Неверный email или пароль.");
   await d1().prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
   return userRecord(user, tenant)!;
 }
@@ -199,9 +206,8 @@ export async function changePassword(user: AppUser, currentPassword: string, new
   if (currentPassword === newPassword) throw new Error("Новый пароль должен отличаться от текущего.");
   const stored = await d1().prepare("SELECT password_hash, password_salt, password_algorithm, password_iterations FROM users WHERE id = ?").bind(user.id).first<{ password_hash: string; password_salt: string; password_algorithm: string; password_iterations: number }>();
   if (!stored) throw new Error("Пользователь не найден.");
-  if (stored.password_algorithm !== PASSWORD_ALGORITHM) throw new Error("Формат пароля не поддерживается.");
-  const current = await passwordHash(currentPassword, stored.password_salt, stored.password_iterations || 100_000);
-  if (!equal(current.hash, stored.password_hash)) throw new Error("Текущий пароль указан неверно.");
+  if (stored.password_algorithm !== PASSWORD_ALGORITHM || !Number.isInteger(stored.password_iterations) || stored.password_iterations < 100_000) throw new Error("Формат пароля не поддерживается.");
+  if (!await passwordMatches(currentPassword, { hash: stored.password_hash, salt: stored.password_salt, algorithm: stored.password_algorithm, iterations: stored.password_iterations })) throw new Error("Текущий пароль указан неверно.");
   const next = await passwordHash(newPassword);
   await d1().prepare("UPDATE users SET password_hash = ?, password_salt = ?, password_algorithm = ?, password_iterations = ? WHERE id = ?").bind(next.hash, next.salt, next.algorithm, next.iterations, user.id).run();
 }

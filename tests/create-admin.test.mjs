@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
-import { createGlobalAdmin, normalizeEmail, verifyPassword } from "../scripts/create-admin.mjs";
+import { createGlobalAdmin, hashPassword, normalizeEmail, verifyPassword } from "../scripts/create-admin.mjs";
 
 const testAdminPassword = ["test-only", "admin", "passphrase"].join("-");
 
@@ -60,4 +60,13 @@ test("create-admin rejects duplicate normalized email", () => {
 
 test("email normalization is stable", () => {
   assert.equal(normalizeEmail(" User@Example.COM "), "user@example.com");
+});
+
+test("password verification honors legacy and current stored iteration counts", () => {
+  const legacy = hashPassword(testAdminPassword, undefined, 100_000);
+  const current = hashPassword(testAdminPassword, undefined, 600_000);
+
+  assert.equal(verifyPassword(testAdminPassword, legacy), true);
+  assert.equal(verifyPassword(testAdminPassword, current), true);
+  assert.equal(verifyPassword(testAdminPassword, { ...legacy, iterations: current.iterations }), false);
 });
