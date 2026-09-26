@@ -1,6 +1,6 @@
 import { imageModel } from "@/lib/image-model";
 import { openAIKey } from "@/lib/server-config";
-import { currentUser } from "@/lib/auth";
+import { requireTenantUser } from "@/lib/auth";
 
 type LayerRequest = { mode?: "background"; image?: string; mask?: string; outputSize?: string };
 
@@ -12,7 +12,7 @@ const dataUrlToBlob = (dataUrl: string) => {
 };
 
 export async function POST(request: Request) {
-  if (!await currentUser(request)) return Response.json({ error: "Требуется вход." }, { status: 401 });
+  if (!await requireTenantUser(request)) return Response.json({ error: "Требуется tenant membership." }, { status: 403 });
   const apiKey = openAIKey();
   if (!apiKey) return Response.json({ error: "Сервис слоёв пока не настроен." }, { status: 503 });
   const body = await request.json() as LayerRequest;

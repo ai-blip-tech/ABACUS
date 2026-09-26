@@ -1,5 +1,5 @@
 import { openAIKey } from "@/lib/server-config";
-import { currentUser, ensureStore } from "@/lib/auth";
+import { ensureStore, requireTenantUser } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 
 type ObjectResponse = {
@@ -15,7 +15,7 @@ const schema = { type: "object", properties: { objects: { type: "array", items: 
 const apiHeaders = (apiKey: string) => ({ "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" });
 
 export async function POST(request: Request) {
-  const user = await currentUser(request);
+  const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
   const apiKey = openAIKey();
   if (!apiKey) return Response.json({ error: "Сервис распознавания пока не настроен." }, { status: 503 });
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const user = await currentUser(request);
+  const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
   const apiKey = openAIKey();
   const id = new URL(request.url).searchParams.get("id");

@@ -12,3 +12,10 @@ export function openAIKey() {
 export function roboflowKey() {
   return configuredSecret(process.env.ROBOFLOW_API_KEY);
 }
+
+export function googleOAuthConfig() {
+  const clientId = configuredSecret(process.env.GOOGLE_CLIENT_ID);
+  const clientSecret = configuredSecret(process.env.GOOGLE_CLIENT_SECRET);
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim() || "";
+  return { clientId, clientSecret, redirectUri, enabled: Boolean(clientId && clientSecret) };
+}

@@ -1,5 +1,5 @@
 import { roboflowKey } from "@/lib/server-config";
-import { currentUser } from "@/lib/auth";
+import { requireTenantUser } from "@/lib/auth";
 
 type Polygon = number[][];
 type Prediction = { masks?: Polygon[]; confidence?: number };
@@ -11,7 +11,7 @@ type RoboflowResponse = {
 };
 
 export async function POST(request: Request) {
-  if (!await currentUser(request)) return Response.json({ error: "Требуется вход." }, { status: 401 });
+  if (!await requireTenantUser(request)) return Response.json({ error: "Требуется tenant membership." }, { status: 403 });
   const token = roboflowKey();
   if (!token) return Response.json({ error: "Сервис точных контуров пока не настроен." }, { status: 503 });
   const body = await request.json() as { image?: string; x?: number; y?: number; width?: number; height?: number };
