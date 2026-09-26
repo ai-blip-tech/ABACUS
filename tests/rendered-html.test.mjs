@@ -55,6 +55,8 @@ test("image generation is configurable and rejects placeholder secrets", async (
   assert.match(modelSource, /gpt-image-2\.5-sunburst/);
   assert.match(modelSource, /OPENAI_IMAGE_MODEL/);
   assert.match(configSource, /replace-me/);
+  assert.match(configSource, /your-openai-api-key/);
+  assert.match(configSource, /your-roboflow-api-key/);
   assert.match(generateSource, /openAIKey\(\)/);
   assert.match(generateSource, /imageModel\(\)/);
 });

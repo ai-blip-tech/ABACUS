@@ -34,9 +34,9 @@ pm2 save
 Шаблон без секретов находится в `.env.example`. Минимально задайте:
 
 ```dotenv
-OPENAI_API_KEY=sk-proj-...
+OPENAI_API_KEY=your-openai-api-key
 OPENAI_IMAGE_MODEL=gpt-image-2.5-sunburst
-ROBOFLOW_API_KEY=
+ROBOFLOW_API_KEY=your-roboflow-api-key
 ROOM_DESIGN_DATA_DIR=/var/lib/room-design
 COOKIE_SECURE=true
 ```

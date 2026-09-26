@@ -4,6 +4,8 @@ import test from "node:test";
 
 import { createGlobalAdmin, normalizeEmail, verifyPassword } from "../scripts/create-admin.mjs";
 
+const testAdminPassword = ["test-only", "admin", "passphrase"].join("-");
+
 test("create-admin creates a global admin without tenant membership", () => {
   const database = new DatabaseSync(":memory:");
   database.exec(`
@@ -20,8 +22,8 @@ test("create-admin creates a global admin without tenant membership", () => {
     email: "  ADMIN@Example.COM ",
     firstName: "Ada",
     lastName: "Lovelace",
-    password: "a-secure-admin-password",
-    passwordConfirmation: "a-secure-admin-password",
+    password: testAdminPassword,
+    passwordConfirmation: testAdminPassword,
   });
 
   const user = database.prepare("SELECT * FROM users").get();
@@ -31,8 +33,8 @@ test("create-admin creates a global admin without tenant membership", () => {
   assert.equal(user.last_name, "Lovelace");
   assert.equal(user.password_algorithm, "pbkdf2-sha256");
   assert.equal(user.password_iterations, 600_000);
-  assert.notEqual(user.password_hash, "a-secure-admin-password");
-  assert.equal(verifyPassword("a-secure-admin-password", {
+  assert.notEqual(user.password_hash, testAdminPassword);
+  assert.equal(verifyPassword(testAdminPassword, {
     hash: user.password_hash,
     salt: user.password_salt,
     algorithm: user.password_algorithm,
@@ -48,8 +50,8 @@ test("create-admin rejects duplicate normalized email", () => {
     email: "admin@example.com",
     firstName: "Ada",
     lastName: "Lovelace",
-    password: "a-secure-admin-password",
-    passwordConfirmation: "a-secure-admin-password",
+    password: testAdminPassword,
+    passwordConfirmation: testAdminPassword,
   };
   createGlobalAdmin(database, values);
   assert.throws(() => createGlobalAdmin(database, { ...values, email: " ADMIN@EXAMPLE.COM " }), /уже существует/);
