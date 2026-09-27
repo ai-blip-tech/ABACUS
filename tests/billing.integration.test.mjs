@@ -44,6 +44,7 @@ test("transfer is atomic, audited and idempotent", async () => {
 });
 
 test("exchange rate and brutto changes affect new quotes while snapshots remain historical", async () => {
+  assert.equal((await billing.getGlobalSettings()).payments_enabled, false);
   assert.equal((await billing.quoteTokenPurchase(1000)).tokenAmount, 401_000);
   const oldAi = await billing.quoteAiOperation("generate");
   await billing.updateGlobalSettings("source", { token_exchange_rate: 420, brutto_coefficient: 3 });
@@ -61,6 +62,29 @@ test("failed AI operation refund and duplicate protection preserve balance", asy
   await billing.refundAiTokens("target", "failed-op", reserved.quote.tokenCost, "technical failure");
   await billing.refundAiTokens("target", "failed-op", reserved.quote.tokenCost, "duplicate retry");
   assert.equal((await billing.getTokenAccount("target")).balance, before);
+});
+
+test("Free plan records calculated AI cost without debiting the token balance", async () => {
+  const assigned = await billing.assignPlanToUser("source", "target", "free");
+  assert.equal(assigned.code, "free");
+  assert.equal(assigned.no_debit, 1);
+  const before = (await billing.getTokenAccount("target")).balance;
+  const reservation = await billing.reserveAiTokens("target", "generate", "free-generation", "reserve-free-generation");
+  assert.equal(reservation.plan.code, "free");
+  assert.equal(reservation.debitedAmount, 0);
+  assert.equal((await billing.getTokenAccount("target")).balance, before);
+  const transaction = await database.prepare("SELECT amount, balance_before, balance_after, metadata_json FROM token_transactions WHERE reference_id = 'free-generation'").first();
+  const metadata = JSON.parse(transaction.metadata_json);
+  assert.equal(transaction.amount, 0);
+  assert.equal(transaction.balance_before, before);
+  assert.equal(transaction.balance_after, before);
+  assert.ok(metadata.calculatedTokenCost > 0);
+  assert.equal(metadata.actualDebit, 0);
+  assert.equal(metadata.noDebit, true);
+  assert.equal(metadata.planCode, "free");
+
+  await billing.assignPlanToUser("source", "target", "metered");
+  assert.equal((await billing.getUserPlan("target")).code, "metered");
 });
 
 test("Google identity creates once and links by verified normalized email", async () => {
