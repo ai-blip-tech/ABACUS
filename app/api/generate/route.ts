@@ -11,7 +11,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; removal?: { name?: string; mask?: string }; replacement?: { name?: string; mask?: string }; placement?: { x?: number; y?: number; mask?: string }; adjustment?: { instruction?: string; mask?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
+  const body = await request.json() as { prompt?: string; preserved?: string[]; creativity?: string; product?: string; projectId?: string; projectName?: string; roomImage?: string; referenceImage?: string; outputSize?: string; removal?: { name?: string; mask?: string }; replacement?: { name?: string; mask?: string }; placement?: { x?: number; y?: number; mask?: string }; adjustment?: { instruction?: string; mask?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -138,7 +138,7 @@ async function generateResponse(request: Request) {
     return Response.json({ error: message }, { status: message.includes("Недостаточно") ? 402 : 400 });
   }
   const refundReservation = async (reason: string) => {
-    if (reservation.transaction) await refundAiTokens(user.id, operationId, reservation.quote.tokenCost, reason);
+    if (reservation.debitedAmount > 0) await refundAiTokens(user.id, operationId, reservation.debitedAmount, reason);
   };
 
   let response: Response;
@@ -259,7 +259,7 @@ async function generateResponse(request: Request) {
   try {
     await storage().put(outputKey, binary, { httpMetadata: { contentType: "image/webp" } });
     const tokenTransaction = reservation.transaction as { id?: string } | null;
-    await recordGeneration(user, { id: operationId, operation, prompt: body.prompt || "", outputKey, contentType: "image/webp", bytes: binary.byteLength, inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens, totalTokens: result.usage?.total_tokens, tokenTransactionId: tokenTransaction?.id || null, tokenCost: reservation.quote.tokenCost, bruttoCoefficientSnapshot: reservation.quote.bruttoCoefficient });
+    await recordGeneration(user, { id: operationId, operation, prompt: body.prompt || "", outputKey, contentType: "image/webp", bytes: binary.byteLength, inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens, totalTokens: result.usage?.total_tokens, tokenTransactionId: tokenTransaction?.id || null, tokenCost: reservation.quote.tokenCost, bruttoCoefficientSnapshot: reservation.quote.bruttoCoefficient, nettoUsdSnapshot: reservation.quote.nettoUsd, projectId: body.projectId || null, projectNameSnapshot: body.projectName || null });
   } catch (error) {
     await refundReservation("Возврат после ошибки сохранения результата AI-операции");
     return Response.json({ error: error instanceof Error ? error.message : "Не удалось сохранить результат генерации." }, { status: 503 });

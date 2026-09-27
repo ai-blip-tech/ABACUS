@@ -9,6 +9,16 @@ export type GlobalSettings = {
   usd_to_rub_rate: number;
   token_charging_enabled: boolean;
   custom_token_purchase_enabled: boolean;
+  payments_enabled: boolean;
+};
+
+export type UserPlan = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  included_tokens: number;
+  no_debit: number;
 };
 
 const settingDefaults: GlobalSettings = {
@@ -17,6 +27,7 @@ const settingDefaults: GlobalSettings = {
   usd_to_rub_rate: 100,
   token_charging_enabled: false,
   custom_token_purchase_enabled: true,
+  payments_enabled: false,
 };
 
 let billingSetup: Promise<void> | null = null;
@@ -31,7 +42,7 @@ export function ensureBillingStore() {
       database.prepare("CREATE TABLE IF NOT EXISTS token_accounts (id TEXT PRIMARY KEY, user_id TEXT NOT NULL UNIQUE, balance INTEGER NOT NULL DEFAULT 0 CHECK(balance >= 0), created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"),
       database.prepare("CREATE TABLE IF NOT EXISTS token_transactions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL, amount INTEGER NOT NULL, balance_before INTEGER NOT NULL, balance_after INTEGER NOT NULL CHECK(balance_after >= 0), reference_type TEXT, reference_id TEXT, source_user_id TEXT, target_user_id TEXT, initiated_by_admin_id TEXT, description TEXT, metadata_json TEXT, idempotency_key TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"),
       database.prepare("CREATE TABLE IF NOT EXISTS token_transfers (id TEXT PRIMARY KEY, source_user_id TEXT NOT NULL, target_user_id TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount > 0), initiated_by_admin_id TEXT NOT NULL, reason TEXT, idempotency_key TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)"),
-      database.prepare("CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT, price INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'RUB', billing_period TEXT, included_tokens INTEGER NOT NULL DEFAULT 0, limits_json TEXT, active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"),
+      database.prepare("CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT, price INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'RUB', billing_period TEXT, included_tokens INTEGER NOT NULL DEFAULT 0, limits_json TEXT, no_debit INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"),
       database.prepare("CREATE TABLE IF NOT EXISTS subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, plan_id TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, current_period_start TEXT, current_period_end TEXT, cancel_at_period_end INTEGER NOT NULL DEFAULT 0, provider TEXT, external_customer_id TEXT, external_subscription_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"),
       database.prepare("CREATE TABLE IF NOT EXISTS token_packages (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, token_amount INTEGER NOT NULL, price INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'RUB', active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"),
       database.prepare("CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL, external_payment_id TEXT, amount INTEGER NOT NULL, currency TEXT NOT NULL, status TEXT NOT NULL, purpose TEXT NOT NULL, token_package_id TEXT, subscription_id TEXT, token_amount INTEGER NOT NULL DEFAULT 0, exchange_rate_snapshot INTEGER NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, paid_at TEXT, failed_at TEXT, refunded_at TEXT, metadata_json TEXT)"),
@@ -45,10 +56,17 @@ export function ensureBillingStore() {
     if (!names.has("token_transaction_id")) await database.prepare("ALTER TABLE generations ADD COLUMN token_transaction_id TEXT").run();
     if (!names.has("token_cost")) await database.prepare("ALTER TABLE generations ADD COLUMN token_cost INTEGER").run();
     if (!names.has("brutto_coefficient_snapshot")) await database.prepare("ALTER TABLE generations ADD COLUMN brutto_coefficient_snapshot REAL").run();
+    if (!names.has("netto_usd_snapshot")) await database.prepare("ALTER TABLE generations ADD COLUMN netto_usd_snapshot REAL").run();
+    if (!names.has("project_id")) await database.prepare("ALTER TABLE generations ADD COLUMN project_id TEXT").run();
+    if (!names.has("project_name_snapshot")) await database.prepare("ALTER TABLE generations ADD COLUMN project_name_snapshot TEXT").run();
+    const planColumns = await database.prepare("PRAGMA table_info(plans)").all<{ name: string }>();
+    if (!planColumns.results.some((column) => column.name === "no_debit")) await database.prepare("ALTER TABLE plans ADD COLUMN no_debit INTEGER NOT NULL DEFAULT 0").run();
     const now = new Date().toISOString();
     await database.batch([
       ...Object.entries(settingDefaults).map(([key, value]) => database.prepare("INSERT OR IGNORE INTO global_settings (key, value_json, created_at, updated_at) VALUES (?, ?, ?, ?)").bind(key, JSON.stringify(value), now, now)),
-      database.prepare("INSERT OR IGNORE INTO plans (id, code, name, description, price, currency, billing_period, included_tokens, limits_json, active, sort_order, created_at, updated_at) VALUES ('plan_free', 'free', 'Free', 'Базовый доступ Room Design', 0, 'RUB', 'month', 0, '{}', 1, 0, ?, ?)").bind(now, now),
+      database.prepare("INSERT OR IGNORE INTO plans (id, code, name, description, price, currency, billing_period, included_tokens, limits_json, no_debit, active, sort_order, created_at, updated_at) VALUES ('plan_metered', 'metered', 'По токенам', 'Оплата AI-операций токенами', 0, 'RUB', 'month', 0, '{}', 0, 1, 0, ?, ?)").bind(now, now),
+      database.prepare("INSERT OR IGNORE INTO plans (id, code, name, description, price, currency, billing_period, included_tokens, limits_json, no_debit, active, sort_order, created_at, updated_at) VALUES ('plan_free', 'free', 'Free', 'Тестовый тариф без списания токенов', 0, 'RUB', 'month', 0, '{}', 1, 1, 10, ?, ?)").bind(now, now),
+      database.prepare("UPDATE plans SET no_debit = 1, description = 'Тестовый тариф без списания токенов', updated_at = ? WHERE code = 'free'").bind(now),
       database.prepare("INSERT OR IGNORE INTO token_packages (id, code, name, token_amount, price, currency, active, sort_order, created_at, updated_at) VALUES ('package_100', 'tokens-100-rub', 'Стартовый пакет', 40100, 10000, 'RUB', 1, 10, ?, ?)").bind(now, now),
       database.prepare("INSERT OR IGNORE INTO token_packages (id, code, name, token_amount, price, currency, active, sort_order, created_at, updated_at) VALUES ('package_1000', 'tokens-1000-rub', 'Рабочий пакет', 401000, 100000, 'RUB', 1, 20, ?, ?)").bind(now, now),
       database.prepare("INSERT OR IGNORE INTO ai_operation_prices (operation, estimated_netto_usd, created_at, updated_at) VALUES ('generate', 0.04, ?, ?)").bind(now, now),
@@ -123,6 +141,36 @@ export async function getTokenHistory(userId: string, limit = 100) {
   return (await database.prepare("SELECT * FROM token_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?").bind(userId, Math.min(Math.max(limit, 1), 500)).all()).results;
 }
 
+export async function getUserPlan(userId: string): Promise<UserPlan> {
+  await ensureBillingStore();
+  const assigned = await database.prepare("SELECT plans.id, plans.code, plans.name, plans.description, plans.included_tokens, plans.no_debit FROM subscriptions JOIN plans ON plans.id = subscriptions.plan_id WHERE subscriptions.user_id = ? AND subscriptions.status = 'active' AND plans.active = 1 ORDER BY subscriptions.created_at DESC LIMIT 1").bind(userId).first<UserPlan>();
+  if (assigned) return assigned;
+  const metered = await database.prepare("SELECT id, code, name, description, included_tokens, no_debit FROM plans WHERE code = 'metered' AND active = 1").first<UserPlan>();
+  if (!metered) throw new Error("Базовый тариф не настроен.");
+  return metered;
+}
+
+export async function listActivePlans() {
+  await ensureBillingStore();
+  return (await database.prepare("SELECT id, code, name, description, included_tokens, no_debit FROM plans WHERE active = 1 ORDER BY sort_order, name").all<UserPlan>()).results;
+}
+
+export async function assignPlanToUser(adminUserId: string, userId: string, planCode: string) {
+  await ensureBillingStore();
+  return database.transaction((sqlite) => {
+    const user = sqlite.prepare("SELECT id FROM users WHERE id = ?").get(userId) as { id: string } | undefined;
+    const plan = sqlite.prepare("SELECT id, code, name, description, included_tokens, no_debit FROM plans WHERE code = ? AND active = 1").get(planCode) as UserPlan | undefined;
+    if (!user) throw new Error("Пользователь не найден.");
+    if (!plan) throw new Error("Тариф не найден или отключён.");
+    const now = new Date().toISOString();
+    sqlite.prepare("UPDATE subscriptions SET status = 'replaced', updated_at = ? WHERE user_id = ? AND status = 'active'").run(now, userId);
+    const subscriptionId = crypto.randomUUID();
+    sqlite.prepare("INSERT INTO subscriptions (id, user_id, plan_id, status, started_at, current_period_start, cancel_at_period_end, provider, created_at, updated_at) VALUES (?, ?, ?, 'active', ?, ?, 0, 'manual', ?, ?)").run(subscriptionId, userId, plan.id, now, now, now, now);
+    sqlite.prepare("INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, metadata_json, created_at) VALUES (?, ?, 'subscription.assign', 'subscription', ?, ?, ?)").run(crypto.randomUUID(), adminUserId, subscriptionId, JSON.stringify({ userId, planCode: plan.code }), now);
+    return plan;
+  });
+}
+
 export async function creditTokens(input: Omit<Mutation, "amount"> & { amount: number }) {
   await ensureBillingStore();
   if (input.amount <= 0) throw new Error("Начисление должно быть положительным.");
@@ -176,11 +224,28 @@ export async function quoteAiOperation(operation: string) {
   return { operation, nettoUsd, bruttoCoefficient: settings.brutto_coefficient, tokenCost: Math.max(0, Math.ceil(rubles * settings.token_exchange_rate)), chargingEnabled: settings.token_charging_enabled };
 }
 
+function recordNoDebitAiOperation(userId: string, operation: string, referenceId: string, idempotencyKey: string, quote: Awaited<ReturnType<typeof quoteAiOperation>>, plan: UserPlan) {
+  return database.transaction((sqlite) => {
+    const duplicate = sqlite.prepare("SELECT * FROM token_transactions WHERE idempotency_key = ?").get(idempotencyKey);
+    if (duplicate) return duplicate;
+    const account = accountInTransaction(sqlite, userId);
+    const now = new Date().toISOString();
+    const id = crypto.randomUUID();
+    sqlite.prepare("INSERT INTO token_transactions (id, user_id, type, amount, balance_before, balance_after, reference_type, reference_id, description, metadata_json, idempotency_key, created_at) VALUES (?, ?, 'generation', 0, ?, ?, 'ai_operation', ?, ?, ?, ?, ?)")
+      .run(id, userId, account.balance, account.balance, referenceId, `Расчёт AI-операции без списания: ${operation}`, JSON.stringify({ ...quote, calculatedTokenCost: quote.tokenCost, actualDebit: 0, noDebit: true, planCode: plan.code }), idempotencyKey, now);
+    return sqlite.prepare("SELECT * FROM token_transactions WHERE id = ?").get(id);
+  });
+}
+
 export async function reserveAiTokens(userId: string, operation: string, referenceId: string, idempotencyKey: string) {
-  const quote = await quoteAiOperation(operation);
-  if (!quote.chargingEnabled || quote.tokenCost === 0) return { quote, transaction: null };
+  const [quote, plan] = await Promise.all([quoteAiOperation(operation), getUserPlan(userId)]);
+  if (plan.no_debit) {
+    const transaction = recordNoDebitAiOperation(userId, operation, referenceId, idempotencyKey, quote, plan);
+    return { quote, plan, transaction, debitedAmount: 0 };
+  }
+  if (!quote.chargingEnabled || quote.tokenCost === 0) return { quote, plan, transaction: null, debitedAmount: 0 };
   const transaction = await debitTokens({ userId, type: "generation", amount: quote.tokenCost, referenceType: "ai_operation", referenceId, description: `Резерв токенов: ${operation}`, metadata: quote, idempotencyKey });
-  return { quote, transaction };
+  return { quote, plan, transaction, debitedAmount: quote.tokenCost };
 }
 
 export async function refundAiTokens(userId: string, operationId: string, amount: number, reason: string) {

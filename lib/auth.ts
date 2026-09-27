@@ -251,10 +251,10 @@ export async function userForRequest(request: Request, userId: string) {
   return userRecord(row, tenant);
 }
 
-export async function recordGeneration(user: AppUser, values: { id?: string; operation: string; prompt: string; outputKey: string; contentType: string; bytes: number; inputTokens?: number | null; outputTokens?: number | null; totalTokens?: number | null; tokenTransactionId?: string | null; tokenCost?: number | null; bruttoCoefficientSnapshot?: number | null }) {
+export async function recordGeneration(user: AppUser, values: { id?: string; operation: string; prompt: string; outputKey: string; contentType: string; bytes: number; inputTokens?: number | null; outputTokens?: number | null; totalTokens?: number | null; tokenTransactionId?: string | null; tokenCost?: number | null; bruttoCoefficientSnapshot?: number | null; nettoUsdSnapshot?: number | null; projectId?: string | null; projectNameSnapshot?: string | null }) {
   await ensureStore();
   const id = values.id || crypto.randomUUID();
-  await d1().prepare("INSERT INTO generations (id, user_id, tenant_id, operation, prompt, output_key, content_type, bytes, input_tokens, output_tokens, total_tokens, token_transaction_id, token_cost, brutto_coefficient_snapshot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, user.id, user.tenantId, values.operation, values.prompt.slice(0, 2000), values.outputKey, values.contentType, values.bytes, values.inputTokens ?? null, values.outputTokens ?? null, values.totalTokens ?? null, values.tokenTransactionId ?? null, values.tokenCost ?? null, values.bruttoCoefficientSnapshot ?? null, new Date().toISOString()).run();
+  await d1().prepare("INSERT INTO generations (id, user_id, tenant_id, operation, prompt, output_key, content_type, bytes, input_tokens, output_tokens, total_tokens, token_transaction_id, token_cost, brutto_coefficient_snapshot, netto_usd_snapshot, project_id, project_name_snapshot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, user.id, user.tenantId, values.operation, values.prompt.slice(0, 2000), values.outputKey, values.contentType, values.bytes, values.inputTokens ?? null, values.outputTokens ?? null, values.totalTokens ?? null, values.tokenTransactionId ?? null, values.tokenCost ?? null, values.bruttoCoefficientSnapshot ?? null, values.nettoUsdSnapshot ?? null, values.projectId ?? null, values.projectNameSnapshot?.slice(0, 240) || null, new Date().toISOString()).run();
   return id;
 }
 
