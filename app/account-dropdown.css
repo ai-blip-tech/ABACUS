@@ -1,0 +1,21 @@
+.account-dropdown{position:relative;display:inline-flex;z-index:140}
+.account-trigger{min-width:0;max-width:280px;height:42px;padding:4px 9px 4px 5px!important;border:1px solid #e0d5c7!important;border-radius:22px!important;background:#fff!important;color:#2b1d14!important;display:flex;align-items:center;gap:8px;cursor:pointer;text-align:left;font:inherit!important}
+.account-trigger:hover,.account-trigger[aria-expanded="true"]{border-color:#b96420!important;background:#fffdf9!important}
+.account-trigger-avatar{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:#2b1d14;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800;letter-spacing:.3px}
+.account-trigger-copy{min-width:0;display:flex;flex-direction:column;gap:1px}
+.account-trigger-copy b,.account-trigger-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-trigger-copy b{font-size:12px;font-weight:700;color:#2b1d14}
+.account-trigger-copy small{font-size:10px;color:#8b7355}
+.studio-account-trigger{width:30px;min-width:30px;height:30px;padding:0;border:0!important;background:transparent!important}
+.studio-account-trigger .account-trigger-avatar{width:30px;height:30px;flex-basis:30px}
+.account-dropdown-card{position:absolute;right:0;top:calc(100% + 10px);z-index:150;width:268px;padding:10px;border:1px solid #e0d5c7;border-radius:9px;background:#fff;box-shadow:0 14px 34px rgba(43,29,20,.2);color:#2b1d14;text-align:left}
+.account-dropdown-user{display:flex;align-items:center;gap:10px;padding:7px 8px 11px}
+.account-dropdown-user>span{width:36px;height:36px;flex:0 0 36px;border-radius:50%;background:#2b1d14;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:800}
+.account-dropdown-user div{min-width:0;display:flex;flex-direction:column;gap:2px}
+.account-dropdown-user b,.account-dropdown-user small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-dropdown-user b{font-size:13px}.account-dropdown-user small{color:#8b7355;font-size:10px}
+.account-dropdown-card nav{display:flex;flex-direction:column;margin:0}
+.account-dropdown-card nav a,.account-dropdown-logout{width:100%;padding:8px 9px;border:0;border-radius:5px;background:transparent;color:#5c3d2e;text-decoration:none;font:600 12px/1.25 inherit;text-align:left;cursor:pointer}
+.account-dropdown-card nav a:hover,.account-dropdown-card nav a:focus-visible,.account-dropdown-logout:hover,.account-dropdown-logout:focus-visible{outline:0;background:#f5efe6;color:#2b1d14}
+.account-dropdown-divider{height:1px;margin:7px 3px;background:#e0d5c7}
+.account-dropdown-logout{color:#a43d32}
