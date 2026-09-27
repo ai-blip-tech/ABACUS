@@ -116,6 +116,12 @@ body{background:var(--paper);color:#1e1e1e;font-family:-apple-system,BlinkMacSys
 @media(max-width:850px){.account-page .account-stats{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:600px){.account-page .account-stats{grid-template-columns:1fr}}
 
+/* One visual treatment for the existing save actions in both Studio modes. */
+.canvas-actions .project-save-control,.planogram-toolbar-actions .project-save-control{height:30px;min-width:auto;margin:0;padding:0 12px;border:1px solid #2b1d14;border-radius:4px;background:#2b1d14;color:#fff;font:700 11px/1 inherit;cursor:pointer;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .08s ease,opacity .15s ease}
+.canvas-actions .project-save-control:hover,.planogram-toolbar-actions .project-save-control:hover{border-color:#5c3d2e;background:#5c3d2e;color:#fff}
+.canvas-actions .project-save-control:active,.planogram-toolbar-actions .project-save-control:active{transform:translateY(1px)}
+.canvas-actions .project-save-control:disabled,.planogram-toolbar-actions .project-save-control:disabled{cursor:not-allowed;opacity:.55;transform:none}
+
 /* Catalog: full product previews with continuous scrolling. */
 .catalog-drawer{min-height:0}
 .catalog-grid{min-height:0;grid-auto-rows:max-content;gap:10px;padding:0 9px 18px 14px;overflow-x:hidden;overflow-y:scroll;overscroll-behavior:contain;scrollbar-gutter:stable;-webkit-overflow-scrolling:touch;scrollbar-width:auto;scrollbar-color:#b96420 #f1e8dc}
