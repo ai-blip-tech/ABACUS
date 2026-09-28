@@ -39,3 +39,8 @@ test("both existing save actions share one visual control without changing handl
   assert.match(homeSource, /onClick=\{\(\)=>void saveProject\(\)\}/);
   assert.match(globalCss, /\.canvas-actions \.project-save-control,\.planogram-toolbar-actions \.project-save-control/);
 });
+
+test("planogram templates use a unique key for table variants", () => {
+  assert.match(homeSource, /key=\{`\$\{item\.kind\}:\$\{item\.name\}`\}/);
+  assert.doesNotMatch(homeSource, /key=\{item\.kind\}/);
+});
