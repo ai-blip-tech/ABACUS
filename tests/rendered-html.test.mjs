@@ -68,11 +68,11 @@ test("health endpoint reports image-generation readiness without exposing a secr
   assert.doesNotMatch(healthSource, /OPENAI_API_KEY/);
 });
 
-test("admin brutto coefficient is loaded from global settings", async () => {
+test("global admin overview uses the shared real-data aggregator", async () => {
   const adminSource = await readFile(new URL("../app/api/admin/overview/route.ts", import.meta.url), "utf8");
-  assert.match(adminSource, /getGlobalSettings/);
-  assert.match(adminSource, /brutto_coefficient/);
-  assert.doesNotMatch(adminSource, /BRUTTO_MULTIPLIER\s*=/);
+  assert.match(adminSource, /requireGlobalAdmin/);
+  assert.match(adminSource, /adminOverview/);
+  assert.doesNotMatch(adminSource, /requireAdmin\s*\(/);
 });
 
 test("planogram keeps menus readable, rugs below furniture, and supports bedside tables", async () => {
