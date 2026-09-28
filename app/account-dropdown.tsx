@@ -6,6 +6,7 @@ type AccountUser = {
   email: string;
   firstName: string;
   lastName: string;
+  role: "user" | "admin";
 };
 
 const accountLinks = [
@@ -66,6 +67,7 @@ export default function AccountDropdown({ user, studio = false }: { user: Accoun
         <div><b>{fullName || user.email}</b>{fullName && <small>{user.email}</small>}</div>
       </div>
       <nav>{accountLinks.map(([label, anchor]) => <a key={label} role="menuitem" href={`/account#${anchor}`} onClick={() => setOpen(false)}>{label}</a>)}</nav>
+      {user.role === "admin" && <><div className="account-dropdown-divider"/><nav><a role="menuitem" href="/admin" onClick={() => setOpen(false)}>Админ-панель</a></nav></>}
       <div className="account-dropdown-divider"/>
       <button className="account-dropdown-logout" type="button" role="menuitem" onClick={() => void logout()}>Выйти</button>
     </div>}

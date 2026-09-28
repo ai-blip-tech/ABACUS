@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, @next/next/no-html-link-for-pages */
 
 import { useEffect, useState } from "react";
+import AccountDropdown from "../account-dropdown";
 import "./account.css";
 
 type Data = Record<string, any>;
@@ -32,7 +33,7 @@ export default function AccountPage() {
   if (!data.profile) return <main className="account-shell solo"><section className="account-signin"><b>ROOM design</b><h1>Личный кабинет</h1><p>{error || "Загружаем…"}</p>{error && <><a href="/">Войти по email и паролю</a>{google && <a className="secondary" href="/api/auth/google">Продолжить с Google</a>}</>}</section></main>;
   return <main className="account-shell">
     <aside><a className="logo" href="/">ROOM <span>design</span></a><nav>{["Профиль","Тариф и токены","Купить токены","История токенов","История рендеров","Платежи","Настройки","Безопасность"].map((x,i)=><a key={x} href={`#s${i}`}>{x}</a>)}</nav><button onClick={logout}>Выйти</button></aside>
-    <div className="account-content"><header><small>ЛИЧНЫЙ КАБИНЕТ</small><h1>Здравствуйте, {data.profile.first_name || data.profile.email}</h1><p>Глобальный профиль Room Design, тарифы и операции с токенами.</p></header>{error && <p className="alert">{error}</p>}
+    <div className="account-content"><header className="account-page-header"><div><small>ЛИЧНЫЙ КАБИНЕТ</small><h1>Здравствуйте, {data.profile.first_name || data.profile.email}</h1><p>Глобальный профиль Room Design, тарифы и операции с токенами.</p></div><AccountDropdown user={{ email: data.profile.email, firstName: data.profile.first_name || "", lastName: data.profile.last_name || "", role: data.profile.global_role === "admin" ? "admin" : "user" }}/></header>{error && <p className="alert">{error}</p>}
       <section className="stats"><article><small>ТАРИФ</small><b>{data.plan?.name || "Free"}</b></article><article><small>БАЛАНС</small><b>{nf.format(data.account?.balance || 0)}</b><span>токенов</span></article><article><small>ОПЕРАЦИИ</small><b>{data.transactions?.length || 0}</b></article></section>
       <Panel id="s0" title="Профиль"><div className="grid">{[["Имя",data.profile.first_name],["Фамилия",data.profile.last_name],["Email",data.profile.email],["Телефон",data.profile.phone],["Компания / должность",data.profile.company_role],["Дата регистрации",when(data.profile.created_at)]].map(([a,b])=><p key={a}><small>{a}</small>{b || "—"}</p>)}</div><h3>Способы входа</h3><div className="tags">{data.identities?.map((x:any)=><span key={x.provider}>{x.provider === "google" ? "Google" : "Email + пароль"}</span>)}</div><h3>Tenant memberships</h3>{data.memberships?.length ? data.memberships.map((x:any)=><p key={x.id}>{x.name} · {x.role}</p>) : <p className="muted">Привязок к организациям нет.</p>}</Panel>
       <Panel id="s1" title="Тариф и токены"><p>{data.plan?.name || "Free"} · включено {nf.format(data.plan?.included_tokens || 0)} токенов</p><p>Расчётная стоимость новой AI-операции: <b>{nf.format(data.generationQuote?.tokenCost || 0)} токенов</b>{data.generationQuote?.chargingEnabled ? "" : " · списание пока отключено глобальной настройкой"}</p></Panel>

@@ -87,7 +87,7 @@ export async function updateGlobalSettings(adminUserId: string, patch: Partial<G
   return getGlobalSettings();
 }
 
-type Mutation = { userId: string; type: TokenTransactionType; amount: number; referenceType?: string; referenceId?: string; sourceUserId?: string; targetUserId?: string; initiatedByAdminId?: string; description?: string; metadata?: Record<string, unknown>; idempotencyKey: string };
+type Mutation = { userId: string; type: TokenTransactionType; amount: number; referenceType?: string; referenceId?: string; sourceUserId?: string; targetUserId?: string; initiatedByAdminId?: string; description?: string; metadata?: Record<string, unknown>; idempotencyKey: string; auditAction?: string };
 
 function accountInTransaction(sqlite: import("node:sqlite").DatabaseSync, userId: string) {
   const now = new Date().toISOString();
@@ -109,6 +109,10 @@ function mutateBalance(mutation: Mutation) {
     const id = crypto.randomUUID();
     sqlite.prepare("INSERT INTO token_transactions (id, user_id, type, amount, balance_before, balance_after, reference_type, reference_id, source_user_id, target_user_id, initiated_by_admin_id, description, metadata_json, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(id, mutation.userId, mutation.type, amount, account.balance, after, mutation.referenceType ?? null, mutation.referenceId ?? null, mutation.sourceUserId ?? null, mutation.targetUserId ?? null, mutation.initiatedByAdminId ?? null, mutation.description ?? null, JSON.stringify(mutation.metadata ?? {}), mutation.idempotencyKey, now);
+    if (mutation.auditAction && mutation.initiatedByAdminId) {
+      sqlite.prepare("INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, metadata_json, created_at) VALUES (?, ?, ?, 'user', ?, ?, ?)")
+        .run(crypto.randomUUID(), mutation.initiatedByAdminId, mutation.auditAction, mutation.userId, JSON.stringify({ amount: Math.abs(amount), reason: mutation.description ?? null, transactionId: id }), now);
+    }
     return sqlite.prepare("SELECT * FROM token_transactions WHERE id = ?").get(id);
   });
 }
@@ -154,7 +158,7 @@ export async function transferTokens(input: { sourceUserId: string; targetUserId
     const insertTransaction = sqlite.prepare("INSERT INTO token_transactions (id, user_id, type, amount, balance_before, balance_after, reference_type, reference_id, source_user_id, target_user_id, initiated_by_admin_id, description, metadata_json, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?, ?, 'transfer', ?, ?, ?, ?, ?, '{}', ?, ?)");
     insertTransaction.run(crypto.randomUUID(), input.sourceUserId, "transfer_out", -amount, source.balance, source.balance - amount, transferId, input.sourceUserId, input.targetUserId, input.adminUserId, input.reason ?? null, `${input.idempotencyKey}:out`, now);
     insertTransaction.run(crypto.randomUUID(), input.targetUserId, "transfer_in", amount, target.balance, target.balance + amount, transferId, input.sourceUserId, input.targetUserId, input.adminUserId, input.reason ?? null, `${input.idempotencyKey}:in`, now);
-    sqlite.prepare("INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, metadata_json, created_at) VALUES (?, ?, 'tokens.transfer', 'token_transfer', ?, ?, ?)").run(crypto.randomUUID(), input.adminUserId, transferId, JSON.stringify({ sourceUserId: input.sourceUserId, targetUserId: input.targetUserId, amount }), now);
+    sqlite.prepare("INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, metadata_json, created_at) VALUES (?, ?, 'tokens.transfer', 'token_transfer', ?, ?, ?)").run(crypto.randomUUID(), input.adminUserId, transferId, JSON.stringify({ sourceUserId: input.sourceUserId, targetUserId: input.targetUserId, amount, reason: input.reason ?? null }), now);
     return sqlite.prepare("SELECT * FROM token_transfers WHERE id = ?").get(transferId);
   });
 }

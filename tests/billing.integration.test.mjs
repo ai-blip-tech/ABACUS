@@ -39,6 +39,8 @@ test("transfer is atomic, audited and idempotent", async () => {
   const rows = await database.prepare("SELECT type, initiated_by_admin_id, source_user_id, target_user_id FROM token_transactions WHERE reference_id = ? ORDER BY type").bind(first.id).all();
   assert.equal(rows.results.length, 2);
   assert.ok(rows.results.every((row) => row.initiated_by_admin_id === "source" && row.source_user_id === "source" && row.target_user_id === "target"));
+  const audit = await database.prepare("SELECT metadata_json FROM audit_logs WHERE action = 'tokens.transfer' AND entity_id = ?").bind(first.id).first();
+  assert.equal(JSON.parse(audit.metadata_json).reason, "Manager testing");
   await assert.rejects(billing.transferTokens({ ...input, amount: 2_000_000, idempotencyKey: "transfer-2" }), /Недостаточно/);
   assert.equal((await billing.getTokenAccount("target")).balance, 50_000);
 });
