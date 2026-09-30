@@ -15,5 +15,5 @@
 .account-dropdown-logout-divider{margin-top:7px;margin-bottom:5px}.account-dropdown-logout{color:var(--rd-charcoal,#201813)}
 @keyframes account-dropdown-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:900px){.account-trigger-copy{display:none}.account-dropdown-card{right:0}}
-@media(max-width:767px){.account-dropdown-card{position:fixed;top:68px;right:12px;width:min(360px,calc(100vw - 24px));max-height:calc(100dvh - 80px)}.account-dropdown-card nav a,.account-dropdown-logout{min-height:44px}}
+@media(max-width:767px){.account-dropdown-card{position:fixed;top:68px;right:12px;width:min(360px,calc(100vw - 24px));max-height:calc(100vh - 80px);max-height:calc(100dvh - 80px)}.account-dropdown-card nav a,.account-dropdown-logout{min-height:44px}}
 @media(prefers-reduced-motion:reduce){.account-dropdown-card{animation:none}.account-trigger-chevron{transition:none}}

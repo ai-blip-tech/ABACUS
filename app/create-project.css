@@ -1,4 +1,5 @@
 .project-page-concept {
+  min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
   background: var(--rd-ivory);
@@ -99,6 +100,7 @@
 }
 
 .project-form-wrap {
+  min-height: calc(100vh - 76px);
   min-height: calc(100dvh - 76px);
   display: grid;
   grid-template-columns: minmax(0, 61fr) minmax(440px, 39fr);
@@ -383,6 +385,7 @@
   }
 
   .project-form-wrap {
+    min-height: calc(100vh - 70px);
     min-height: calc(100dvh - 70px);
     grid-template-columns: minmax(0, 48fr) minmax(420px, 52fr);
   }

@@ -1,5 +1,6 @@
 .projects-dashboard{
   min-height:100vh;
+  min-height:100dvh;
   overflow-x:hidden;
   background:var(--rd-paper,#fbfaf7);
   color:var(--rd-charcoal,#201813);
@@ -232,7 +233,7 @@
   .projects-dashboard-project{grid-template-columns:40% 60%}.projects-dashboard-project-mark{min-height:188px}
   .projects-dashboard-empty{min-height:108px;padding:22px 20px;align-items:flex-start;flex-direction:column}.projects-dashboard-empty b{font-size:19px}.projects-dashboard-empty>button{min-height:44px}
   .projects-dashboard-footer{margin-top:24px;padding:15px 20px;align-items:flex-start;gap:12px;flex-direction:column}.projects-dashboard-footer>span:last-child{align-self:flex-end;text-align:right}
-  .dashboard-account-dropdown .account-dropdown-card{position:fixed;top:68px;right:12px;width:min(360px,calc(100vw - 24px));max-height:calc(100dvh - 80px)}
+  .dashboard-account-dropdown .account-dropdown-card{position:fixed;top:68px;right:12px;width:min(360px,calc(100vw - 24px));max-height:calc(100vh - 80px);max-height:calc(100dvh - 80px)}
 }
 @media(max-width:390px){
   .projects-dashboard-header>strong{font-size:22px}.projects-dashboard-header{gap:9px}.projects-dashboard-header>button{font-size:11px}
