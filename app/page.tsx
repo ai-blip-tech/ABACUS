@@ -19,7 +19,7 @@ type CatalogProduct = { id:string; name:string; article:string; image:string; im
 type FurnitureEdit = { id:string; action:"add"|"replace"; point:{x:number;y:number}; referenceName:string; referenceImage:string; productId?:string };
 type PlanSurfaceReference = { image: string; name: string };
 type SignedInUser = { id: string; email: string; role: "user" | "admin"; firstName: string; lastName: string; phone: string; companyRole: string };
-type AccountProject = { id: string; name: string; project_type: string; description?: string | null; created_at: string; updated_at: string };
+type AccountProject = { id: string; name: string; project_type: string; description?: string | null; preview_image?: string | null; created_at: string; updated_at: string };
 type AccountGeneration = { id: string; operation: string; created_at: string; total_tokens?: number | null; cost_usd?: number | null };
 type AccountOverview = { projects: AccountProject[]; generations: AccountGeneration[]; summary: { generation_count?: number; total_tokens?: number; cost_usd?: number } };
 const products: Product[] = [
@@ -342,7 +342,58 @@ export default function Home() {
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
   </main>;
   if (view === "account") return <AccountDashboardWithProfile user={user} onUserUpdated={setUser} onHome={()=>navigate("home")} onCreate={()=>navigate("newProject")} onOpenProject={(project)=>{setProjectId(project.id);setProjectName(project.name);navigate("studio")}} onOpenGeneration={async(generation)=>{try{const image=await blobAsDataUrl(`/api/account/generations/${generation.id}`);setInteriorImage(image);setGeneratedImage(image);setInteriorName("Сохранённая генерация");setGenerated(true);setRatioFromImage(image);setHistoryVersions([{id:generation.id,name:"Сохранённая генерация",image,generated:true}]);setActiveHistoryId(generation.id);navigate("studio");}catch{setGenerationError("Не удалось открыть сохранённую генерацию.");}}} onLogin={()=>openAuth("login")}/>;
-  if (view === "newProject") return <main className="project-page"><header className="project-nav"><button onClick={() => user ? navigate("account") : navigate("home")}>← {user ? "Кабинет" : "На главную"}</button><div className="home-wordmark">ROOM<span>design</span></div>{user?<AccountDropdown user={user}/>:<button onClick={()=>openAuth("login")}>Войти</button>}</header><section className="project-form-wrap"><div className="project-intro"><p>НОВЫЙ ПРОЕКТ</p><h1>Создайте пространство<br/>для своей идеи.</h1><span>Начните с названия — затем добавьте комнаты и изображения.</span></div><form className="project-form" onSubmit={(e) => { e.preventDefault(); if (!user) { openAuth("register"); return; } const name = projectName.trim(); if (!name) { setProjectError("Введите название проекта."); return; } setProjectError(""); setProjectName(name); setProjectId(crypto.randomUUID()); setProjectSaved(false); navigate("studio"); }}><label>НАЗВАНИЕ ПРОЕКТА<input autoFocus required value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Например, квартира на Патриарших"/></label><label>ТИП ПРОЕКТА<select value={projectType} onChange={(e)=>setProjectType(e.target.value)}><option>Квартира</option><option>Дом</option><option>Офис</option><option>Гостеприимство</option><option>Другое</option></select></label><label>ОПИСАНИЕ <small>необязательно</small><textarea value={projectDescription} onChange={(e)=>setProjectDescription(e.target.value)} placeholder="Коротко опишите проект"/></label>{projectError&&<p className="project-error">{projectError}</p>}<button className="create-project" type="submit">Создать проект <span>→</span></button></form></section>{authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}</main>;
+  if (view === "newProject") return <main className="project-page project-page-concept">
+    <header className="project-nav">
+      <div className="project-brand">
+        <div className="project-wordmark rd-wordmark">ROOM DESIGN</div>
+        <i aria-hidden="true"/>
+        <button className="project-back" type="button" onClick={() => user ? navigate("account") : navigate("home")}>← {user ? "Кабинет" : "На главную"}</button>
+      </div>
+      {user ? <AccountDropdown user={user}/> : <button className="project-login" type="button" onClick={()=>openAuth("login")}>Войти</button>}
+    </header>
+    <section className="project-form-wrap">
+      <section className="project-intro" aria-label="Новый проект">
+        <img src="/concept-d-create-project-hero.png" alt=""/>
+        <div className="project-intro-shade" aria-hidden="true"/>
+        <div className="project-intro-copy">
+          <p className="project-kicker"><span>01</span><i aria-hidden="true"/>НОВЫЙ ПРОЕКТ</p>
+          <h1>Создайте<br/>пространство<br/>для своей идеи.</h1>
+          <p className="project-lead">Начните с названия — затем добавьте<br className="project-desktop-break"/> комнаты и изображения.</p>
+        </div>
+        <p className="project-slogan"><i aria-hidden="true"/>ВДОХНОВЕНИЕ ПРЕВРАЩАЕТ ПРОСТРАНСТВО В ДОМ</p>
+      </section>
+      <section className="project-panel">
+        <form className="project-form" noValidate onSubmit={(e) => {
+          e.preventDefault();
+          if (!user) { openAuth("register"); return; }
+          const name = projectName.trim();
+          if (!name) { setProjectError("Введите название проекта."); return; }
+          setProjectError("");
+          setProjectName(name);
+          setProjectId(crypto.randomUUID());
+          setProjectSaved(false);
+          navigate("studio");
+        }}>
+          <div className={projectError ? "project-field has-error" : "project-field"}>
+            <label htmlFor="project-name">НАЗВАНИЕ ПРОЕКТА</label>
+            <input id="project-name" required aria-invalid={Boolean(projectError)} aria-describedby={projectError ? "project-name-error" : undefined} value={projectName} onChange={(e) => { setProjectName(e.target.value); if (projectError) setProjectError(""); }} placeholder="Например, квартира на Патриарших"/>
+            {projectError && <p id="project-name-error" className="project-error" role="alert">{projectError}</p>}
+          </div>
+          <div className="project-field">
+            <label htmlFor="project-type">ТИП ПРОЕКТА</label>
+            <div className="project-select-wrap"><select id="project-type" value={projectType} onChange={(e)=>setProjectType(e.target.value)}><option>Квартира</option><option>Дом</option><option>Офис</option><option>Гостеприимство</option><option>Другое</option></select><span aria-hidden="true">⌄</span></div>
+          </div>
+          <div className="project-field">
+            <div className="project-label-row"><label htmlFor="project-description">ОПИСАНИЕ</label><small>необязательно</small></div>
+            <textarea id="project-description" value={projectDescription} onChange={(e)=>setProjectDescription(e.target.value)} placeholder="Коротко опишите проект"/>
+          </div>
+          <button className="create-project" type="submit">Создать проект <span aria-hidden="true">→</span></button>
+        </form>
+        <footer className="project-panel-footer"><span>ROOM DESIGN</span><i aria-hidden="true"/><em>БОЛЬШЕ, ЧЕМ ИНТЕРЬЕР</em><b>№ 001</b></footer>
+      </section>
+    </section>
+    {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
+  </main>;
   return <main className="studio-shell">
     <header className="topbar"><div className="wordmark">ROOM<span>DESIGN</span></div><div className="crumb"><button onClick={() => window.history.back()}>← Проекты</button><i>›</i><b>{projectName || "Новый проект"}</b><i>›</i><span>Гостиная</span></div><div className="top-actions"><button className="help">?</button>{user?<AccountDropdown user={user} studio/>:<button className="avatar" title="Аккаунт" onClick={()=>openAuth("login")}>?</button>}</div></header>
     <section className="studio"><aside className="tools" aria-label="Добавить мебель">
@@ -367,11 +418,41 @@ function AccountDashboardWithProfile({user,onUserUpdated,onHome,onCreate,onOpenP
   const [data,setData]=useState<AccountOverview|null>(null);
   const [error,setError]=useState("");
   const [profileOpen,setProfileOpen]=useState(false);
-  useEffect(()=>{if(!user)return;void fetch("/api/account/overview").then(async(response)=>{const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||"Не удалось загрузить кабинет.");return payload;}).then(setData).catch((reason)=>setError(reason instanceof Error?reason.message:"Не удалось загрузить кабинет."));},[user?.id]);
-  if(!user)return <main className="account-page"><header className="account-nav"><button onClick={onHome}>← На главную</button><div className="home-wordmark">ROOM<span>design</span></div><button onClick={onLogin}>Войти</button></header><section className="account-empty"><span>ROOM DESIGN</span><h1>Войдите, чтобы открыть кабинет</h1><p>Здесь хранятся проекты, сохранённые визуализации и история использования токенов.</p><button onClick={onLogin}>Войти или зарегистрироваться</button></section></main>;
+  useEffect(()=>{if(!user)return;void fetch("/api/account/overview").then(async(response)=>{const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||"Не удалось загрузить кабинет.");return payload;}).then(setData).catch(()=>setError("Не удалось загрузить данные кабинета. Попробуйте обновить страницу."));},[user?.id]);
+  if(!user)return <main className="account-page"><header className="account-nav"><button onClick={onHome}>← На главную</button><div className="home-wordmark rd-wordmark">ROOM DESIGN</div><button onClick={onLogin}>Войти</button></header><section className="account-empty"><span>ROOM DESIGN</span><h1>Войдите, чтобы открыть кабинет</h1><p>Здесь хранятся проекты, сохранённые визуализации и история использования токенов.</p><button onClick={onLogin}>Войти или зарегистрироваться</button></section></main>;
   const summary=data?.summary||{};
   const greeting=user.firstName?`Ваши проекты, ${user.firstName}.`:"Ваши проекты.";
-  return <main className="account-page"><header className="account-nav"><button onClick={onHome}>← На главную</button><div className="home-wordmark">ROOM<span>design</span></div><AccountDropdown user={user}/></header>{error?<p className="account-error">{error}</p>:!data?<p className="account-loading">Загружаем кабинет…</p>:<><section className="account-stats"><article><small>ПРОЕКТЫ</small><b>{data.projects.length}</b></article><article><small>СОХРАНЁННЫЕ ГЕНЕРАЦИИ</small><b>{Number(summary.generation_count||0)}</b></article><article><small>ИСПОЛЬЗОВАНО ТОКЕНОВ</small><b>{Number(summary.total_tokens||0).toLocaleString("ru-RU")}</b></article><article><small>СТОИМОСТЬ ГЕНЕРАЦИЙ</small><b>${Number(summary.cost_usd||0).toFixed(4)}</b></article></section><section className="account-hero"><div><p>ЛИЧНЫЙ КАБИНЕТ</p><h1>{greeting}</h1><span>Продолжайте работу с сохранёнными результатами или сделайте новый проект.</span></div><div className="account-hero-actions"><button className="account-profile-button" onClick={()=>setProfileOpen(true)}><span aria-hidden="true">○</span> Личные данные</button><button onClick={onCreate}>Создать проект <b>→</b></button></div></section><section className="account-section"><div className="account-section-head"><div><small>ПРОЕКТЫ</small><h2>Продолжить работу</h2></div></div>{data.projects.length?<div className="account-project-grid">{data.projects.map((project)=><article key={project.id} className="account-project"><span>{project.project_type}</span><h3>{project.name}</h3><p>{project.description||"Без описания"}</p><footer><time>{new Date(project.updated_at).toLocaleDateString("ru-RU")}</time><button onClick={()=>onOpenProject(project)}>Открыть →</button></footer></article>)}</div>:<div className="account-no-projects"><b>Здесь появятся ваши проекты.</b><span>Создайте первый проект, чтобы начать работать с интерьером.</span></div>}</section><section className="account-section"><div className="account-section-head"><div><small>СОХРАНЁННЫЕ ИЗОБРАЖЕНИЯ</small><h2>Последние генерации</h2></div></div>{data.generations.length?<div className="account-generation-grid">{data.generations.map((generation)=><button key={generation.id} className="account-generation" onClick={()=>onOpenGeneration(generation)}><img src={`/api/account/generations/${generation.id}`} alt="Сохранённая генерация"/><span>{generation.operation}</span><small>{new Date(generation.created_at).toLocaleDateString("ru-RU")} · {Number(generation.total_tokens||0).toLocaleString("ru-RU")} токенов</small><b>Продолжить редактирование →</b></button>)}</div>:<div className="account-no-projects"><b>Сохранённых генераций пока нет.</b><span>Они появятся здесь после первой визуализации.</span></div>}</section></>}{profileOpen&&<ProfileModal user={user} onClose={()=>setProfileOpen(false)} onUserUpdated={onUserUpdated}/>}</main>;
+  const formatDate=(value:string,withTime=false)=>new Intl.DateTimeFormat("ru-RU",withTime?{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}:{day:"numeric",month:"short",year:"numeric"}).format(new Date(value));
+  const isLoading=!data&&!error;
+  const projects=data?.projects||[];
+  const generations=data?.generations||[];
+  return <main className="projects-dashboard">
+    <section className="projects-dashboard-top">
+      <div className="projects-dashboard-paper">
+        <header className="projects-dashboard-header"><strong className="rd-wordmark">ROOM DESIGN</strong><i/><button type="button" onClick={onHome}>←&nbsp;&nbsp;На главную</button></header>
+        <div className="projects-dashboard-copy"><p><b>01</b><i/><span>ЛИЧНЫЙ КАБИНЕТ</span></p><h1>{greeting}</h1><div className="projects-dashboard-description">Продолжайте работу с сохранёнными результатами<br className="projects-dashboard-copy-break"/> или создайте новый проект.</div><div className="projects-dashboard-actions"><button className="projects-dashboard-primary" type="button" onClick={onCreate}>Создать проект <b>→</b></button><button className="projects-dashboard-secondary" type="button" onClick={()=>setProfileOpen(true)}><span className="projects-dashboard-person" aria-hidden="true"/> Личные данные</button></div></div>
+      </div>
+      <div className="projects-dashboard-media"><img src="/images/room-design/room-design-projects-dashboard-hero-reference.png" alt=""/><p className="projects-dashboard-good"><i/>Good<br/>Rooms<br/>Better<br/>Lives<i/></p><p className="projects-dashboard-story">ПРОСТРАНСТВО<br/>ДЛЯ ЛУЧШИХ<br/>ИСТОРИЙ<i/></p></div>
+      <div className="projects-dashboard-account"><AccountDropdown user={user} dashboard/></div>
+    </section>
+    {error&&<p className="projects-dashboard-error" role="status">{error}</p>}
+    <section className={isLoading?"projects-dashboard-ledger is-loading":"projects-dashboard-ledger"} aria-busy={isLoading}>
+      <article><span>01</span><i/><div><small>Проекты</small><b>{isLoading?"—":projects.length}</b></div></article>
+      <article><span>02</span><i/><div><small>Сохранённые генерации</small><b>{isLoading?"—":Number(summary.generation_count||0)}</b></div></article>
+      <article><span>03</span><i/><div><small>Использовано токенов</small><b>{isLoading?"—":Number(summary.total_tokens||0).toLocaleString("ru-RU")}</b></div></article>
+      <aside><span>БОЛЬШЕ, ЧЕМ<br/>ИНТЕРЬЕР</span><i/></aside>
+    </section>
+    <section className="projects-dashboard-section projects-dashboard-projects" aria-labelledby="projects-dashboard-projects-title">
+      <header><span>04</span><i/><h2 id="projects-dashboard-projects-title">Продолжить работу</h2></header>
+      {isLoading?<div className="projects-dashboard-skeleton"><i/><i/><i/></div>:projects.length?<div className="projects-dashboard-project-grid">{projects.map((project)=><div key={project.id} className="projects-dashboard-project" role="link" tabIndex={0} aria-label={`Открыть проект «${project.name}»`} onClick={()=>onOpenProject(project)} onKeyDown={(event)=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onOpenProject(project);}}}><div className="projects-dashboard-project-mark">{project.preview_image?<img src={project.preview_image} alt={`Последнее изображение проекта «${project.name}»`} loading="lazy"/>:<span aria-hidden="true">{project.project_type.slice(0,1)}</span>}</div><div><small>{project.project_type}</small><h3>{project.name}</h3><p>{project.description||"Описание проекта пока не добавлено."}</p><time>Обновлено {formatDate(project.updated_at)}</time><span className="projects-dashboard-project-open">Открыть <b>→</b></span></div></div>)}</div>:<div className="projects-dashboard-empty"><div><b>Здесь появятся ваши проекты.</b><span>Создайте первый проект, чтобы начать работать с интерьером.</span></div><button type="button" onClick={onCreate}>Создать первый проект →</button></div>}
+    </section>
+    <section className="projects-dashboard-section projects-dashboard-generations" aria-labelledby="projects-dashboard-generations-title">
+      <header><span>05</span><i/><h2 id="projects-dashboard-generations-title">Последние генерации</h2>{generations.length>0&&<a href="/account#renders">Все генерации&nbsp;&nbsp;→</a>}</header>
+      {isLoading?<div className="projects-dashboard-skeleton is-compact"><i/><i/><i/></div>:generations.length?<div className="projects-dashboard-generation-grid">{generations.map((generation)=><button key={generation.id} type="button" className="projects-dashboard-generation" onClick={()=>onOpenGeneration(generation)}><img src={`/api/account/generations/${generation.id}`} alt={`Сохранённый рендер: ${generation.operation}`}/><span><b>{generation.operation}</b><small>{formatDate(generation.created_at,true)}<i/> {Number(generation.total_tokens||0).toLocaleString("ru-RU")} токенов</small><strong>Продолжить редактирование&nbsp;&nbsp;→</strong></span></button>)}</div>:<div className="projects-dashboard-empty is-compact"><div><b>Сохранённых генераций пока нет.</b><span>Они появятся здесь после первой визуализации.</span></div></div>}
+    </section>
+    <footer className="projects-dashboard-footer"><span>ROOM DESIGN <i/> <em>БОЛЬШЕ, ЧЕМ ИНТЕРЬЕР</em></span><span><b>№ 001</b><i/>СОЗДАЁМ ПРОСТРАНСТВА ДЛЯ ЛУЧШИХ ИСТОРИЙ</span></footer>
+    {profileOpen&&<ProfileModal user={user} onClose={()=>setProfileOpen(false)} onUserUpdated={onUserUpdated}/>}
+  </main>;
 }
 
 function ProfileModal({user,onClose,onUserUpdated}:{user:SignedInUser;onClose:()=>void;onUserUpdated:(user:SignedInUser)=>void}){

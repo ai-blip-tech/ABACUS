@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./concept-d.css";
 import "./home-override.css";
+import "./create-project.css";
+import "./account-dashboard-concept-d.css";
 
 export const metadata: Metadata = {
   title: "ROOM design — ИИ-платформа для дизайнеров интерьера",

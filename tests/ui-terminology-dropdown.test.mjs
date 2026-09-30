@@ -30,7 +30,7 @@ test("one account dropdown is used by project and Studio headers", () => {
   assert.match(dropdownSource, /event\.key === "Escape"/);
   assert.match(dropdownSource, /setOpen\(\(value\) => !value\)/);
   assert.match(dropdownCss, /z-index:150/);
-  assert.match(dropdownCss, /width:268px/);
+  assert.match(dropdownCss, /width:min\(344px/);
 });
 
 test("both existing save actions share one visual control without changing handlers", () => {
