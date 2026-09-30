@@ -39,17 +39,17 @@ test("global image edit and material restyling remain composable with local tool
   await expect(materialMenu).toBeVisible();
   const menuMetrics = await materialMenu.evaluate((element) => {
     const box = element.getBoundingClientRect();
-    const title = element.querySelector(":scope > b");
-    return { width: box.width, height: box.height, titleSize: title ? Number.parseFloat(getComputedStyle(title).fontSize) : 0 };
+    const firstAction = element.querySelector("button");
+    return { width: box.width, height: box.height, actionSize: firstAction ? Number.parseFloat(getComputedStyle(firstAction).fontSize) : 0 };
   });
-  expect(menuMetrics.width).toBeLessThanOrEqual(212);
-  expect(menuMetrics.height).toBeLessThan(180);
-  expect(menuMetrics.titleSize).toBeLessThanOrEqual(8);
-  await page.getByRole("button", { name: "Выбрать из каталога" }).click();
+  expect(menuMetrics.width).toBeLessThanOrEqual(118);
+  expect(menuMetrics.height).toBeLessThan(90);
+  expect(menuMetrics.actionSize).toBeLessThanOrEqual(8.5);
+  await materialMenu.getByRole("button", { name: "Добавить из каталога", exact: true }).click();
   await expect(page.getByText("Каталог материалов готовится.")).toBeVisible();
-  await page.locator(".material-source-actions input[type=file]").setInputFiles({ name: "green-boucle.png", mimeType: "image/png", buffer: imageBytes });
-  await expect(page.getByAltText("Референс материала")).toBeVisible();
-  await page.getByRole("button", { name: "Применить материал" }).click();
+  await expect(materialMenu).toHaveCount(0);
+  await brush.click();
+  await page.locator(".material-reference-input").setInputFiles({ name: "green-boucle.png", mimeType: "image/png", buffer: imageBytes });
   await expect.poll(() => requests.length).toBe(1);
   expect(requests[0].material).toBeTruthy();
   expect((requests[0].material as Record<string, unknown>).mask).toBeTruthy();

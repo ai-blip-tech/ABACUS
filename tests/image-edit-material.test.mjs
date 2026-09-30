@@ -21,9 +21,11 @@ test("free-text edit targets the current full image rather than the last placed 
 test("material brush is selection-gated and uses a distinct masked material operation", () => {
   assert.match(page, /activeTool === "Добавить мебель" && interiorImage && placementPoint&&<div className="material-tool"/);
   assert.match(page, /aria-label="Изменить материал выбранной поверхности"/);
-  assert.match(page, /ИЗМЕНИТЬ МАТЕРИАЛ/);
+  assert.match(page, /materialInputRef\.current\?\.click\(\)[\s\S]*?>Загрузить референс<\/button>/);
+  assert.match(page, /material-catalog-action[\s\S]*?>Добавить из каталога<\/button>/);
   assert.match(page, /Каталог материалов готовится\./);
   assert.match(page, /type="file" accept="image\/png,image\/jpeg,image\/webp"[^>]*onChange=\{\(event\)=>loadMaterialReference/);
+  assert.match(page, /const loadMaterialReference[\s\S]*?void applyMaterial\(String\(reader\.result\),file\.name\)/);
   assert.match(page, /const applyMaterial[\s\S]*?getSurfaceMask\(roomImage,placementPoint\)[\s\S]*?prepareLocalEdit\(roomImage,mask\)/);
   assert.match(page, /material:\{instruction:[\s\S]*?mask:local\.mask\}/);
   assert.match(page, /const applyMaterial[\s\S]*?local\.compose\(await blobToDataUrl\(imageBlob\)\)/);
@@ -32,8 +34,8 @@ test("material brush is selection-gated and uses a distinct masked material oper
   assert.match(route, /body\.roomImage && body\.referenceImage && body\.material\?\.mask/);
   assert.match(route, /Do not replace it with another object\./);
   assert.doesNotMatch(route.match(/body\.roomImage && body\.referenceImage && body\.material[\s\S]*?body\.roomImage && body\.globalEdit/)?.[0] || "", /replacementPrompt/);
-  assert.match(css, /\.material-menu\{width:min\(210px,/);
-  assert.match(css, /\.material-source-actions button,.material-source-actions label\{[^}]*min-height:32px[^}]*font:700 8\.5px/);
+  assert.match(css, /\.material-menu\{width:116px;[^}]*padding:4px[^}]*gap:1px/);
+  assert.match(css, /\.material-menu button\{[^}]*padding:5px[^}]*font-size:8\.5px[^}]*font-weight:600/);
 });
 
 test("existing Add, Replace and Remove controls remain present", () => {
