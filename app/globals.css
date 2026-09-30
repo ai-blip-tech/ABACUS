@@ -231,3 +231,25 @@ body{background:var(--paper);color:#1e1e1e;font-family:-apple-system,BlinkMacSys
 
 /* Pointer Events own plan item movement; native browser dragging must never compete with it. */
 .planogram-furniture{user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
+
+/* Local surface restyling stays compact and separate from Add / Replace / Remove. */
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.material-tool{position:absolute;z-index:9;top:14px;left:14px;display:flex;align-items:flex-start;gap:8px;font-family:inherit}
+.material-brush-trigger{display:grid;width:38px;height:38px;flex:0 0 38px;place-items:center;padding:0;border:1px solid #ded2c3;border-radius:7px;background:#fffdf9;color:#5c3d2e;box-shadow:0 6px 18px rgba(43,29,20,.18);cursor:pointer}
+.material-brush-trigger:hover,.material-brush-trigger[aria-expanded="true"]{border-color:#b96420;background:#b96420;color:#fff}
+.material-brush-trigger svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.material-menu{width:min(300px,calc(100vw - 150px));padding:13px;border:1px solid #ded2c3;border-radius:9px;background:#fffdf9;color:#2b1d14;box-shadow:0 12px 30px rgba(43,29,20,.22)}
+.material-menu>b{display:block;margin-bottom:10px;color:#8b7355;font-size:9px;letter-spacing:1.2px}
+.material-source-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.material-source-actions button,.material-source-actions label{display:grid;min-height:42px;place-items:center;padding:8px;border:1px solid #ded2c3;border-radius:6px;background:#fff;color:#5c3d2e;font:700 10px/1.25 inherit;text-align:center;cursor:pointer}
+.material-source-actions button:hover,.material-source-actions label:hover,.material-source-actions .active{border-color:#b96420;background:#f8eee5;color:#8b3e13}
+.material-source-actions input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.material-catalog-note{margin:10px 0 0;padding:9px;border-radius:5px;background:#f5efe6;color:#8b7355;font-size:10px;line-height:1.35}
+.material-reference-preview{display:flex;align-items:center;gap:9px;margin-top:10px;padding:7px;border:1px solid #e0d5c7;border-radius:6px;background:#fff}
+.material-reference-preview img{width:54px;height:45px;object-fit:cover;border-radius:4px}
+.material-reference-preview span{display:grid;min-width:0;gap:3px}
+.material-reference-preview b{overflow:hidden;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.material-reference-preview small{color:#8b7355;font-size:9px}
+.material-apply{width:100%;margin-top:10px;padding:10px;border:0;border-radius:6px;background:#2b1d14;color:#fff;font:700 10px inherit;cursor:pointer}
+.material-apply:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:700px){.material-tool{top:8px;left:8px}.material-menu{width:min(272px,calc(100vw - 112px))}.material-source-actions{grid-template-columns:1fr}}

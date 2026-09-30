@@ -11,7 +11,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; removal?: { name?: string; mask?: string }; replacement?: { name?: string; mask?: string }; placement?: { x?: number; y?: number; mask?: string }; adjustment?: { instruction?: string; mask?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
+  const body = await request.json() as { prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; removal?: { name?: string; mask?: string }; replacement?: { name?: string; mask?: string }; placement?: { x?: number; y?: number; mask?: string }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string; mask?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -62,6 +62,20 @@ async function generateResponse(request: Request) {
     `Apply this instruction only to the selected recently added object: ${body.adjustment.instruction}`,
     "The transparent mask is the only permitted edit area. Everything outside it must remain visually identical: do not move, alter, regenerate, crop, or retouch any other object, furniture, wall, floor, lighting, material, shadow, person, or composition.",
     "Keep image dimensions and camera framing exactly unchanged. No text, logos, or watermark.",
+  ].join("\n") : "";
+  const globalEditPrompt = body.globalEdit?.instruction ? [
+    "Edit the first image as one coherent completed interior while preserving its dimensions and camera framing.",
+    `Apply the user's instruction to the current image: ${body.globalEdit.instruction}`,
+    "Change only what the instruction requires. Preserve all unrelated architecture, furniture, materials, lighting, people, perspective, and composition.",
+    "Return a photorealistic full-frame result. No text, logos, or watermark unless the user's instruction explicitly requires existing text to remain.",
+  ].join("\n") : "";
+  const materialPrompt = body.material ? [
+    "Perform one strictly local material and surface restyling operation in the first image of a completed interior.",
+    "Use the second image only as the visual reference for colour, material, texture, finish, and surface character.",
+    body.material.instruction || "Transfer the referenced material to the selected surface.",
+    "Keep the selected object's exact identity, silhouette, geometry, construction, size, position, perspective, seams, and surrounding scene. Do not replace it with another object.",
+    "The transparent mask is the only permitted edit area. Preserve every pixel outside the mask visually identical.",
+    "Match the existing lighting and shadows. No new objects, people, text, logos, or watermark.",
   ].join("\n") : "";
   const upscalePrompt = [
     "Perform a technical quality upscale of the supplied image.",
@@ -125,7 +139,7 @@ async function generateResponse(request: Request) {
     return new Blob([await sample.arrayBuffer()], { type: sample.headers.get("content-type") || "image/jpeg" });
   };
 
-  const operation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  const operation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
   const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
   if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first()) {
     return Response.json({ error: "Эта AI-операция уже выполнена." }, { status: 409 });
@@ -165,6 +179,27 @@ async function generateResponse(request: Request) {
       form.append("image[]", dataUrlToBlob(body.roomImage), "source-image.png");
       form.append("size", outputSize);
       form.append("quality", "high");
+      form.append("output_format", "webp");
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
+    } else if (body.roomImage && body.referenceImage && body.material?.mask) {
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", materialPrompt);
+      form.append("image[]", dataUrlToBlob(body.roomImage), "selected-surface.png");
+      const materialBlob = await imageSourceToBlob(body.referenceImage);
+      form.append("image[]", materialBlob, `material-reference.${materialBlob.type.split("/")[1] || "jpg"}`);
+      form.append("mask", dataUrlToBlob(body.material.mask), "selected-surface-mask.png");
+      form.append("size", outputSize);
+      form.append("quality", "medium");
+      form.append("output_format", "webp");
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
+    } else if (body.roomImage && body.globalEdit?.instruction) {
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", globalEditPrompt);
+      form.append("image[]", dataUrlToBlob(body.roomImage), "current-interior.png");
+      form.append("size", outputSize);
+      form.append("quality", "medium");
       form.append("output_format", "webp");
       response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
     } else if (body.roomImage && body.referenceImage && body.replacement?.mask) {
@@ -244,7 +279,7 @@ async function generateResponse(request: Request) {
   }
   if (!response.ok) {
     await refundReservation("Возврат после ошибки AI-провайдера");
-    console.error("Image edit failed", { status: response.status, operation: body.replacement ? "replace" : body.placement ? "place" : "generate", message: result.error?.message });
+    console.error("Image edit failed", { status: response.status, operation, message: result.error?.message });
     return Response.json({ error: result.error?.message || `Сервис генерации временно недоступен (код ${response.status}). Попробуйте ещё раз.` }, { status: response.status });
   }
 
