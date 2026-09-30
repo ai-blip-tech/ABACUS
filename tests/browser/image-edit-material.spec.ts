@@ -35,7 +35,16 @@ test("global image edit and material restyling remain composable with local tool
   await page.getByRole("button", { name: "Поставить точку размещения предмета" }).click({ position: { x: 250, y: 180 } });
   await expect(brush).toBeVisible();
   await brush.click();
-  await expect(page.getByRole("dialog", { name: "Изменить материал" })).toBeVisible();
+  const materialMenu = page.getByRole("dialog", { name: "Изменить материал" });
+  await expect(materialMenu).toBeVisible();
+  const menuMetrics = await materialMenu.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const title = element.querySelector(":scope > b");
+    return { width: box.width, height: box.height, titleSize: title ? Number.parseFloat(getComputedStyle(title).fontSize) : 0 };
+  });
+  expect(menuMetrics.width).toBeLessThanOrEqual(212);
+  expect(menuMetrics.height).toBeLessThan(180);
+  expect(menuMetrics.titleSize).toBeLessThanOrEqual(8);
   await page.getByRole("button", { name: "Выбрать из каталога" }).click();
   await expect(page.getByText("Каталог материалов готовится.")).toBeVisible();
   await page.locator(".material-source-actions input[type=file]").setInputFiles({ name: "green-boucle.png", mimeType: "image/png", buffer: imageBytes });

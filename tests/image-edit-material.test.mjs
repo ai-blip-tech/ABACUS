@@ -4,6 +4,7 @@ import test from "node:test";
 
 const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 const route = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
 test("free-text edit targets the current full image rather than the last placed object", () => {
   assert.doesNotMatch(page, /lastPlacementPoint|adjustLastPlacement/);
@@ -31,6 +32,8 @@ test("material brush is selection-gated and uses a distinct masked material oper
   assert.match(route, /body\.roomImage && body\.referenceImage && body\.material\?\.mask/);
   assert.match(route, /Do not replace it with another object\./);
   assert.doesNotMatch(route.match(/body\.roomImage && body\.referenceImage && body\.material[\s\S]*?body\.roomImage && body\.globalEdit/)?.[0] || "", /replacementPrompt/);
+  assert.match(css, /\.material-menu\{width:min\(210px,/);
+  assert.match(css, /\.material-source-actions button,.material-source-actions label\{[^}]*min-height:32px[^}]*font:700 8\.5px/);
 });
 
 test("existing Add, Replace and Remove controls remain present", () => {
