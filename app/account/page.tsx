@@ -113,7 +113,7 @@ export default function AccountPage() {
     <div className="account-content">
       <header className="account-masthead">
         <div className="account-masthead-top"><a href="/">← К проектам</a><span>СОЗДАЁМ ПРОСТРАНСТВА, В КОТОРЫХ ЖИВЁТ ЖИЗНЬ</span>{userForDropdown && <AccountDropdown user={userForDropdown} studio/>}</div>
-        <div className="account-masthead-grid"><div className="account-heading"><span className="account-kicker">{current.eyebrow}</span><h1>{title}</h1><p>{current.subtitle}</p></div><div className="account-masthead-art"><img src="/images/room-design/room-design-projects-dashboard-hero-reference.png" alt=""/><p><i/>Good<br/>Rooms<br/>Better<br/>Lives<i/></p></div></div>
+        <div className="account-masthead-grid"><div className="account-heading"><span className="account-kicker">{current.eyebrow}</span><h1>{title}</h1><p>{current.subtitle}</p></div><div className="account-masthead-art"><img src="/images/room-design/room-design-projects-dashboard-hero-reference.avif" alt=""/><p><i/>Good<br/>Rooms<br/>Better<br/>Lives<i/></p></div></div>
       </header>
 
       <AccountLedger plan={data.plan?.name || "Free"} balance={Number(data.account?.balance || 0)} operations={data.transactions?.length || 0}/>

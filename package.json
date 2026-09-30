@@ -12,6 +12,10 @@
     "start:pm2": "pm2 start ecosystem.config.cjs --env production",
     "create-admin": "node scripts/create-admin.mjs",
     "test": "npm run build && node --experimental-transform-types --test tests/*.test.mjs",
+    "test:browser": "playwright test",
+    "test:browser:chromium": "playwright test --project=chromium-1440 --project=chromium-1366 --project=chromium-tablet --project=chromium-mobile",
+    "test:browser:webkit": "playwright test --project=webkit-1440 --project=webkit-1366 --project=webkit-tablet --project=webkit-mobile",
+    "test:browser:firefox": "playwright test --project=firefox-1440 --project=firefox-1366 --project=firefox-tablet --project=firefox-mobile",
     "lint": "eslint . --ignore-pattern .next"
   },
   "dependencies": {
@@ -25,6 +29,7 @@
   "devDependencies": {
     "@eslint/js": "9.39.4",
     "@next/eslint-plugin-next": "16.3.6",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",

@@ -330,7 +330,7 @@ export default function Home() {
   const navigate = (nextView: "home" | "account" | "newProject" | "studio") => { const paths = { home: "/", account: "#кабинет", newProject: "#новый-проект", studio: "#студия" }; window.history.pushState({ norrView: nextView }, "", paths[nextView]); setView(nextView); };
   const openAuth = (mode: "register" | "login" = "register") => { setAuthMode(mode); setAuthOpen(true); };
   const continueToProject = () => user ? navigate("account") : openAuth("register");
-  useEffect(() => { window.history.replaceState({ norrView: "home" }, "", "/"); const onPopState = (event: PopStateEvent) => setView(event.state?.norrView ?? "home"); window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
+  useEffect(() => { const hash=decodeURIComponent(window.location.hash);const initialView=hash==="#кабинет"?"account":hash==="#новый-проект"?"newProject":hash==="#студия"?"studio":"home";window.history.replaceState({ ...window.history.state, norrView:initialView }, "", window.location.href);const frame=requestAnimationFrame(()=>setView(initialView));const onPopState = (event: PopStateEvent) => setView(event.state?.norrView ?? "home"); window.addEventListener("popstate", onPopState); return () => {cancelAnimationFrame(frame);window.removeEventListener("popstate", onPopState);}; }, []);
   useEffect(() => { void fetch("/api/auth/me").then((response) => response.ok ? response.json() : { user: null }).then((payload) => setUser(payload.user || null)).catch(() => setUser(null)); }, []);
   if (view === "home") return <main className="home-page reference-home">
     <header className="reference-nav"><div className="reference-nav-inner"><button className="reference-wordmark" onClick={() => navigate("home")} aria-label="ROOM design">ROOM <span>design</span></button><nav><a href="#возможности">Возможности</a><a href="#процесс">Процесс</a>{user?<AccountDropdown user={user}/>:<button onClick={() => openAuth("login")}>Войти</button>}</nav></div></header>
@@ -353,7 +353,7 @@ export default function Home() {
     </header>
     <section className="project-form-wrap">
       <section className="project-intro" aria-label="Новый проект">
-        <img src="/concept-d-create-project-hero.png" alt=""/>
+        <img src="/concept-d-create-project-hero.avif" alt=""/>
         <div className="project-intro-shade" aria-hidden="true"/>
         <div className="project-intro-copy">
           <p className="project-kicker"><span>01</span><i aria-hidden="true"/>НОВЫЙ ПРОЕКТ</p>
@@ -432,7 +432,7 @@ function AccountDashboardWithProfile({user,onUserUpdated,onHome,onCreate,onOpenP
         <header className="projects-dashboard-header"><strong className="rd-wordmark">ROOM DESIGN</strong><i/><button type="button" onClick={onHome}>←&nbsp;&nbsp;На главную</button></header>
         <div className="projects-dashboard-copy"><p><b>01</b><i/><span>ЛИЧНЫЙ КАБИНЕТ</span></p><h1>{greeting}</h1><div className="projects-dashboard-description">Продолжайте работу с сохранёнными результатами<br className="projects-dashboard-copy-break"/> или создайте новый проект.</div><div className="projects-dashboard-actions"><button className="projects-dashboard-primary" type="button" onClick={onCreate}>Создать проект <b>→</b></button><button className="projects-dashboard-secondary" type="button" onClick={()=>setProfileOpen(true)}><span className="projects-dashboard-person" aria-hidden="true"/> Личные данные</button></div></div>
       </div>
-      <div className="projects-dashboard-media"><img src="/images/room-design/room-design-projects-dashboard-hero-reference.png" alt=""/><p className="projects-dashboard-good"><i/>Good<br/>Rooms<br/>Better<br/>Lives<i/></p><p className="projects-dashboard-story">ПРОСТРАНСТВО<br/>ДЛЯ ЛУЧШИХ<br/>ИСТОРИЙ<i/></p></div>
+      <div className="projects-dashboard-media"><img src="/images/room-design/room-design-projects-dashboard-hero-reference.avif" alt=""/><p className="projects-dashboard-good"><i/>Good<br/>Rooms<br/>Better<br/>Lives<i/></p><p className="projects-dashboard-story">ПРОСТРАНСТВО<br/>ДЛЯ ЛУЧШИХ<br/>ИСТОРИЙ<i/></p></div>
       <div className="projects-dashboard-account"><AccountDropdown user={user} dashboard/></div>
     </section>
     {error&&<p className="projects-dashboard-error" role="status">{error}</p>}

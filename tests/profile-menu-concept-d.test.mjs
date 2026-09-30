@@ -8,7 +8,7 @@ const dropdownCss = await readFile(new URL("../app/account-dropdown.css", import
 const dashboard = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 const account = await readFile(new URL("../app/account/page.tsx", import.meta.url), "utf8");
 const dashboardCss = await readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8");
-const hero = await readFile(new URL("../public/images/room-design/room-design-projects-dashboard-hero-reference.png", import.meta.url));
+const hero = await readFile(new URL("../public/images/room-design/room-design-projects-dashboard-hero-reference.avif", import.meta.url));
 
 test("profile menu keeps dynamic identity, approved order and existing permissions", () => {
   assert.match(dropdown, /const fullName = \[user\.firstName, user\.lastName\]/);
@@ -35,12 +35,12 @@ test("profile menu follows accessible popover behavior without an incomplete ARI
 });
 
 test("dashboard and account use the exact approved local hero with HTML slogans", () => {
-  const path = "/images/room-design/room-design-projects-dashboard-hero-reference.png";
+  const path = "/images/room-design/room-design-projects-dashboard-hero-reference.avif";
   assert.ok(dashboard.includes(path));
   assert.ok(account.includes(path));
   assert.match(dashboard, /Good<br\/>Rooms<br\/>Better<br\/>Lives/);
   assert.match(dashboard, /ПРОСТРАНСТВО<br\/>ДЛЯ ЛУЧШИХ<br\/>ИСТОРИЙ/);
   assert.match(dashboardCss, /object-fit:cover/);
   assert.match(dashboardCss, /object-position:45% 50%/);
-  assert.equal(createHash("sha256").update(hero).digest("hex"), "b13e536611cd1c4f8e34cb15b263746a3f53c58aa6f815e156bd447aacbb558d");
+  assert.equal(createHash("sha256").update(hero).digest("hex"), "a6587e5d7204aa0734efe266552d6ced784b94719ba15ffcb9cafa13a996a15e");
 });

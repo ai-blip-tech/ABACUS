@@ -9,3 +9,5 @@ data/
 *.sqlite-wal
 npm-debug.log*
 *.tsbuildinfo
+playwright-report/
+test-results/

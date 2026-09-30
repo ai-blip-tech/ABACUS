@@ -22,7 +22,7 @@ test("create-project validation is inline and accessible", () => {
 });
 
 test("Concept D create-project shell keeps the approved layout and typography tokens", () => {
-  assert.match(page, /src="\/concept-d-create-project-hero\.png" alt=""/);
+  assert.match(page, /src="\/concept-d-create-project-hero\.avif" alt=""/);
   assert.doesNotMatch(page, /generated-bleed-runner\.png/);
   assert.match(styles, /grid-template-columns: minmax\(0, 61fr\) minmax\(440px, 39fr\)/);
   assert.match(styles, /padding: clamp\(48px, 4vw, 58px\).*clamp\(88px, 11vw, 170px\)/);
@@ -32,6 +32,6 @@ test("Concept D create-project shell keeps the approved layout and typography to
   assert.match(styles, /@media \(max-width: 767px\)/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(tokens, /--rd-oxblood: #7b1020/);
-  assert.match(tokens, /--rd-display: "Cormorant Garamond"/);
+  assert.match(tokens, /--rd-display: var\(--font-cormorant-garamond\)/);
   assert.match(tokens, /--rd-wordmark: var\(--rd-display\)/);
 });

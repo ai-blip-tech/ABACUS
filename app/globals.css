@@ -64,6 +64,18 @@ body{background:var(--paper);color:#1e1e1e;font-family:-apple-system,BlinkMacSys
 .account-page .account-stats{grid-template-columns:repeat(3,1fr)}
 .account-page .account-stats article:nth-child(4){display:none}
 
+/* Keep the Studio header inside narrow mobile viewports across browser engines. */
+@media(max-width:480px){
+  .topbar{padding-right:10px;padding-left:10px;gap:8px}
+  .topbar .wordmark{flex:0 0 auto;font-size:20px}
+  .topbar .crumb{min-width:0;flex:1;gap:6px}
+  .topbar .crumb b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar .top-actions{flex:0 0 auto;gap:6px}
+  .room-canvas{width:calc(100% - 24px);min-width:0;max-width:calc(100% - 24px)}
+  .canvas-note{right:22px;min-width:0}
+  .canvas-note strong{overflow-wrap:anywhere}
+}
+
 /* Planogram symbols: the top edge is always the back/orientation side. */
 .planogram-furniture.sofa,.planogram-furniture.chair,.planogram-furniture.stool,.planogram-furniture.bed,.planogram-furniture.cabinet,.planogram-furniture.dresser,.planogram-furniture.nightstand,.planogram-furniture.tv_stand,.planogram-furniture.lamp{overflow:visible}
 .planogram-furniture.sofa i,.planogram-furniture.chair i,.planogram-furniture.stool i,.planogram-furniture.bed i,.planogram-furniture.cabinet i,.planogram-furniture.dresser i,.planogram-furniture.nightstand i,.planogram-furniture.tv_stand i,.planogram-furniture.lamp i{position:absolute;box-sizing:border-box;opacity:.7}
