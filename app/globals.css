@@ -155,12 +155,12 @@ body{background:var(--paper);color:#1e1e1e;font-family:-apple-system,BlinkMacSys
 
 /* Planogram camera controls. */
 .planogram-camera-host{display:contents}
-.plan-camera-marker{position:absolute;z-index:40;width:44px;height:32px;border:2px solid #fff;border-radius:8px;background:#c2681d;box-shadow:0 4px 14px rgba(43,29,20,.28);cursor:grab;transform-origin:center;touch-action:none;padding:0}
+.plan-camera-marker{position:absolute;z-index:40;width:44px;height:32px;border:2px solid #fff;border-radius:8px;background:#c2681d;box-shadow:0 4px 14px rgba(43,29,20,.28);cursor:grab;transform-origin:center;touch-action:none;padding:0;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
 .plan-camera-marker:active{cursor:grabbing}
-.plan-camera-marker span{position:absolute;left:9px;top:7px;width:18px;height:15px;border:2px solid #fff;border-radius:3px}
+.plan-camera-marker span{position:absolute;z-index:2;left:9px;top:7px;width:18px;height:15px;border:2px solid #fff;border-radius:3px}
 .plan-camera-marker span:before{content:"";position:absolute;left:5px;top:3px;width:5px;height:5px;border:2px solid #fff;border-radius:50%}
 .plan-camera-marker span:after{content:"";position:absolute;left:2px;top:-6px;width:8px;height:4px;border-radius:2px 2px 0 0;background:#fff}
-.plan-camera-marker i{position:absolute;left:40px;top:8px;width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-left:22px solid rgba(194,104,29,.72)}
+.plan-camera-marker .plan-camera-fov{position:absolute;z-index:1;left:35px;top:50%;width:170px;height:112px;transform:translateY(-50%);background:linear-gradient(90deg,rgba(194,104,29,.25),rgba(194,104,29,.07));clip-path:polygon(0 50%,100% 0,100% 100%);pointer-events:none}
 .plan-camera-settings{order:2;display:flex;flex-direction:column;gap:12px;padding:18px;border:1px solid #dfd2c0;border-radius:12px;background:#f7f0e6}
 .plan-camera-settings>label{font-size:12px;font-weight:800;letter-spacing:.16em;color:#8d755b}
 .plan-camera-settings>p,.plan-camera-settings>small{margin:0;color:#75695f;line-height:1.45}
@@ -228,3 +228,6 @@ body{background:var(--paper);color:#1e1e1e;font-family:-apple-system,BlinkMacSys
 /* The plan itself stays clean after an item is placed. Its name remains
    available to assistive technology and inside the context menu. */
 .planogram-editor-board .planogram-furniture>span{display:none!important}
+
+/* Pointer Events own plan item movement; native browser dragging must never compete with it. */
+.planogram-furniture{user-select:none;-webkit-user-select:none;-webkit-user-drag:none}

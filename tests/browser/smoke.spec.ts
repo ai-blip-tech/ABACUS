@@ -74,6 +74,30 @@ test("landing, auth, projects, account dropdown, account and Studio", async ({ p
   await expect(page.getByRole("button", { name: /Меню пользователя/ })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
+  if (!testInfo.project.name.endsWith("mobile")) {
+    await page.getByRole("button", { name: "Создание интерьера" }).click();
+    await page.getByRole("button", { name: "Диван", exact: true }).click();
+    const planItem = page.getByRole("button", { name: /Диван: перемещать/ });
+    await expect(planItem).toBeVisible();
+    await expect(planItem).toHaveAttribute("draggable", "false");
+    const before = await planItem.evaluate((element) => (element as HTMLElement).style.left);
+    const itemBox = await planItem.boundingBox();
+    const boardBox = await page.locator(".planogram-editor-board").boundingBox();
+    expect(itemBox).not.toBeNull();
+    expect(boardBox).not.toBeNull();
+    await page.mouse.move(itemBox!.x + itemBox!.width / 2, itemBox!.y + itemBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(Math.min(boardBox!.x + boardBox!.width - 40, itemBox!.x + itemBox!.width / 2 + 80), Math.min(boardBox!.y + boardBox!.height - 40, itemBox!.y + itemBox!.height / 2 + 45), { steps: 5 });
+    await page.mouse.up();
+    await expect.poll(() => planItem.evaluate((element) => (element as HTMLElement).style.left)).not.toBe(before);
+    const board = page.locator(".planogram-editor-board");
+    const cameraBoardBox = await board.boundingBox();
+    expect(cameraBoardBox).not.toBeNull();
+    await board.dblclick({ position: { x: Math.round(cameraBoardBox!.width * 0.84), y: Math.round(cameraBoardBox!.height * 0.78) } });
+    await expect(page.locator(".plan-camera-marker .plan-camera-fov")).toBeVisible();
+    await expect(page.locator(".plan-camera-settings")).toContainText("°");
+  }
+
   expect(remoteFontRequests).toEqual([]);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors.filter((message) => !message.includes("Failed to load resource"))).toEqual([]);
