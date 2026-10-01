@@ -76,7 +76,8 @@ test("Add, Replace and Remove use a local crop and preserve the original scene o
   expect(requests).toHaveLength(3);
 
   await page.getByRole("button", { name: "Изменить материал выбранной поверхности" }).click();
-  await page.locator(".material-reference-input").setInputFiles({ name: "material.png", mimeType: "image/png", buffer: source });
-  await expect(page.getByText("Не удалось точно выделить поверхность для материала. Выберите другую точку.").first()).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Изменить материал" })).toHaveCount(0);
+  await expect(page.locator(".material-reference-input")).toHaveCount(0);
+  await expect(page.getByText("Не удалось точно выделить поверхность для материала. Выберите точку повторно.").first()).toBeVisible();
   expect(requests).toHaveLength(3);
 });
