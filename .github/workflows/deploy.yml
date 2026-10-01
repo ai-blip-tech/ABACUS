@@ -1,16 +1,14 @@
-name: Deploy Room Design
+name: Diagnose Production Segmentation
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  diagnose:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Amsterdam VPS
+      - name: Run read-only segmentation diagnostics
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -20,48 +18,90 @@ jobs:
             set -eu
             cd ~/ABACUS
 
-            echo "PRODUCTION_SHA_BEFORE=$(git rev-parse HEAD)"
-            pm2 describe roomdesign
+            echo "PRODUCTION_SHA=$(git rev-parse HEAD)"
+            pm2 describe roomdesign | grep -E 'status|exec cwd|created at'
 
-            git fetch origin main
-            git pull --ff-only origin main
-            test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
-            echo "PRODUCTION_SHA_BUILD=$(git rev-parse HEAD)"
+            unauth_status="$(curl --silent --output /tmp/segment-unauth-response.json --write-out '%{http_code}' \
+              --request POST http://127.0.0.1:3000/api/segment \
+              --header 'Content-Type: application/json' \
+              --data '{"image":"data:image/png;base64,AA==","x":1,"y":1}')"
+            echo "SEGMENT_ROUTE_UNAUTH_STATUS=$unauth_status"
+            rm -f /tmp/segment-unauth-response.json
 
-            npm install
+            node <<'NODE'
+            const fs = require("node:fs");
+            const { execFileSync } = require("node:child_process");
+            const { randomUUID } = require("node:crypto");
 
-            test ! -e .next.rollback
-            pm2 stop roomdesign
-            if [ -d .next ]; then
-              mv .next .next.rollback
-            fi
-
-            rollback_build() {
-              result=$?
-              trap - ERR
-              rm -rf .next
-              if [ -d .next.rollback ]; then
-                mv .next.rollback .next
-                pm2 restart roomdesign --update-env
-              fi
-              exit "$result"
+            const placeholders = new Set(["", "replace-me", "changeme", "your-key-here", "your-roboflow-api-key"]);
+            function configured(value) {
+              const secret = String(value || "").trim();
+              return placeholders.has(secret.toLowerCase()) ? "" : secret;
             }
-            trap rollback_build ERR
+            function dotenvValue(name) {
+              if (!fs.existsSync(".env")) return "";
+              const line = fs.readFileSync(".env", "utf8").split(/\r?\n/).find((entry) => entry.startsWith(`${name}=`));
+              if (!line) return "";
+              return line.slice(name.length + 1).trim().replace(/^['"]|['"]$/g, "");
+            }
 
-            npm run build
-            pm2 restart roomdesign --update-env
+            let pm2Value = "";
+            try {
+              const processes = JSON.parse(execFileSync("pm2", ["jlist"], { encoding: "utf8" }));
+              const process = processes.find((item) => item.name === "roomdesign");
+              pm2Value = process?.pm2_env?.ROBOFLOW_API_KEY || "";
+            } catch {}
+            const dotenvToken = configured(dotenvValue("ROBOFLOW_API_KEY"));
+            const token = configured(pm2Value) || dotenvToken;
+            console.log(`ROBOFLOW_API_KEY_CONFIGURED=${token ? "YES" : "NO"}`);
+            console.log(`ROBOFLOW_KEY_SOURCE=${configured(pm2Value) ? "PM2_ENV" : dotenvToken ? "DOTENV" : "NONE"}`);
+            if (!token) process.exit(0);
 
-            curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
-            curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
-            curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
+            const image = fs.readFileSync("public/proposal-cover.png").toString("base64");
+            const point = { x: 1210, y: 860 };
+            const body = {
+              image: { type: "base64", value: image },
+              image_id: randomUUID(),
+              prompts: [{ prompts: [{ points: [{ positive: true, x: point.x, y: point.y }] }] }],
+              format: "json",
+              sam2_version_id: "hiera_large",
+              multimask_output: false,
+              save_logits_to_cache: false,
+              load_logits_from_cache: false,
+            };
 
-            production_html="$(curl --fail --silent --show-error http://127.0.0.1:3000/)"
-            production_css="$(printf '%s' "$production_html" | grep -oE '/_next/static/[^\" ]+\.css' | sort -u | while IFS= read -r asset; do curl --fail --silent --show-error "http://127.0.0.1:3000${asset}"; done)"
-            printf '%s' "$production_css" | grep -q '\.material-tool'
-            printf '%s' "$production_css" | grep -q '\.material-brush-trigger'
-
-            trap - ERR
-            rm -rf .next.rollback
-
-            echo "PRODUCTION_SHA_AFTER=$(git rev-parse HEAD)"
-            pm2 describe roomdesign
+            (async () => {
+              const response = await fetch(`https://serverless.roboflow.com/sam3/visual_segment?api_key=${encodeURIComponent(token)}`, {
+                method: "POST",
+                signal: AbortSignal.timeout(30_000),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              });
+              const text = await response.text();
+              let payload = {};
+              try { payload = JSON.parse(text); } catch {}
+              const predictions = payload.prompt_results?.flatMap((result) => result.predictions || []) || payload.predictions || [];
+              const best = [...predictions].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+              const polygons = best?.masks?.filter((polygon) => polygon.length >= 3) || [];
+              const points = polygons.reduce((total, polygon) => total + polygon.length, 0);
+              const allPoints = polygons.flat();
+              const bounds = allPoints.length ? {
+                minX: Math.min(...allPoints.map((entry) => entry[0])),
+                minY: Math.min(...allPoints.map((entry) => entry[1])),
+                maxX: Math.max(...allPoints.map((entry) => entry[0])),
+                maxY: Math.max(...allPoints.map((entry) => entry[1])),
+              } : null;
+              console.log(`ROBOFLOW_HTTP_STATUS=${response.status}`);
+              console.log(`ROBOFLOW_RESPONSE_OK=${response.ok ? "YES" : "NO"}`);
+              console.log(`SOFA_TEST_POINT=${point.x},${point.y}`);
+              console.log(`SOFA_POLYGON_RETURNED=${polygons.length ? "YES" : "NO"}`);
+              console.log(`SOFA_POLYGON_COUNT=${polygons.length}`);
+              console.log(`SOFA_POLYGON_POINTS=${points}`);
+              console.log(`SOFA_CONFIDENCE=${Number.isFinite(best?.confidence) ? best.confidence : "UNAVAILABLE"}`);
+              console.log(`SOFA_POLYGON_BOUNDS=${bounds ? JSON.stringify(bounds) : "NONE"}`);
+              if (!response.ok) console.log(`ROBOFLOW_ERROR_TYPE=${payload.detail ? "DETAIL" : payload.message ? "MESSAGE" : "UNKNOWN"}`);
+            })().catch((error) => {
+              console.log(`ROBOFLOW_PROBE_ERROR=${error?.name || "ERROR"}`);
+              process.exitCode = 1;
+            });
+            NODE
