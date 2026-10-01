@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     const image = body.image.includes(",") ? body.image.slice(body.image.indexOf(",") + 1) : body.image;
     const response = await fetch(`https://serverless.roboflow.com/sam3/visual_segment?api_key=${encodeURIComponent(token)}`, {
       method: "POST",
+      signal: AbortSignal.timeout(30_000),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         image: { type: "base64", value: image },

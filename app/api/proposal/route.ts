@@ -1,5 +1,6 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFImage, PDFFont, rgb } from "pdf-lib";
+import { proposalImageFormat } from "@/lib/proposal-image";
 
 type ProductParameter = { name?: string; value?: string };
 type ProposalProduct = {
@@ -67,10 +68,9 @@ const embedImage = async (document: PDFDocument, source?: string) => {
   if (!source) return null;
   try {
     const { mime, bytes } = await imageBytes(source);
-    const png = mime.includes("png") || (bytes[0] === 0x89 && bytes[1] === 0x50);
-    const jpeg = mime.includes("jpeg") || mime.includes("jpg") || (bytes[0] === 0xff && bytes[1] === 0xd8);
-    if (png) return await document.embedPng(bytes);
-    if (jpeg) return await document.embedJpg(bytes);
+    const format = proposalImageFormat(bytes, mime);
+    if (format === "png") return await document.embedPng(bytes);
+    if (format === "jpeg") return await document.embedJpg(bytes);
     return null;
   } catch {
     return null;
