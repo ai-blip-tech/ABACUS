@@ -30,6 +30,7 @@ jobs:
             pm2 describe roomdesign
 
             test "$current_sha" = "$expected_current_sha"
+            git status --short
             test -z "$(git status --porcelain)"
             git fetch origin main
             test "$(git rev-parse origin/main)" = "$expected_current_sha"
