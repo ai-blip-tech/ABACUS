@@ -23,17 +23,18 @@ jobs:
             rollback_sha="133faa6cd8f17a6c93f54da8ea8ae61830ac244d"
             expected_current_sha="fe4ae21321fb97d04b5361284bf5308d31846fa3"
             current_sha="$(git rev-parse HEAD)"
+            current_branch="$(git branch --show-current)"
 
             echo "PRODUCTION_SHA_BEFORE=$(git rev-parse HEAD)"
+            echo "PRODUCTION_BRANCH_BEFORE=${current_branch:-detached}"
             pm2 describe roomdesign
 
             test "$current_sha" = "$expected_current_sha"
-            test "$(git branch --show-current)" = "main"
             test -z "$(git status --porcelain)"
             git fetch origin main
             test "$(git rev-parse origin/main)" = "$expected_current_sha"
             git cat-file -e "${rollback_sha}^{commit}"
-            git switch -C main "$rollback_sha"
+            git switch -C production-rollback "$rollback_sha"
             echo "PRODUCTION_SHA_BUILD=$(git rev-parse HEAD)"
 
             pm2_stopped=0
@@ -41,7 +42,12 @@ jobs:
             rollback_build() {
               result=$?
               trap - ERR
-              git switch -C main "$current_sha"
+              if [ -n "$current_branch" ]; then
+                git switch "$current_branch"
+                test "$(git rev-parse HEAD)" = "$current_sha"
+              else
+                git switch --detach "$current_sha"
+              fi
               if [ "$build_backup_ready" = "1" ]; then
                 rm -rf .next
                 mv .next.rollback .next
