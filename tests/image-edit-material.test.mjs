@@ -19,7 +19,7 @@ test("free-text edit targets the current full image rather than the last placed 
 });
 
 test("material brush is selection-gated and uses a distinct masked material operation", () => {
-  assert.match(page, /activeTool === "Добавить мебель" && interiorImage && placementPoint&&<div className="material-tool"/);
+  assert.match(page, /\(activeTool === "Добавить мебель" \|\| activeTool === "Заменить"\) && interiorImage && placementPoint && !isGenerating&&<div className="material-tool"/);
   assert.match(page, /aria-label="Изменить материал выбранной поверхности"/);
   assert.match(page, /materialInputRef\.current\?\.click\(\)[\s\S]*?>Загрузить референс<\/button>/);
   assert.match(page, /material-catalog-action[\s\S]*?>Добавить из каталога<\/button>/);
