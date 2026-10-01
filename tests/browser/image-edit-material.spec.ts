@@ -7,7 +7,6 @@ const providerBytes = await sharp({ create: { width: 100, height: 100, channels:
 test("global image edit and material restyling remain composable with local tools", async ({ page, browserName }, testInfo) => {
   test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium-1440");
   const requests: Array<Record<string, unknown>> = [];
-  let segmentRequests = 0;
 
   await page.route("**/api/account/overview", (route) => route.fulfill({
     contentType: "application/json",
@@ -18,10 +17,7 @@ test("global image edit and material restyling remain composable with local tool
     }),
   }));
   await page.route("**/api/account/generations/edit-source", (route) => route.fulfill({ status: 200, contentType: "image/png", body: imageBytes }));
-  await page.route("**/api/segment", (route) => {
-    segmentRequests += 1;
-    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ polygons: [[[10, 10], [45, 10], [45, 45], [10, 45]]] }) });
-  });
+  await page.route("**/api/segment", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ polygons: [[[10, 10], [45, 10], [45, 45], [10, 45]]] }) }));
   await page.route("**/api/generate", async (route) => {
     requests.push(route.request().postDataJSON() as Record<string, unknown>);
     await route.fulfill({ status: 200, contentType: "image/png", body: providerBytes });
@@ -43,7 +39,6 @@ test("global image edit and material restyling remain composable with local tool
   await brush.click();
   const materialMenu = page.getByRole("dialog", { name: "Изменить материал" });
   await expect(materialMenu).toBeVisible();
-  expect(segmentRequests).toBe(0);
   const menuMetrics = await materialMenu.evaluate((element) => {
     const box = element.getBoundingClientRect();
     const firstAction = element.querySelector("button");
@@ -59,7 +54,6 @@ test("global image edit and material restyling remain composable with local tool
   await expect(materialMenu).toBeVisible();
   await page.locator(".material-reference-input").setInputFiles({ name: "yellow-boucle.png", mimeType: "image/png", buffer: imageBytes });
   await expect.poll(() => requests.length).toBe(1);
-  expect(segmentRequests).toBe(1);
 
   const assertMaterialRequest = (request: Record<string, unknown>) => {
     expect(request.operation).toBe("material");

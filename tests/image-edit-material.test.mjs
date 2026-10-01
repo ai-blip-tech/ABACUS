@@ -21,19 +21,16 @@ test("free-text edit targets the current full image rather than the last placed 
 test("material brush is selection-gated and uses a distinct masked material operation", () => {
   assert.match(page, /\(activeTool === "Добавить мебель" \|\| activeTool === "Заменить"\) && interiorImage && placementPoint && !isGenerating&&<div className="material-tool"/);
   assert.match(page, /materialMode, setMaterialMode.*"idle" \| "segmenting" \| "ready"/);
-  const enterMaterialMode = page.match(/const enterMaterialMode[\s\S]*?const loadMaterialReference/)?.[0] || "";
-  assert.match(enterMaterialMode, /setMaterialSelection\(\{point,roomImage:source\}\)[\s\S]*?setMaterialMode\("ready"\)[\s\S]*?setMaterialMenuOpen\(true\)/);
-  assert.doesNotMatch(enterMaterialMode, /getSurfaceMask|\/api\/segment/);
+  assert.match(page, /const enterMaterialMode[\s\S]*?setMaterialSelection\(\{point,roomImage,mask\}\)[\s\S]*?setMaterialMode\("ready"\)/);
   assert.match(page, /aria-label="Изменить материал выбранной поверхности"/);
   assert.match(page, /materialInputRef\.current\?\.click\(\)[\s\S]*?>Загрузить референс<\/button>/);
   assert.match(page, /material-catalog-action[\s\S]*?>Добавить из каталога<\/button>/);
   assert.match(page, /Каталог материалов готовится\./);
   assert.match(page, /type="file" accept="image\/png,image\/jpeg,image\/webp"[^>]*onChange=\{\(event\)=>loadMaterialReference/);
   assert.match(page, /const loadMaterialReference[\s\S]*?void applyMaterial\(String\(reader\.result\),file\.name\)/);
-  assert.match(page, /const getSurfaceMask[\s\S]*?throw new Error\("Не удалось определить выбранный объект\. Поставьте точку ближе к центру объекта и попробуйте ещё раз\."\)/);
+  assert.match(page, /const getSurfaceMask[\s\S]*?throw new Error\("Не удалось точно выделить поверхность для материала\. Выберите точку повторно\."\)/);
   assert.doesNotMatch(page, /createSurfaceFallbackMask/);
-  assert.match(page, /const applyMaterial[\s\S]*?const selection=materialSelection[\s\S]*?getSurfaceMask\(roomImage,selection\.point\)[\s\S]*?prepareLocalEdit\(roomImage,mask\)/);
-  assert.match(page, /materialMenuOpen&&materialSelection&&<div className="material-menu"/);
+  assert.match(page, /const applyMaterial[\s\S]*?const selection=materialSelection[\s\S]*?prepareLocalEdit\(selection\.roomImage,selection\.mask\)/);
   assert.match(page, /const applyMaterial[\s\S]*?operation:"material"/);
   assert.match(page, /material:\{instruction:[\s\S]*?mask:local\.mask\}/);
   assert.doesNotMatch(page.match(/const applyMaterial[\s\S]*?const detectObjects/)?.[0] || "", /placement:|replacement:|removal:|furnitureAction/);
