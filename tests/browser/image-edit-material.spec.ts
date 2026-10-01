@@ -49,19 +49,38 @@ test("global image edit and material restyling remain composable with local tool
   await expect(page.getByText("Каталог материалов готовится.")).toBeVisible();
   await expect(materialMenu).toHaveCount(0);
   await brush.click();
+  await expect(materialMenu).toBeVisible();
   await page.locator(".material-reference-input").setInputFiles({ name: "green-boucle.png", mimeType: "image/png", buffer: imageBytes });
   await expect.poll(() => requests.length).toBe(1);
-  expect(requests[0].material).toBeTruthy();
-  expect((requests[0].material as Record<string, unknown>).mask).toBeTruthy();
-  expect(requests[0].replacement).toBeUndefined();
+
+  const assertMaterialRequest = (request: Record<string, unknown>) => {
+    expect(request.operation).toBe("material");
+    expect(request.material).toBeTruthy();
+    expect((request.material as Record<string, unknown>).mask).toBeTruthy();
+    expect(request.referenceImage).toBeTruthy();
+    expect(request.placement).toBeUndefined();
+    expect(request.replacement).toBeUndefined();
+    expect(request.removal).toBeUndefined();
+  };
+  assertMaterialRequest(requests[0]);
+
+  const furnitureActions = page.getByRole("group", { name: "Действие с мебелью" });
+  await furnitureActions.getByRole("button", { name: "Заменить" }).click();
+  await page.getByRole("button", { name: "Поставить точку в центре предмета для замены" }).click({ position: { x: 250, y: 180 } });
+  await brush.click();
+  await expect(materialMenu).toBeVisible();
+  await page.locator(".material-reference-input").setInputFiles({ name: "green-boucle.png", mimeType: "image/png", buffer: imageBytes });
+  await expect.poll(() => requests.length).toBe(2);
+  assertMaterialRequest(requests[1]);
+
   await expect(brush).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Действие с мебелью" })).toContainText("ДобавитьЗаменитьУдалить");
+  await expect(furnitureActions).toContainText("ДобавитьЗаменитьУдалить");
 
   const instruction = "Сделай стены светлее";
   await page.getByPlaceholder("Например: сделай кресло зелёным, убери торшер или добавь человека в кресло").fill(instruction);
   await page.getByRole("button", { name: "Применить изменения" }).click();
-  await expect.poll(() => requests.length).toBe(2);
-  expect(requests[1].globalEdit).toEqual({ instruction });
-  expect(requests[1].adjustment).toBeUndefined();
+  await expect.poll(() => requests.length).toBe(3);
+  expect(requests[2].globalEdit).toEqual({ instruction });
+  expect(requests[2].adjustment).toBeUndefined();
   await expect(page.getByText("Изменение изображения")).toBeVisible();
 });
