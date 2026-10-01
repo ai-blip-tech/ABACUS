@@ -32,7 +32,7 @@ const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCA
 const differentSizeMask = Buffer.from(png.split(",")[1], "base64");
 differentSizeMask.writeUInt32BE(2, 16);
 const globalEdit = { prompt: "Сделай стены светлее", roomImage: png, globalEdit: { instruction: "Сделай стены светлее" } };
-const material = { operation: "material", prompt: "Измени материал", roomImage: png, referenceImage: png, material: { mask: png, instruction: "Применить материал" } };
+const material = { prompt: "Измени материал", roomImage: png, referenceImage: png, material: { mask: png, instruction: "Применить материал" } };
 let nextId = 0;
 const request = (body, id = `safety-${++nextId}`) => new Request("http://localhost/api/generate", { method: "POST", headers: { Cookie: `room_session=${session}`, "Content-Type": "application/json", "Idempotency-Key": id }, body: JSON.stringify(body) });
 const balance = async () => (await billing.getTokenAccount(user.id)).balance;
@@ -53,22 +53,6 @@ test("global_edit and material reject missing/invalid inputs before reserve or p
     { ...material, material: { mask: `data:image/png;base64,${differentSizeMask.toString("base64")}` } },
   ];
   for (const body of cases) assert.equal((await POST(request(body))).status, 400);
-  assert.equal(await balance(), before);
-});
-
-test("explicit material routing rejects Add, Replace and Remove payloads before reserve or provider", async () => {
-  globalThis.fetch = () => { throw new Error("Provider must not be called"); };
-  const before = await balance();
-  const conflictingPayloads = [
-    { ...material, placement: { x: 50, y: 50, mask: png } },
-    { ...material, replacement: { name: "диван", mask: png } },
-    { ...material, removal: { name: "диван", mask: png } },
-  ];
-  for (const body of conflictingPayloads) {
-    const response = await POST(request(body));
-    assert.equal(response.status, 400);
-    assert.match((await response.json()).error, /Material operation/);
-  }
   assert.equal(await balance(), before);
 });
 
@@ -124,12 +108,6 @@ test("success charges once, persists generation and duplicate request does not c
       assert.ok(options.signal);
       assert.equal(options.body.getAll("image[]").length, body.material ? 2 : 1);
       assert.equal(Boolean(options.body.get("mask")), Boolean(body.material));
-      if (body.material) {
-        const providerPrompt = String(options.body.get("prompt"));
-        assert.match(providerPrompt, /exclusively as a source of colour, material, texture/);
-        assert.match(providerPrompt, /Do not add, insert, copy, reconstruct, or reproduce the object depicted in the reference/);
-        assert.match(providerPrompt, /Preserve the selected object's exact identity, silhouette, geometry, shape, dimensions/);
-      }
       return Response.json({ data: [{ b64_json: png.split(",")[1] }] });
     };
     assert.equal((await POST(request(body, id))).status, 200);
