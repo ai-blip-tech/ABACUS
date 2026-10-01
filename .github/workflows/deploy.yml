@@ -52,7 +52,7 @@ jobs:
             npm run build
             pm2 restart roomdesign --update-env
 
-            curl --fail --silent --show-error --retry 12 --retry-delay 2 http://127.0.0.1:3000/api/health >/dev/null
+            curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
 
