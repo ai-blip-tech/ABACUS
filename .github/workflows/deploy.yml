@@ -1,6 +1,9 @@
 name: Diagnose Production Segmentation
 
 on:
+  push:
+    branches:
+      - codex/diagnose-production-segmentation
   workflow_dispatch:
 
 jobs:
