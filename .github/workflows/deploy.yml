@@ -1,16 +1,14 @@
-name: Deploy Room Design
+name: Read Material Runtime Diagnostic
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  read-diagnostic:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Amsterdam VPS
+      - name: Read safe Material routing diagnostics
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -19,49 +17,6 @@ jobs:
           script: |
             set -eu
             cd ~/ABACUS
-
-            echo "PRODUCTION_SHA_BEFORE=$(git rev-parse HEAD)"
-            pm2 describe roomdesign
-
-            git fetch origin main
-            git pull --ff-only origin main
-            test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
-            echo "PRODUCTION_SHA_BUILD=$(git rev-parse HEAD)"
-
-            npm install
-
-            test ! -e .next.rollback
-            pm2 stop roomdesign
-            if [ -d .next ]; then
-              mv .next .next.rollback
-            fi
-
-            rollback_build() {
-              result=$?
-              trap - ERR
-              rm -rf .next
-              if [ -d .next.rollback ]; then
-                mv .next.rollback .next
-                pm2 restart roomdesign --update-env
-              fi
-              exit "$result"
-            }
-            trap rollback_build ERR
-
-            npm run build
-            pm2 restart roomdesign --update-env
-
-            curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
-            curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
-            curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
-
-            production_html="$(curl --fail --silent --show-error http://127.0.0.1:3000/)"
-            production_css="$(printf '%s' "$production_html" | grep -oE '/_next/static/[^\" ]+\.css' | sort -u | while IFS= read -r asset; do curl --fail --silent --show-error "http://127.0.0.1:3000${asset}"; done)"
-            printf '%s' "$production_css" | grep -q '\.material-tool'
-            printf '%s' "$production_css" | grep -q '\.material-brush-trigger'
-
-            trap - ERR
-            rm -rf .next.rollback
-
-            echo "PRODUCTION_SHA_AFTER=$(git rev-parse HEAD)"
-            pm2 describe roomdesign
+            echo "PRODUCTION_SHA=$(git rev-parse HEAD)"
+            pm2 describe roomdesign | grep -E 'status|exec cwd|created at'
+            pm2 logs roomdesign --lines 500 --nostream 2>&1 | grep '\[generate-runtime-diagnostic\]' | tail -n 20
