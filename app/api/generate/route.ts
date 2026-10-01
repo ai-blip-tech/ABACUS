@@ -236,7 +236,7 @@ async function generateResponse(request: Request) {
       form.append("quality", "high");
       form.append("output_format", "webp");
       response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
-    } else if (operation === "material" && body.roomImage && body.referenceImage && body.material?.mask) {
+    } else if (body.roomImage && body.referenceImage && body.material?.mask) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", materialPrompt);
