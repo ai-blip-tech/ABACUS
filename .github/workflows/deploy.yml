@@ -32,11 +32,14 @@ jobs:
             test "$current_sha" = "$expected_current_sha"
             git status --short
             git diff --stat -- package-lock.json
-            if [ -e roomdesign ]; then
-              ls -ld roomdesign
-              file roomdesign
-            fi
-            test -z "$(git status --porcelain)"
+            test "$(git status --porcelain -- package-lock.json)" = " M package-lock.json"
+            test "$(git status --porcelain -- roomdesign)" = "?? roomdesign"
+            test -L roomdesign
+            test "$(readlink roomdesign)" = "/etc/nginx/sites-available/roomdesign"
+            unexpected_changes="$(git status --porcelain | grep -v -e '^ M package-lock.json$' -e '^?? roomdesign$' || true)"
+            test -z "$unexpected_changes"
+            git stash push -m "production-package-lock-before-rollback-133faa6" -- package-lock.json
+            test -z "$(git status --porcelain -- package-lock.json)"
             git fetch origin main
             test "$(git rev-parse origin/main)" = "$expected_current_sha"
             git cat-file -e "${rollback_sha}^{commit}"
@@ -65,7 +68,8 @@ jobs:
             }
             trap rollback_build ERR
 
-            npm install
+            npm ci
+            test -z "$(git status --porcelain -- package-lock.json)"
 
             test ! -e .next.rollback
             test -d .next
