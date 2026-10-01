@@ -20,7 +20,9 @@ jobs:
             set -eu
             cd ~/ABACUS
 
-            echo "PRODUCTION_SHA_BEFORE=$(git rev-parse HEAD)"
+            previous_sha="$(git rev-parse HEAD)"
+            rollback_dir=".next.rollback-${previous_sha}-$(date +%Y%m%d%H%M%S)"
+            echo "PRODUCTION_SHA_BEFORE=${previous_sha}"
             pm2 describe roomdesign
 
             git fetch origin main
@@ -30,18 +32,18 @@ jobs:
 
             npm install
 
-            test ! -e .next.rollback
+            test ! -e "$rollback_dir"
             pm2 stop roomdesign
             if [ -d .next ]; then
-              mv .next .next.rollback
+              mv .next "$rollback_dir"
             fi
 
             rollback_build() {
               result=$?
               trap - ERR
               rm -rf .next
-              if [ -d .next.rollback ]; then
-                mv .next.rollback .next
+              if [ -d "$rollback_dir" ]; then
+                mv "$rollback_dir" .next
                 pm2 restart roomdesign --update-env
               fi
               exit "$result"
@@ -61,7 +63,7 @@ jobs:
             printf '%s' "$production_css" | grep -q '\.material-brush-trigger'
 
             trap - ERR
-            rm -rf .next.rollback
+            echo "ROLLBACK_BUILD=${rollback_dir}"
 
             echo "PRODUCTION_SHA_AFTER=$(git rev-parse HEAD)"
             pm2 describe roomdesign

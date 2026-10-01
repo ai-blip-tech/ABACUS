@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 
 const imageBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
-test("stable Add, Replace and Remove request routing remains unchanged", async ({ page, browserName }, testInfo) => {
+test("Add, Replace and Remove use point-guided routing without segmentation", async ({ page, browserName }, testInfo) => {
   test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium-1440");
   const requests: Array<Record<string, unknown>> = [];
+  let segmentRequests = 0;
 
   await page.route("**/api/account/overview", (route) => route.fulfill({
     contentType: "application/json",
@@ -19,6 +20,7 @@ test("stable Add, Replace and Remove request routing remains unchanged", async (
     requests.push(route.request().postDataJSON() as Record<string, unknown>);
     await route.fulfill({ status: 200, contentType: "image/png", body: imageBytes });
   });
+  await page.route("**/api/segment", async (route) => { segmentRequests += 1; await route.abort(); });
 
   await page.goto("/");
   await page.getByRole("button", { name: "Войти" }).click();
@@ -39,7 +41,9 @@ test("stable Add, Replace and Remove request routing remains unchanged", async (
   expect(requests[0].placement).toBeTruthy();
   expect(requests[0].replacement).toBeUndefined();
   expect(requests[0].removal).toBeUndefined();
-  expect(requests[0].operation).toBeUndefined();
+  expect(requests[0].operation).toBe("place");
+  expect(requests[0].pointEdit).toBeTruthy();
+  expect((requests[0].pointEdit as Record<string, unknown>).markedImage).toBeTruthy();
 
   await page.locator(".room-canvas").hover();
   await actions.getByRole("button", { name: "Заменить" }).click();
@@ -48,9 +52,10 @@ test("stable Add, Replace and Remove request routing remains unchanged", async (
   await page.getByRole("button", { name: "Создать интерьер" }).click();
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[1].replacement).toBeTruthy();
-  expect(requests[1].placement).toBeTruthy();
+  expect(requests[1].placement).toBeUndefined();
   expect(requests[1].removal).toBeUndefined();
-  expect(requests[1].operation).toBeUndefined();
+  expect(requests[1].operation).toBe("replace");
+  expect(requests[1].pointEdit).toBeTruthy();
 
   await page.locator(".room-canvas").hover();
   await actions.getByRole("button", { name: "Удалить" }).click();
@@ -59,5 +64,7 @@ test("stable Add, Replace and Remove request routing remains unchanged", async (
   expect(requests[2].removal).toBeTruthy();
   expect(requests[2].placement).toBeUndefined();
   expect(requests[2].replacement).toBeUndefined();
-  expect(requests[2].operation).toBeUndefined();
+  expect(requests[2].operation).toBe("remove");
+  expect(requests[2].pointEdit).toBeTruthy();
+  expect(segmentRequests).toBe(0);
 });

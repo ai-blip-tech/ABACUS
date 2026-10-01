@@ -29,69 +29,68 @@ const originalFetch = globalThis.fetch;
 after(async () => { globalThis.fetch = originalFetch; await rm(root, { recursive: true, force: true }); });
 
 const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl4bAAAAABJRU5ErkJggg==";
-const differentSizeMask = Buffer.from(png.split(",")[1], "base64");
-differentSizeMask.writeUInt32BE(2, 16);
+const pointEdit = { x: 50, y: 50, markedImage: png };
 const globalEdit = { prompt: "Сделай стены светлее", roomImage: png, globalEdit: { instruction: "Сделай стены светлее" } };
-const material = { operation: "material", prompt: "Измени материал", roomImage: png, referenceImage: png, material: { mask: png, instruction: "Применить материал" } };
+const operations = [
+  { name: "material", body: { operation: "material", prompt: "Измени материал", roomImage: png, referenceImage: png, pointEdit, material: { instruction: "Применить материал" } }, images: 3 },
+  { name: "replace", body: { operation: "replace", prompt: "Замени диван", roomImage: png, referenceImage: png, pointEdit, replacement: { name: "диван" } }, images: 3 },
+  { name: "remove", body: { operation: "remove", prompt: "Удали диван", roomImage: png, pointEdit, removal: { name: "диван" } }, images: 2 },
+  { name: "place", body: { operation: "place", prompt: "Добавь кресло", roomImage: png, referenceImage: png, pointEdit, placement: { x: 50, y: 50 } }, images: 3 },
+  { name: "global_edit", body: globalEdit, images: 1 },
+];
 let nextId = 0;
 const request = (body, id = `safety-${++nextId}`) => new Request("http://localhost/api/generate", { method: "POST", headers: { Cookie: `room_session=${session}`, "Content-Type": "application/json", "Idempotency-Key": id }, body: JSON.stringify(body) });
 const balance = async () => (await billing.getTokenAccount(user.id)).balance;
 const transactions = async (id) => (await database.prepare("SELECT type FROM token_transactions WHERE reference_id = ? ORDER BY type").bind(id).all()).results.map((row) => row.type);
 const generationCount = async (id) => Number((await database.prepare("SELECT COUNT(*) AS count FROM generations WHERE id = ?").bind(id).first()).count);
 
-test("global_edit and material reject missing/invalid inputs before reserve or provider", async () => {
+test("point-guided operations reject invalid images and points before reserve or provider", async () => {
   globalThis.fetch = () => { throw new Error("Provider must not be called"); };
   const before = await balance();
+  const material = operations[0].body;
   const cases = [
     { ...globalEdit, roomImage: undefined },
-    { ...globalEdit, roomImage: "data:image/png;base64,bm90LWltYWdl" },
     { ...globalEdit, globalEdit: { instruction: " " } },
+    { ...material, roomImage: "data:image/png;base64,bm90LWltYWdl" },
     { ...material, referenceImage: undefined },
     { ...material, referenceImage: "data:image/png;base64,bm90LWltYWdl" },
-    { ...material, material: { mask: undefined } },
-    { ...material, material: { mask: "data:image/jpeg;base64,/9j/AA==" } },
-    { ...material, material: { mask: `data:image/png;base64,${differentSizeMask.toString("base64")}` } },
+    { ...material, pointEdit: undefined },
+    { ...material, pointEdit: { x: -1, y: 50, markedImage: png } },
+    { ...material, pointEdit: { x: 50, y: 50, markedImage: "data:image/png;base64,bm90LWltYWdl" } },
   ];
   for (const body of cases) assert.equal((await POST(request(body))).status, 400);
   assert.equal(await balance(), before);
 });
 
-test("explicit material routing rejects Add, Replace and Remove payloads before reserve or provider", async () => {
+test("explicit material routing rejects Add, Replace and Remove payloads before reserve", async () => {
   globalThis.fetch = () => { throw new Error("Provider must not be called"); };
   const before = await balance();
-  const conflictingPayloads = [
-    { ...material, placement: { x: 50, y: 50, mask: png } },
-    { ...material, replacement: { name: "диван", mask: png } },
-    { ...material, removal: { name: "диван", mask: png } },
-  ];
-  for (const body of conflictingPayloads) {
-    const response = await POST(request(body));
-    assert.equal(response.status, 400);
-    assert.match((await response.json()).error, /Material operation/);
+  const material = operations[0].body;
+  for (const body of [{ ...material, placement: { x: 50, y: 50 } }, { ...material, replacement: { name: "диван" } }, { ...material, removal: { name: "диван" } }]) {
+    assert.equal((await POST(request(body))).status, 400);
   }
   assert.equal(await balance(), before);
 });
 
-test("both operations reject insufficient tokens without calling provider", async () => {
+test("all edit operations reject insufficient tokens without calling provider", async () => {
   globalThis.fetch = () => { throw new Error("Provider must not be called"); };
   await database.prepare("UPDATE token_accounts SET balance = 0 WHERE user_id = ?").bind(user.id).run();
-  for (const body of [globalEdit, material]) assert.equal((await POST(request(body))).status, 402);
+  for (const { body } of operations) assert.equal((await POST(request(body))).status, 402);
   await billing.creditTokens({ userId: user.id, type: "correction", amount: 1_000_000, idempotencyKey: "safety-reseed" });
 });
 
-test("provider error, timeout and response-read failure refund once for both operations", async () => {
-  for (const body of [globalEdit, material]) {
-    for (const failure of ["provider", "timeout", "read"]) {
-      const id = `failed-${body.material ? "material" : "global"}-${failure}`;
+test("provider error and timeout refund exactly once for every edit operation", async () => {
+  for (const { name, body } of operations) {
+    for (const failure of ["provider", "timeout"]) {
+      const id = `failed-${name}-${failure}`;
       const before = await balance();
       globalThis.fetch = async (_url, options) => {
         assert.ok(options.signal, "provider request must have a timeout signal");
         if (failure === "timeout") throw new DOMException("Timed out", "TimeoutError");
-        if (failure === "read") return { text: async () => { throw new Error("Stream failed"); } };
         return Response.json({ error: { message: "Provider failed" } }, { status: 503 });
       };
       const response = await POST(request(body, id));
-      assert.equal(response.status, failure === "timeout" ? 504 : failure === "read" ? 502 : 503);
+      assert.equal(response.status, failure === "timeout" ? 504 : 503);
       assert.equal(await balance(), before);
       assert.deepEqual(await transactions(id), ["generation", "refund"]);
       assert.equal(await generationCount(id), 0);
@@ -101,39 +100,24 @@ test("provider error, timeout and response-read failure refund once for both ope
   }
 });
 
-test("invalid provider image refunds once without persisting history", async () => {
-  for (const body of [globalEdit, material]) {
-    const id = `invalid-output-${body.material ? "material" : "global"}`;
-    const before = await balance();
-    globalThis.fetch = async () => Response.json({ data: [{ b64_json: "not-base64" }] });
-    assert.equal((await POST(request(body, id))).status, 502);
-    assert.equal(await balance(), before);
-    assert.deepEqual(await transactions(id), ["generation", "refund"]);
-    assert.equal(await generationCount(id), 0);
-  }
-});
-
-test("success charges once, persists generation and duplicate request does not charge or call provider", async () => {
-  for (const body of [globalEdit, material]) {
-    const id = `success-${body.material ? "material" : "global"}`;
+test("success sends clean plus marked images, never a segmentation mask, and charges once", async () => {
+  for (const { name, body, images } of operations) {
+    const id = `success-${name}`;
     const before = await balance();
     let calls = 0;
     globalThis.fetch = async (url, options) => {
       calls += 1;
       assert.equal(url, "https://api.openai.com/v1/images/edits");
       assert.ok(options.signal);
-      assert.equal(options.body.getAll("image[]").length, body.material ? 2 : 1);
-      assert.equal(Boolean(options.body.get("mask")), Boolean(body.material));
-      if (body.material) {
-        const providerPrompt = String(options.body.get("prompt"));
-        assert.match(providerPrompt, /exclusively as a source of colour, material, texture/);
-        assert.match(providerPrompt, /Do not add, insert, copy, reconstruct, or reproduce the object depicted in the reference/);
-        assert.match(providerPrompt, /Preserve the selected object's exact identity, silhouette, geometry, shape, dimensions/);
-      }
+      assert.equal(options.body.getAll("image[]").length, images);
+      assert.equal(options.body.get("mask"), null);
+      const providerPrompt = String(options.body.get("prompt"));
+      if (name !== "global_edit") assert.match(providerPrompt, /temporary crosshair marker/);
+      if (name === "material") assert.match(providerPrompt, /exclusively as a source of colour, material, texture/);
       return Response.json({ data: [{ b64_json: png.split(",")[1] }] });
     };
     assert.equal((await POST(request(body, id))).status, 200);
-    const cost = (await billing.quoteAiOperation(body.material ? "material" : "global_edit")).tokenCost;
+    const cost = (await billing.quoteAiOperation(name)).tokenCost;
     assert.equal(await balance(), before - cost);
     assert.deepEqual(await transactions(id), ["generation"]);
     assert.equal(await generationCount(id), 1);

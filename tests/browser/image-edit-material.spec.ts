@@ -5,6 +5,7 @@ const imageBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAA
 test("global image edit and material restyling remain composable with local tools", async ({ page, browserName }, testInfo) => {
   test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium-1440");
   const requests: Array<Record<string, unknown>> = [];
+  let segmentRequests = 0;
 
   await page.route("**/api/account/overview", (route) => route.fulfill({
     contentType: "application/json",
@@ -15,7 +16,7 @@ test("global image edit and material restyling remain composable with local tool
     }),
   }));
   await page.route("**/api/account/generations/edit-source", (route) => route.fulfill({ status: 200, contentType: "image/png", body: imageBytes }));
-  await page.route("**/api/segment", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ polygons: [[[0, 0], [1, 0], [1, 1], [0, 1]]] }) }));
+  await page.route("**/api/segment", async (route) => { segmentRequests += 1; await route.abort(); });
   await page.route("**/api/generate", async (route) => {
     requests.push(route.request().postDataJSON() as Record<string, unknown>);
     await route.fulfill({ status: 200, contentType: "image/png", body: imageBytes });
@@ -56,7 +57,9 @@ test("global image edit and material restyling remain composable with local tool
   const assertMaterialRequest = (request: Record<string, unknown>) => {
     expect(request.operation).toBe("material");
     expect(request.material).toBeTruthy();
-    expect((request.material as Record<string, unknown>).mask).toBeTruthy();
+    expect((request.material as Record<string, unknown>).mask).toBeUndefined();
+    expect(request.pointEdit).toBeTruthy();
+    expect((request.pointEdit as Record<string, unknown>).markedImage).toBeTruthy();
     expect(request.referenceImage).toBeTruthy();
     expect(request.placement).toBeUndefined();
     expect(request.replacement).toBeUndefined();
@@ -82,5 +85,6 @@ test("global image edit and material restyling remain composable with local tool
   await expect.poll(() => requests.length).toBe(3);
   expect(requests[2].globalEdit).toEqual({ instruction });
   expect(requests[2].adjustment).toBeUndefined();
+  expect(segmentRequests).toBe(0);
   await expect(page.getByText("Изменение изображения")).toBeVisible();
 });
