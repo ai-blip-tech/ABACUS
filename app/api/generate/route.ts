@@ -187,6 +187,17 @@ async function generateResponse(request: Request) {
     }
   }
   const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
+  const diagnosticBranch = body.roomImage && body.referenceImage && body.material?.mask ? "material"
+    : body.roomImage && body.globalEdit?.instruction ? "global_edit"
+    : body.roomImage && body.referenceImage && body.replacement?.mask ? "replace"
+    : body.roomImage && body.removal?.mask ? "remove"
+    : (body.roomImage && body.referenceImage && body.placement?.mask) || (body.roomImage && body.product && body.placement?.mask) ? "add"
+    : "other";
+  const diagnosticMaskPresent = Boolean(body.material?.mask || body.placement?.mask || body.replacement?.mask || body.removal?.mask || body.adjustment?.mask);
+  const diagnosticProviderInputImages = diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 2
+    : diagnosticBranch === "remove" || diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
+    : 0;
+  const diagnosticProviderEndpoint = body.roomImage || body.planRender?.planImage ? "openai.images.edits" : "openai.images.generations";
   if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first()) {
     return Response.json({ error: "Эта AI-операция уже выполнена." }, { status: 409 });
   }
@@ -324,6 +335,20 @@ async function generateResponse(request: Request) {
     await refundReservation("Возврат после технической ошибки подготовки AI-операции");
     return Response.json({ error: providerTimedOut(error) ? "Сервис генерации не ответил вовремя. Попробуйте ещё раз." : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
   }
+  console.info("[generate-runtime-diagnostic]", JSON.stringify({
+    requestId: operationId,
+    operation,
+    materialPresent: Boolean(body.material),
+    referencePresent: Boolean(body.referenceImage),
+    maskPresent: diagnosticMaskPresent,
+    placementPresent: Boolean(body.placement),
+    replacementPresent: Boolean(body.replacement),
+    removalPresent: Boolean(body.removal),
+    backendBranch: diagnosticBranch,
+    providerInputImagesCount: diagnosticProviderInputImages,
+    providerMask: diagnosticMaskPresent,
+    providerEndpoint: diagnosticProviderEndpoint,
+  }));
   let responseText: string;
   try {
     responseText = await response.text();
