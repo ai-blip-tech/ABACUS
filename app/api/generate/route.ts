@@ -114,7 +114,25 @@ async function generateResponse(request: Request) {
     if (!mediaType || !encoded) throw new Error("Некорректный формат изображения.");
     return new Blob([Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))], { type: mediaType });
   };
-  const imageSourceToBlob = async (source: string) => {
+  const validatedEditImage = async (source: string | undefined, label: string, mask = false) => {
+    if (!source) throw new Error(`Загрузите ${label}.`);
+    const blob = dataUrlToBlob(source);
+    if (!(["image/png", "image/jpeg", "image/webp"].includes(blob.type)) || (mask && blob.type !== "image/png") || !blob.size || blob.size > 15 * 1024 * 1024) {
+      throw new Error(`Некорректное изображение: ${label}.`);
+    }
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const png = bytes.length >= 26 && bytes.slice(0, 8).every((byte, index) => byte === [137, 80, 78, 71, 13, 10, 26, 10][index]);
+    const jpeg = bytes.length >= 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+    const webp = bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+    if (!(blob.type === "image/png" && png || blob.type === "image/jpeg" && jpeg || blob.type === "image/webp" && webp)) {
+      throw new Error(`Некорректное изображение: ${label}.`);
+    }
+    if (mask && ![4, 6].includes(bytes[25])) throw new Error("Маска должна быть PNG с прозрачностью.");
+    const dimensions = png ? { width: new DataView(bytes.buffer).getUint32(16), height: new DataView(bytes.buffer).getUint32(20) } : null;
+    if (dimensions && (!dimensions.width || !dimensions.height)) throw new Error(`Некорректное изображение: ${label}.`);
+    return dimensions;
+  };
+  const imageSourceToBlob = async (source: string, signal?: AbortSignal) => {
     if (source.startsWith("data:")) return dataUrlToBlob(source);
     let imageUrl: URL;
     try {
@@ -125,7 +143,7 @@ async function generateResponse(request: Request) {
     if (imageUrl.protocol !== "https:" || !/(^|\.)norrmobler\.ru$/i.test(imageUrl.hostname)) {
       throw new Error("Источник изображения товара не поддерживается.");
     }
-    const imageResponse = await fetch(imageUrl, { headers: { Accept: "image/*", "User-Agent": "ROOM-design-catalog/1.0" } });
+    const imageResponse = await fetch(imageUrl, { headers: { Accept: "image/*", "User-Agent": "ROOM-design-catalog/1.0" }, signal });
     if (!imageResponse.ok) throw new Error("Не удалось загрузить фотографию товара из каталога.");
     const contentType = imageResponse.headers.get("content-type")?.split(";")[0] || "";
     if (!contentType.startsWith("image/")) throw new Error("Каталог вернул файл, который не является изображением.");
@@ -140,9 +158,30 @@ async function generateResponse(request: Request) {
   };
 
   const operation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  if (operation === "global_edit" || operation === "material") {
+    try {
+      const roomDimensions = await validatedEditImage(body.roomImage, "текущее изображение");
+      if (operation === "global_edit" && !body.globalEdit?.instruction?.trim()) throw new Error("Опишите изменение изображения.");
+      if (operation === "material") {
+        const maskDimensions = await validatedEditImage(body.material?.mask, "маску выбранной поверхности", true);
+        if (roomDimensions && maskDimensions && (roomDimensions.width !== maskDimensions.width || roomDimensions.height !== maskDimensions.height)) throw new Error("Размер маски не совпадает с изображением.");
+        if (!body.referenceImage) throw new Error("Загрузите референс материала.");
+        if (body.referenceImage.startsWith("data:")) await validatedEditImage(body.referenceImage, "референс материала");
+        else {
+          const url = new URL(body.referenceImage);
+          if (url.protocol !== "https:" || !/(^|\.)norrmobler\.ru$/i.test(url.hostname)) throw new Error("Источник референса материала не поддерживается.");
+        }
+      }
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Некорректные данные изображения." }, { status: 400 });
+    }
+  }
   const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
   if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first()) {
     return Response.json({ error: "Эта AI-операция уже выполнена." }, { status: 409 });
+  }
+  if ((operation === "material" || operation === "global_edit") && await database.prepare("SELECT id FROM token_transactions WHERE user_id = ? AND idempotency_key = ?").bind(user.id, `ai-refund:${operationId}`).first()) {
+    return Response.json({ error: "Эта AI-операция уже завершилась ошибкой. Повторите попытку как новую операцию." }, { status: 409 });
   }
   let reservation: Awaited<ReturnType<typeof reserveAiTokens>>;
   try {
@@ -151,9 +190,15 @@ async function generateResponse(request: Request) {
     const message = error instanceof Error ? error.message : "Недостаточно токенов.";
     return Response.json({ error: message }, { status: message.includes("Недостаточно") ? 402 : 400 });
   }
+  let refunded = false;
   const refundReservation = async (reason: string) => {
-    if (reservation.transaction) await refundAiTokens(user.id, operationId, reservation.quote.tokenCost, reason);
+    if (reservation.transaction && !refunded) {
+      await refundAiTokens(user.id, operationId, reservation.quote.tokenCost, reason);
+      refunded = true;
+    }
   };
+  const providerTimeout = operation === "material" || operation === "global_edit" ? AbortSignal.timeout(180_000) : undefined;
+  const providerTimedOut = (error?: unknown) => providerTimeout?.aborted || error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 
   let response: Response;
   try {
@@ -186,13 +231,13 @@ async function generateResponse(request: Request) {
       form.append("model", model);
       form.append("prompt", materialPrompt);
       form.append("image[]", dataUrlToBlob(body.roomImage), "selected-surface.png");
-      const materialBlob = await imageSourceToBlob(body.referenceImage);
+      const materialBlob = await imageSourceToBlob(body.referenceImage, providerTimeout);
       form.append("image[]", materialBlob, `material-reference.${materialBlob.type.split("/")[1] || "jpg"}`);
       form.append("mask", dataUrlToBlob(body.material.mask), "selected-surface-mask.png");
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else if (body.roomImage && body.globalEdit?.instruction) {
       const form = new FormData();
       form.append("model", model);
@@ -201,7 +246,7 @@ async function generateResponse(request: Request) {
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else if (body.roomImage && body.referenceImage && body.replacement?.mask) {
       const form = new FormData();
       form.append("model", model);
@@ -267,9 +312,15 @@ async function generateResponse(request: Request) {
     }
   } catch (error) {
     await refundReservation("Возврат после технической ошибки подготовки AI-операции");
-    return Response.json({ error: error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: 400 });
+    return Response.json({ error: providerTimedOut(error) ? "Сервис генерации не ответил вовремя. Попробуйте ещё раз." : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
   }
-  const responseText = await response.text();
+  let responseText: string;
+  try {
+    responseText = await response.text();
+  } catch {
+    await refundReservation("Возврат после ошибки чтения ответа AI-провайдера");
+    return Response.json({ error: providerTimedOut() ? "Сервис генерации не ответил вовремя. Попробуйте ещё раз." : "Не удалось получить ответ сервиса генерации." }, { status: providerTimedOut() ? 504 : 502 });
+  }
   let result: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string }; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } } = {};
   try {
     result = JSON.parse(responseText);
@@ -289,7 +340,14 @@ async function generateResponse(request: Request) {
     return Response.json({ error: "Изображение не вернулось от модели." }, { status: 502 });
   }
 
-  const binary = Uint8Array.from(atob(encodedImage), (character) => character.charCodeAt(0));
+  let binary: Uint8Array<ArrayBuffer>;
+  try {
+    binary = Uint8Array.from(atob(encodedImage), (character) => character.charCodeAt(0));
+    if (!binary.byteLength) throw new Error("Пустое изображение.");
+  } catch {
+    await refundReservation("Возврат после некорректного изображения AI-провайдера");
+    return Response.json({ error: "Сервис генерации вернул некорректное изображение." }, { status: 502 });
+  }
   const outputKey = `${tenantStoragePrefix(user)}/generations/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.webp`;
   try {
     await storage().put(outputKey, binary, { httpMetadata: { contentType: "image/webp" } });
