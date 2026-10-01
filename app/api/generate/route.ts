@@ -11,7 +11,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; removal?: { name?: string; mask?: string }; replacement?: { name?: string; mask?: string }; placement?: { x?: number; y?: number; mask?: string }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string; mask?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
+  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; removal?: { name?: string; mask?: string }; replacement?: { name?: string; mask?: string }; placement?: { x?: number; y?: number; mask?: string }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string; mask?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -70,10 +70,11 @@ async function generateResponse(request: Request) {
     "Return a photorealistic full-frame result. No text, logos, or watermark unless the user's instruction explicitly requires existing text to remain.",
   ].join("\n") : "";
   const materialPrompt = body.material ? [
-    "Perform one strictly local material and surface restyling operation in the first image of a completed interior.",
-    "Use the second image only as the visual reference for colour, material, texture, finish, and surface character.",
+    "Retexture or re-material only the selected masked surface in the first image of the completed interior.",
+    "Use the second image exclusively as a source of colour, material, texture, pattern, finish, and surface character, even when it depicts a complete object.",
     body.material.instruction || "Transfer the referenced material to the selected surface.",
-    "Keep the selected object's exact identity, silhouette, geometry, construction, size, position, perspective, seams, and surrounding scene. Do not replace it with another object.",
+    "Preserve the selected object's exact identity, silhouette, geometry, shape, dimensions, construction, position, perspective, seams, and surrounding scene.",
+    "Do not add, insert, copy, reconstruct, or reproduce the object depicted in the reference. Do not replace the selected object with the reference object or change its furniture category.",
     "The transparent mask is the only permitted edit area. Preserve every pixel outside the mask visually identical.",
     "Match the existing lighting and shadows. No new objects, people, text, logos, or watermark.",
   ].join("\n") : "";
@@ -157,7 +158,16 @@ async function generateResponse(request: Request) {
     return new Blob([await sample.arrayBuffer()], { type: sample.headers.get("content-type") || "image/jpeg" });
   };
 
-  const operation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  const inferredOperation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  const requestedOperation = body.operation?.trim();
+  const supportedOperations = new Set(["plan_render", "upscale", "material", "global_edit", "remove", "replace", "place", "adjust", "generate"]);
+  if (requestedOperation && (!supportedOperations.has(requestedOperation) || requestedOperation !== inferredOperation)) {
+    return Response.json({ error: "Тип AI-операции не соответствует переданным данным." }, { status: 400 });
+  }
+  const operation = requestedOperation || inferredOperation;
+  if (operation === "material" && (body.placement || body.replacement || body.removal || body.adjustment || body.globalEdit || body.planRender || body.upscale || body.product)) {
+    return Response.json({ error: "Material operation не может выполнять добавление, замену или удаление объекта." }, { status: 400 });
+  }
   if (operation === "global_edit" || operation === "material") {
     try {
       const roomDimensions = await validatedEditImage(body.roomImage, "текущее изображение");
