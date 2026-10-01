@@ -11,7 +11,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; removal?: { name?: string; mask?: string }; replacement?: { name?: string; mask?: string }; placement?: { x?: number; y?: number; mask?: string }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string; mask?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
+  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -41,20 +41,21 @@ async function generateResponse(request: Request) {
     "No people, no text, no logos, no watermark.",
   ].filter(Boolean).join("\n");
 
-  const placementDescription = body.placement ? `The selected placement point is at ${Math.round(body.placement.x || 0)}% from the left and ${Math.round(body.placement.y || 0)}% from the top of the room image. Place the visual centre of the new item at that point.` : "";
+  const pointDescription = body.pointEdit ? `The marker centre is at ${Math.round(body.pointEdit.x || 0)}% from the left and ${Math.round(body.pointEdit.y || 0)}% from the top.` : "";
   const editPrompt = [
-    "Use the first image as the completed interior to preserve.",
-    "Use the second image as the exact furniture reference.",
-    "Add that specific furniture item naturally to the interior. Match the room's perspective, scale, lighting, material realism, contact shadows and colour. Do not replace the room or invent a different item.",
-    placementDescription,
-    "The transparent mask is the only permitted edit area. Keep all pixels outside it visually identical.",
+    "Use image 1 as the clean completed interior to preserve.",
+    "Image 2 is the same interior with a temporary crosshair marker. The marker centre is the insertion location and must not appear in the result.",
+    "Use image 3 as the exact furniture reference. Add that specific furniture item naturally at the marked location.",
+    pointDescription,
+    "Match perspective, scale, lighting, material realism and contact shadows. Preserve the rest of the room as closely as possible.",
     "No people, no text, no logos, no watermark.",
   ].join("\n");
   const catalogPlacementPrompt = [
-    "Perform one local furniture addition in the first image of a completed interior.",
+    "Use image 1 as the clean completed interior to preserve.",
+    "Image 2 is the same interior with a temporary crosshair marker. The marker centre is the insertion location and must not appear in the result.",
     `Add this item naturally: ${body.product || "selected furniture"}.`,
-    placementDescription,
-    "The transparent mask is the only permitted edit area. Preserve every pixel outside it visually identical. Match perspective, scale, lighting and contact shadows.",
+    pointDescription,
+    "Match perspective, scale, lighting and contact shadows. Preserve the rest of the room as closely as possible.",
     "No people, no text, no logos, no watermark.",
   ].join("\n");
   const adjustmentPrompt = body.adjustment?.instruction ? [
@@ -70,12 +71,14 @@ async function generateResponse(request: Request) {
     "Return a photorealistic full-frame result. No text, logos, or watermark unless the user's instruction explicitly requires existing text to remain.",
   ].join("\n") : "";
   const materialPrompt = body.material ? [
-    "Retexture or re-material only the selected masked surface in the first image of the completed interior.",
-    "Use the second image exclusively as a source of colour, material, texture, pattern, finish, and surface character, even when it depicts a complete object.",
+    "Use image 1 as the clean completed interior.",
+    "Image 2 is the same interior with a temporary crosshair marker. Identify the complete semantic object or surface containing the marker centre. The marker must not appear in the result.",
+    "Use image 3 exclusively as a source of colour, material, texture, pattern, finish, and surface character, even when it depicts a complete object.",
+    pointDescription,
     body.material.instruction || "Transfer the referenced material to the selected surface.",
     "Preserve the selected object's exact identity, silhouette, geometry, shape, dimensions, construction, position, perspective, seams, and surrounding scene.",
     "Do not add, insert, copy, reconstruct, or reproduce the object depicted in the reference. Do not replace the selected object with the reference object or change its furniture category.",
-    "The transparent mask is the only permitted edit area. Preserve every pixel outside the mask visually identical.",
+    "Change predominantly the selected object's surface. Preserve the surrounding scene as closely as possible.",
     "Match the existing lighting and shadows. No new objects, people, text, logos, or watermark.",
   ].join("\n") : "";
   const upscalePrompt = [
@@ -92,20 +95,23 @@ async function generateResponse(request: Request) {
     "Keep the room dimensions and all objects proportional. Do not add extra furniture. No people, no text, no logos, no watermark.",
   ].join("\n");
   const replacementPrompt = body.replacement?.name ? [
-    "Perform one strictly local furniture replacement in the first image of a finished interior.",
-    `Replace only the selected existing object: ${body.replacement.name}.`,
-    "The transparent area in the mask is the only permitted edit zone. The second image is the exact furniture reference to place there.",
-    "Reproduce the furniture from the second image faithfully: preserve its exact number of modules, silhouette, proportions, upholstery, seams, legs, colour, and distinctive details. Do not simplify, reinterpret, combine, or invent another model.",
+    "Use image 1 as the clean finished interior to preserve.",
+    "Image 2 is the same interior with a temporary crosshair marker. Identify the complete semantic object containing the marker centre; the marker must not appear in the result.",
+    `Replace only that selected object: ${body.replacement.name}.`,
+    "Image 3 is the exact furniture reference to place instead of the selected object.",
+    "Reproduce the furniture from image 3 faithfully: preserve its exact number of modules, silhouette, proportions, upholstery, seams, legs, colour, and distinctive details.",
+    pointDescription,
     "Do not add a second item. The reference furniture must occupy the position of the selected existing object only, with believable scale, perspective, contact shadows, and lighting.",
-    "Everything outside the transparent mask must remain visually identical to the first image. Do not alter, remove, move, crop, regenerate, or retouch any other furniture, décor, table, wall, floor, lighting, material, shadow, or composition.",
+    "Preserve all other furniture, décor, architecture, lighting, materials and composition as closely as possible.",
     "Keep the original image dimensions and camera framing exactly unchanged. No people, no text, no logos, no watermark.",
   ].join("\n") : "";
   const removalPrompt = body.removal?.name ? [
-    "Perform one strictly local edit on the first image of a finished interior.",
-    `Remove only the selected object: ${body.removal.name}.`,
-    "The transparent area in the mask is the only permitted edit zone. Modify pixels only inside that transparent mask.",
-    "Everything outside the transparent mask must remain visually identical to the original: do not alter, regenerate, move, crop, restyle, add, remove, or retouch any other furniture, décor, wall, floor, lighting, object, material, shadow, or composition.",
-    "Inside the masked area only, reconstruct the background that would naturally be visible behind the removed object, matching the immediately surrounding materials and lighting.",
+    "Use image 1 as the clean finished interior to preserve.",
+    "Image 2 is the same interior with a temporary crosshair marker. Identify the complete semantic object containing the marker centre; the marker must not appear in the result.",
+    `Remove that entire selected object: ${body.removal.name}.`,
+    pointDescription,
+    "Naturally reconstruct the background that was hidden behind the removed object. Do not add or replace it with another object.",
+    "Preserve all other furniture, décor, walls, floor, lighting, materials, perspective and composition as closely as possible.",
     "Keep the original image dimensions and camera framing exactly unchanged.",
     "No people, no text, no logos, no watermark.",
   ].join("\n") : "";
@@ -168,15 +174,17 @@ async function generateResponse(request: Request) {
   if (operation === "material" && (body.placement || body.replacement || body.removal || body.adjustment || body.globalEdit || body.planRender || body.upscale || body.product)) {
     return Response.json({ error: "Material operation не может выполнять добавление, замену или удаление объекта." }, { status: 400 });
   }
-  if (operation === "global_edit" || operation === "material") {
+  if (["global_edit", "material", "remove", "replace", "place"].includes(operation)) {
     try {
-      const roomDimensions = await validatedEditImage(body.roomImage, "текущее изображение");
+      await validatedEditImage(body.roomImage, "текущее изображение");
       if (operation === "global_edit" && !body.globalEdit?.instruction?.trim()) throw new Error("Опишите изменение изображения.");
-      if (operation === "material") {
-        const maskDimensions = await validatedEditImage(body.material?.mask, "маску выбранной поверхности", true);
-        if (roomDimensions && maskDimensions && (roomDimensions.width !== maskDimensions.width || roomDimensions.height !== maskDimensions.height)) throw new Error("Размер маски не совпадает с изображением.");
-        if (!body.referenceImage) throw new Error("Загрузите референс материала.");
-        if (body.referenceImage.startsWith("data:")) await validatedEditImage(body.referenceImage, "референс материала");
+      if (operation !== "global_edit") {
+        if (!Number.isFinite(body.pointEdit?.x) || !Number.isFinite(body.pointEdit?.y) || (body.pointEdit?.x as number) < 0 || (body.pointEdit?.x as number) > 100 || (body.pointEdit?.y as number) < 0 || (body.pointEdit?.y as number) > 100) throw new Error("Поставьте точку на изображении.");
+        await validatedEditImage(body.pointEdit?.markedImage, "изображение с маркером");
+      }
+      if (["material", "replace"].includes(operation) || operation === "place" && !body.product) {
+        if (!body.referenceImage) throw new Error(operation === "material" ? "Загрузите референс материала." : "Загрузите референс предмета.");
+        if (body.referenceImage.startsWith("data:")) await validatedEditImage(body.referenceImage, operation === "material" ? "референс материала" : "референс предмета");
         else {
           const url = new URL(body.referenceImage);
           if (url.protocol !== "https:" || !/(^|\.)norrmobler\.ru$/i.test(url.hostname)) throw new Error("Источник референса материала не поддерживается.");
@@ -187,21 +195,22 @@ async function generateResponse(request: Request) {
     }
   }
   const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
-  const diagnosticBranch = body.roomImage && body.referenceImage && body.material?.mask ? "material"
+  const diagnosticBranch = body.roomImage && body.referenceImage && body.material && body.pointEdit?.markedImage ? "material"
     : body.roomImage && body.globalEdit?.instruction ? "global_edit"
-    : body.roomImage && body.referenceImage && body.replacement?.mask ? "replace"
-    : body.roomImage && body.removal?.mask ? "remove"
-    : (body.roomImage && body.referenceImage && body.placement?.mask) || (body.roomImage && body.product && body.placement?.mask) ? "add"
+    : body.roomImage && body.referenceImage && body.replacement && body.pointEdit?.markedImage ? "replace"
+    : body.roomImage && body.removal && body.pointEdit?.markedImage ? "remove"
+    : body.roomImage && body.placement && body.pointEdit?.markedImage && (body.referenceImage || body.product) ? "add"
     : "other";
-  const diagnosticMaskPresent = Boolean(body.material?.mask || body.placement?.mask || body.replacement?.mask || body.removal?.mask || body.adjustment?.mask);
-  const diagnosticProviderInputImages = diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 2
-    : diagnosticBranch === "remove" || diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
+  const diagnosticMaskPresent = Boolean(body.adjustment?.mask);
+  const diagnosticProviderInputImages = diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 3
+    : diagnosticBranch === "remove" || diagnosticBranch === "add" || Boolean(body.roomImage) && Boolean(body.pointEdit?.markedImage) ? 2
+    : diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
     : 0;
   const diagnosticProviderEndpoint = body.roomImage || body.planRender?.planImage ? "openai.images.edits" : "openai.images.generations";
   if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first()) {
     return Response.json({ error: "Эта AI-операция уже выполнена." }, { status: 409 });
   }
-  if ((operation === "material" || operation === "global_edit") && await database.prepare("SELECT id FROM token_transactions WHERE user_id = ? AND idempotency_key = ?").bind(user.id, `ai-refund:${operationId}`).first()) {
+  if (["material", "global_edit", "remove", "replace", "place"].includes(operation) && await database.prepare("SELECT id FROM token_transactions WHERE user_id = ? AND idempotency_key = ?").bind(user.id, `ai-refund:${operationId}`).first()) {
     return Response.json({ error: "Эта AI-операция уже завершилась ошибкой. Повторите попытку как новую операцию." }, { status: 409 });
   }
   let reservation: Awaited<ReturnType<typeof reserveAiTokens>>;
@@ -218,7 +227,7 @@ async function generateResponse(request: Request) {
       refunded = true;
     }
   };
-  const providerTimeout = operation === "material" || operation === "global_edit" ? AbortSignal.timeout(180_000) : undefined;
+  const providerTimeout = ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(180_000) : undefined;
   const providerTimedOut = (error?: unknown) => providerTimeout?.aborted || error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 
   let response: Response;
@@ -237,7 +246,7 @@ async function generateResponse(request: Request) {
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else if (body.roomImage && body.upscale) {
       const form = new FormData();
       form.append("model", model);
@@ -246,15 +255,15 @@ async function generateResponse(request: Request) {
       form.append("size", outputSize);
       form.append("quality", "high");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
-    } else if (body.roomImage && body.referenceImage && body.material?.mask) {
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.pointEdit?.markedImage && body.referenceImage && body.material) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", materialPrompt);
-      form.append("image[]", dataUrlToBlob(body.roomImage), "selected-surface.png");
+      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
+      form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
       const materialBlob = await imageSourceToBlob(body.referenceImage, providerTimeout);
       form.append("image[]", materialBlob, `material-reference.${materialBlob.type.split("/")[1] || "jpg"}`);
-      form.append("mask", dataUrlToBlob(body.material.mask), "selected-surface-mask.png");
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
@@ -268,29 +277,28 @@ async function generateResponse(request: Request) {
       form.append("quality", "medium");
       form.append("output_format", "webp");
       response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
-    } else if (body.roomImage && body.referenceImage && body.replacement?.mask) {
+    } else if (body.roomImage && body.pointEdit?.markedImage && body.referenceImage && body.replacement) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", replacementPrompt);
-      form.append("image[]", dataUrlToBlob(body.roomImage), "interior.png");
-      const referenceBlob = await imageSourceToBlob(body.referenceImage);
-      if (!referenceBlob) return Response.json({ error: "Не удалось загрузить фотографию товара из каталога." }, { status: 400 });
+      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
+      form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
+      const referenceBlob = await imageSourceToBlob(body.referenceImage, providerTimeout);
       form.append("image[]", referenceBlob, `furniture-reference.${referenceBlob.type.split("/")[1] || "jpg"}`);
-      form.append("mask", dataUrlToBlob(body.replacement.mask), "replacement-area-mask.png");
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
-    } else if (body.roomImage && body.removal?.mask) {
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.pointEdit?.markedImage && body.removal) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", removalPrompt);
-      form.append("image[]", dataUrlToBlob(body.roomImage), "interior.png");
-      form.append("mask", dataUrlToBlob(body.removal.mask), "selected-object-mask.png");
+      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
+      form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else if (body.roomImage && body.adjustment?.mask) {
       const form = new FormData();
       form.append("model", model);
@@ -300,30 +308,29 @@ async function generateResponse(request: Request) {
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
-    } else if (body.roomImage && body.referenceImage && body.placement?.mask) {
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.pointEdit?.markedImage && body.referenceImage && body.placement) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", editPrompt);
-      form.append("image[]", body.roomImage === "sample-interior" ? await sampleInteriorBlob() : dataUrlToBlob(body.roomImage), "interior.webp");
-      const referenceBlob = await imageSourceToBlob(body.referenceImage);
-      if (!referenceBlob) return Response.json({ error: "Не удалось загрузить фотографию товара из каталога." }, { status: 400 });
+      form.append("image[]", body.roomImage === "sample-interior" ? await sampleInteriorBlob() : dataUrlToBlob(body.roomImage), "clean-interior.webp");
+      form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
+      const referenceBlob = await imageSourceToBlob(body.referenceImage, providerTimeout);
       form.append("image[]", referenceBlob, `furniture-reference.${referenceBlob.type.split("/")[1] || "jpg"}`);
-      form.append("mask", dataUrlToBlob(body.placement.mask), "placement-area-mask.png");
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
-    } else if (body.roomImage && body.product && body.placement?.mask) {
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.pointEdit?.markedImage && body.product && body.placement) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", catalogPlacementPrompt);
-      form.append("image[]", body.roomImage === "sample-interior" ? await sampleInteriorBlob() : dataUrlToBlob(body.roomImage), "interior.webp");
-      form.append("mask", dataUrlToBlob(body.placement.mask), "placement-area-mask.png");
+      form.append("image[]", body.roomImage === "sample-interior" ? await sampleInteriorBlob() : dataUrlToBlob(body.roomImage), "clean-interior.webp");
+      form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form });
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else {
       response = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",

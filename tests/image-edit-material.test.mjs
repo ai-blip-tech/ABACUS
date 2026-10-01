@@ -18,7 +18,7 @@ test("free-text edit targets the current full image rather than the last placed 
   assert.match(route, /image\[\]", dataUrlToBlob\(body\.roomImage\), "current-interior\.png"/);
 });
 
-test("material brush is selection-gated and uses a distinct masked material operation", () => {
+test("material brush is selection-gated and uses a distinct point-guided material operation", () => {
   assert.match(page, /activeTool === "Добавить мебель" && interiorImage && placementPoint&&<div className="material-tool"/);
   assert.match(page, /type MaterialSelection = \{ point:\{x:number;y:number\}; roomImage:string \}/);
   assert.match(page, /const enterMaterialMode[\s\S]*?setMaterialSelection\(\{point,roomImage:source\}\)[\s\S]*?setMaterialMenuOpen\(true\)/);
@@ -28,19 +28,39 @@ test("material brush is selection-gated and uses a distinct masked material oper
   assert.match(page, /Каталог материалов готовится\./);
   assert.match(page, /type="file" accept="image\/png,image\/jpeg,image\/webp"[^>]*onChange=\{\(event\)=>loadMaterialReference/);
   assert.match(page, /const loadMaterialReference[\s\S]*?void applyMaterial\(String\(reader\.result\),file\.name\)/);
-  assert.match(page, /const applyMaterial[\s\S]*?const selection=materialSelection[\s\S]*?getSurfaceMask\(roomImage,selection\.point\)[\s\S]*?prepareLocalEdit\(roomImage,mask\)/);
+  assert.match(page, /const applyMaterial[\s\S]*?const selection=materialSelection[\s\S]*?createPointMarkerImage\(roomImage,selection\.point\)/);
   assert.match(page, /const applyMaterial[\s\S]*?operation:"material"/);
-  assert.match(page, /material:\{instruction:[\s\S]*?mask:local\.mask\}/);
+  assert.match(page, /const applyMaterial[\s\S]*?roomImage,referenceImage:materialReference,pointEdit,material:\{instruction:/);
   assert.doesNotMatch(page.match(/const applyMaterial[\s\S]*?const detectObjects/)?.[0] || "", /placement:|replacement:|removal:|furnitureAction/);
-  assert.match(page, /const applyMaterial[\s\S]*?local\.compose\(await blobToDataUrl\(imageBlob\)\)/);
+  assert.doesNotMatch(page.match(/const applyMaterial[\s\S]*?const detectObjects/)?.[0] || "", /getSurfaceMask|prepareLocalEdit|\/api\/segment|mask:/);
   assert.match(page, /const applyMaterial[\s\S]*?setActiveTool\("Добавить мебель"\)/);
   assert.match(route, /requestedOperation !== inferredOperation/);
   assert.match(route, /Material operation не может выполнять добавление, замену или удаление объекта/);
-  assert.match(route, /body\.roomImage && body\.referenceImage && body\.material\?\.mask/);
+  assert.match(route, /body\.roomImage && body\.pointEdit\?\.markedImage && body\.referenceImage && body\.material/);
+  assert.match(route, /"clean-interior\.png"/);
+  assert.match(route, /"marked-interior\.png"/);
+  assert.match(route, /`material-reference\./);
+  assert.doesNotMatch(route.match(/body\.roomImage && body\.pointEdit\?\.markedImage && body\.referenceImage && body\.material[\s\S]*?body\.roomImage && body\.globalEdit/)?.[0] || "", /form\.append\("mask"/);
   assert.match(route, /Do not add, insert, copy, reconstruct, or reproduce the object depicted in the reference\./);
   assert.doesNotMatch(route.match(/body\.roomImage && body\.referenceImage && body\.material[\s\S]*?body\.roomImage && body\.globalEdit/)?.[0] || "", /replacementPrompt/);
   assert.match(css, /\.material-menu\{width:116px;[^}]*padding:4px[^}]*gap:1px/);
   assert.match(css, /\.material-menu button\{[^}]*padding:5px[^}]*font-size:8\.5px[^}]*font-weight:600/);
+});
+
+test("Add, Replace, Remove and Material point paths never call segmentation", () => {
+  assert.doesNotMatch(page, /fetch\("\/api\/segment"/);
+  assert.match(page, /const generate[\s\S]*?pointEdit[\s\S]*?operation:replacement\?"replace":placement\?"place":undefined/);
+  assert.match(page, /const removeAtPlacement[\s\S]*?pointEdit[\s\S]*?operation:"remove"/);
+  assert.match(page, /const applyMaterial[\s\S]*?pointEdit[\s\S]*?operation:"material"/);
+  assert.match(page, /const createPointMarkerImage/);
+  assert.doesNotMatch(route, /ROBOFLOW|fallback ellipse|segmentation/i);
+});
+
+test("point-guided failures always release the Editor loading state", () => {
+  assert.match(page, /const generate[\s\S]*?finally \{ setIsGenerating\(false\); \}/);
+  assert.match(page, /const generateFurnitureEdits[\s\S]*?finally\{setIsGenerating\(false\);\}/);
+  assert.match(page, /const removeAtPlacement[\s\S]*?finally\{setIsGenerating\(false\);\}/);
+  assert.match(page, /const applyMaterial[\s\S]*?finally\{setIsGenerating\(false\);\}/);
 });
 
 test("existing Add, Replace and Remove controls remain present", () => {

@@ -28,13 +28,13 @@ test("commercial proposal keeps an inline PDF and opens its tab before asynchron
   assert.match(proposalRoute, /"Content-Disposition": `inline;/);
 });
 
-test("remove flow sends the remove operation, composites only its local mask and restores editor controls", () => {
+test("remove flow sends a point-guided remove operation and restores editor controls", () => {
   assert.match(generateRoute, /body\.removal \? "remove"/);
-  assert.match(generateRoute, /body\.roomImage && body\.removal\?\.mask/);
-  assert.match(page, /const removeSelectedObject[\s\S]*?removal:\{ name:item\.name, mask:local\.mask \}/);
-  assert.match(page, /const removeSelectedObject[\s\S]*?local\.compose\(await blobToDataUrl\(imageBlob\)\)/);
+  assert.match(generateRoute, /body\.roomImage && body\.pointEdit\?\.markedImage && body\.removal/);
+  assert.match(page, /const removeSelectedObject[\s\S]*?createPointMarkerImage\(roomImage,point\)[\s\S]*?operation:"remove"[\s\S]*?pointEdit[\s\S]*?removal:\{ name:item\.name \}/);
+  assert.doesNotMatch(page.match(/const removeSelectedObject[\s\S]*?const openHistoryVersion/)?.[0] || "", /prepareLocalEdit|local\.compose|\/api\/segment|mask:/);
   assert.match(page, /const removeSelectedObject[\s\S]*?setActiveTool\("Добавить мебель"\); setFurnitureAction\("add"\)/);
-  assert.match(page, /const removeAtPlacement[\s\S]*?roomImage:local\.roomImage[\s\S]*?removal:/);
+  assert.match(page, /const removeAtPlacement[\s\S]*?roomImage,pointEdit,removal:/);
 });
 
 test("mouse dragging disables native drag without replacing touch, context menu or double-click handlers", () => {
