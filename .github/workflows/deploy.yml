@@ -31,6 +31,11 @@ jobs:
 
             test "$current_sha" = "$expected_current_sha"
             git status --short
+            git diff --stat -- package-lock.json
+            if [ -e roomdesign ]; then
+              ls -ld roomdesign
+              file roomdesign
+            fi
             test -z "$(git status --porcelain)"
             git fetch origin main
             test "$(git rev-parse origin/main)" = "$expected_current_sha"
