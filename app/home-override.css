@@ -159,6 +159,7 @@
 .canvas-area:has(.furniture-action-bar:hover) .furniture-action-bar,
 .canvas-area:has(.furniture-action-bar:focus-within) .furniture-action-bar,
 .canvas-area:has(.room-canvas:focus-within) .furniture-action-bar,
+.canvas-area:has(.furniture-delete-point) .furniture-action-bar,
 .canvas-area:has(.room-canvas:hover) .room-canvas .canvas-note,
 .canvas-area:has(.furniture-action-bar:hover) .room-canvas .canvas-note,
 .canvas-area:has(.furniture-action-bar:focus-within) .room-canvas .canvas-note,
@@ -169,10 +170,12 @@
   transform:translateY(0);
 }
 .furniture-delete-overlay { position: absolute; z-index: 6; top: 56px; left: 23px; right: 23px; width: calc(100% - 46px); border: 0; padding: 0; background: transparent; cursor: crosshair; }
+.furniture-delete-point { position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border:2px solid #d5e85a;border-radius:50%;background:#1f201c;color:#fff;display:grid;place-items:center;font-size:22px;pointer-events:none; }
 .canvas-area:has(.furniture-action-bar .danger.active) .canvas-note span,
 .canvas-area:has(.furniture-action-bar .danger.active) .canvas-note strong { font-size: 0; }
 .canvas-area:has(.furniture-action-bar .danger.active) .canvas-note span::after { content: "УДАЛЕНИЕ ПРЕДМЕТА"; font-size: 9px; letter-spacing: 1.2px; }
 .canvas-area:has(.furniture-action-bar .danger.active) .canvas-note strong::after { content: "Поставьте точку на предмете, который хотите удалить."; font-size: 14px; }
+.canvas-area:has(.furniture-delete-point) .canvas-note strong::after { content: "Нажмите «Удалить» ещё раз или выберите кисть материала."; }
 @media (max-width: 850px) { .furniture-action-bar { right:24px; top:68px; grid-template-columns:repeat(3,minmax(76px,1fr)); } .furniture-action-bar button { min-height:42px; font-size:10px; } .furniture-delete-overlay { left:12px; right:12px; width:calc(100% - 24px); } }
 @media (hover:none), (pointer:coarse) {
   .canvas-area:has(.furniture-action-bar) .furniture-action-bar,
