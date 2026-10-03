@@ -10,11 +10,14 @@ const [page, layout, styles, accountStyles, homeOverride] = await Promise.all([
   readFile(new URL("../app/home-override.css", import.meta.url), "utf8"),
 ]);
 
-test("Studio keeps the source image uncropped and overlays render history", () => {
+test("Studio keeps the source image uncropped and stacks render history safely", () => {
   assert.match(layout, /studio-preview-iteration\.css/);
   assert.match(styles, /\.room-canvas>img\{object-fit:contain!important/);
-  assert.match(styles, /\.canvas-area>\.history-strip\{position:relative;z-index:8/);
-  assert.match(styles, /margin:-128px auto 16px/);
+  assert.match(styles, /\.canvas-area>\.history-strip\{position:relative;z-index:8;flex:0 0 112px/);
+  assert.match(styles, /margin:0 auto 16px/);
+  assert.doesNotMatch(styles, /margin:-1\d+px auto/);
+  assert.match(styles, /-webkit-overflow-scrolling:touch/);
+  assert.match(styles, /\.canvas-note\{bottom:18px/);
   assert.match(styles, /overflow-x:auto/);
   assert.match(styles, /@media\(hover:none\),\(pointer:coarse\)/);
   assert.match(page, /openHistoryVersion\(version\)/);
