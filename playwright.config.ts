@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const viewports = [
+  { name: "1920", viewport: { width: 1920, height: 1080 } },
   { name: "1440", viewport: { width: 1440, height: 900 } },
   { name: "1366", viewport: { width: 1366, height: 768 } },
   { name: "tablet", viewport: { width: 1024, height: 768 } },
