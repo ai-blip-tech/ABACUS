@@ -78,3 +78,48 @@ test("Add, Replace and Remove use point-guided routing without segmentation", as
   expect(requests[2].pointEdit).toBeTruthy();
   expect(segmentRequests).toBe(0);
 });
+
+test("Studio keeps canvas, history and upscale separated and scrollable", async ({ page }, testInfo) => {
+  test.skip(!/-(1440|1366|tablet)$/.test(testInfo.project.name));
+
+  await page.route("**/api/account/overview", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      projects: [],
+      generations: [{ id: "studio-layout-source", operation: "generate", created_at: new Date().toISOString() }],
+      summary: { generation_count: 1, total_tokens: 0, cost_usd: 0 },
+    }),
+  }));
+  await page.route("**/api/account/generations/studio-layout-source", (route) => route.fulfill({ status: 200, contentType: "image/png", body: imageBytes }));
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByRole("button", { name: "Нет аккаунта? Зарегистрироваться" }).click();
+  await page.getByLabel("Имя обязательно").fill("Studio layout");
+  await page.getByLabel("Email логин").fill(`studio-layout-${testInfo.project.name}-${Date.now()}@example.com`);
+  await page.getByLabel("Пароль", { exact: true }).fill("StudioLayout123!");
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.locator(".projects-dashboard-generation").click();
+  await page.getByRole("button", { name: "Сохранённая генерация", exact: true }).click();
+
+  const canvas = page.locator(".room-canvas");
+  const history = page.locator(".history-strip");
+  const upscale = page.locator(".upscale-panel");
+  await expect(canvas).toBeVisible();
+  await expect(history).toBeVisible();
+  await expect(upscale).toBeVisible();
+
+  const boxes = await Promise.all([canvas, history, upscale].map((locator) => locator.boundingBox()));
+  expect(boxes.every(Boolean)).toBe(true);
+  const [canvasBox, historyBox, upscaleBox] = boxes as NonNullable<(typeof boxes)[number]>[];
+  expect(historyBox.y).toBeGreaterThanOrEqual(canvasBox.y + canvasBox.height - 1);
+  expect(upscaleBox.y).toBeGreaterThanOrEqual(historyBox.y + historyBox.height - 1);
+
+  const scrollState = await page.locator(".canvas-area").evaluate((element) => {
+    const area = element as HTMLElement;
+    area.scrollTop = area.scrollHeight;
+    return { clientHeight: area.clientHeight, scrollHeight: area.scrollHeight, scrollTop: area.scrollTop };
+  });
+  expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
+  expect(scrollState.scrollTop).toBeGreaterThan(0);
+});
