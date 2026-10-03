@@ -132,6 +132,7 @@
 .proposal-print { width:31px; height:31px; display:grid; place-items:center; padding:0!important; border:1px solid #d8cbbb!important; border-radius:50%; background:#fffdf9!important; color:#5c3d2e!important; cursor:pointer; }
 .proposal-print:hover { color:#b96420!important; border-color:#b96420!important; }
 .proposal-print svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.65; stroke-linecap:round; stroke-linejoin:round; }
+.proposal-print.proposal-editor-open{width:auto;height:34px;display:flex;gap:7px;padding:0 11px!important;border-radius:5px;font:700 10px/1 Arial,sans-serif!important;white-space:nowrap}.proposal-editor-open span{display:inline}.proposal-inline-error{position:absolute;z-index:30;top:40px;right:0;width:210px;padding:8px;border:1px solid #e3cbc5;border-radius:5px;background:#fff;color:#a33d30;font-size:10px;line-height:1.35;box-shadow:0 8px 20px #2b1d1422}
 .proposal-menu { position:absolute; z-index:30; top:39px; right:-28px; width:220px; padding:8px; border:1px solid #d8cbbb; border-radius:8px; background:#fff; box-shadow:0 12px 28px rgba(43,29,20,.18); display:grid; gap:4px; }
 .proposal-menu b { padding:7px 8px 5px; color:#2b1d14; font-size:11px; }
 .proposal-menu button { width:100%; padding:10px 9px!important; border:0!important; border-radius:5px; background:#f5efe6!important; color:#5c3d2e!important; text-align:left; font:600 11px/1.2 Arial,sans-serif!important; cursor:pointer; }

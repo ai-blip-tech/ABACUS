@@ -1,9 +1,13 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFImage, PDFFont, rgb } from "pdf-lib";
 import { proposalImageFormat } from "@/lib/proposal-image";
+import { requireTenantUser } from "@/lib/auth";
+import { database } from "@/lib/server-runtime";
 
 type ProductParameter = { name?: string; value?: string };
 type ProposalProduct = {
+  objectIds?: string[];
+  quantity?: number;
   name?: string;
   referenceName?: string;
   referenceArticle?: string;
@@ -21,9 +25,13 @@ type ProposalProduct = {
   referenceParameters?: ProductParameter[];
   width?: number;
   depth?: number;
+  height?: number;
+  price?: number;
+  notes?: string;
 };
 
 type ProposalBody = {
+  projectId?: string;
   projectName?: string;
   proposalCoverImage?: string;
   coverImage?: string;
@@ -126,13 +134,25 @@ const drawField = (page: ReturnType<PDFDocument["addPage"]>, font: PDFFont, labe
 
 export async function POST(request: Request) {
   try {
+    const user = await requireTenantUser(request);
+    if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
     const body = await request.json() as ProposalBody;
     const proposalCoverSource = body.proposalCoverImage || "";
     const visualisationSource = body.coverImage || "";
     const products = Array.isArray(body.products) ? body.products.slice(0, 40) : [];
     if (!proposalCoverSource) return Response.json({ error: "Нет изображения обложки." }, { status: 400 });
     if (!visualisationSource) return Response.json({ error: "Нет изображения визуализации." }, { status: 400 });
-    if (!products.length) return Response.json({ error: "В планограмме нет товаров из каталога." }, { status: 400 });
+    if (!products.length) return Response.json({ error: "В проекте нет товаров для коммерческого предложения." }, { status: 400 });
+    if (!body.projectId || !/^[a-zA-Z0-9-]{12,100}$/.test(body.projectId)) return Response.json({ error: "Некорректный проект." }, { status: 400 });
+    const project = await database.prepare("SELECT state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?")
+      .bind(body.projectId, user.tenantId, user.id)
+      .first<{ state_json: string | null }>();
+    if (!project?.state_json) return Response.json({ error: "Сохранённый проект не найден." }, { status: 404 });
+    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }> };
+    const allowedObjectIds = new Set((savedState.planItems || []).map((item) => item.id).filter((id): id is string => Boolean(id)));
+    if (products.some((product) => !product.objectIds?.length || product.objectIds.some((id) => !allowedObjectIds.has(id)))) {
+      return Response.json({ error: "Состав коммерческого предложения не соответствует проекту." }, { status: 403 });
+    }
 
     const document = await PDFDocument.create();
     document.registerFontkit(fontkit);
@@ -172,8 +192,9 @@ export async function POST(request: Request) {
       page.drawLine({ start: { x: 28, y: fieldY - 7 }, end: { x: 198, y: fieldY - 7 }, thickness: 0.8, color: BROWN });
       fieldY -= 25;
       if (product.width) fieldY = drawField(page, font, "Ширина", `${product.width} мм`, fieldY);
-      if (product.referenceHeightMm) fieldY = drawField(page, font, "Высота", `${product.referenceHeightMm} мм`, fieldY);
+      if (product.height || product.referenceHeightMm) fieldY = drawField(page, font, "Высота", `${product.height || product.referenceHeightMm} мм`, fieldY);
       if (product.depth) fieldY = drawField(page, font, "Глубина", `${product.depth} мм`, fieldY);
+      if ((product.quantity || 1) > 1) fieldY = drawField(page, font, "Количество", String(product.quantity), fieldY);
       fieldY -= 3;
       page.drawText("Характеристики", { x: 28, y: fieldY, font, size: 13, color: BROWN });
       page.drawLine({ start: { x: 28, y: fieldY - 7 }, end: { x: 198, y: fieldY - 7 }, thickness: 0.8, color: BROWN });
@@ -196,10 +217,11 @@ export async function POST(request: Request) {
         page.drawText("Изображение товара недоступно", { x: 430, y: 420, font, size: 12, color: MUTED });
       }
 
-      const description = asText(product.referenceDescription);
+      const description = asText(product.notes || product.referenceDescription);
       if (description) drawLines(page, wrapText(description, font, 12, 520, 6), { x: 270, y: 245, font, size: 12, lineHeight: 17, color: BROWN });
       if (body.withPrices) {
-        const price = formatPrice(product.referencePrice);
+        const unitPrice = product.price ?? product.referencePrice;
+        const price = formatPrice(unitPrice ? unitPrice * (product.quantity || 1) : undefined);
         page.drawText(price, { x: 790 - font.widthOfTextAtSize(price, 25), y: 48, font, size: 25, color: rgb(0.05, 0.05, 0.05) });
         if (product.referenceOldPrice && product.referenceOldPrice > (product.referencePrice || 0)) {
           const oldPrice = formatPrice(product.referenceOldPrice);
@@ -210,16 +232,28 @@ export async function POST(request: Request) {
       }
     }
 
+    if (body.withPrices) {
+      const total = products.reduce((sum, product) => sum + (product.price ?? product.referencePrice ?? 0) * (product.quantity || 1), 0);
+      const summary = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      summary.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: PALE });
+      summary.drawText("ИТОГ КОММЕРЧЕСКОГО ПРЕДЛОЖЕНИЯ", { x: 48, y: PAGE_HEIGHT - 82, font, size: 13, color: MUTED });
+      summary.drawText(asText(body.projectName || "ROOM design"), { x: 48, y: PAGE_HEIGHT - 132, font, size: 28, color: BROWN });
+      summary.drawText(`${products.length} поз. / ${products.reduce((sum, product) => sum + (product.quantity || 1), 0)} шт.`, { x: 48, y: PAGE_HEIGHT - 175, font, size: 12, color: MUTED });
+      const totalText = total ? `${new Intl.NumberFormat("ru-RU").format(total)} руб.` : "Цена по запросу";
+      summary.drawText("ИТОГО", { x: 48, y: 125, font, size: 12, color: MUTED });
+      summary.drawText(totalText, { x: 48, y: 70, font, size: 34, color: BROWN });
+    }
+
     document.setTitle(`Коммерческое предложение — ${asText(body.projectName || "ROOM design")}`);
     document.setAuthor("ROOM design");
     document.setCreator("ROOM design");
     const bytes = await document.save();
-    const filename = body.withPrices ? "room-design-proposal-with-prices.pdf" : "room-design-proposal.pdf";
+    const filename = "room-design-commercial-proposal.pdf";
     const payload = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     return new Response(payload, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${filename}"`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store",
       },
     });

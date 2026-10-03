@@ -18,14 +18,11 @@ test("proposal images are detected by their bytes before an unreliable MIME head
   assert.match(proposalRoute, /proposalImageFormat\(bytes, mime\)/);
 });
 
-test("commercial proposal keeps an inline PDF and opens its tab before asynchronous work", () => {
-  const openIndex = page.indexOf('window.open("about:blank", "_blank")');
-  const catalogIndex = page.indexOf("const catalogResponse = await fetch", openIndex);
-  assert.ok(openIndex > 0 && catalogIndex > openIndex);
-  assert.match(page, /pdfWindow\.location\.replace\(pdfUrl\)/);
-  assert.doesNotMatch(page.slice(openIndex, page.indexOf("useEffect", openIndex)), /download\.click\(\)/);
+test("commercial proposal opens an editor and downloads PDF only after confirmation", () => {
+  assert.match(page, /\/proposal\/\$\{encodeURIComponent\(projectId\)\}/);
+  assert.match(page, /Создать коммерческое предложение/);
   assert.match(proposalRoute, /"Content-Type": "application\/pdf"/);
-  assert.match(proposalRoute, /"Content-Disposition": `inline;/);
+  assert.match(proposalRoute, /"Content-Disposition": `attachment;/);
 });
 
 test("remove flow sends a point-guided remove operation and restores editor controls", () => {

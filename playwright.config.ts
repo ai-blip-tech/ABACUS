@@ -43,6 +43,7 @@ export default defineConfig({
     env: {
       ...process.env,
       ROOM_DESIGN_DATA_DIR: join(tmpdir(), "room-design-playwright"),
+      COOKIE_SECURE: "false",
     },
   },
 });

@@ -3,6 +3,7 @@ import { database } from "@/lib/server-runtime";
 
 type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string };
 type SavedPlanParameter = { name: string; value: string };
+type SavedProposalOverride = { name?: string; width?: number; depth?: number; height?: number; price?: number; notes?: string };
 type SavedPlanItem = {
   id: string;
   kind: string;
@@ -29,6 +30,7 @@ type SavedPlanItem = {
   referenceHeightMm?: number | null;
   referenceDescription?: string;
   referenceParameters?: SavedPlanParameter[];
+  proposalOverride?: SavedProposalOverride;
 };
 type SavedSurfaceReference = { name: string; asset?: string; image?: string };
 type SavedPlanCamera = { x: number; y: number; height: number; rotation: number };
@@ -49,6 +51,7 @@ type SavedState = {
   planFloorReference?: SavedSurfaceReference | null;
   planWallReference?: SavedSurfaceReference | null;
   planCamera?: SavedPlanCamera | null;
+  proposalShowPrices?: boolean;
 };
 
 const validProjectId = (id: string) => /^[a-zA-Z0-9-]{12,100}$/.test(id);
@@ -121,6 +124,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const description = typeof body?.description === "string" ? body.description.trim().slice(0, 1000) : "";
   if (!name || !body?.state || typeof body.state !== "object") return Response.json({ error: "Не удалось подготовить проект к сохранению." }, { status: 400 });
   const draft = body.state as Record<string, unknown>;
+  const existingProject = await database.prepare("SELECT id, state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first<{ id: string; state_json: string | null }>();
+  let persistedShowPrices = true;
+  const persistedOverrides = new Map<string, unknown>();
+  if (existingProject?.state_json) {
+    try {
+      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; planItems?: Array<{ id?: string; proposalOverride?: unknown }> };
+      persistedShowPrices = persisted.proposalShowPrices !== false;
+      for (const item of persisted.planItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
+    } catch { /* a normal project save will replace an unreadable legacy state */ }
+  }
   const images = new Map<string, string>();
   const collectImage = (asset: string, image: unknown) => { if (typeof image === "string" && image.startsWith("data:")) images.set(asset, image); };
   collectImage("interior", draft.interiorImage);
@@ -171,6 +184,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       referenceHeightMm: item.referenceHeightMm === null ? null : typeof item.referenceHeightMm === "number" && Number.isFinite(item.referenceHeightMm) ? item.referenceHeightMm : undefined,
       referenceDescription: shortText(item.referenceDescription, 5000) || undefined,
       referenceParameters: parameters.length ? parameters : undefined,
+      proposalOverride: (() => {
+        const savedOverride = item.proposalOverride && typeof item.proposalOverride === "object" ? item.proposalOverride : persistedOverrides.get(shortText(item.id, 120));
+        if (!savedOverride || typeof savedOverride !== "object") return undefined;
+        const override = savedOverride as Record<string, unknown>;
+        return {
+          name: shortText(override.name, 240) || undefined,
+          width: typeof override.width === "number" && Number.isFinite(override.width) ? finiteNumber(override.width, 0, 0, 20000) : undefined,
+          depth: typeof override.depth === "number" && Number.isFinite(override.depth) ? finiteNumber(override.depth, 0, 0, 20000) : undefined,
+          height: typeof override.height === "number" && Number.isFinite(override.height) ? finiteNumber(override.height, 0, 0, 20000) : undefined,
+          price: typeof override.price === "number" && Number.isFinite(override.price) ? finiteNumber(override.price, 0, 0, 1_000_000_000) : undefined,
+          notes: shortText(override.notes, 2000) || undefined,
+        };
+      })(),
     }];
   });
   const planRoomInput = draft.planRoom && typeof draft.planRoom === "object" ? draft.planRoom as Record<string, unknown> : {};
@@ -211,10 +237,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     planFloorReference,
     planWallReference,
     planCamera,
+    proposalShowPrices: typeof draft.proposalShowPrices === "boolean" ? draft.proposalShowPrices : persistedShowPrices,
   };
   const now = new Date().toISOString();
-  const existing = await database.prepare("SELECT id FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first();
-  if (existing) {
+  if (existingProject) {
     await database.prepare("UPDATE projects SET name = ?, project_type = ?, description = ?, state_json = ?, updated_at = ? WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(name, projectType || "Квартира", description || null, JSON.stringify(state), now, id, user.tenantId, user.id).run();
   } else {
     await database.prepare("INSERT INTO projects (id, user_id, tenant_id, name, project_type, description, state_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, user.id, user.tenantId, name, projectType || "Квартира", description || null, JSON.stringify(state), now, now).run();
