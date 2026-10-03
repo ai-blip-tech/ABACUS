@@ -19,7 +19,7 @@ test("proposal images are detected by their bytes before an unreliable MIME head
 });
 
 test("commercial proposal opens an editor and downloads PDF only after confirmation", () => {
-  assert.match(page, /\/proposal\/\$\{encodeURIComponent\(projectId\)\}/);
+  assert.match(page, /await persistProject\(targetId, name\);[\s\S]*?\/proposal\/\$\{encodeURIComponent\(targetId\)\}/);
   assert.match(page, /Создать коммерческое предложение/);
   assert.match(proposalRoute, /"Content-Type": "application\/pdf"/);
   assert.match(proposalRoute, /"Content-Disposition": `attachment;/);

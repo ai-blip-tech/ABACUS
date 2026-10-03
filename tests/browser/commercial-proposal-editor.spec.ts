@@ -34,6 +34,34 @@ test("commercial proposal editor supports catalog and reference products before 
   expect((pdfPayloads[0].products as unknown[]).length).toBe(2);
 });
 
+test("commercial proposal saves a newly created project before opening the editor", async ({ page, browserName }, testInfo) => {
+  test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium-1440");
+  const email = `proposal-unsaved-${Date.now()}@example.com`;
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByRole("button", { name: "Нет аккаунта? Зарегистрироваться" }).click();
+  await page.getByLabel("Имя обязательно").fill("Proposal save");
+  await page.getByLabel("Email логин").fill(email);
+  await page.getByLabel("Пароль", { exact: true }).fill("ProposalSave123!");
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: "Создать проект" }).first().click();
+  await page.getByLabel("НАЗВАНИЕ ПРОЕКТА").fill("Новое коммерческое предложение");
+  await page.getByRole("button", { name: "Создать проект" }).click();
+  await expect(page.locator("main.studio-shell")).toBeVisible();
+  await page.locator(".furniture-choice .upload-zone input[type=file]").setInputFiles({
+    name: "interior.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(image.split(",")[1], "base64"),
+  });
+
+  const popupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Создать коммерческое предложение" }).click();
+  const popup = await popupPromise;
+  await popup.waitForURL(/\/proposal\//);
+  await expect(popup.locator(".proposal-editor-shell")).toBeVisible();
+});
+
 test("commercial proposal creates a real PDF from a saved reference product", async ({ page, context, browserName }, testInfo) => {
   test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium-1440");
   const representativeImage = `data:image/png;base64,${(await readFile("public/generated-bleed-runner.png")).toString("base64")}`;
