@@ -157,12 +157,14 @@
 }
 .canvas-area:has(.room-canvas:hover) .furniture-action-bar,
 .canvas-area:has(.furniture-action-bar:hover) .furniture-action-bar,
-.canvas-area:has(.furniture-action-bar:focus-within) .furniture-action-bar,
-.canvas-area:has(.room-canvas:focus-within) .furniture-action-bar,
+.canvas-area:has(.furniture-action-bar :focus-visible) .furniture-action-bar,
+.canvas-area:has(.room-canvas :focus-visible) .furniture-action-bar,
+.canvas-area:has(.material-tool) .furniture-action-bar,
 .canvas-area:has(.room-canvas:hover) .room-canvas .canvas-note,
 .canvas-area:has(.furniture-action-bar:hover) .room-canvas .canvas-note,
-.canvas-area:has(.furniture-action-bar:focus-within) .room-canvas .canvas-note,
-.canvas-area:has(.room-canvas:focus-within) .room-canvas .canvas-note {
+.canvas-area:has(.furniture-action-bar :focus-visible) .room-canvas .canvas-note,
+.canvas-area:has(.room-canvas :focus-visible) .room-canvas .canvas-note,
+.canvas-area:has(.material-tool) .room-canvas .canvas-note {
   opacity:1;
   visibility:visible;
   pointer-events:auto;

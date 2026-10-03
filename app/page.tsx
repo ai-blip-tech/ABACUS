@@ -7,6 +7,7 @@ import type React from "react";
 import AccountDropdown from "./account-dropdown";
 import "./account-dropdown.css";
 import { normalizePlanReferenceImages } from "@/lib/plan-render";
+import { clonePlanogramItem, isEditablePlanogramShortcutTarget } from "@/lib/planogram-clipboard";
 
 type Product = { name: string; type: string; price: string; image: string };
 type DetectedObject = { id: string; name: string; x: number; y: number; width: number; height: number; polygon?: number[][] };
@@ -23,6 +24,7 @@ type SignedInUser = { id: string; email: string; role: "user" | "admin"; firstNa
 type AccountProject = { id: string; name: string; project_type: string; description?: string | null; preview_image?: string | null; created_at: string; updated_at: string };
 type AccountGeneration = { id: string; operation: string; created_at: string; total_tokens?: number | null; cost_usd?: number | null };
 type AccountOverview = { projects: AccountProject[]; generations: AccountGeneration[]; summary: { generation_count?: number; total_tokens?: number; cost_usd?: number } };
+
 const products: Product[] = [
   { name: "Модульный диван Осло", type: "Диваны", price: "$2,400", image: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=500&q=85" },
   { name: "Кресло Берген", type: "Кресла", price: "$890", image: "https://images.unsplash.com/photo-1592078615290-033ee584e267?auto=format&fit=crop&w=500&q=85" },
@@ -562,6 +564,8 @@ function PlanogramWorkspace(props:PlanogramWorkspaceProps){
 
 function PlanogramWorkspaceBase({items,room,selectedId,onSelect,onChange,onRoomChange,floorReference,wallReference,onFloorReferenceChange,onWallReferenceChange,onCreateReference,isCreatingReference}:PlanogramWorkspaceProps){
   const [dragging,setDragging]=useState<string|null>(null); const [resizing,setResizing]=useState<{id:string;handle:"n"|"ne"|"e"|"se"|"s"|"sw"|"w"|"nw";x:number;y:number;item:PlanItem}|null>(null); const [rotating,setRotating]=useState<{id:string;centerX:number;centerY:number;startAngle:number;startRotation:number}|null>(null); const [editingId,setEditingId]=useState<string|null>(null); const [zoom,setZoom]=useState(100); const [menu,setMenu]=useState<string|null>(null); const [roomResize,setRoomResize]=useState<{mode:"width"|"length";x:number;y:number;width:number;length:number}|null>(null); const fileRef=useRef<HTMLInputElement>(null); const floorRef=useRef<HTMLInputElement>(null); const wallRef=useRef<HTMLInputElement>(null);
+  const planClipboardRef=useRef<PlanItem|null>(null); const pasteIndexRef=useRef(0);
+  useEffect(()=>{const handlePlanogramClipboard=(event:KeyboardEvent)=>{if(!(event.ctrlKey||event.metaKey)||event.altKey||isEditablePlanogramShortcutTarget(event.target))return;const key=event.key.toLowerCase();if(key==="c"){const selected=items.find((item)=>item.id===selectedId);if(!selected)return;planClipboardRef.current=structuredClone(selected);pasteIndexRef.current=0;event.preventDefault();return;}if(key!=="v"||!planClipboardRef.current)return;pasteIndexRef.current+=1;const clone=clonePlanogramItem(planClipboardRef.current,crypto.randomUUID(),pasteIndexRef.current);onChange([...items,clone]);onSelect(clone.id);setEditingId(null);setMenu(null);event.preventDefault();};window.addEventListener("keydown",handlePlanogramClipboard);return()=>window.removeEventListener("keydown",handlePlanogramClipboard);},[items,onChange,onSelect,selectedId]);
   useEffect(()=>{const selectCatalogProduct=(event:Event)=>{const detail=(event as CustomEvent<{index:number;product:CatalogProduct}>).detail;const item=items[detail?.index];const product=detail?.product;if(!item||!product)return;onChange(items.map((current)=>current.id===item.id?{...current,name:product.name,width:product.widthMm||current.width,depth:product.depthMm||current.depth,referenceImage:product.image,referenceImages:product.images,referenceName:product.name,referenceProductId:product.id,referenceArticle:product.article,referenceUrl:product.url,referencePrice:product.price,referenceOldPrice:product.oldPrice,referenceCategory:product.category,referenceSubtype:product.subtype,referenceColor:product.color,referenceMaterial:product.material,referenceHeightMm:product.heightMm,referenceDescription:product.description,referenceParameters:product.parameters}:current));onSelect(item.id);};window.addEventListener("room-plan-catalog-select",selectCatalogProduct);return()=>window.removeEventListener("room-plan-catalog-select",selectCatalogProduct);},[items,onChange,onSelect]);
   const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
   const itemWidth=(item:PlanItem)=>Math.max(4,item.width/room.width*100); const itemDepth=(item:PlanItem)=>Math.max(4,item.depth/room.length*100);

@@ -77,7 +77,7 @@ test("landing, auth, projects, account dropdown, account and Studio", async ({ p
   if (!testInfo.project.name.endsWith("mobile")) {
     await page.getByRole("button", { name: "Создание интерьера" }).click();
     await page.getByRole("button", { name: "Диван", exact: true }).click();
-    const planItem = page.getByRole("button", { name: /Диван: перемещать/ });
+    const planItem = page.getByRole("button", { name: /Диван: перемещать/ }).first();
     await expect(planItem).toBeVisible();
     await expect(planItem).toHaveAttribute("draggable", "false");
     const before = await planItem.evaluate((element) => (element as HTMLElement).style.left);
@@ -90,6 +90,16 @@ test("landing, auth, projects, account dropdown, account and Studio", async ({ p
     await page.mouse.move(Math.min(boardBox!.x + boardBox!.width - 40, itemBox!.x + itemBox!.width / 2 + 80), Math.min(boardBox!.y + boardBox!.height - 40, itemBox!.y + itemBox!.height / 2 + 45), { steps: 5 });
     await page.mouse.up();
     await expect.poll(() => planItem.evaluate((element) => (element as HTMLElement).style.left)).not.toBe(before);
+    await planItem.focus();
+    await page.keyboard.press("Control+C");
+    await page.keyboard.press("Control+V");
+    await expect(page.getByRole("button", { name: /Диван: перемещать/ })).toHaveCount(2);
+    await page.keyboard.press("Control+V");
+    await expect(page.getByRole("button", { name: /Диван: перемещать/ })).toHaveCount(3);
+    const widthInput = page.getByLabel("Ширина предмета в миллиметрах");
+    await widthInput.focus();
+    await page.keyboard.press("Control+V");
+    await expect(page.getByRole("button", { name: /Диван: перемещать/ })).toHaveCount(3);
     const board = page.locator(".planogram-editor-board");
     const cameraBoardBox = await board.boundingBox();
     expect(cameraBoardBox).not.toBeNull();
