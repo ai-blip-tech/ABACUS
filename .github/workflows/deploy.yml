@@ -25,12 +25,14 @@ jobs:
             echo "PRODUCTION_SHA_BEFORE=${previous_sha}"
             pm2 describe roomdesign
 
+            test -z "$(git status --porcelain -- . ':(exclude)package-lock.json')"
+            git restore --source=HEAD -- package-lock.json
             git fetch origin main
             git pull --ff-only origin main
             test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
             echo "PRODUCTION_SHA_BUILD=$(git rev-parse HEAD)"
 
-            npm install
+            npm ci
 
             test ! -e "$rollback_dir"
             pm2 stop roomdesign
