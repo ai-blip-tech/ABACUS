@@ -19,6 +19,8 @@ test("Studio keeps the source image uncropped and overlays one render-history ri
   assert.match(styles, />\.upscale-panel\{grid-column:1;grid-row:3/);
   assert.match(styles, /\.canvas-area>\.history-strip\{position:relative;z-index:8;flex:0 0 112px/);
   assert.match(styles, /margin:0 auto 32px/);
+  assert.match(styles, /color:#fff;opacity:\.28/);
+  assert.match(styles, /\.canvas-area:has\(\.material-tool\)>\.history-strip\{opacity:\.94\}/);
   assert.match(styles, /-webkit-overflow-scrolling:touch/);
   assert.match(styles, /\.canvas-note\{bottom:140px/);
   assert.match(styles, /overflow-x:auto/);
