@@ -29,6 +29,18 @@ type ProposalProduct = {
   height?: number;
   price?: number;
   notes?: string;
+  article?: string;
+  category?: string;
+  brand?: string;
+  configuration?: string;
+  option?: string;
+  characteristics?: string[];
+};
+
+type ProposalDocument = {
+  clientName?: string; projectName?: string; offerNumber?: string; offerDate?: string; validUntil?: string;
+  selectionCount?: string; categories?: string; principle?: string; cityObject?: string; summaryNote?: string;
+  leadTime?: string; delivery?: string; payment?: string; managerRole?: string; managerPhone?: string; managerEmail?: string;
 };
 
 type ProposalBody = {
@@ -39,6 +51,8 @@ type ProposalBody = {
   fontData?: string;
   withPrices?: boolean;
   products?: ProposalProduct[];
+  document?: ProposalDocument;
+  managerName?: string;
 };
 
 const PAGE_WIDTH = 841.89;
@@ -46,6 +60,9 @@ const PAGE_HEIGHT = 595.28;
 const BROWN = rgb(0.17, 0.11, 0.075);
 const MUTED = rgb(0.45, 0.42, 0.39);
 const PALE = rgb(0.95, 0.94, 0.93);
+const BURGUNDY = rgb(0.43, 0.14, 0.16);
+const WARM_LINE = rgb(0.87, 0.84, 0.80);
+const WHITE = rgb(1, 1, 1);
 
 const asText = (value: unknown) => String(value ?? "").replace(/\s+/g, " ").trim();
 const formatPrice = (value?: number) => value && Number.isFinite(value)
@@ -80,13 +97,6 @@ const embedImage = async (document: PDFDocument, source: string | undefined, rol
     });
     throw new Error(`Не удалось встроить изображение ${role === "visualization" ? "визуализации" : role === "cover" ? "обложки" : role === "catalog" ? "каталожного товара" : "референсного товара"} в PDF.`);
   }
-};
-
-const drawImageCover = (page: ReturnType<PDFDocument["addPage"]>, image: PDFImage) => {
-  const scale = Math.max(PAGE_WIDTH / image.width, PAGE_HEIGHT / image.height);
-  const width = image.width * scale;
-  const height = image.height * scale;
-  page.drawImage(image, { x: (PAGE_WIDTH - width) / 2, y: (PAGE_HEIGHT - height) / 2, width, height });
 };
 
 const drawImageContain = (page: ReturnType<PDFDocument["addPage"]>, image: PDFImage, box: { x: number; y: number; width: number; height: number }) => {
@@ -150,15 +160,22 @@ const drawField = (page: ReturnType<PDFDocument["addPage"]>, font: PDFFont, labe
   return y - 18 - Math.max(1, lines.length) * 11;
 };
 
+const drawMarker = (page: ReturnType<PDFDocument["addPage"]>, font: PDFFont, number: string, title: string) => {
+  page.drawText(number, { x: 42, y: 563, font, size: 8, color: BURGUNDY });
+  page.drawLine({ start: { x: 70, y: 566 }, end: { x: 104, y: 566 }, thickness: 1.4, color: BURGUNDY });
+  page.drawText(title.toUpperCase(), { x: 116, y: 563, font, size: 7.5, color: MUTED });
+};
+
+const textValue = (value: unknown, fallback = "—") => asText(value) || fallback;
+
 export async function POST(request: Request) {
   try {
     const user = await requireTenantUser(request);
     if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
     const body = await request.json() as ProposalBody;
-    const proposalCoverSource = body.proposalCoverImage || "";
     const visualisationSource = body.coverImage || "";
+    const proposal = body.document || {};
     const products = Array.isArray(body.products) ? body.products.slice(0, 40) : [];
-    if (!proposalCoverSource) return Response.json({ error: "Нет изображения обложки." }, { status: 400 });
     if (!visualisationSource) return Response.json({ error: "Нет изображения визуализации." }, { status: 400 });
     if (!products.length) return Response.json({ error: "В проекте нет товаров для коммерческого предложения." }, { status: 400 });
     if (!body.projectId || !/^[a-zA-Z0-9-]{12,100}$/.test(body.projectId)) return Response.json({ error: "Некорректный проект." }, { status: 400 });
@@ -177,18 +194,37 @@ export async function POST(request: Request) {
     const inlineFont = body.fontData ? decodeDataUrl(body.fontData) : null;
     if (!inlineFont?.bytes?.length) throw new Error("Не удалось загрузить шрифт PDF.");
     const font = await document.embedFont(inlineFont.bytes, { subset: true });
-    const [proposalCover, visualisation] = await Promise.all([
-      embedImage(document, proposalCoverSource, "cover"),
-      embedImage(document, visualisationSource, "visualization"),
-    ]);
-    if (!proposalCover) throw new Error("Не удалось подготовить изображение обложки для PDF.");
+    const visualisation = await embedImage(document, visualisationSource, "visualization");
     if (!visualisation) throw new Error("Не удалось подготовить изображение визуализации для PDF.");
 
     const firstPage = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawImageCover(firstPage, proposalCover);
+    firstPage.drawRectangle({ x: 0, y: 0, width: 330, height: PAGE_HEIGHT, color: BURGUNDY });
+    firstPage.drawText("NORR", { x: 66, y: 440, font, size: 54, color: WHITE });
+    firstPage.drawText("MOBLER", { x: 77, y: 407, font, size: 18, color: WHITE });
+    firstPage.drawText("Интерьер, собранный вокруг вашей жизни.", { x: 52, y: 70, font, size: 12, color: WHITE });
+    firstPage.drawRectangle({ x: 330, y: 0, width: PAGE_WIDTH - 330, height: PAGE_HEIGHT, color: PALE });
+    firstPage.drawText("NORR MOBLER / PRIVATE SELECTION", { x: 382, y: 520, font, size: 7, color: BURGUNDY });
+    firstPage.drawText("КОММЕРЧЕСКОЕ", { x: 382, y: 458, font, size: 31, color: BROWN });
+    firstPage.drawText("ПРЕДЛОЖЕНИЕ", { x: 382, y: 420, font, size: 31, color: BROWN });
+    let coverY = 350;
+    for (const [label, value] of [["КЛИЕНТ", proposal.clientName], ["ПРОЕКТ", proposal.projectName], ["ПРЕДЛОЖЕНИЕ", proposal.offerNumber], ["ДАТА", proposal.offerDate], ["ДЕЙСТВИТЕЛЬНО ДО", proposal.validUntil]] as const) {
+      firstPage.drawText(label, { x: 382, y: coverY, font, size: 7, color: BURGUNDY });
+      firstPage.drawText(textValue(value), { x: 382, y: coverY - 18, font, size: 12, color: BROWN });
+      coverY -= 53;
+    }
 
     const visualisationPage = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawImageCover(visualisationPage, visualisation);
+    drawMarker(visualisationPage, font, "01", "Подборка для вашего пространства");
+    visualisationPage.drawText("Собрано в единую интерьерную историю", { x: 42, y: 520, font, size: 25, color: BROWN });
+    visualisationPage.drawText("Мы объединили мебель, свет и фактуры в один сценарий пространства.", { x: 42, y: 492, font, size: 10, color: MUTED });
+    drawImageContain(visualisationPage, visualisation, { x: 42, y: 58, width: 525, height: 405 });
+    visualisationPage.drawRectangle({ x: 567, y: 58, width: 233, height: 405, color: PALE });
+    let selectionY = 420;
+    for (const [label, value] of [["ВАША ПОДБОРКА", proposal.selectionCount], ["КАТЕГОРИИ", proposal.categories], ["ПРИНЦИП", proposal.principle], ["ГОРОД / ОБЪЕКТ", proposal.cityObject]] as const) {
+      visualisationPage.drawText(label, { x: 590, y: selectionY, font, size: 7, color: BURGUNDY });
+      drawLines(visualisationPage, wrapText(textValue(value), font, 10, 185, 5), { x: 590, y: selectionY - 18, font, size: 10, lineHeight: 12 });
+      selectionY -= 82;
+    }
 
     const embeddedProductImages = await Promise.all(products.map(async (product) => {
       const images = [product.referenceImage, ...(product.referenceImages || []).filter((source) => source && source !== product.referenceImage)];
@@ -200,8 +236,8 @@ export async function POST(request: Request) {
       const product = products[index];
       const page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       page.drawRectangle({ x: 0, y: 0, width: 230, height: PAGE_HEIGHT, color: PALE });
-      page.drawText(String(index + 3).padStart(2, "0"), { x: 28, y: PAGE_HEIGHT - 30, font, size: 8, color: MUTED });
-      page.drawText("ПРЕДМЕТ ИНТЕРЬЕРА", { x: 28, y: PAGE_HEIGHT - 68, font, size: 8, color: MUTED });
+      drawMarker(page, font, String(index + 2).padStart(2, "0"), textValue(product.category || product.referenceCategory, "Предмет интерьера"));
+      page.drawText(textValue(product.brand, "NORR MOBLER SELECTION"), { x: 28, y: PAGE_HEIGHT - 68, font, size: 8, color: BURGUNDY });
       const name = asText(product.referenceName || product.name || "Товар");
       const title = fittedProductTitle(name, font);
       drawLines(page, title.lines, { x: 28, y: PAGE_HEIGHT - 96, font, size: title.size, lineHeight: title.lineHeight });
@@ -219,14 +255,12 @@ export async function POST(request: Request) {
       page.drawLine({ start: { x: 28, y: fieldY - 7 }, end: { x: 198, y: fieldY - 7 }, thickness: 0.8, color: BROWN });
       fieldY -= 25;
       const fields = [
-        ["Артикул", product.referenceArticle], ["Категория", product.referenceCategory],
-        ["Тип", product.referenceSubtype], ["Материал", product.referenceMaterial], ["Цвет", product.referenceColor],
+        ["Артикул", product.article || product.referenceArticle], ["Конфигурация", product.configuration],
+        ["Обивка / вариант", product.option], ["Категория", product.category || product.referenceCategory],
       ] as Array<[string, string | undefined]>;
       for (const [label, value] of fields) if (value && fieldY > 72) fieldY = drawField(page, font, label, value, fieldY);
-      const additional = (product.referenceParameters || [])
-        .filter((parameter) => parameter.name && parameter.value && !/артикул|габарит|материал|цвет|тип/i.test(parameter.name))
-        .slice(0, 4);
-      for (const parameter of additional) if (fieldY > 72) fieldY = drawField(page, font, asText(parameter.name), asText(parameter.value), fieldY);
+      const additional = (product.characteristics || []).filter(Boolean).slice(0, 4);
+      for (const value of additional) if (fieldY > 72) fieldY = drawField(page, font, "Доп. характеристика", value, fieldY);
 
       const [mainImage, secondaryImage] = embeddedProductImages[index];
       if (secondaryImage) drawImageContain(page, secondaryImage, { x: 250, y: 300, width: 190, height: 255 });
@@ -255,23 +289,53 @@ export async function POST(request: Request) {
       }
     }
 
-    if (body.withPrices) {
-      const total = products.reduce((sum, product) => sum + (product.price ?? product.referencePrice ?? 0) * (product.quantity || 1), 0);
-      const summary = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      summary.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: PALE });
-      summary.drawText("ИТОГ КОММЕРЧЕСКОГО ПРЕДЛОЖЕНИЯ", { x: 48, y: PAGE_HEIGHT - 82, font, size: 13, color: MUTED });
-      summary.drawText(asText(body.projectName || "ROOM design"), { x: 48, y: PAGE_HEIGHT - 132, font, size: 28, color: BROWN });
-      summary.drawText(`${products.length} поз. / ${products.reduce((sum, product) => sum + (product.quantity || 1), 0)} шт.`, { x: 48, y: PAGE_HEIGHT - 175, font, size: 12, color: MUTED });
-      const totalText = total ? `${new Intl.NumberFormat("ru-RU").format(total)} руб.` : "Цена по запросу";
-      summary.drawText("ИТОГО", { x: 48, y: 125, font, size: 12, color: MUTED });
-      summary.drawText(totalText, { x: 48, y: 70, font, size: 34, color: BROWN });
-    }
+    const total = products.reduce((sum, product) => sum + (product.price ?? product.referencePrice ?? 0) * (product.quantity || 1), 0);
+    const summary = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    drawMarker(summary, font, "05", "Итог и условия");
+    summary.drawText("Спецификация", { x: 42, y: 520, font, size: 27, color: BROWN });
+    const columns = [42, 72, 370, 490, 555, 660];
+    summary.drawRectangle({ x: 36, y: 468, width: 764, height: 28, color: BROWN, opacity: .98 });
+    ["№", "ПОЗИЦИЯ", "АРТИКУЛ", "КОЛ-ВО", "ЦЕНА", "СУММА"].forEach((value, index) => summary.drawText(value, { x: columns[index], y: 480, font, size: 7, color: WHITE }));
+    products.forEach((product, index) => {
+      const y = 442 - index * 34;
+      const row = [String(index + 1).padStart(2, "0"), textValue(product.name), textValue(product.article || product.referenceArticle), String(product.quantity || 1), body.withPrices ? formatPrice(product.price) : "по запросу", body.withPrices && product.price ? formatPrice(product.price * (product.quantity || 1)) : "по запросу"];
+      row.forEach((value, column) => summary.drawText(value.slice(0, column === 1 ? 40 : 20), { x: columns[column], y, font, size: 8, color: BROWN }));
+      summary.drawLine({ start: { x: 36, y: y - 10 }, end: { x: 800, y: y - 10 }, thickness: .5, color: WARM_LINE });
+    });
+    const summaryY = Math.max(228, 438 - products.length * 34);
+    drawLines(summary, wrapText(textValue(proposal.summaryNote), font, 9, 470, 3), { x: 42, y: summaryY, font, size: 9, lineHeight: 12, color: MUTED });
+    const totalText = body.withPrices && total ? formatPrice(total) : "Цена по запросу";
+    summary.drawText("ПРЕДВАРИТЕЛЬНЫЙ ИТОГ", { x: 610, y: summaryY, font, size: 7, color: BURGUNDY });
+    summary.drawText(totalText, { x: 610, y: summaryY - 26, font, size: 19, color: BROWN });
+    summary.drawText("Условия предложения", { x: 42, y: 160, font, size: 17, color: BROWN });
+    [["СРОК ПОСТАВКИ", proposal.leadTime], ["ДОСТАВКА И СБОРКА", proposal.delivery], ["ОПЛАТА", proposal.payment]].forEach(([label, value], index) => {
+      const x = 42 + index * 253; summary.drawRectangle({ x, y: 48, width: 235, height: 92, color: PALE });
+      summary.drawText(label!, { x: x + 14, y: 118, font, size: 7, color: BURGUNDY });
+      drawLines(summary, wrapText(textValue(value), font, 8.5, 205, 4), { x: x + 14, y: 97, font, size: 8.5, lineHeight: 11 });
+    });
 
-    document.setTitle(`Коммерческое предложение — ${asText(body.projectName || "ROOM design")}`);
-    document.setAuthor("ROOM design");
-    document.setCreator("ROOM design");
+    const about = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    drawMarker(about, font, "06", "О NORR mobler");
+    about.drawText("Европейский дизайн. Индивидуальный сценарий.", { x: 42, y: 516, font, size: 25, color: BROWN });
+    drawImageContain(about, visualisation, { x: 42, y: 248, width: 490, height: 230 });
+    about.drawRectangle({ x: 532, y: 248, width: 268, height: 230, color: BROWN });
+    drawLines(about, wrapText("Интерьер начинается не с отдельного предмета, а с ощущения, которое вы хотите сохранить.", font, 14, 220, 6), { x: 558, y: 425, font, size: 14, lineHeight: 18, color: WHITE });
+    about.drawText("Сервис вокруг вашего проекта", { x: 42, y: 210, font, size: 17, color: BROWN });
+    ["Персональная конфигурация", "Дизайнерская поддержка", "Единый сервис", "Материалы вживую"].forEach((value, index) => { const x = 42 + index * 190; about.drawText(String(index + 1).padStart(2, "0"), { x, y: 165, font, size: 8, color: BURGUNDY }); drawLines(about, wrapText(value, font, 11, 150, 3), { x, y: 145, font, size: 11, lineHeight: 13 }); });
+
+    const manager = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    drawMarker(manager, font, "07", "Ваш персональный менеджер");
+    drawImageContain(manager, visualisation, { x: 42, y: 168, width: 480, height: 340 });
+    manager.drawRectangle({ x: 542, y: 64, width: 258, height: 444, color: PALE });
+    manager.drawText(textValue(body.managerName, "Имя Фамилия"), { x: 570, y: 408, font, size: 22, color: BROWN });
+    let managerY = 365;
+    for (const [label, value] of [["ДОЛЖНОСТЬ", proposal.managerRole], ["ТЕЛЕФОН", proposal.managerPhone], ["EMAIL", proposal.managerEmail], ["САЙТ", "norrmobler.ru"]] as const) { manager.drawText(label, { x: 570, y: managerY, font, size: 7, color: BURGUNDY }); manager.drawText(textValue(value), { x: 570, y: managerY - 20, font, size: 11, color: BROWN }); managerY -= 68; }
+
+    document.setTitle(`Коммерческое предложение — ${asText(body.projectName || "NORR mobler")}`);
+    document.setAuthor("NORR mobler");
+    document.setCreator("ROOM Design");
     const bytes = await document.save();
-    const filename = "room-design-commercial-proposal.pdf";
+    const filename = "NORR_Mobler_Commercial_Proposal.pdf";
     const payload = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     return new Response(payload, {
       headers: {

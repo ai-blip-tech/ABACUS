@@ -16,21 +16,23 @@ test("commercial proposal editor supports catalog and reference products before 
       { id: "reference-chair-a", kind: "chair", name: "Кресло", width: 2200, depth: 950, referenceHeightMm: 900, referenceImage: image, referenceName: "Диван Миллер с реклайнером" },
     ] },
   }) }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ user: { firstName: "Кирилл", lastName: "Волосников", email: "kirill@example.com" } }) }));
   await page.route("**/api/catalog?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [{ id: "sofa-1", name: "NORR Sofa", image, images: [image], price: 100000, widthMm: 2200, depthMm: 900, heightMm: 760 }] }) }));
   await page.route("**/api/projects/project-preview-12345/proposal", async (route) => { saves.push(route.request().postDataJSON()); await route.fulfill({ contentType: "application/json", body: "{\"ok\":true}" }); });
   await page.route("**/api/proposal", async (route) => { pdfPayloads.push(route.request().postDataJSON() as Record<string, unknown>); await route.fulfill({ contentType: "application/pdf", body: Buffer.alloc(1600) }); });
 
   await page.goto("/proposal/project-preview-12345");
-  await expect(page.locator(".proposal-cover-page")).toContainText("");
-  await expect(page.locator(".proposal-cover-page")).not.toContainText("ROOM DESIGN");
-  await expect(page.locator(".proposal-cover-page")).not.toContainText("Гостиная Preview");
-  await expect(page.locator(".proposal-visual-page img")).toHaveAttribute("src", selectedImage);
+  await expect(page.locator(".proposal-cover-page")).toContainText("КОММЕРЧЕСКОЕ");
+  await expect(page.getByLabel("Проект")).toHaveValue("Гостиная Preview");
+  await expect(page.locator(".proposal-selection-page img")).toHaveAttribute("src", selectedImage);
   await expect(page.getByLabel("Наименование")).toHaveCount(2);
   await expect(page.getByLabel("Наименование").nth(0)).toHaveValue("NORR Sofa");
   await expect(page.getByLabel("Наименование").nth(1)).toHaveValue("Диван Миллер с реклайнером");
+  await expect(page.locator(".proposal-manager-page")).toContainText("Кирилл Волосников");
+  await page.getByLabel("Клиент").fill("Анна Петрова");
   await page.getByLabel("Цена: NORR Sofa").fill("90000");
   await page.getByLabel("Цена: Диван Миллер с реклайнером").fill("250000");
-  await page.locator(".proposal-product-page").nth(1).getByLabel("Дополнительные параметры").fill("Ткань букле, электрический реклайнер");
+  await page.locator(".proposal-product-page").nth(1).getByLabel("Примечание").fill("Ткань букле, электрический реклайнер");
   await page.getByText("Показывать цены").click();
   await expect(page.locator(".proposal-price")).toHaveCount(0);
   await page.getByRole("button", { name: "Скачать PDF" }).click();
@@ -44,6 +46,7 @@ test("commercial proposal editor supports catalog and reference products before 
   expect((pdfPayloads[1].products as unknown[]).length).toBe(2);
   expect(saves.some((entry) => JSON.stringify(entry).includes("250000"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Ткань букле, электрический реклайнер"))).toBe(true);
+  expect(saves.some((entry) => JSON.stringify(entry).includes("Анна Петрова"))).toBe(true);
 });
 
 test("commercial proposal saves a newly created project before opening the editor", async ({ page, browserName }, testInfo) => {
@@ -106,7 +109,7 @@ test("commercial proposal snapshots the history version selected in Studio", asy
   await page.getByRole("button", { name: "Создать коммерческое предложение" }).click();
   let popup = await popupPromise;
   await popup.waitForURL(/\/proposal\//);
-  await expect(popup.locator(".proposal-visual-page img")).toBeVisible();
+  await expect(popup.locator(".proposal-selection-page img")).toBeVisible();
   await popup.close();
 
   await page.getByRole("button", { name: "Render B", exact: true }).click();
@@ -141,7 +144,7 @@ test("commercial proposal creates a real PDF from a saved reference product", as
   await page.route("**/api/catalog?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [{ id: "NRM00116", name: "BOX COFFEE TABLE", image: webpImage, images: [webpImage], price: 89000, widthMm: 900, depthMm: 600, heightMm: 380 }] }) }));
   await page.goto(`/proposal/${created.project.id}`);
   await page.getByLabel("Цена: Диван Миллер с реклайнером").fill("250000");
-  await page.locator(".proposal-product-page").nth(0).getByLabel("Дополнительные параметры").fill("Ткань букле, электрический реклайнер");
+  await page.locator(".proposal-product-page").nth(0).getByLabel("Примечание").fill("Ткань букле, электрический реклайнер");
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать PDF" }).click();
   const download = await downloadPromise;
@@ -149,5 +152,5 @@ test("commercial proposal creates a real PDF from a saved reference product", as
   const path = await download.path();
   expect(path).toBeTruthy();
   const pdf = await PDFDocument.load(await readFile(path!));
-  expect(pdf.getPageCount()).toBe(5);
+  expect(pdf.getPageCount()).toBe(7);
 });

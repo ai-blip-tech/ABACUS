@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <title>NORR circle motif without text</title>
+  <rect width="1000" height="1000" fill="none"/>
+  <circle cx="500" cy="500" r="380" fill="none" stroke="#D8D2CB" stroke-width="3"/>
+  <path d="M185 288 A410 410 0 0 1 815 288" fill="none" stroke="#6E242A" stroke-width="4"/>
+  <line x1="420" y1="625" x2="580" y2="625" stroke="#6E242A" stroke-width="4"/>
+</svg>

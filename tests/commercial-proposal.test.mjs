@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { buildProposalProducts, proposalTotal } from "../lib/commercial-proposal.ts";
+import { buildProposalProducts, defaultProposalDocument, mergeProposalDocument, proposalOverrideFor, proposalTotal } from "../lib/commercial-proposal.ts";
 
 const catalog = new Map([["catalog-1", {
   id: "catalog-1", name: "Каталожный диван", image: "https://example.com/sofa.jpg", images: [],
@@ -44,6 +44,22 @@ test("commercial proposal total uses override price and quantity", () => {
   assert.equal(proposalTotal(products), 255000);
 });
 
+test("commercial proposal persists manager-facing product fields and document metadata", () => {
+  const [product] = buildProposalProducts([{
+    id: "custom", kind: "chair", name: "Кресло", width: 800, depth: 800, referenceImage: "image",
+    proposalOverride: { article: "CUSTOM-1", quantity: 3, brand: "NORR", configuration: "Левая секция", option: "Зелёное букле", characteristics: ["Ножки: дуб"], category: "Мягкая мебель" },
+  }]);
+  assert.equal(product.quantity, 3);
+  assert.equal(product.article, "CUSTOM-1");
+  assert.equal(product.option, "Зелёное букле");
+  assert.deepEqual(proposalOverrideFor(product).characteristics, ["Ножки: дуб", "", "", ""]);
+  const defaults = defaultProposalDocument("Гостиная", 1);
+  const document = mergeProposalDocument({ clientName: "Кирилл", managerEmail: "manager@example.com" }, defaults);
+  assert.equal(document.projectName, "Гостиная");
+  assert.equal(document.clientName, "Кирилл");
+  assert.equal(document.managerEmail, "manager@example.com");
+});
+
 test("proposal endpoints enforce auth, ownership and byte-based image detection", async () => {
   const [pdfRoute, metadataRoute] = await Promise.all([
     readFile(new URL("../app/api/proposal/route.ts", import.meta.url), "utf8"),
@@ -54,4 +70,5 @@ test("proposal endpoints enforce auth, ownership and byte-based image detection"
   assert.match(pdfRoute, /allowedObjectIds/);
   assert.match(pdfRoute, /normalizeProposalImage/);
   assert.match(metadataRoute, /tenant_id = \? AND user_id = \?/);
+  assert.match(metadataRoute, /proposalDocument/);
 });

@@ -3,7 +3,7 @@ import { database } from "@/lib/server-runtime";
 
 type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string };
 type SavedPlanParameter = { name: string; value: string };
-type SavedProposalOverride = { name?: string; width?: number; depth?: number; height?: number; price?: number; notes?: string };
+type SavedProposalOverride = { name?: string; width?: number; depth?: number; height?: number; price?: number; quantity?: number; article?: string; category?: string; brand?: string; configuration?: string; option?: string; characteristics?: string[]; notes?: string };
 type SavedPlanItem = {
   id: string;
   kind: string;
@@ -53,6 +53,7 @@ type SavedState = {
   planCamera?: SavedPlanCamera | null;
   proposalShowPrices?: boolean;
   proposalVisualizationAsset?: string;
+  proposalDocument?: Record<string, string>;
 };
 
 const validProjectId = (id: string) => /^[a-zA-Z0-9-]{12,100}$/.test(id);
@@ -129,12 +130,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const existingProject = await database.prepare("SELECT id, state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first<{ id: string; state_json: string | null }>();
   let persistedShowPrices = true;
   let persistedProposalVisualizationAsset: string | undefined;
+  let persistedProposalDocument: Record<string, string> | undefined;
   const persistedOverrides = new Map<string, unknown>();
   if (existingProject?.state_json) {
     try {
-      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; planItems?: Array<{ id?: string; proposalOverride?: unknown }> };
+      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalDocument?: Record<string, string>; planItems?: Array<{ id?: string; proposalOverride?: unknown }> };
       persistedShowPrices = persisted.proposalShowPrices !== false;
       persistedProposalVisualizationAsset = persisted.proposalVisualizationAsset;
+      persistedProposalDocument = persisted.proposalDocument;
       for (const item of persisted.planItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
     } catch { /* a normal project save will replace an unreadable legacy state */ }
   }
@@ -198,6 +201,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           depth: typeof override.depth === "number" && Number.isFinite(override.depth) ? finiteNumber(override.depth, 0, 0, 20000) : undefined,
           height: typeof override.height === "number" && Number.isFinite(override.height) ? finiteNumber(override.height, 0, 0, 20000) : undefined,
           price: typeof override.price === "number" && Number.isFinite(override.price) ? finiteNumber(override.price, 0, 0, 1_000_000_000) : undefined,
+          quantity: typeof override.quantity === "number" && Number.isFinite(override.quantity) ? finiteNumber(override.quantity, 1, 1, 10_000) : undefined,
+          article: shortText(override.article, 160) || undefined,
+          category: shortText(override.category, 240) || undefined,
+          brand: shortText(override.brand, 240) || undefined,
+          configuration: shortText(override.configuration, 800) || undefined,
+          option: shortText(override.option, 800) || undefined,
+          characteristics: Array.isArray(override.characteristics) ? override.characteristics.slice(0, 4).map((entry) => shortText(entry, 600)) : undefined,
           notes: shortText(override.notes, 2000) || undefined,
         };
       })(),
@@ -243,6 +253,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     planCamera,
     proposalShowPrices: typeof draft.proposalShowPrices === "boolean" ? draft.proposalShowPrices : persistedShowPrices,
     proposalVisualizationAsset: persistedProposalVisualizationAsset,
+    proposalDocument: persistedProposalDocument,
   };
   const now = new Date().toISOString();
   if (existingProject) {
