@@ -25,6 +25,7 @@ jobs:
             echo "PRODUCTION_SHA_BEFORE=${previous_sha}"
             pm2 describe roomdesign
 
+            git status --short
             test -z "$(git status --porcelain -- . ':(exclude)package-lock.json')"
             git restore --source=HEAD -- package-lock.json
             git fetch origin main
