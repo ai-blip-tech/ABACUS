@@ -149,7 +149,15 @@ export default function Home() {
     setProjectSaved(false);
     setProposalError("");
     try {
+      const proposalVisualization = await imageForProjectSave(generatedImage || interiorImage);
       await persistProject(targetId, name);
+      const snapshotResponse = await fetch(`/api/projects/${encodeURIComponent(targetId)}/proposal`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: [], visualization: proposalVisualization }),
+      });
+      const snapshotPayload = await snapshotResponse.json().catch(() => ({}));
+      if (!snapshotResponse.ok) throw new Error(snapshotPayload.error || "Не удалось зафиксировать выбранную визуализацию.");
       setProjectSaved(true);
       popup.location.replace(`/proposal/${encodeURIComponent(targetId)}`);
     } catch (error) {

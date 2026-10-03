@@ -52,6 +52,7 @@ type SavedState = {
   planWallReference?: SavedSurfaceReference | null;
   planCamera?: SavedPlanCamera | null;
   proposalShowPrices?: boolean;
+  proposalVisualizationAsset?: string;
 };
 
 const validProjectId = (id: string) => /^[a-zA-Z0-9-]{12,100}$/.test(id);
@@ -64,6 +65,7 @@ function hydrateState(projectId: string, state: SavedState) {
     ...state,
     interiorImage: state.interiorAsset ? assetUrl(projectId, state.interiorAsset) : "",
     generatedImage: state.generatedAsset ? assetUrl(projectId, state.generatedAsset) : "",
+    proposalVisualization: state.proposalVisualizationAsset ? assetUrl(projectId, state.proposalVisualizationAsset) : "",
     historyVersions: (state.historyVersions || []).map((version) => ({ ...version, image: assetUrl(projectId, version.asset) })),
     planItems: (state.planItems || []).map(({ referenceAsset, ...item }) => ({
       ...item,
@@ -126,11 +128,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const draft = body.state as Record<string, unknown>;
   const existingProject = await database.prepare("SELECT id, state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first<{ id: string; state_json: string | null }>();
   let persistedShowPrices = true;
+  let persistedProposalVisualizationAsset: string | undefined;
   const persistedOverrides = new Map<string, unknown>();
   if (existingProject?.state_json) {
     try {
-      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; planItems?: Array<{ id?: string; proposalOverride?: unknown }> };
+      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; planItems?: Array<{ id?: string; proposalOverride?: unknown }> };
       persistedShowPrices = persisted.proposalShowPrices !== false;
+      persistedProposalVisualizationAsset = persisted.proposalVisualizationAsset;
       for (const item of persisted.planItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
     } catch { /* a normal project save will replace an unreadable legacy state */ }
   }
@@ -238,6 +242,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     planWallReference,
     planCamera,
     proposalShowPrices: typeof draft.proposalShowPrices === "boolean" ? draft.proposalShowPrices : persistedShowPrices,
+    proposalVisualizationAsset: persistedProposalVisualizationAsset,
   };
   const now = new Date().toISOString();
   if (existingProject) {

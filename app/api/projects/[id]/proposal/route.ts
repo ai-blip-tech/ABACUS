@@ -1,4 +1,4 @@
-import { requireTenantUser } from "@/lib/auth";
+import { ensureStore, requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 
 const validProjectId = (id: string) => /^[a-zA-Z0-9-]{12,100}$/.test(id);
@@ -21,12 +21,19 @@ function cleanOverride(value: unknown) {
   return Object.values(override).some((entry) => entry !== undefined) ? override : undefined;
 }
 
+function dataUrlToBytes(value: string) {
+  const match = value.match(/^data:([^;,]+);base64,([a-zA-Z0-9+/=]+)$/);
+  if (!match) throw new Error("Не удалось сохранить выбранную визуализацию.");
+  const binary = atob(match[2]);
+  return { contentType: match[1], bytes: Uint8Array.from(binary, (character) => character.charCodeAt(0)) };
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
   const { id } = await params;
   if (!validProjectId(id)) return Response.json({ error: "Некорректный проект." }, { status: 400 });
-  const body = await request.json().catch(() => null) as { showPrices?: unknown; items?: unknown } | null;
+  const body = await request.json().catch(() => null) as { showPrices?: unknown; items?: unknown; visualization?: unknown } | null;
   if (!body || !Array.isArray(body.items)) return Response.json({ error: "Некорректные данные коммерческого предложения." }, { status: 400 });
   const project = await database.prepare("SELECT state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?")
     .bind(id, user.tenantId, user.id)
@@ -52,7 +59,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     delete rest.proposalOverride;
     return proposalOverride ? { ...rest, proposalOverride } : rest;
   });
-  state.proposalShowPrices = body.showPrices !== false;
+  if (typeof body.showPrices === "boolean") state.proposalShowPrices = body.showPrices;
+  if (typeof body.visualization === "string" && body.visualization) {
+    try {
+      await ensureStore();
+      const file = dataUrlToBytes(body.visualization);
+      const asset = "proposal-visualization";
+      await storage().put(`${tenantStoragePrefix(user)}/projects/${id}/${asset}`, file.bytes, {
+        httpMetadata: { contentType: file.contentType },
+        customMetadata: { projectId: id, userId: user.id, tenantId: user.tenantId },
+      });
+      state.proposalVisualizationAsset = asset;
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Не удалось сохранить выбранную визуализацию." }, { status: 500 });
+    }
+  }
   await database.prepare("UPDATE projects SET state_json = ?, updated_at = ? WHERE id = ? AND tenant_id = ? AND user_id = ?")
     .bind(JSON.stringify(state), new Date().toISOString(), id, user.tenantId, user.id)
     .run();

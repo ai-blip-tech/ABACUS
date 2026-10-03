@@ -18,8 +18,6 @@ export function proposalImageFormat(bytes: Uint8Array, mime = ""): ProposalImage
     && bytes[2] === 0xff;
   if (isJpeg) return "jpeg";
 
-  const normalizedMime = mime.toLowerCase().split(";", 1)[0].trim();
-  if (normalizedMime === "image/png") return "png";
-  if (normalizedMime === "image/jpeg" || normalizedMime === "image/jpg") return "jpeg";
+  void mime;
   return null;
 }

@@ -16,12 +16,15 @@ type ProjectPayload = {
   state?: {
     planItems?: ProposalPlanItem[];
     proposalShowPrices?: boolean;
+    proposalVisualization?: string;
     generatedImage?: string;
     interiorImage?: string;
   };
 };
 
 const money = (value?: number) => value === undefined ? "Цена не указана" : `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
+const productTitleRows = (value: string) => Math.min(4, Math.max(2, Math.ceil(value.length / 24)));
+const productTitleClass = (value: string) => value.length > 64 ? "proposal-product-name very-long" : value.length > 36 ? "proposal-product-name long" : "proposal-product-name";
 const dataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result));
@@ -116,7 +119,7 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
     try {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       await save(products, showPrices);
-      const coverSource = project.state.generatedImage || project.state.interiorImage || "";
+      const coverSource = project.state.proposalVisualization || project.state.generatedImage || project.state.interiorImage || "";
       const [coverImage, proposalCoverImage, fontData, preparedProducts] = await Promise.all([
         pdfImage(coverSource),
         pdfImage("/proposal-cover.png"),
@@ -180,13 +183,13 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
     </section>
     <section className="proposal-document" aria-label="Предпросмотр коммерческого предложения">
       <article className="proposal-page proposal-cover-page">
-        <img src="/proposal-cover.png" alt=""/><div><b>ROOM DESIGN</b><h1>КОММЕРЧЕСКОЕ<br/>ПРЕДЛОЖЕНИЕ</h1><p>{project?.project?.name}</p></div>
+        <img src="/proposal-cover.png" alt="Обложка коммерческого предложения NORR"/>
       </article>
-      {(project?.state?.generatedImage || project?.state?.interiorImage) && <article className="proposal-page proposal-visual-page"><img src={project.state.generatedImage || project.state.interiorImage} alt="Визуализация проекта"/></article>}
+      {(project?.state?.proposalVisualization || project?.state?.generatedImage || project?.state?.interiorImage) && <article className="proposal-page proposal-visual-page"><img src={project.state.proposalVisualization || project.state.generatedImage || project.state.interiorImage} alt="Выбранная визуализация проекта"/></article>}
       {products.map((product, index) => <article className="proposal-page proposal-product-page" key={product.key}>
         <aside>
           <small>{String(index + 3).padStart(2, "0")} · {product.source === "catalog" ? "КАТАЛОГ" : "РЕФЕРЕНС"}</small>
-          <input aria-label="Наименование" value={product.name} onChange={(event) => update(product.key, { name: event.target.value })}/>
+          <textarea className={productTitleClass(product.name)} rows={productTitleRows(product.name)} aria-label="Наименование" value={product.name} onChange={(event) => update(product.key, { name: event.target.value })}/>
           <div className="proposal-dimensions">
             {(["width", "height", "depth"] as const).map((field) => <label key={field}>{field === "width" ? "Ширина" : field === "height" ? "Высота" : "Глубина"}<input type="number" min="0" value={product[field] ?? ""} onChange={(event) => update(product.key, { [field]: event.target.value === "" ? undefined : Number(event.target.value) })}/><span>мм</span></label>)}
           </div>

@@ -1,11 +1,12 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFImage, PDFFont, rgb } from "pdf-lib";
-import { proposalImageFormat } from "@/lib/proposal-image";
+import { normalizeProposalImage, type ProposalImageRole } from "@/lib/proposal-pdf-image";
 import { requireTenantUser } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 
 type ProductParameter = { name?: string; value?: string };
 type ProposalProduct = {
+  source?: "catalog" | "reference";
   objectIds?: string[];
   quantity?: number;
   name?: string;
@@ -64,24 +65,20 @@ const decodeDataUrl = (source: string) => {
   };
 };
 
-const imageBytes = async (source: string) => {
-  const inline = decodeDataUrl(source);
-  if (inline) return inline;
-  const response = await fetch(source, { headers: { "User-Agent": "ROOM-design-proposal/1.0" } });
-  if (!response.ok) throw new Error(`Не удалось получить изображение (${response.status}).`);
-  return { mime: response.headers.get("content-type") || "", bytes: new Uint8Array(await response.arrayBuffer()) };
-};
-
-const embedImage = async (document: PDFDocument, source?: string) => {
+const embedImage = async (document: PDFDocument, source: string | undefined, role: ProposalImageRole) => {
   if (!source) return null;
+  const image = await normalizeProposalImage(source, role);
   try {
-    const { mime, bytes } = await imageBytes(source);
-    const format = proposalImageFormat(bytes, mime);
-    if (format === "png") return await document.embedPng(bytes);
-    if (format === "jpeg") return await document.embedJpg(bytes);
-    return null;
-  } catch {
-    return null;
+    return image.format === "png" ? await document.embedPng(image.bytes) : await document.embedJpg(image.bytes);
+  } catch (error) {
+    console.error("[proposal-image]", {
+      role,
+      detectedFormat: image.detectedFormat,
+      normalizationResult: image.normalized ? `converted-to-${image.format}` : "not-required",
+      failureStage: "embed",
+      message: error instanceof Error ? error.message : "unknown",
+    });
+    throw new Error(`Не удалось встроить изображение ${role === "visualization" ? "визуализации" : role === "cover" ? "обложки" : role === "catalog" ? "каталожного товара" : "референсного товара"} в PDF.`);
   }
 };
 
@@ -119,6 +116,27 @@ const wrapText = (text: string, font: PDFFont, size: number, maxWidth: number, m
     lines[lines.length - 1] = `${last}…`;
   }
   return lines;
+};
+
+const wrapAllText = (text: string, font: PDFFont, size: number, maxWidth: number) => {
+  const words = asText(text).split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (!current || font.widthOfTextAtSize(next, size) <= maxWidth) current = next;
+    else { lines.push(current); current = word; }
+  }
+  if (current) lines.push(current);
+  return lines;
+};
+
+const fittedProductTitle = (text: string, font: PDFFont) => {
+  for (let size = 23; size >= 15; size -= 1) {
+    const lines = wrapAllText(text, font, size, 170);
+    if (lines.length <= 3) return { lines, size, lineHeight: size + 3 };
+  }
+  return { lines: wrapAllText(text, font, 15, 170), size: 15, lineHeight: 18 };
 };
 
 const drawLines = (page: ReturnType<PDFDocument["addPage"]>, lines: string[], options: { x: number; y: number; font: PDFFont; size: number; lineHeight: number; color?: ReturnType<typeof rgb> }) => {
@@ -160,11 +178,11 @@ export async function POST(request: Request) {
     if (!inlineFont?.bytes?.length) throw new Error("Не удалось загрузить шрифт PDF.");
     const font = await document.embedFont(inlineFont.bytes, { subset: true });
     const [proposalCover, visualisation] = await Promise.all([
-      embedImage(document, proposalCoverSource),
-      embedImage(document, visualisationSource),
+      embedImage(document, proposalCoverSource, "cover"),
+      embedImage(document, visualisationSource, "visualization"),
     ]);
-    if (!proposalCover) throw new Error("Формат изображения обложки не поддерживается.");
-    if (!visualisation) throw new Error("Формат изображения визуализации не поддерживается.");
+    if (!proposalCover) throw new Error("Не удалось подготовить изображение обложки для PDF.");
+    if (!visualisation) throw new Error("Не удалось подготовить изображение визуализации для PDF.");
 
     const firstPage = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     drawImageCover(firstPage, proposalCover);
@@ -174,7 +192,8 @@ export async function POST(request: Request) {
 
     const embeddedProductImages = await Promise.all(products.map(async (product) => {
       const images = [product.referenceImage, ...(product.referenceImages || []).filter((source) => source && source !== product.referenceImage)];
-      return Promise.all([embedImage(document, images[0]), embedImage(document, images[1])]);
+      const role: ProposalImageRole = product.source === "reference" ? "reference" : "catalog";
+      return Promise.all([embedImage(document, images[0], role), embedImage(document, images[1], role)]);
     }));
 
     for (let index = 0; index < products.length; index += 1) {
@@ -184,10 +203,10 @@ export async function POST(request: Request) {
       page.drawText(String(index + 3).padStart(2, "0"), { x: 28, y: PAGE_HEIGHT - 30, font, size: 8, color: MUTED });
       page.drawText("ПРЕДМЕТ ИНТЕРЬЕРА", { x: 28, y: PAGE_HEIGHT - 68, font, size: 8, color: MUTED });
       const name = asText(product.referenceName || product.name || "Товар");
-      const nameLines = wrapText(name, font, 23, 170, 4);
-      drawLines(page, nameLines, { x: 28, y: PAGE_HEIGHT - 96, font, size: 23, lineHeight: 26 });
+      const title = fittedProductTitle(name, font);
+      drawLines(page, title.lines, { x: 28, y: PAGE_HEIGHT - 96, font, size: title.size, lineHeight: title.lineHeight });
 
-      let fieldY = PAGE_HEIGHT - 108 - nameLines.length * 26;
+      let fieldY = PAGE_HEIGHT - 108 - title.lines.length * title.lineHeight;
       page.drawText("Размеры", { x: 28, y: fieldY, font, size: 13, color: BROWN });
       page.drawLine({ start: { x: 28, y: fieldY - 7 }, end: { x: 198, y: fieldY - 7 }, thickness: 0.8, color: BROWN });
       fieldY -= 25;
@@ -221,8 +240,12 @@ export async function POST(request: Request) {
       if (description) drawLines(page, wrapText(description, font, 12, 520, 6), { x: 270, y: 245, font, size: 12, lineHeight: 17, color: BROWN });
       if (body.withPrices) {
         const unitPrice = product.price ?? product.referencePrice;
-        const price = formatPrice(unitPrice ? unitPrice * (product.quantity || 1) : undefined);
+        const price = formatPrice(unitPrice);
         page.drawText(price, { x: 790 - font.widthOfTextAtSize(price, 25), y: 48, font, size: 25, color: rgb(0.05, 0.05, 0.05) });
+        if (unitPrice && (product.quantity || 1) > 1) {
+          const subtotal = `Итого: ${formatPrice(unitPrice * (product.quantity || 1))}`;
+          page.drawText(subtotal, { x: 790 - font.widthOfTextAtSize(subtotal, 11), y: 30, font, size: 11, color: MUTED });
+        }
         if (product.referenceOldPrice && product.referenceOldPrice > (product.referencePrice || 0)) {
           const oldPrice = formatPrice(product.referenceOldPrice);
           const oldX = 790 - font.widthOfTextAtSize(oldPrice, 15);
