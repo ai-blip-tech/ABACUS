@@ -26,7 +26,7 @@ jobs:
             pm2 describe roomdesign
 
             git status --short
-            test -z "$(git status --porcelain -- . ':(exclude)package-lock.json')"
+            test -z "$(git status --porcelain -- . ':(exclude)package-lock.json' ':(exclude).next.rollback-*' ':(exclude)roomdesign')"
             git restore --source=HEAD -- package-lock.json
             git fetch origin main
             git pull --ff-only origin main
