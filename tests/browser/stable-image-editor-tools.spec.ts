@@ -79,7 +79,7 @@ test("Add, Replace and Remove use point-guided routing without segmentation", as
   expect(segmentRequests).toBe(0);
 });
 
-test("Studio keeps canvas, history and upscale separated and scrollable", async ({ page }, testInfo) => {
+test("Studio keeps history over the canvas and upscale in the first screen", async ({ page }, testInfo) => {
   test.skip(!/-(1440|1366|tablet)$/.test(testInfo.project.name));
 
   await page.route("**/api/account/overview", (route) => route.fulfill({
@@ -112,14 +112,9 @@ test("Studio keeps canvas, history and upscale separated and scrollable", async 
   const boxes = await Promise.all([canvas, history, upscale].map((locator) => locator.boundingBox()));
   expect(boxes.every(Boolean)).toBe(true);
   const [canvasBox, historyBox, upscaleBox] = boxes as NonNullable<(typeof boxes)[number]>[];
-  expect(historyBox.y).toBeGreaterThanOrEqual(canvasBox.y + canvasBox.height - 1);
-  expect(upscaleBox.y).toBeGreaterThanOrEqual(historyBox.y + historyBox.height - 1);
-
-  const scrollState = await page.locator(".canvas-area").evaluate((element) => {
-    const area = element as HTMLElement;
-    area.scrollTop = area.scrollHeight;
-    return { clientHeight: area.clientHeight, scrollHeight: area.scrollHeight, scrollTop: area.scrollTop };
-  });
-  expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
-  expect(scrollState.scrollTop).toBeGreaterThan(0);
+  expect(historyBox.y).toBeGreaterThan(canvasBox.y);
+  expect(historyBox.y + historyBox.height).toBeLessThanOrEqual(canvasBox.y + canvasBox.height + 1);
+  expect(upscaleBox.y).toBeGreaterThanOrEqual(canvasBox.y + canvasBox.height - 1);
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  expect(upscaleBox.y + upscaleBox.height).toBeLessThanOrEqual(viewportHeight + 1);
 });

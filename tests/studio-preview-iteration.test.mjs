@@ -10,14 +10,17 @@ const [page, layout, styles, accountStyles, homeOverride] = await Promise.all([
   readFile(new URL("../app/home-override.css", import.meta.url), "utf8"),
 ]);
 
-test("Studio keeps the source image uncropped and stacks render history safely", () => {
+test("Studio keeps the source image uncropped and overlays one render-history ribbon safely", () => {
   assert.match(layout, /studio-preview-iteration\.css/);
   assert.match(styles, /\.room-canvas>img\{object-fit:contain!important/);
+  assert.match(styles, /\.canvas-area:has\(>\.room-canvas\)\{display:grid/);
+  assert.match(styles, /\.room-canvas\{height:clamp\(360px,calc\(100dvh - 280px\),680px\)!important/);
+  assert.match(styles, />\.history-strip\{grid-column:1;grid-row:2;align-self:end/);
+  assert.match(styles, />\.upscale-panel\{grid-column:1;grid-row:3/);
   assert.match(styles, /\.canvas-area>\.history-strip\{position:relative;z-index:8;flex:0 0 112px/);
-  assert.match(styles, /margin:0 auto 16px/);
-  assert.doesNotMatch(styles, /margin:-1\d+px auto/);
+  assert.match(styles, /margin:0 auto 32px/);
   assert.match(styles, /-webkit-overflow-scrolling:touch/);
-  assert.match(styles, /\.canvas-note\{bottom:18px/);
+  assert.match(styles, /\.canvas-note\{bottom:140px/);
   assert.match(styles, /overflow-x:auto/);
   assert.match(styles, /@media\(hover:none\),\(pointer:coarse\)/);
   assert.match(page, /openHistoryVersion\(version\)/);
