@@ -31,11 +31,21 @@ test("Add, Replace and Remove use point-guided routing without segmentation", as
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.locator(".projects-dashboard-generation").click();
 
-  const actions = page.getByRole("group", { name: "Действие с мебелью" });
+  const actions = page.locator(".furniture-action-bar");
   const uploadReference = async () => page.locator(".direct-reference-input").setInputFiles({ name: "reference.png", mimeType: "image/png", buffer: imageBytes });
+  const placementButton = page.getByRole("button", { name: "Поставить точку размещения предмета" });
+
+  await page.mouse.move(4, 4);
+  await expect(actions).toHaveCSS("opacity", "0");
+  await placementButton.click({ position: { x: 250, y: 180 } });
+  await page.mouse.move(4, 4);
+  await expect(actions).toHaveCSS("opacity", "1");
+  await placementButton.click({ position: { x: 250, y: 180 } });
+  await page.mouse.move(4, 4);
+  await expect(actions).toHaveCSS("opacity", "0");
 
   await uploadReference();
-  await page.getByRole("button", { name: "Поставить точку размещения предмета" }).click({ position: { x: 250, y: 180 } });
+  await placementButton.click({ position: { x: 250, y: 180 } });
   await page.getByRole("button", { name: "Создать интерьер" }).click();
   await expect.poll(() => requests.length).toBe(1);
   expect(requests[0].placement).toBeTruthy();

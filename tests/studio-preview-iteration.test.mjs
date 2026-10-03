@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-const [page, layout, styles, accountStyles] = await Promise.all([
+const [page, layout, styles, accountStyles, homeOverride] = await Promise.all([
   readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/studio-preview-iteration.css", import.meta.url), "utf8"),
   readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8"),
+  readFile(new URL("../app/home-override.css", import.meta.url), "utf8"),
 ]);
 
 test("Studio keeps the source image uncropped and overlays render history", () => {
@@ -31,4 +32,11 @@ test("planogram clipboard ignores editable fields and creates independent clones
   assert.match(page, /key==="c"/);
   assert.match(page, /key!=="v"/);
   assert.match(page, /clonePlanogramItem\(planClipboardRef\.current,crypto\.randomUUID\(\),pasteIndexRef\.current\)/);
+});
+
+test("Editor controls follow hover or a real placement point instead of sticky mouse focus", () => {
+  assert.doesNotMatch(homeOverride, /room-canvas:focus-within/);
+  assert.doesNotMatch(homeOverride, /furniture-action-bar:focus-within/);
+  assert.match(homeOverride, /canvas-area:has\(\.material-tool\) \.furniture-action-bar/);
+  assert.match(homeOverride, /room-canvas :focus-visible/);
 });
