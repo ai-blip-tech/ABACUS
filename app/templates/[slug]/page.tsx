@@ -26,27 +26,28 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function TemplateDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const template = getTemplateBySlug((await params).slug);
   if (!template) notFound();
+  const isFurnitureCasting = template.slug === "furniture-casting";
   return (
     <main className="template-detail-page">
       <TemplatesHeader />
       <div className="template-detail-back"><Link href="/templates">← Все шаблоны</Link><span>{template.id} / 40</span></div>
-      <section className="template-detail-hero">
-        <div className="template-detail-media">
+      <section className={`template-detail-hero${isFurnitureCasting ? " is-furniture-casting" : ""}`}>
+        {!isFurnitureCasting && <div className="template-detail-media">
           <Image src={template.preview.src} alt={template.preview.alt} fill priority sizes="(max-width: 800px) 100vw, 58vw" />
           <span className="template-fixture-label">PREVIEW / PLACEHOLDER</span>
           <p>Fixture показывает только композицию экрана и не обещает качество будущего AI-результата.</p>
-        </div>
+        </div>}
         <div className="template-detail-copy">
-          <p className="templates-section-kicker"><b>{template.id}</b><i aria-hidden="true" /> {statusLabels[template.status]}</p>
+          <p className="templates-section-kicker"><b>{template.id}</b><i aria-hidden="true" /> {isFurnitureCasting ? "ROOM DESIGN" : statusLabels[template.status]}</p>
           <h1>{template.title}</h1>
           <h2>{template.hook}</h2>
           <p>{template.description}</p>
-          <dl>
+          {!isFurnitureCasting && <dl>
             <div><dt>Результат</dt><dd>{resultLabels[template.resultType]}</dd></div>
             <div><dt>Что нужно</dt><dd>{template.inputSummary}</dd></div>
             <div><dt>Статус</dt><dd>{statusLabels[template.status]}</dd></div>
-          </dl>
-          <a href="#workspace">Создать со своей комнатой <span>↓</span></a>
+          </dl>}
+          {!isFurnitureCasting && <a href="#workspace">Создать со своей комнатой <span>↓</span></a>}
         </div>
       </section>
       <TemplateWorkspace template={template} />

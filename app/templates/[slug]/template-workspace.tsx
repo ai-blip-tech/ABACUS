@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ChangeEvent, type MouseEvent } from 
 
 import { resultLabels, statusLabels } from "@/lib/templates/registry";
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
+import FurnitureCastingWorkspace from "./furniture-casting-workspace";
 
 type UploadedInput = { id: string; name: string; type: string; size: number; dataUrl: string };
 type GenerationMetadata = {
@@ -78,6 +79,10 @@ const createPointMarkerImage = (source: string, point: { x: number; y: number })
 const fileKind = (slot: TemplateInputSlot) => !["choice", "short_text"].includes(slot.kind);
 
 export default function TemplateWorkspace({ template }: { template: TemplateDefinition }) {
+  return template.slug === "furniture-casting" ? <FurnitureCastingWorkspace template={template} /> : <GenericTemplateWorkspace template={template} />;
+}
+
+function GenericTemplateWorkspace({ template }: { template: TemplateDefinition }) {
   const [uploads, setUploads] = useState<Record<string, UploadedInput[]>>({});
   const [values, setValues] = useState<Record<string, string>>({});
   const [consents, setConsents] = useState<Record<string, boolean>>({});

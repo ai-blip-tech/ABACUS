@@ -5,6 +5,7 @@ import test from "node:test";
 import { featuredTemplates, previewTemplates, templateRegistry } from "../lib/templates/registry.ts";
 
 const workspaceSource = await readFile(new URL("../app/templates/[slug]/template-workspace.tsx", import.meta.url), "utf8");
+const furnitureWorkspaceSource = await readFile(new URL("../app/templates/[slug]/furniture-casting-workspace.tsx", import.meta.url), "utf8");
 const detailSource = await readFile(new URL("../app/templates/[slug]/page.tsx", import.meta.url), "utf8");
 
 test("registry contains exactly forty unique versioned templates", () => {
@@ -38,15 +39,27 @@ test("furniture casting has the approved room plus one-to-five product schema", 
 
 test("unsupported flows remain honest fixtures while furniture uses the existing real endpoint", () => {
   assert.match(workspaceSource, /PREVIEW RESULT · AI НЕ ЗАПУСКАЛСЯ/);
-  assert.match(workspaceSource, /fetch\("\/api\/generate"/);
-  assert.match(workspaceSource, /Idempotency-Key/);
-  assert.match(workspaceSource, /operation: "place"/);
-  assert.match(workspaceSource, /pointEdit: \{ \.\.\.placement, markedImage \}/);
-  assert.match(workspaceSource, /let currentRoom = roomImage/);
-  assert.match(workspaceSource, /currentRoom = dataUrl/);
-  assert.doesNotMatch(workspaceSource, /createPlacementMask|placement: \{ \.\.\.placement, mask \}/);
+  assert.match(furnitureWorkspaceSource, /fetch\("\/api\/generate"/);
+  assert.match(furnitureWorkspaceSource, /Idempotency-Key/);
+  assert.match(furnitureWorkspaceSource, /operation: "place"/);
+  assert.match(furnitureWorkspaceSource, /pointEdit: \{ \.\.\.placement, markedImage \}/);
+  assert.match(furnitureWorkspaceSource, /let currentRoom = room\.dataUrl/);
+  assert.match(furnitureWorkspaceSource, /currentRoom = await blobToDataUrl/);
+  assert.doesNotMatch(furnitureWorkspaceSource, /createPlacementMask|placement: \{ \.\.\.placement, mask \}/);
   assert.match(workspaceSource, /!canRunReal && !realFurnitureFlow/);
   assert.match(workspaceSource, /fetch\("\/api\/projects"/);
   assert.match(detailSource, /generateStaticParams/);
-  assert.doesNotMatch(workspaceSource, /pipelineKey|OPENAI_API_KEY|providerSecret/);
+  assert.doesNotMatch(`${workspaceSource}${furnitureWorkspaceSource}`, /pipelineKey|OPENAI_API_KEY|providerSecret/);
+});
+
+test("furniture casting uses one point per product and keeps a consumer-facing generation history", () => {
+  assert.match(furnitureWorkspaceSource, /Record<string, Point>/);
+  assert.match(furnitureWorkspaceSource, /placements\[product\.id\]/);
+  assert.match(furnitureWorkspaceSource, /setPlacingProductId/);
+  assert.match(furnitureWorkspaceSource, /\/api\/account\/generations/);
+  assert.match(furnitureWorkspaceSource, /setHistory/);
+  assert.match(furnitureWorkspaceSource, /Открыть готовый рендер на весь экран/);
+  assert.match(furnitureWorkspaceSource, /ИСТОРИЯ ГЕНЕРАЦИЙ/);
+  assert.doesNotMatch(furnitureWorkspaceSource, /Provider usage|Стоимость Room Design|tokenCost|X-Room-AI/);
+  assert.match(detailSource, /!isFurnitureCasting && <div className="template-detail-media">/);
 });
