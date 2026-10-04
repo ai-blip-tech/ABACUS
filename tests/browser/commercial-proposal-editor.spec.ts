@@ -2,9 +2,18 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import sharp from "sharp";
+import { approvedProposalFixture } from "../fixtures/commercial-proposal-approved";
 
 const image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const selectedImage = `data:image/png;base64,${(await sharp({ create: { width: 2, height: 2, channels: 4, background: "#8f1024" } }).png().toBuffer()).toString("base64")}`;
+
+test("approved proposal visual fixture keeps the exact reference content", async () => {
+  expect(approvedProposalFixture.document.offerNumber).toBe("№ 112");
+  expect(approvedProposalFixture.prices.total).toBe(302_715);
+  expect(approvedProposalFixture.brands).toEqual({
+    sofa: "NORR MÖBLER SELECTION", lamp: "SEYVAA PARIS", rug: "NORR CARPETS",
+  });
+});
 
 test("commercial proposal editor supports catalog and reference products before PDF", async ({ page }) => {
   const saves: unknown[] = [];
@@ -13,7 +22,7 @@ test("commercial proposal editor supports catalog and reference products before 
     project: { name: "Гостиная Preview" },
     state: { generatedImage: image, proposalVisualization: selectedImage, proposalShowPrices: true, planItems: [
       { id: "catalog-sofa-a", kind: "sofa", name: "Диван", width: 2200, depth: 900, referenceImage: image, referenceProductId: "sofa-1" },
-      { id: "reference-chair-a", kind: "chair", name: "Кресло", width: 2200, depth: 950, referenceHeightMm: 900, referenceImage: image, referenceName: "Диван Миллер с реклайнером" },
+      { id: "reference-chair-a", kind: "chair", name: "Кресло", width: 2200, depth: 950, referenceHeightMm: 900, referenceImage: selectedImage, referenceName: "Диван Миллер с реклайнером" },
     ] },
   }) }));
   await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ user: { firstName: "Кирилл", lastName: "Волосников", email: "kirill@example.com" } }) }));
@@ -22,13 +31,19 @@ test("commercial proposal editor supports catalog and reference products before 
   await page.route("**/api/proposal", async (route) => { pdfPayloads.push(route.request().postDataJSON() as Record<string, unknown>); await route.fulfill({ contentType: "application/pdf", body: Buffer.alloc(1600) }); });
 
   await page.goto("/proposal/project-preview-12345");
-  await expect(page.locator(".proposal-cover-page")).toContainText("КОММЕРЧЕСКОЕ");
+  await expect(page.locator(".proposal-cover-page h1")).toContainText("Коммерческое");
+  await expect(page.locator(".proposal-cover-page h1")).toContainText("предложение");
   await expect(page.getByLabel("Проект")).toHaveValue("Гостиная Preview");
   await expect(page.locator(".proposal-selection-page img")).toHaveAttribute("src", selectedImage);
+  await expect(page.locator(".proposal-about-page img")).toHaveAttribute("src", selectedImage);
+  await expect(page.locator(".proposal-product-page").nth(0).locator("img")).toHaveAttribute("src", image);
+  await expect(page.locator(".proposal-product-page").nth(1).locator("img")).toHaveAttribute("src", selectedImage);
   await expect(page.getByLabel("Наименование")).toHaveCount(2);
   await expect(page.getByLabel("Наименование").nth(0)).toHaveValue("NORR Sofa");
   await expect(page.getByLabel("Наименование").nth(1)).toHaveValue("Диван Миллер с реклайнером");
   await expect(page.locator(".proposal-manager-page")).toContainText("Кирилл Волосников");
+  await expect(page.locator(".proposal-manager-person")).not.toContainText("ВАШ ЧЕЛОВЕК В NORR");
+  await expect(page.getByLabel("Должность")).toHaveValue("Персональный менеджер");
   await page.getByLabel("Клиент").fill("Анна Петрова");
   await page.getByLabel("Цена: NORR Sofa").fill("90000");
   await page.getByLabel("Цена: Диван Миллер с реклайнером").fill("250000");
@@ -43,7 +58,9 @@ test("commercial proposal editor supports catalog and reference products before 
   await expect.poll(() => saves.length).toBeGreaterThan(0);
   await expect.poll(() => pdfPayloads.length).toBe(2);
   expect(pdfPayloads[1].withPrices).toBe(true);
+  expect(pdfPayloads[1].coverImage).toBe(selectedImage);
   expect((pdfPayloads[1].products as unknown[]).length).toBe(2);
+  expect((pdfPayloads[1].products as Array<{ referenceImage: string }>).map((product) => product.referenceImage)).toEqual([image, selectedImage]);
   expect(saves.some((entry) => JSON.stringify(entry).includes("250000"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Ткань букле, электрический реклайнер"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Анна Петрова"))).toBe(true);
@@ -137,6 +154,7 @@ test("commercial proposal creates a real PDF from a saved reference product", as
       planItems: [
         { id: "reference-chair", kind: "chair", name: "Кресло", x: 30, y: 40, width: 2200, depth: 950, rotation: 0, referenceImage: webpImage, referenceName: "Диван Миллер с реклайнером", referenceHeightMm: 900 },
         { id: "catalog-table", kind: "table", name: "Стол", x: 55, y: 55, width: 900, depth: 600, rotation: 0, referenceImage: webpImage, referenceProductId: "NRM00116" },
+        { id: "reference-rug", kind: "rug", name: "Ковёр", x: 45, y: 64, width: 2300, depth: 2000, rotation: 0, referenceImage: webpImage, referenceName: "Ковёр COLUMBIA" },
       ],
     },
   } });
@@ -152,5 +170,5 @@ test("commercial proposal creates a real PDF from a saved reference product", as
   const path = await download.path();
   expect(path).toBeTruthy();
   const pdf = await PDFDocument.load(await readFile(path!));
-  expect(pdf.getPageCount()).toBe(7);
+  expect(pdf.getPageCount()).toBe(8);
 });

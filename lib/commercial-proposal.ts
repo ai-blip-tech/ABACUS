@@ -80,6 +80,10 @@ export function buildProposalProducts(items: ProposalPlanItem[], catalog: Map<st
     const override = item.proposalOverride || {};
     const image = product?.image || item.referenceImage || "";
     const parameters = product?.parameters || item.referenceParameters || [];
+    const productIdentity = `${product?.category || item.referenceCategory || ""} ${product?.name || item.referenceName || item.name || ""}`;
+    const defaultBrand = /свет|ламп|торшер/i.test(productIdentity)
+      ? "SEYVAA PARIS"
+      : /ковр|фактур|шкур/i.test(productIdentity) ? "NORR CARPETS" : "NORR MÖBLER SELECTION";
     const defaults = parameters.filter(({ name }) => !/артикул|габарит|цвет|материал|тип/i.test(name))
       .slice(0, 4).map(({ name, value }) => `${name}: ${value}`);
     return {
@@ -95,7 +99,8 @@ export function buildProposalProducts(items: ProposalPlanItem[], catalog: Map<st
       oldPrice: finite(product?.oldPrice) ?? finite(item.referenceOldPrice),
       notes: override.notes ?? "Финальная стоимость зависит от ткани, отделки и выбранной конфигурации.",
       category: override.category ?? product?.category ?? item.referenceCategory ?? "Предмет интерьера",
-      brand: override.brand ?? "NORR MÖBLER SELECTION",
+      brand: override.brand && !(override.brand === "NORR MÖBLER SELECTION" && defaultBrand !== "NORR MÖBLER SELECTION")
+        ? override.brand : defaultBrand,
       configuration: override.configuration ?? "Выбранная конфигурация",
       option: override.option ?? product?.material ?? item.referenceMaterial ?? "Подтверждается по образцу",
       characteristics: [...(override.characteristics ?? defaults), "", "", "", ""].slice(0, 4),

@@ -1,0 +1,22 @@
+export const approvedProposalFixture = {
+  document: {
+    clientName: "Для частного интерьера",
+    projectName: "Гостиная / персональная подборка",
+    offerNumber: "№ 112",
+    offerDate: "03.10.2026",
+    validUntil: "17.10.2026",
+    selectionCount: "3 предмета",
+    categories: "Мягкая мебель\nСвет\nКовры и фактуры",
+    principle: "Спокойная основа, архитектурный свет и один выразительный акцент.",
+    cityObject: "Москва",
+    summaryNote: "Стоимость дивана будет добавлена после подтверждения конфигурации и ткани.",
+    leadTime: "Уточняется после подтверждения конфигурации",
+    delivery: "Индивидуальный расчёт; сборка согласуется с менеджером",
+    payment: "По счёту, согласно условиям договора",
+    managerRole: "Персональный менеджер",
+    managerPhone: "+7 (___) ___-__-__",
+    managerEmail: "manager@norrmobler.ru",
+  },
+  prices: { sofa: undefined, lamp: 176_715, rug: 126_000, total: 302_715 },
+  brands: { sofa: "NORR MÖBLER SELECTION", lamp: "SEYVAA PARIS", rug: "NORR CARPETS" },
+} as const;
