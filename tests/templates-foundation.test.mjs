@@ -8,6 +8,7 @@ const workspaceSource = await readFile(new URL("../app/templates/[slug]/template
 const furnitureWorkspaceSource = await readFile(new URL("../app/templates/[slug]/furniture-casting-workspace.tsx", import.meta.url), "utf8");
 const detailSource = await readFile(new URL("../app/templates/[slug]/page.tsx", import.meta.url), "utf8");
 const generateRouteSource = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+const templatesCssSource = await readFile(new URL("../app/templates-foundation.css", import.meta.url), "utf8");
 
 test("registry contains exactly forty unique versioned templates", () => {
   assert.equal(templateRegistry.length, 40);
@@ -45,7 +46,7 @@ test("unsupported flows remain honest fixtures while furniture uses the existing
   assert.match(furnitureWorkspaceSource, /operation: "place"/);
   assert.match(furnitureWorkspaceSource, /furnitureCasting: \{/);
   assert.match(furnitureWorkspaceSource, /createPlacementGuideImage/);
-  assert.match(furnitureWorkspaceSource, /items: products\.map/);
+  assert.match(furnitureWorkspaceSource, /items: selectedProducts\.map/);
   assert.match(furnitureWorkspaceSource, /readFile\(file, 2048\)/);
   assert.match(furnitureWorkspaceSource, /readFile\(file, 1280\)/);
   assert.doesNotMatch(furnitureWorkspaceSource, /for \(let index = 0; index < products\.length/);
@@ -66,7 +67,7 @@ test("furniture casting uses one point per product and keeps a consumer-facing g
   assert.match(furnitureWorkspaceSource, /\/api\/account\/generations/);
   assert.match(furnitureWorkspaceSource, /setHistory/);
   assert.match(furnitureWorkspaceSource, /generation\.prompt\.includes\(FINAL_RENDER_MARKER\)/);
-  assert.match(furnitureWorkspaceSource, /\[items:\$\{products\.length\}; \$\{FINAL_RENDER_MARKER\}\]/);
+  assert.match(furnitureWorkspaceSource, /\[items:\$\{selectedProducts\.length\}; \$\{FINAL_RENDER_MARKER\}\]/);
   assert.match(furnitureWorkspaceSource, /const finalItem: HistoryItem/);
   assert.match(furnitureWorkspaceSource, /setHistory\(\(current\) => \[finalItem/);
   assert.doesNotMatch(furnitureWorkspaceSource, /Предметы добавляются последовательно/);
@@ -80,10 +81,24 @@ test("furniture casting uses one point per product and keeps a consumer-facing g
 });
 
 test("changing furniture-casting inputs preserves history but resets the active result and point order", () => {
-  assert.match(furnitureWorkspaceSource, /setPlacements\(\{\}\);\s*setLatestResult\(null\);\s*setPlacingProductId\(products\[0\]\?\.id \|\| ""\)/);
-  assert.match(furnitureWorkspaceSource, /setPlacingProductId\(\(current\) => current \|\| next\[0\]\.id\)/);
+  assert.match(furnitureWorkspaceSource, /setPlacements\(\{\}\);\s*setLatestResult\(null\);\s*setPlacingProductId\(selectedProducts\[0\]\?\.id \|\| ""\)/);
+  assert.match(furnitureWorkspaceSource, /setPlacingProductId\(\(current\) => current \|\| automaticallySelected\[0\]\.id\)/);
   assert.match(furnitureWorkspaceSource, /const point = \{[\s\S]*?setLatestResult\(null\);\s*setPlacements/);
   assert.doesNotMatch(furnitureWorkspaceSource, /setHistory\(\[\]\)/);
+});
+
+test("furniture library persists products, scrolls horizontally and separates selection from storage", () => {
+  assert.match(furnitureWorkspaceSource, /indexedDB\.open\(FURNITURE_LIBRARY_DATABASE, 1\)/);
+  assert.match(furnitureWorkspaceSource, /loadFurnitureLibrary\(me\.user\.id\)/);
+  assert.match(furnitureWorkspaceSource, /saveFurnitureProducts\(user\?\.id \|\| "guest", next\)/);
+  assert.match(furnitureWorkspaceSource, /selectedProductIds/);
+  assert.match(furnitureWorkspaceSource, /aria-pressed=\{selected\}/);
+  assert.match(furnitureWorkspaceSource, /scrollBy\(\{ left: -340/);
+  assert.match(furnitureWorkspaceSource, /scrollBy\(\{ left: 340/);
+  assert.match(furnitureWorkspaceSource, /Для одного рендера можно выбрать до/);
+  assert.match(templatesCssSource, /\.furniture-product-points\{display:flex/);
+  assert.match(templatesCssSource, /overflow-x:auto/);
+  assert.match(templatesCssSource, /article\.is-selected\{border-color:var\(--th-wine\);background:var\(--th-wine\);color:#fff\}/);
 });
 
 test("all selected furniture points remain visible until generation starts", () => {

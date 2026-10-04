@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
 
 type UploadedInput = { id: string; name: string; type: string; size: number; dataUrl: string };
+type FurnitureProduct = UploadedInput & { createdAt: string };
+type StoredFurnitureProduct = FurnitureProduct & { ownerId: string };
 type Point = { x: number; y: number };
 type HistoryItem = { id: string; name: string; dataUrl: string; createdAt: string; productCount: number };
 type User = { id: string; email: string; firstName?: string; lastName?: string };
@@ -13,6 +15,54 @@ type Phase = "idle" | "processing" | "failed";
 
 const FURNITURE_CASTING_PROMPT = "Мебельный кастинг: разместить все выбранные предметы в указанных точках одним цельным рендером, сохранив комнату и ракурс.";
 const FINAL_RENDER_MARKER = "final:yes";
+const FURNITURE_LIBRARY_DATABASE = "room-design-furniture-library";
+const FURNITURE_LIBRARY_STORE = "products";
+
+const openFurnitureLibrary = () => new Promise<IDBDatabase>((resolve, reject) => {
+  const request = indexedDB.open(FURNITURE_LIBRARY_DATABASE, 1);
+  request.onupgradeneeded = () => {
+    if (!request.result.objectStoreNames.contains(FURNITURE_LIBRARY_STORE)) request.result.createObjectStore(FURNITURE_LIBRARY_STORE, { keyPath: "id" });
+  };
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error || new Error("Не удалось открыть библиотеку мебели."));
+});
+
+const loadFurnitureLibrary = async (ownerId: string) => {
+  const database = await openFurnitureLibrary();
+  return new Promise<FurnitureProduct[]>((resolve, reject) => {
+    const request = database.transaction(FURNITURE_LIBRARY_STORE, "readonly").objectStore(FURNITURE_LIBRARY_STORE).getAll();
+    request.onsuccess = () => {
+      const products = (request.result as StoredFurnitureProduct[])
+        .filter((product) => product.ownerId === ownerId)
+        .sort((first, second) => first.createdAt.localeCompare(second.createdAt))
+        .map((product) => ({ id: product.id, name: product.name, type: product.type, size: product.size, dataUrl: product.dataUrl, createdAt: product.createdAt }));
+      database.close();
+      resolve(products);
+    };
+    request.onerror = () => { database.close(); reject(request.error || new Error("Не удалось загрузить библиотеку мебели.")); };
+  });
+};
+
+const saveFurnitureProducts = async (ownerId: string, products: FurnitureProduct[]) => {
+  const database = await openFurnitureLibrary();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(FURNITURE_LIBRARY_STORE, "readwrite");
+    const store = transaction.objectStore(FURNITURE_LIBRARY_STORE);
+    products.forEach((product) => store.put({ ...product, ownerId } satisfies StoredFurnitureProduct));
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => { database.close(); reject(transaction.error || new Error("Не удалось сохранить мебель.")); };
+  });
+};
+
+const deleteFurnitureProduct = async (id: string) => {
+  const database = await openFurnitureLibrary();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(FURNITURE_LIBRARY_STORE, "readwrite");
+    transaction.objectStore(FURNITURE_LIBRARY_STORE).delete(id);
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => { database.close(); reject(transaction.error || new Error("Не удалось удалить мебель.")); };
+  });
+};
 
 const readFile = (file: File, maxDimension: number) => new Promise<UploadedInput>((resolve, reject) => {
   const reader = new FileReader();
@@ -90,7 +140,8 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
   const roomSlot = template.inputSlots.find((slot) => slot.id === "room")!;
   const productSlot = template.inputSlots.find((slot) => slot.id === "products")!;
   const [room, setRoom] = useState<UploadedInput | null>(null);
-  const [products, setProducts] = useState<UploadedInput[]>([]);
+  const [products, setProducts] = useState<FurnitureProduct[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [placements, setPlacements] = useState<Record<string, Point>>({});
   const [placingProductId, setPlacingProductId] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -102,6 +153,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [generationConfigured, setGenerationConfigured] = useState(false);
+  const productStripRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -114,9 +166,14 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
       setAuthChecked(true);
       setGenerationConfigured(Boolean(health.imageGeneration?.configured));
       if (me.user) {
-        const response = await fetch("/api/account/generations");
+        const [response, savedProducts] = await Promise.all([
+          fetch("/api/account/generations"),
+          loadFurnitureLibrary(me.user.id).catch(() => []),
+        ]);
         const payload = await response.json().catch(() => ({ generations: [] }));
-        if (!active || !response.ok) return;
+        if (!active) return;
+        setProducts((current) => [...savedProducts, ...current.filter((product) => !savedProducts.some((savedProduct) => savedProduct.id === product.id))]);
+        if (!response.ok) return;
         const stored = (payload.generations || [])
           .filter((generation: { operation?: string; prompt?: string }) => generation.operation === "place" && generation.prompt?.startsWith(FURNITURE_CASTING_PROMPT) && generation.prompt.includes(FINAL_RENDER_MARKER))
           .map((generation: { id: string; created_at: string; prompt: string }) => ({
@@ -142,19 +199,17 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
   }, [lightbox]);
 
   useEffect(() => {
-    if (phase !== "processing") {
-      setElapsedSeconds(0);
-      return;
-    }
+    if (phase !== "processing") return;
     const startedAt = Date.now();
     const timer = window.setInterval(() => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
     return () => window.clearInterval(timer);
   }, [phase]);
 
-  const activeProduct = products.find((product) => product.id === placingProductId) || null;
-  const missingPoint = products.find((product) => !placements[product.id]);
+  const selectedProducts = useMemo(() => selectedProductIds.map((id) => products.find((product) => product.id === id)).filter((product): product is FurnitureProduct => Boolean(product)), [products, selectedProductIds]);
+  const activeProduct = selectedProducts.find((product) => product.id === placingProductId) || null;
+  const missingPoint = selectedProducts.find((product) => !placements[product.id]);
   const stageImage = placingProductId ? room?.dataUrl : latestResult?.dataUrl || room?.dataUrl;
-  const completedPoints = useMemo(() => products.filter((product) => placements[product.id]).length, [placements, products]);
+  const completedPoints = useMemo(() => selectedProducts.filter((product) => placements[product.id]).length, [placements, selectedProducts]);
 
   const uploadRoom = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -166,7 +221,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
       setRoom(await readFile(file, 2048));
       setPlacements({});
       setLatestResult(null);
-      setPlacingProductId(products[0]?.id || "");
+      setPlacingProductId(selectedProducts[0]?.id || "");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось добавить комнату.");
     }
@@ -178,19 +233,52 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     if (!files.length) return;
     setError("");
     try {
-      const accepted = files.slice(0, Math.max(0, productSlot.maxCount - products.length));
-      validateFiles(productSlot, accepted);
-      const next = await Promise.all(accepted.map((file) => readFile(file, 1280)));
-      setProducts((current) => [...current, ...next].slice(0, productSlot.maxCount));
+      validateFiles(productSlot, files);
+      const uploaded = await Promise.all(files.map((file) => readFile(file, 1280)));
+      const uploadStartedAt = new Date().toISOString();
+      const next = uploaded.map((product, index) => ({ ...product, createdAt: `${uploadStartedAt}:${String(index).padStart(3, "0")}` }));
+      const availableSelectionSlots = Math.max(0, productSlot.maxCount - selectedProductIds.length);
+      const automaticallySelected = next.slice(0, availableSelectionSlots);
+      setProducts((current) => [...current, ...next]);
+      setSelectedProductIds((current) => [...current, ...automaticallySelected.map((product) => product.id)]);
       setLatestResult(null);
-      if (next[0]) setPlacingProductId((current) => current || next[0].id);
+      if (automaticallySelected[0]) setPlacingProductId((current) => current || automaticallySelected[0].id);
+      await saveFurnitureProducts(user?.id || "guest", next);
+      if (automaticallySelected.length < next.length) setError(`Все товары сохранены в ленте. Для одного рендера можно выбрать до ${productSlot.maxCount}.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось добавить мебель.");
     }
   };
 
-  const removeProduct = (id: string) => {
+  const toggleProductSelection = (product: FurnitureProduct) => {
+    const isSelected = selectedProductIds.includes(product.id);
+    setLatestResult(null);
+    setError("");
+    if (isSelected) {
+      const remainingProducts = selectedProducts.filter((item) => item.id !== product.id);
+      setSelectedProductIds((current) => current.filter((id) => id !== product.id));
+      setPlacements((current) => {
+        const next = { ...current };
+        delete next[product.id];
+        return next;
+      });
+      if (placingProductId === product.id) setPlacingProductId(remainingProducts.find((item) => !placements[item.id])?.id || "");
+      return;
+    }
+    if (selectedProductIds.length >= productSlot.maxCount) return setError(`Для одного рендера можно выбрать до ${productSlot.maxCount} товаров.`);
+    setSelectedProductIds((current) => [...current, product.id]);
+    setPlacingProductId((current) => current || product.id);
+  };
+
+  const selectProductPlacement = (product: FurnitureProduct) => {
+    if (!selectedProductIds.includes(product.id)) return toggleProductSelection(product);
+    setPlacingProductId(product.id);
+    setError("");
+  };
+
+  const removeProduct = async (id: string) => {
     setProducts((current) => current.filter((product) => product.id !== id));
+    setSelectedProductIds((current) => current.filter((productId) => productId !== id));
     setLatestResult(null);
     setPlacements((current) => {
       const next = { ...current };
@@ -198,8 +286,13 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
       return next;
     });
     if (placingProductId === id) {
-      const nextProduct = products.find((product) => product.id !== id && !placements[product.id]);
+      const nextProduct = selectedProducts.find((product) => product.id !== id && !placements[product.id]);
       setPlacingProductId(nextProduct?.id || "");
+    }
+    try {
+      await deleteFurnitureProduct(id);
+    } catch {
+      setError("Товар убран из ленты, но локальное хранилище не удалось обновить.");
     }
   };
 
@@ -212,14 +305,14 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     const point = { x: (event.clientX - bounds.left) * 100 / bounds.width, y: (event.clientY - bounds.top) * 100 / bounds.height };
     setLatestResult(null);
     setPlacements((current) => ({ ...current, [placingProductId]: point }));
-    const nextProduct = products.find((product) => product.id !== placingProductId && !placements[product.id]);
+    const nextProduct = selectedProducts.find((product) => product.id !== placingProductId && !placements[product.id]);
     setPlacingProductId(nextProduct?.id || "");
     setError("");
   };
 
   const runGeneration = async () => {
     if (!room) return setError("Сначала загрузите фото комнаты.");
-    if (!products.length) return setError("Добавьте хотя бы одно фото мебели.");
+    if (!selectedProducts.length) return setError("Выберите хотя бы один товар из ленты.");
     if (missingPoint) {
       setPlacingProductId(missingPoint.id);
       return setError(`Укажите на экране место для предмета «${missingPoint.name}».`);
@@ -227,20 +320,21 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     if (!user) return setError("Войдите в Room Design, чтобы создать рендер.");
     if (!generationConfigured) return setError("Генерация сейчас недоступна: AI provider не настроен.");
     setError("");
+    setElapsedSeconds(0);
     setPhase("processing");
     try {
-      const markedImage = await createPlacementGuideImage(room.dataUrl, products.map((product, index) => ({ point: placements[product.id], number: index + 1 })));
+      const markedImage = await createPlacementGuideImage(room.dataUrl, selectedProducts.map((product, index) => ({ point: placements[product.id], number: index + 1 })));
       const operationId = crypto.randomUUID();
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": operationId },
         body: JSON.stringify({
           operation: "place",
-          prompt: `${FURNITURE_CASTING_PROMPT} [items:${products.length}; ${FINAL_RENDER_MARKER}]`,
+          prompt: `${FURNITURE_CASTING_PROMPT} [items:${selectedProducts.length}; ${FINAL_RENDER_MARKER}]`,
           roomImage: room.dataUrl,
           furnitureCasting: {
             markedImage,
-            items: products.map((product) => ({ ...placements[product.id], name: product.name, referenceImage: product.dataUrl })),
+            items: selectedProducts.map((product) => ({ ...placements[product.id], name: product.name, referenceImage: product.dataUrl })),
           },
           outputSize: "1536x1024",
         }),
@@ -249,7 +343,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.error || "Не удалось создать рендер.");
       }
-      const finalItem: HistoryItem = { id: operationId, name: "Мебельный кастинг", dataUrl: await blobToDataUrl(await response.blob()), createdAt: new Date().toISOString(), productCount: products.length };
+      const finalItem: HistoryItem = { id: operationId, name: "Мебельный кастинг", dataUrl: await blobToDataUrl(await response.blob()), createdAt: new Date().toISOString(), productCount: selectedProducts.length };
       setHistory((current) => [finalItem, ...current.filter((entry) => entry.id !== finalItem.id)]);
       setLatestResult(finalItem);
       setPhase("idle");
@@ -271,29 +365,44 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
         <label className={products.length ? "has-file" : ""}>
           <input type="file" multiple accept={productSlot.acceptedMimeTypes.join(",")} onChange={(event) => void uploadProducts(event)} />
           <span>Добавить фото мебели</span>
-          <small>{products.length ? `${products.length} из ${productSlot.maxCount}` : "1–5 предметов"}</small>
+          <small>{products.length ? `${selectedProducts.length} выбрано · ${products.length} в ленте` : "Товары сохранятся в вашей ленте"}</small>
         </label>
         <button className="furniture-create-button" type="button" disabled={phase === "processing"} onClick={() => void runGeneration()}>{phase === "processing" ? "Создаём единый рендер…" : "Создать рендер"}<span>→</span></button>
       </div>
 
-      {products.length > 0 && <div className="furniture-product-points" aria-label="Точки размещения мебели">
-        {products.map((product, index) => <article key={product.id} className={placingProductId === product.id ? "is-active" : ""}>
-          <img src={product.dataUrl} alt="" />
-          <button type="button" onClick={() => setPlacingProductId(product.id)}><b>{String(index + 1).padStart(2, "0")} · {product.name}</b><span>{placements[product.id] ? "Точка выбрана · изменить" : "Указать точку на экране"}</span></button>
-          <button type="button" aria-label={`Удалить ${product.name}`} onClick={() => removeProduct(product.id)}>×</button>
-        </article>)}
-      </div>}
+      {products.length > 0 && <section className="furniture-product-library" aria-labelledby="furniture-library-title">
+        <header>
+          <div><p>ВАША МЕБЕЛЬ</p><b id="furniture-library-title">Выбрано {selectedProducts.length} из {productSlot.maxCount}</b></div>
+          <span>Выберите товары для текущего рендера</span>
+          <nav aria-label="Прокрутка ленты мебели">
+            <button type="button" aria-label="Прокрутить мебель влево" onClick={() => productStripRef.current?.scrollBy({ left: -340, behavior: "smooth" })}>←</button>
+            <button type="button" aria-label="Прокрутить мебель вправо" onClick={() => productStripRef.current?.scrollBy({ left: 340, behavior: "smooth" })}>→</button>
+          </nav>
+        </header>
+        <div className="furniture-product-points" ref={productStripRef} aria-label="Сохранённая мебель">
+          {products.map((product) => {
+            const selectedIndex = selectedProductIds.indexOf(product.id);
+            const selected = selectedIndex >= 0;
+            return <article key={product.id} className={`${selected ? "is-selected" : ""}${placingProductId === product.id ? " is-active" : ""}`}>
+              <button className="furniture-product-select" type="button" aria-pressed={selected} aria-label={selected ? `Убрать ${product.name} из рендера` : `Выбрать ${product.name} для рендера`} onClick={() => toggleProductSelection(product)}>{selected ? "✓" : "+"}</button>
+              <img src={product.dataUrl} alt="" />
+              <button className="furniture-product-place" type="button" onClick={() => selectProductPlacement(product)}><b>{selected ? `${String(selectedIndex + 1).padStart(2, "0")} · ` : ""}{product.name}</b><span>{selected ? placements[product.id] ? "Выбран · точку можно изменить" : "Выбран · укажите точку" : "Выбрать для рендера"}</span></button>
+              <button className="furniture-product-delete" type="button" aria-label={`Удалить ${product.name} из ленты`} onClick={() => void removeProduct(product.id)}>×</button>
+            </article>;
+          })}
+        </div>
+      </section>}
 
       <div className="furniture-stage-heading">
-        <div><p>РЕЗУЛЬТАТ</p><h2>{latestResult ? "Готовый рендер" : room ? "Выберите место для мебели" : "Здесь появится ваш интерьер"}</h2></div>
-        {room && products.length > 0 && <span>{completedPoints} / {products.length} точек</span>}
+        <div><p>РЕЗУЛЬТАТ</p><h2>{latestResult ? "Готовый рендер" : room ? selectedProducts.length ? "Выберите место для мебели" : "Выберите мебель из ленты" : "Здесь появится ваш интерьер"}</h2></div>
+        {room && selectedProducts.length > 0 && <span>{completedPoints} / {selectedProducts.length} точек</span>}
       </div>
 
       <div className={`furniture-stage${placingProductId ? " is-placing" : ""}${latestResult && !placingProductId ? " has-result" : ""}`}>
         {stageImage ? <button type="button" onClick={handleStageClick} aria-label={placingProductId ? `Указать точку для ${activeProduct?.name || "мебели"}` : latestResult ? "Открыть готовый рендер на весь экран" : "Изображение комнаты"}>
           <img src={stageImage} alt={latestResult && !placingProductId ? "Готовый рендер интерьера" : "Загруженная комната"} />
           {!latestResult && phase !== "processing" && Object.entries(placements).map(([productId, point]) => {
-            const index = products.findIndex((product) => product.id === productId);
+            const index = selectedProducts.findIndex((product) => product.id === productId);
             return <span className="furniture-stage-point" key={productId} style={{ left: `${point.x}%`, top: `${point.y}%` }}>{index + 1}</span>;
           })}
           {placingProductId && <em>Поставьте точку для «{activeProduct?.name}»</em>}
