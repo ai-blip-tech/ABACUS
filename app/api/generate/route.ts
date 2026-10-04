@@ -11,7 +11,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
+  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -49,6 +49,16 @@ async function generateResponse(request: Request) {
     pointDescription,
     "Match perspective, scale, lighting, material realism and contact shadows. Preserve the rest of the room as closely as possible.",
     "No people, no text, no logos, no watermark.",
+  ].join("\n");
+  const furnitureCastingItems = body.furnitureCasting?.items || [];
+  const furnitureCastingPrompt = [
+    "Create one unified photorealistic edit that places every supplied furniture reference into the room at the same time.",
+    "Image 1 is the clean original room and is the composition, camera, architecture and lighting source to preserve.",
+    "Image 2 is the same room with numbered location markers. Remove every marker from the final result.",
+    ...furnitureCastingItems.map((item, index) => `Image ${index + 3} is furniture item ${index + 1}${item.name ? ` (${item.name})` : ""}. Place it exactly once at marker ${index + 1}, centred near ${Math.round(item.x || 0)}% from the left and ${Math.round(item.y || 0)}% from the top.`),
+    `The final room must contain all ${furnitureCastingItems.length} supplied furniture items together in one coherent image. Do not omit an item and do not return intermediate variants.`,
+    "Match believable scale, perspective, lighting, occlusion and contact shadows for every inserted item. Preserve everything else in the room as closely as possible.",
+    "Return exactly one final image. No people, no text, no logos, no watermark.",
   ].join("\n");
   const catalogPlacementPrompt = [
     "Use image 1 as the clean completed interior to preserve.",
@@ -164,7 +174,7 @@ async function generateResponse(request: Request) {
     return new Blob([await sample.arrayBuffer()], { type: sample.headers.get("content-type") || "image/jpeg" });
   };
 
-  const inferredOperation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  const inferredOperation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.furnitureCasting || body.placement ? "place" : body.adjustment ? "adjust" : "generate";
   const requestedOperation = body.operation?.trim();
   const supportedOperations = new Set(["plan_render", "upscale", "material", "global_edit", "remove", "replace", "place", "adjust", "generate"]);
   if (requestedOperation && (!supportedOperations.has(requestedOperation) || requestedOperation !== inferredOperation)) {
@@ -178,11 +188,20 @@ async function generateResponse(request: Request) {
     try {
       await validatedEditImage(body.roomImage, "текущее изображение");
       if (operation === "global_edit" && !body.globalEdit?.instruction?.trim()) throw new Error("Опишите изменение изображения.");
-      if (operation !== "global_edit") {
+      if (body.furnitureCasting) {
+        if (operation !== "place" || furnitureCastingItems.length < 1 || furnitureCastingItems.length > 5) throw new Error("Добавьте от одного до пяти предметов мебели.");
+        await validatedEditImage(body.furnitureCasting.markedImage, "изображение со всеми точками");
+        for (const [index, item] of furnitureCastingItems.entries()) {
+          if (!Number.isFinite(item.x) || !Number.isFinite(item.y) || (item.x as number) < 0 || (item.x as number) > 100 || (item.y as number) < 0 || (item.y as number) > 100) throw new Error(`Укажите точку для предмета ${index + 1}.`);
+          if (!item.referenceImage) throw new Error(`Загрузите референс предмета ${index + 1}.`);
+          if (item.referenceImage.startsWith("data:")) await validatedEditImage(item.referenceImage, `референс предмета ${index + 1}`);
+          else await imageSourceToBlob(item.referenceImage);
+        }
+      } else if (operation !== "global_edit") {
         if (!Number.isFinite(body.pointEdit?.x) || !Number.isFinite(body.pointEdit?.y) || (body.pointEdit?.x as number) < 0 || (body.pointEdit?.x as number) > 100 || (body.pointEdit?.y as number) < 0 || (body.pointEdit?.y as number) > 100) throw new Error("Поставьте точку на изображении.");
         await validatedEditImage(body.pointEdit?.markedImage, "изображение с маркером");
       }
-      if (["material", "replace"].includes(operation) || operation === "place" && !body.product) {
+      if (!body.furnitureCasting && (["material", "replace"].includes(operation) || operation === "place" && !body.product)) {
         if (!body.referenceImage) throw new Error(operation === "material" ? "Загрузите референс материала." : "Загрузите референс предмета.");
         if (body.referenceImage.startsWith("data:")) await validatedEditImage(body.referenceImage, operation === "material" ? "референс материала" : "референс предмета");
         else {
@@ -195,14 +214,16 @@ async function generateResponse(request: Request) {
     }
   }
   const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
-  const diagnosticBranch = body.roomImage && body.referenceImage && body.material && body.pointEdit?.markedImage ? "material"
+  const diagnosticBranch = body.roomImage && body.furnitureCasting?.markedImage && furnitureCastingItems.length ? "furniture_casting"
+    : body.roomImage && body.referenceImage && body.material && body.pointEdit?.markedImage ? "material"
     : body.roomImage && body.globalEdit?.instruction ? "global_edit"
     : body.roomImage && body.referenceImage && body.replacement && body.pointEdit?.markedImage ? "replace"
     : body.roomImage && body.removal && body.pointEdit?.markedImage ? "remove"
     : body.roomImage && body.placement && body.pointEdit?.markedImage && (body.referenceImage || body.product) ? "add"
     : "other";
   const diagnosticMaskPresent = Boolean(body.adjustment?.mask);
-  const diagnosticProviderInputImages = diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 3
+  const diagnosticProviderInputImages = diagnosticBranch === "furniture_casting" ? 2 + furnitureCastingItems.length
+    : diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 3
     : diagnosticBranch === "remove" || diagnosticBranch === "add" || Boolean(body.roomImage) && Boolean(body.pointEdit?.markedImage) ? 2
     : diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
     : 0;
@@ -243,6 +264,18 @@ async function generateResponse(request: Request) {
         return ["image/jpeg", "image/png", "image/webp"].includes(image.type) ? image : null;
       }))).filter((image): image is Blob => Boolean(image));
       referenceBlobs.forEach((image, index) => form.append("image[]", image, `furniture-reference-${index + 1}.${image.type.split("/")[1] || "png"}`));
+      form.append("size", outputSize);
+      form.append("quality", "medium");
+      form.append("output_format", "webp");
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.furnitureCasting?.markedImage && furnitureCastingItems.length) {
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", furnitureCastingPrompt);
+      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
+      form.append("image[]", dataUrlToBlob(body.furnitureCasting.markedImage), "numbered-placement-guide.png");
+      const referenceBlobs = await Promise.all(furnitureCastingItems.map((item) => imageSourceToBlob(item.referenceImage as string, providerTimeout)));
+      referenceBlobs.forEach((referenceBlob, index) => form.append("image[]", referenceBlob, `furniture-item-${index + 1}.${referenceBlob.type.split("/")[1] || "jpg"}`));
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
@@ -346,9 +379,9 @@ async function generateResponse(request: Request) {
     requestId: operationId,
     operation,
     materialPresent: Boolean(body.material),
-    referencePresent: Boolean(body.referenceImage),
+    referencePresent: Boolean(body.referenceImage || furnitureCastingItems.length),
     maskPresent: diagnosticMaskPresent,
-    placementPresent: Boolean(body.placement),
+    placementPresent: Boolean(body.placement || body.furnitureCasting),
     replacementPresent: Boolean(body.replacement),
     removalPresent: Boolean(body.removal),
     backendBranch: diagnosticBranch,

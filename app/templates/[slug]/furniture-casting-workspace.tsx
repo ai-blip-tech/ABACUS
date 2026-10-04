@@ -11,6 +11,9 @@ type HistoryItem = { id: string; name: string; dataUrl: string; createdAt: strin
 type User = { id: string; email: string; firstName?: string; lastName?: string };
 type Phase = "idle" | "processing" | "failed";
 
+const FURNITURE_CASTING_PROMPT = "Мебельный кастинг: разместить все выбранные предметы в указанных точках одним цельным рендером, сохранив комнату и ракурс.";
+const FINAL_RENDER_MARKER = "final:yes";
+
 const readFile = (file: File) => new Promise<UploadedInput>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve({ id: crypto.randomUUID(), name: file.name, type: file.type, size: file.size, dataUrl: String(reader.result || "") });
@@ -25,7 +28,7 @@ const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   reader.readAsDataURL(blob);
 });
 
-const createPointMarkerImage = (source: string, point: Point) => new Promise<string>((resolve, reject) => {
+const createPlacementGuideImage = (source: string, items: Array<{ point: Point; number: number }>) => new Promise<string>((resolve, reject) => {
   const image = new Image();
   image.onload = () => {
     const canvas = document.createElement("canvas");
@@ -34,31 +37,25 @@ const createPointMarkerImage = (source: string, point: Point) => new Promise<str
     const context = canvas.getContext("2d");
     if (!context) return reject(new Error("Не удалось подготовить выбранную точку."));
     context.drawImage(image, 0, 0);
-    const x = canvas.width * point.x / 100;
-    const y = canvas.height * point.y / 100;
     const radius = Math.max(14, Math.round(Math.min(canvas.width, canvas.height) * 0.025));
-    const drawMarker = () => {
+    for (const item of items) {
+      const x = canvas.width * item.point.x / 100;
+      const y = canvas.height * item.point.y / 100;
+      context.save();
+      context.fillStyle = "#8f001d";
+      context.strokeStyle = "#fff";
+      context.lineWidth = Math.max(4, radius * 0.2);
       context.beginPath();
       context.arc(x, y, radius, 0, Math.PI * 2);
-      context.moveTo(x - radius * 1.45, y);
-      context.lineTo(x + radius * 1.45, y);
-      context.moveTo(x, y - radius * 1.45);
-      context.lineTo(x, y + radius * 1.45);
+      context.fill();
       context.stroke();
-    };
-    context.save();
-    context.lineCap = "round";
-    context.lineWidth = Math.max(4, radius * 0.22);
-    context.strokeStyle = "#fff";
-    drawMarker();
-    context.lineWidth = Math.max(2, radius * 0.11);
-    context.strokeStyle = "#8f001d";
-    drawMarker();
-    context.fillStyle = "#8f001d";
-    context.beginPath();
-    context.arc(x, y, Math.max(3, radius * 0.18), 0, Math.PI * 2);
-    context.fill();
-    context.restore();
+      context.fillStyle = "#fff";
+      context.font = `700 ${Math.round(radius * 1.1)}px Arial`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(String(item.number), x, y + 1);
+      context.restore();
+    }
     resolve(canvas.toDataURL("image/png"));
   };
   image.onerror = () => reject(new Error("Не удалось подготовить изображение комнаты."));
@@ -104,8 +101,14 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
         const payload = await response.json().catch(() => ({ generations: [] }));
         if (!active || !response.ok) return;
         const stored = (payload.generations || [])
-          .filter((generation: { operation?: string; prompt?: string }) => generation.operation === "place" && generation.prompt?.startsWith("Мебельный кастинг:"))
-          .map((generation: { id: string; created_at: string }) => ({ id: generation.id, name: "Мебельный кастинг", dataUrl: `/api/account/generations/${generation.id}`, createdAt: generation.created_at, productCount: 1 }));
+          .filter((generation: { operation?: string; prompt?: string }) => generation.operation === "place" && generation.prompt?.startsWith(FURNITURE_CASTING_PROMPT) && generation.prompt.includes(FINAL_RENDER_MARKER))
+          .map((generation: { id: string; created_at: string; prompt: string }) => ({
+            id: generation.id,
+            name: "Мебельный кастинг",
+            dataUrl: `/api/account/generations/${generation.id}`,
+            createdAt: generation.created_at,
+            productCount: Number(generation.prompt.match(/items:(\d+)/)?.[1] || 1),
+          }));
         setHistory(stored);
         if (stored[0]) setLatestResult(stored[0]);
       }
@@ -191,37 +194,34 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     if (!generationConfigured) return setError("Генерация сейчас недоступна: AI provider не настроен.");
     setError("");
     setPhase("processing");
-    setProgress(0);
-    let currentRoom = room.dataUrl;
+    setProgress(5);
     try {
-      for (let index = 0; index < products.length; index += 1) {
-        const product = products[index];
-        const placement = placements[product.id];
-        const markedImage = await createPointMarkerImage(currentRoom, placement);
-        const operationId = crypto.randomUUID();
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Idempotency-Key": operationId },
-          body: JSON.stringify({
-            operation: "place",
-            prompt: "Мебельный кастинг: примерить выбранный предмет в указанной зоне, сохранив комнату и ракурс.",
-            roomImage: currentRoom,
-            referenceImage: product.dataUrl,
-            pointEdit: { ...placement, markedImage },
-            placement: { x: placement.x, y: placement.y },
-            outputSize: "1536x1024",
-          }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({}));
-          throw new Error(payload.error || `Не удалось добавить предмет ${index + 1}.`);
-        }
-        currentRoom = await blobToDataUrl(await response.blob());
-        const item = { id: operationId, name: product.name, dataUrl: currentRoom, createdAt: new Date().toISOString(), productCount: index + 1 };
-        setHistory((current) => [item, ...current.filter((entry) => entry.id !== item.id)]);
-        setLatestResult(item);
-        setProgress(Math.round((index + 1) * 100 / products.length));
+      const markedImage = await createPlacementGuideImage(room.dataUrl, products.map((product, index) => ({ point: placements[product.id], number: index + 1 })));
+      const operationId = crypto.randomUUID();
+      setProgress(15);
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": operationId },
+        body: JSON.stringify({
+          operation: "place",
+          prompt: `${FURNITURE_CASTING_PROMPT} [items:${products.length}; ${FINAL_RENDER_MARKER}]`,
+          roomImage: room.dataUrl,
+          furnitureCasting: {
+            markedImage,
+            items: products.map((product) => ({ ...placements[product.id], name: product.name, referenceImage: product.dataUrl })),
+          },
+          outputSize: "1536x1024",
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || "Не удалось создать рендер.");
       }
+      setProgress(90);
+      const finalItem: HistoryItem = { id: operationId, name: "Мебельный кастинг", dataUrl: await blobToDataUrl(await response.blob()), createdAt: new Date().toISOString(), productCount: products.length };
+      setHistory((current) => [finalItem, ...current.filter((entry) => entry.id !== finalItem.id)]);
+      setLatestResult(finalItem);
+      setProgress(100);
       setPhase("idle");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Генерация не завершилась.");
@@ -269,7 +269,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
           {placingProductId && <em>Поставьте точку для «{activeProduct?.name}»</em>}
           {latestResult && !placingProductId && <em>Нажмите, чтобы открыть на весь экран</em>}
         </button> : <div><span>ROOM DESIGN</span><p>Загрузите фото комнаты, чтобы начать.</p></div>}
-        {phase === "processing" && <div className="furniture-stage-progress" role="status"><i style={{ width: `${progress}%` }} /><b>Создаём рендер · {progress}%</b><p>Предметы добавляются последовательно.</p></div>}
+        {phase === "processing" && <div className="furniture-stage-progress" role="status"><i style={{ width: `${progress}%` }} /><b>Создаём единый рендер</b><p>Размещаем все предметы в выбранных точках.</p></div>}
       </div>
 
       {error && <p className="furniture-error" role="alert">{error}</p>}

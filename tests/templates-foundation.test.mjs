@@ -7,6 +7,7 @@ import { featuredTemplates, previewTemplates, templateRegistry } from "../lib/te
 const workspaceSource = await readFile(new URL("../app/templates/[slug]/template-workspace.tsx", import.meta.url), "utf8");
 const furnitureWorkspaceSource = await readFile(new URL("../app/templates/[slug]/furniture-casting-workspace.tsx", import.meta.url), "utf8");
 const detailSource = await readFile(new URL("../app/templates/[slug]/page.tsx", import.meta.url), "utf8");
+const generateRouteSource = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 
 test("registry contains exactly forty unique versioned templates", () => {
   assert.equal(templateRegistry.length, 40);
@@ -42,9 +43,13 @@ test("unsupported flows remain honest fixtures while furniture uses the existing
   assert.match(furnitureWorkspaceSource, /fetch\("\/api\/generate"/);
   assert.match(furnitureWorkspaceSource, /Idempotency-Key/);
   assert.match(furnitureWorkspaceSource, /operation: "place"/);
-  assert.match(furnitureWorkspaceSource, /pointEdit: \{ \.\.\.placement, markedImage \}/);
-  assert.match(furnitureWorkspaceSource, /let currentRoom = room\.dataUrl/);
-  assert.match(furnitureWorkspaceSource, /currentRoom = await blobToDataUrl/);
+  assert.match(furnitureWorkspaceSource, /furnitureCasting: \{/);
+  assert.match(furnitureWorkspaceSource, /createPlacementGuideImage/);
+  assert.match(furnitureWorkspaceSource, /items: products\.map/);
+  assert.doesNotMatch(furnitureWorkspaceSource, /for \(let index = 0; index < products\.length/);
+  assert.match(generateRouteSource, /furnitureCastingPrompt/);
+  assert.match(generateRouteSource, /referenceBlobs\.forEach/);
+  assert.match(generateRouteSource, /providerInputImagesCount: diagnosticProviderInputImages/);
   assert.doesNotMatch(furnitureWorkspaceSource, /createPlacementMask|placement: \{ \.\.\.placement, mask \}/);
   assert.match(workspaceSource, /!canRunReal && !realFurnitureFlow/);
   assert.match(workspaceSource, /fetch\("\/api\/projects"/);
@@ -58,6 +63,11 @@ test("furniture casting uses one point per product and keeps a consumer-facing g
   assert.match(furnitureWorkspaceSource, /setPlacingProductId/);
   assert.match(furnitureWorkspaceSource, /\/api\/account\/generations/);
   assert.match(furnitureWorkspaceSource, /setHistory/);
+  assert.match(furnitureWorkspaceSource, /generation\.prompt\.includes\(FINAL_RENDER_MARKER\)/);
+  assert.match(furnitureWorkspaceSource, /\[items:\$\{products\.length\}; \$\{FINAL_RENDER_MARKER\}\]/);
+  assert.match(furnitureWorkspaceSource, /const finalItem: HistoryItem/);
+  assert.match(furnitureWorkspaceSource, /setHistory\(\(current\) => \[finalItem/);
+  assert.doesNotMatch(furnitureWorkspaceSource, /Предметы добавляются последовательно/);
   assert.match(furnitureWorkspaceSource, /Открыть готовый рендер на весь экран/);
   assert.match(furnitureWorkspaceSource, /ИСТОРИЯ ГЕНЕРАЦИЙ/);
   assert.doesNotMatch(furnitureWorkspaceSource, /Provider usage|Стоимость Room Design|tokenCost|X-Room-AI/);

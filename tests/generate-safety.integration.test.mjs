@@ -133,3 +133,36 @@ test("success sends clean plus marked images, never a segmentation mask, and cha
     assert.equal(await balance(), before - cost);
   }
 });
+
+test("furniture casting sends every item in one provider request and stores one final generation", async () => {
+  const id = "success-furniture-casting";
+  const before = await balance();
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    calls += 1;
+    assert.equal(url, "https://api.openai.com/v1/images/edits");
+    assert.equal(options.body.getAll("image[]").length, 4);
+    assert.equal(options.body.get("mask"), null);
+    assert.match(String(options.body.get("prompt")), /all 2 supplied furniture items together in one coherent image/);
+    assert.match(String(options.body.get("prompt")), /Image 3 is furniture item 1/);
+    assert.match(String(options.body.get("prompt")), /Image 4 is furniture item 2/);
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 21, output_tokens: 22, total_tokens: 43 } });
+  };
+  const response = await POST(request({
+    operation: "place",
+    prompt: "Мебельный кастинг: единый результат [items:2; final:yes]",
+    roomImage: png,
+    furnitureCasting: {
+      markedImage: png,
+      items: [
+        { x: 30, y: 55, name: "Кровать", referenceImage: png },
+        { x: 70, y: 65, name: "Пуф", referenceImage: png },
+      ],
+    },
+  }, id));
+  assert.equal(response.status, 200);
+  assert.equal(calls, 1);
+  assert.equal(await generationCount(id), 1);
+  assert.deepEqual(await transactions(id), ["generation"]);
+  assert.equal(await balance(), before - (await billing.quoteAiOperation("place")).tokenCost);
+});
