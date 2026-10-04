@@ -5,9 +5,10 @@ import test from "node:test";
 import { featuredTemplates, previewTemplates, templateRegistry } from "../lib/templates/registry.ts";
 
 const workspaceSource = await readFile(new URL("../app/templates/[slug]/template-workspace.tsx", import.meta.url), "utf8");
-const furnitureWorkspaceSource = await readFile(new URL("../app/templates/[slug]/furniture-casting-workspace.tsx", import.meta.url), "utf8");
+const editorialWorkbenchSource = await readFile(new URL("../app/templates/[slug]/template-editorial-workbench.tsx", import.meta.url), "utf8");
 const detailSource = await readFile(new URL("../app/templates/[slug]/page.tsx", import.meta.url), "utf8");
 const generateRouteSource = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+const templateAssetsRouteSource = await readFile(new URL("../app/api/account/template-assets/route.ts", import.meta.url), "utf8");
 const templatesCssSource = await readFile(new URL("../app/templates-foundation.css", import.meta.url), "utf8");
 
 test("registry contains exactly forty unique versioned templates", () => {
@@ -30,78 +31,78 @@ test("foundation exposes all reviewable records and the approved featured mix", 
 });
 
 test("furniture casting has the approved room plus one-to-five product schema", () => {
-  const furniture = templateRegistry.find((template) => template.slug === "furniture-casting");
-  assert.ok(furniture);
-  assert.equal(furniture.status, "internal");
-  assert.equal(furniture.resultType, "image_series");
-  assert.deepEqual(furniture.inputSlots.map((slot) => slot.kind), ["room_image", "product_images"]);
-  assert.equal(furniture.inputSlots[1].minCount, 1);
-  assert.equal(furniture.inputSlots[1].maxCount, 5);
+  const template = templateRegistry.find((item) => item.slug === "furniture-casting");
+  assert.ok(template);
+  assert.equal(template.status, "internal");
+  assert.equal(template.resultType, "image_series");
+  assert.deepEqual(template.inputSlots.map((slot) => slot.kind), ["room_image", "product_images"]);
+  assert.equal(template.inputSlots[1].minCount, 1);
+  assert.equal(template.inputSlots[1].maxCount, 5);
 });
 
-test("unsupported flows remain honest fixtures while furniture uses the existing real endpoint", () => {
+test("unsupported flows remain honest fixtures while the live workbench uses the existing endpoint", () => {
   assert.match(workspaceSource, /PREVIEW RESULT · AI НЕ ЗАПУСКАЛСЯ/);
-  assert.match(furnitureWorkspaceSource, /fetch\("\/api\/generate"/);
-  assert.match(furnitureWorkspaceSource, /Idempotency-Key/);
-  assert.match(furnitureWorkspaceSource, /operation: "place"/);
-  assert.match(furnitureWorkspaceSource, /furnitureCasting: \{/);
-  assert.match(furnitureWorkspaceSource, /createPlacementGuideImage/);
-  assert.match(furnitureWorkspaceSource, /items: selectedProducts\.map/);
-  assert.match(furnitureWorkspaceSource, /readFile\(file, 2048\)/);
-  assert.match(furnitureWorkspaceSource, /readFile\(file, 1280\)/);
-  assert.doesNotMatch(furnitureWorkspaceSource, /for \(let index = 0; index < products\.length/);
+  assert.match(editorialWorkbenchSource, /fetch\("\/api\/generate"/);
+  assert.match(editorialWorkbenchSource, /Idempotency-Key/);
+  assert.match(editorialWorkbenchSource, /operation: "place"/);
+  assert.match(editorialWorkbenchSource, /furnitureCasting: \{ markedImage/);
+  assert.match(editorialWorkbenchSource, /createPlacementGuideImage/);
+  assert.match(editorialWorkbenchSource, /items: selectedImages\.map/);
+  assert.match(editorialWorkbenchSource, /readFile\(file, 2048\)/);
+  assert.match(editorialWorkbenchSource, /readFile\(file, 1280\)/);
   assert.match(generateRouteSource, /furnitureCastingPrompt/);
   assert.match(generateRouteSource, /referenceBlobs\.forEach/);
   assert.match(generateRouteSource, /providerInputImagesCount: diagnosticProviderInputImages/);
-  assert.doesNotMatch(furnitureWorkspaceSource, /createPlacementMask|placement: \{ \.\.\.placement, mask \}/);
+  assert.doesNotMatch(editorialWorkbenchSource, /createPlacementMask|placement: \{ \.\.\.placement, mask \}/);
   assert.match(workspaceSource, /!canRunReal && !realFurnitureFlow/);
   assert.match(workspaceSource, /fetch\("\/api\/projects"/);
   assert.match(detailSource, /generateStaticParams/);
-  assert.doesNotMatch(`${workspaceSource}${furnitureWorkspaceSource}`, /pipelineKey|OPENAI_API_KEY|providerSecret/);
+  assert.doesNotMatch(`${workspaceSource}${editorialWorkbenchSource}`, /pipelineKey|OPENAI_API_KEY|providerSecret/);
 });
 
-test("furniture casting uses one point per product and keeps a consumer-facing generation history", () => {
-  assert.match(furnitureWorkspaceSource, /Record<string, Point>/);
-  assert.match(furnitureWorkspaceSource, /placements\[product\.id\]/);
-  assert.match(furnitureWorkspaceSource, /setPlacingProductId/);
-  assert.match(furnitureWorkspaceSource, /\/api\/account\/generations/);
-  assert.match(furnitureWorkspaceSource, /setHistory/);
-  assert.match(furnitureWorkspaceSource, /generation\.prompt\.includes\(FINAL_RENDER_MARKER\)/);
-  assert.match(furnitureWorkspaceSource, /\[items:\$\{selectedProducts\.length\}; \$\{FINAL_RENDER_MARKER\}\]/);
-  assert.match(furnitureWorkspaceSource, /const finalItem: HistoryItem/);
-  assert.match(furnitureWorkspaceSource, /setHistory\(\(current\) => \[finalItem/);
-  assert.doesNotMatch(furnitureWorkspaceSource, /Предметы добавляются последовательно/);
-  assert.doesNotMatch(furnitureWorkspaceSource, /setProgress|\$\{progress\}%/);
-  assert.match(furnitureWorkspaceSource, /elapsedSeconds/);
+test("editorial workbench uses one point per active image and one final generation", () => {
+  assert.match(editorialWorkbenchSource, /Record<string, Point>/);
+  assert.match(editorialWorkbenchSource, /placements\[image\.id\]/);
+  assert.match(editorialWorkbenchSource, /setPlacingId/);
+  assert.match(editorialWorkbenchSource, /\/api\/account\/generations/);
+  assert.match(editorialWorkbenchSource, /setGenerationHistory/);
+  assert.match(editorialWorkbenchSource, /generation\.prompt\.includes\(FINAL_RENDER_MARKER\)/);
+  assert.match(editorialWorkbenchSource, /\[items:\$\{selectedImages\.length\}; \$\{FINAL_RENDER_MARKER\}\]/);
+  assert.match(editorialWorkbenchSource, /const finalItem: GenerationItem/);
+  assert.match(editorialWorkbenchSource, /setGenerationHistory\(\(current\) => \[finalItem/);
+  assert.doesNotMatch(editorialWorkbenchSource, /Предметы добавляются последовательно/);
+  assert.doesNotMatch(editorialWorkbenchSource, /setProgress|\$\{progress\}%/);
+  assert.match(editorialWorkbenchSource, /elapsedSeconds/);
   assert.match(generateRouteSource, /body\.furnitureCasting \? 360_000 : 180_000/);
-  assert.match(furnitureWorkspaceSource, /Открыть готовый рендер на весь экран/);
-  assert.match(furnitureWorkspaceSource, /ИСТОРИЯ ГЕНЕРАЦИЙ/);
-  assert.doesNotMatch(furnitureWorkspaceSource, /Provider usage|Стоимость Room Design|tokenCost|X-Room-AI/);
-  assert.match(detailSource, /!isFurnitureCasting && <div className="template-detail-media">/);
+  assert.match(editorialWorkbenchSource, /Открыть готовый рендер/);
+  assert.match(editorialWorkbenchSource, /title="История генераций"/);
+  assert.doesNotMatch(editorialWorkbenchSource, /Provider usage|Стоимость Room Design|tokenCost|X-Room-AI/);
+  assert.match(detailSource, /template-editorial-heading/);
 });
 
-test("changing furniture-casting inputs preserves history but resets the active result and point order", () => {
-  assert.match(furnitureWorkspaceSource, /setPlacements\(\{\}\);\s*setLatestResult\(null\);\s*setPlacingProductId\(selectedProducts\[0\]\?\.id \|\| ""\)/);
-  assert.match(furnitureWorkspaceSource, /setPlacingProductId\(\(current\) => current \|\| automaticallySelected\[0\]\.id\)/);
-  assert.match(furnitureWorkspaceSource, /const point = \{[\s\S]*?setLatestResult\(null\);\s*setPlacements/);
-  assert.doesNotMatch(furnitureWorkspaceSource, /setHistory\(\[\]\)/);
+test("changing workbench inputs preserves histories and keeps the draft visible", () => {
+  assert.match(editorialWorkbenchSource, /setPlacements\(\{\}\);/);
+  assert.match(editorialWorkbenchSource, /setEditingDraft\(true\)/);
+  assert.match(editorialWorkbenchSource, /const nextPlacements = \{ \.\.\.placements, \[placingId\]: point \}/);
+  assert.doesNotMatch(editorialWorkbenchSource, /setGenerationHistory\(\[\]\)|setSourceHistory\(\[\]\)/);
 });
 
-test("furniture library persists products, scrolls horizontally and separates selection from storage", () => {
-  assert.match(furnitureWorkspaceSource, /indexedDB\.open\(FURNITURE_LIBRARY_DATABASE, 1\)/);
-  assert.match(furnitureWorkspaceSource, /loadFurnitureLibrary\(me\.user\.id\)/);
-  assert.match(furnitureWorkspaceSource, /saveFurnitureProducts\(user\?\.id \|\| "guest", next\)/);
-  assert.match(furnitureWorkspaceSource, /selectedProductIds/);
-  assert.match(furnitureWorkspaceSource, /aria-pressed=\{selected\}/);
-  assert.match(furnitureWorkspaceSource, /scrollBy\(\{ left: -340/);
-  assert.match(furnitureWorkspaceSource, /scrollBy\(\{ left: 340/);
-  assert.match(furnitureWorkspaceSource, /Для одного рендера можно выбрать до/);
-  assert.match(templatesCssSource, /\.furniture-product-points\{display:flex/);
+test("source history uses server media storage and active slots remain separate", () => {
+  assert.match(editorialWorkbenchSource, /\/api\/account\/template-assets/);
+  assert.match(templateAssetsRouteSource, /tenantStoragePrefix\(user\)/);
+  assert.match(templateAssetsRouteSource, /storage\(\)\.put/);
+  assert.match(editorialWorkbenchSource, /Array\.from\(\{ length: maxSlots \}/);
+  assert.match(editorialWorkbenchSource, /removeActive/);
+  assert.match(editorialWorkbenchSource, /addFromHistory/);
+  assert.match(editorialWorkbenchSource, /Удалите одно из активных изображений/);
+  assert.match(editorialWorkbenchSource, /scrollBy\(\{ left: direction/);
+  assert.match(editorialWorkbenchSource, /event\.shiftKey/);
+  assert.match(templatesCssSource, /\.editorial-history-viewport\{display:flex/);
   assert.match(templatesCssSource, /overflow-x:auto/);
-  assert.match(templatesCssSource, /article\.is-selected\{border-color:var\(--th-wine\);background:var\(--th-wine\);color:#fff\}/);
+  assert.match(templatesCssSource, /\.editorial-history-viewport>article\.is-selected/);
 });
 
-test("all selected furniture points remain visible until generation starts", () => {
-  assert.match(furnitureWorkspaceSource, /!latestResult && phase !== "processing" && Object\.entries\(placements\)\.map/);
-  assert.doesNotMatch(furnitureWorkspaceSource, /placingProductId && Object\.entries\(placements\)\.map/);
+test("all selected points remain visible until generation starts", () => {
+  assert.match(editorialWorkbenchSource, /showDraft && Object\.entries\(placements\)\.map/);
+  assert.match(editorialWorkbenchSource, /setEditingDraft\(false\)/);
 });
