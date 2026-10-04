@@ -2,12 +2,12 @@ import { expect, test } from "@playwright/test";
 
 const imageBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
-test("a saved generation becomes one reopenable project without duplicate creation", async ({ page, browserName }, testInfo) => {
-  test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium-1440");
+test("a saved generation becomes one reopenable project without duplicate creation", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.endsWith("-1440"));
   let created = 0;
   let updated = 0;
   let savedBody: Record<string, unknown> | null = null;
-  const projectId = "generation-project-123456";
+  const projectId = `generation-project-${testInfo.project.name}`;
   const projectName = "Проект из генерации";
 
   await page.route("**/api/account/overview", async (route) => {
@@ -62,5 +62,11 @@ test("a saved generation becomes one reopenable project without duplicate creati
   await page.locator(".projects-dashboard-project").click();
   await expect(page.locator("main.studio-shell")).toBeVisible();
   await expect(page.locator(".room-canvas img")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect(page).toHaveURL(new RegExp(`\\?project=${projectId}#`));
+
+  await page.reload();
+  await expect(page.locator("main.studio-shell")).toBeVisible();
+  await expect(page.locator(".room-canvas img")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect(page.getByText(projectName, { exact: true })).toBeVisible();
   expect(created).toBe(1);
 });
