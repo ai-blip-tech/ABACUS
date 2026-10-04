@@ -70,3 +70,49 @@ test("a saved generation becomes one reopenable project without duplicate creati
   await expect(page.getByText(projectName, { exact: true })).toBeVisible();
   expect(created).toBe(1);
 });
+
+test("an uploaded project interior survives reload before a manual save click", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.endsWith("-1440"));
+  let savedBody: Record<string, unknown> | null = null;
+  let savedProjectId = "";
+  const projectName = `Reload upload ${testInfo.project.name}`;
+
+  await page.route("**/api/account/overview", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ projects: [], generations: [], summary: { generation_count: 0, total_tokens: 0, cost_usd: 0 } }),
+  }));
+  await page.route("**/api/projects/*", async (route) => {
+    const url = new URL(route.request().url());
+    savedProjectId = decodeURIComponent(url.pathname.split("/").at(-1) || "");
+    if (route.request().method() === "PUT") {
+      savedBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ project: { id: savedProjectId, name: projectName, project_type: "Квартира", description: null }, state: savedBody?.state }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByRole("button", { name: "Нет аккаунта? Зарегистрироваться" }).click();
+  await page.getByLabel("Имя обязательно").fill("Reload upload");
+  await page.getByLabel("Email логин").fill(`reload-upload-${testInfo.project.name}-${Date.now()}@example.com`);
+  await page.getByLabel("Пароль", { exact: true }).fill("ReloadUpload123!");
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: /Создать проект/ }).first().click();
+  await page.getByLabel("НАЗВАНИЕ ПРОЕКТА").fill(projectName);
+  await page.getByRole("button", { name: /Создать проект/ }).click();
+
+  await page.locator(".furniture-choice .upload-zone input[type=file]").setInputFiles({ name: "interior.png", mimeType: "image/png", buffer: imageBytes });
+  await expect(page.locator(".project-save-control").first()).toHaveText("Сохранено");
+  expect(savedProjectId).not.toBe("");
+  expect(savedBody).not.toBeNull();
+
+  await page.reload();
+  await expect(page.locator("main.studio-shell")).toBeVisible();
+  await expect(page.locator(".room-canvas img")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect(page.getByText(projectName, { exact: true })).toBeVisible();
+});
