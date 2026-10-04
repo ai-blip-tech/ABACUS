@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import type React from "react";
 import AccountDropdown from "./account-dropdown";
+import TemplatesHome from "./templates-home";
 import "./account-dropdown.css";
 import { normalizePlanReferenceImages } from "@/lib/plan-render";
 import { clonePlanogramItem, isEditablePlanogramShortcutTarget } from "@/lib/planogram-clipboard";
@@ -414,15 +415,10 @@ export default function Home() {
     return () => {cancelAnimationFrame(frame);window.removeEventListener("popstate", onPopState);};
   }, []);
   useEffect(() => { void fetch("/api/auth/me").then((response) => response.ok ? response.json() : { user: null }).then((payload) => setUser(payload.user || null)).catch(() => setUser(null)); }, []);
-  if (view === "home") return <main className="home-page reference-home">
-    <header className="reference-nav"><div className="reference-nav-inner"><button className="reference-wordmark" onClick={() => navigate("home")} aria-label="ROOM design">ROOM <span>design</span></button><nav><a href="#возможности">Возможности</a><a href="#процесс">Процесс</a>{user?<AccountDropdown user={user}/>:<button onClick={() => openAuth("login")}>Войти</button>}</nav></div></header>
-    <section className="reference-hero"><div className="reference-hero-inner"><div className="reference-copy"><p className="reference-kicker">ИИ-пространство для дизайнеров интерьера</p><h1>Ваш<br/>интерьер.<br/>Ваше<br/><strong>видение.</strong></h1><p>Исследуйте идеи, меняйте пространство и визуализируйте любые предметы в своём проекте.</p><button className="reference-primary" onClick={continueToProject}>Начать <span>→</span></button></div><div className="reference-stage"><img src="https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=1400&q=90" alt="Современный интерьер"/><span>ПРОСТРАНСТВО ДЛЯ ИДЕЙ</span></div></div></section>
-    <section className="reference-features" id="возможности"><div className="reference-section-head"><span>ВОЗМОЖНОСТИ</span><h2>Форма, функция<br/>и безупречный стиль</h2><p>Всё, что нужно для работы над интерьером — от добавления мебели до точной корректировки пространства.</p></div><div className="reference-feature-grid"><article><i>✦</i><h3>ИИ-визуализация</h3><p>Создавайте фотореалистичные визуализации интерьеров за минуты.</p></article><article><i>↔</i><h3>Работа с мебелью</h3><p>Добавляйте и заменяйте предметы по фотографии-референсу.</p></article><article><i>⌁</i><h3>Точная корректировка</h3><p>Уточняйте детали текстовыми командами, сохраняя атмосферу комнаты.</p></article></div></section>
-    <section className="reference-process" id="процесс"><div className="reference-process-copy"><span>ПРОЦЕСС</span><h2>Добавьте любой предмет</h2><p>Загрузите интерьер, отметьте место и добавьте фотографию предмета. ROOM design сохранит масштаб, свет и перспективу комнаты.</p><button className="reference-secondary" onClick={continueToProject}>Попробовать <span>→</span></button></div><img src="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=90" alt="Интерьер для работы с мебелью"/></section>
-    <section className="reference-cta"><h2>Создайте интерьер<br/><strong>сегодня.</strong></h2><p>Начните с пространства, идеи или одного предмета мебели.</p><button className="reference-primary" onClick={continueToProject}>Начать <span>→</span></button></section>
-    <footer className="reference-footer"><div className="reference-wordmark">ROOM <span>design</span></div><span>© 2026 ROOM design</span><a href="#возможности">Возможности</a><a href="#процесс">Процесс</a></footer>
+  if (view === "home") return <>
+    <TemplatesHome accountControl={user ? <AccountDropdown user={user}/> : <button type="button" onClick={() => openAuth("login")}>Войти</button>} onStartProject={continueToProject}/>
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
-  </main>;
+  </>;
   if (view === "account") return <AccountDashboardWithProfile user={user} onUserUpdated={setUser} onHome={()=>navigate("home")} onCreate={()=>navigate("newProject")} onOpenProject={(project)=>{setProjectName(project.name);navigate("studio",project.id)}} onOpenGeneration={async(generation)=>{try{const image=await blobAsDataUrl(`/api/account/generations/${generation.id}`);setProjectId("");setProjectName("");setProjectType("Квартира");setProjectDescription("");setProjectSaved(false);setPlanItems([]);setPlanFloorReference(null);setPlanWallReference(null);setPlanCamera(null);setInteriorImage(image);setGeneratedImage(image);setInteriorName("Сохранённая генерация");setGenerated(true);setRatioFromImage(image);setHistoryVersions([{id:generation.id,name:"Сохранённая генерация",image,generated:true}]);setActiveHistoryId(generation.id);navigate("studio","");}catch{setGenerationError("Не удалось открыть сохранённую генерацию.");}}} onLogin={()=>openAuth("login")}/>;
   if (view === "newProject") return <main className="project-page project-page-concept">
     <header className="project-nav">

@@ -399,7 +399,18 @@ async function generateResponse(request: Request) {
     await refundReservation("Возврат после ошибки сохранения результата AI-операции");
     return Response.json({ error: error instanceof Error ? error.message : "Не удалось сохранить результат генерации." }, { status: 503 });
   }
-  return new Response(binary, { headers: { "Content-Type": "image/webp", "Cache-Control": "no-store" } });
+  const usageHeaders: Record<string, string> = {
+    "Content-Type": "image/webp",
+    "Cache-Control": "no-store",
+    "X-Room-AI-Model": model,
+    "X-Room-AI-Operation": operation,
+    "X-Room-AI-Token-Cost": String(reservation.quote.tokenCost),
+    "X-Room-AI-Charging": reservation.quote.chargingEnabled ? "enabled" : "estimate-only",
+  };
+  if (result.usage?.input_tokens !== undefined) usageHeaders["X-Room-AI-Input-Tokens"] = String(result.usage.input_tokens);
+  if (result.usage?.output_tokens !== undefined) usageHeaders["X-Room-AI-Output-Tokens"] = String(result.usage.output_tokens);
+  if (result.usage?.total_tokens !== undefined) usageHeaders["X-Room-AI-Total-Tokens"] = String(result.usage.total_tokens);
+  return new Response(binary, { headers: usageHeaders });
 }
 
 // Keep route-level failures from being converted into an HTML 500 response by
