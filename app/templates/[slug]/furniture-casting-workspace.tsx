@@ -292,7 +292,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
       <div className={`furniture-stage${placingProductId ? " is-placing" : ""}${latestResult && !placingProductId ? " has-result" : ""}`}>
         {stageImage ? <button type="button" onClick={handleStageClick} aria-label={placingProductId ? `Указать точку для ${activeProduct?.name || "мебели"}` : latestResult ? "Открыть готовый рендер на весь экран" : "Изображение комнаты"}>
           <img src={stageImage} alt={latestResult && !placingProductId ? "Готовый рендер интерьера" : "Загруженная комната"} />
-          {placingProductId && Object.entries(placements).map(([productId, point]) => {
+          {!latestResult && phase !== "processing" && Object.entries(placements).map(([productId, point]) => {
             const index = products.findIndex((product) => product.id === productId);
             return <span className="furniture-stage-point" key={productId} style={{ left: `${point.x}%`, top: `${point.y}%` }}>{index + 1}</span>;
           })}

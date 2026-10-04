@@ -85,3 +85,8 @@ test("changing furniture-casting inputs preserves history but resets the active 
   assert.match(furnitureWorkspaceSource, /const point = \{[\s\S]*?setLatestResult\(null\);\s*setPlacements/);
   assert.doesNotMatch(furnitureWorkspaceSource, /setHistory\(\[\]\)/);
 });
+
+test("all selected furniture points remain visible until generation starts", () => {
+  assert.match(furnitureWorkspaceSource, /!latestResult && phase !== "processing" && Object\.entries\(placements\)\.map/);
+  assert.doesNotMatch(furnitureWorkspaceSource, /placingProductId && Object\.entries\(placements\)\.map/);
+});
