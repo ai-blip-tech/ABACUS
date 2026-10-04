@@ -248,8 +248,9 @@ async function generateResponse(request: Request) {
       refunded = true;
     }
   };
-  const providerTimeout = ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(180_000) : undefined;
+  const providerTimeout = ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(body.furnitureCasting ? 360_000 : 180_000) : undefined;
   const providerTimedOut = (error?: unknown) => providerTimeout?.aborted || error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+  const providerTimeoutMessage = body.furnitureCasting ? "Создание единого рендера заняло больше 6 минут. Попробуйте ещё раз с фотографиями меньшего размера." : "Сервис генерации не ответил вовремя. Попробуйте ещё раз.";
 
   let response: Response;
   try {
@@ -373,7 +374,7 @@ async function generateResponse(request: Request) {
     }
   } catch (error) {
     await refundReservation("Возврат после технической ошибки подготовки AI-операции");
-    return Response.json({ error: providerTimedOut(error) ? "Сервис генерации не ответил вовремя. Попробуйте ещё раз." : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
+    return Response.json({ error: providerTimedOut(error) ? providerTimeoutMessage : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
   }
   console.info("[generate-runtime-diagnostic]", JSON.stringify({
     requestId: operationId,
@@ -394,7 +395,7 @@ async function generateResponse(request: Request) {
     responseText = await response.text();
   } catch {
     await refundReservation("Возврат после ошибки чтения ответа AI-провайдера");
-    return Response.json({ error: providerTimedOut() ? "Сервис генерации не ответил вовремя. Попробуйте ещё раз." : "Не удалось получить ответ сервиса генерации." }, { status: providerTimedOut() ? 504 : 502 });
+    return Response.json({ error: providerTimedOut() ? providerTimeoutMessage : "Не удалось получить ответ сервиса генерации." }, { status: providerTimedOut() ? 504 : 502 });
   }
   let result: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string }; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } } = {};
   try {

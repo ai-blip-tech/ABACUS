@@ -46,6 +46,8 @@ test("unsupported flows remain honest fixtures while furniture uses the existing
   assert.match(furnitureWorkspaceSource, /furnitureCasting: \{/);
   assert.match(furnitureWorkspaceSource, /createPlacementGuideImage/);
   assert.match(furnitureWorkspaceSource, /items: products\.map/);
+  assert.match(furnitureWorkspaceSource, /readFile\(file, 2048\)/);
+  assert.match(furnitureWorkspaceSource, /readFile\(file, 1280\)/);
   assert.doesNotMatch(furnitureWorkspaceSource, /for \(let index = 0; index < products\.length/);
   assert.match(generateRouteSource, /furnitureCastingPrompt/);
   assert.match(generateRouteSource, /referenceBlobs\.forEach/);
@@ -68,6 +70,9 @@ test("furniture casting uses one point per product and keeps a consumer-facing g
   assert.match(furnitureWorkspaceSource, /const finalItem: HistoryItem/);
   assert.match(furnitureWorkspaceSource, /setHistory\(\(current\) => \[finalItem/);
   assert.doesNotMatch(furnitureWorkspaceSource, /Предметы добавляются последовательно/);
+  assert.doesNotMatch(furnitureWorkspaceSource, /setProgress|\$\{progress\}%/);
+  assert.match(furnitureWorkspaceSource, /elapsedSeconds/);
+  assert.match(generateRouteSource, /body\.furnitureCasting \? 360_000 : 180_000/);
   assert.match(furnitureWorkspaceSource, /Открыть готовый рендер на весь экран/);
   assert.match(furnitureWorkspaceSource, /ИСТОРИЯ ГЕНЕРАЦИЙ/);
   assert.doesNotMatch(furnitureWorkspaceSource, /Provider usage|Стоимость Room Design|tokenCost|X-Room-AI/);

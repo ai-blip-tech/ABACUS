@@ -14,9 +14,26 @@ type Phase = "idle" | "processing" | "failed";
 const FURNITURE_CASTING_PROMPT = "Мебельный кастинг: разместить все выбранные предметы в указанных точках одним цельным рендером, сохранив комнату и ракурс.";
 const FINAL_RENDER_MARKER = "final:yes";
 
-const readFile = (file: File) => new Promise<UploadedInput>((resolve, reject) => {
+const readFile = (file: File, maxDimension: number) => new Promise<UploadedInput>((resolve, reject) => {
   const reader = new FileReader();
-  reader.onload = () => resolve({ id: crypto.randomUUID(), name: file.name, type: file.type, size: file.size, dataUrl: String(reader.result || "") });
+  reader.onload = () => {
+    const originalDataUrl = String(reader.result || "");
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      if (scale === 1) return resolve({ id: crypto.randomUUID(), name: file.name, type: file.type, size: file.size, dataUrl: originalDataUrl });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return reject(new Error("Не удалось подготовить изображение."));
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/webp", 0.9);
+      resolve({ id: crypto.randomUUID(), name: file.name, type: "image/webp", size: Math.round(dataUrl.length * 0.75), dataUrl });
+    };
+    image.onerror = () => reject(new Error(`${file.name}: не удалось прочитать изображение.`));
+    image.src = originalDataUrl;
+  };
   reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
   reader.readAsDataURL(file);
 });
@@ -77,7 +94,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
   const [placements, setPlacements] = useState<Record<string, Point>>({});
   const [placingProductId, setPlacingProductId] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
-  const [progress, setProgress] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [error, setError] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [latestResult, setLatestResult] = useState<HistoryItem | null>(null);
@@ -124,6 +141,16 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     return () => window.removeEventListener("keydown", close);
   }, [lightbox]);
 
+  useEffect(() => {
+    if (phase !== "processing") {
+      setElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, [phase]);
+
   const activeProduct = products.find((product) => product.id === placingProductId) || null;
   const missingPoint = products.find((product) => !placements[product.id]);
   const stageImage = placingProductId ? room?.dataUrl : latestResult?.dataUrl || room?.dataUrl;
@@ -136,7 +163,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     setError("");
     try {
       validateFiles(roomSlot, [file]);
-      setRoom(await readFile(file));
+      setRoom(await readFile(file, 2048));
       setPlacements({});
       setPlacingProductId(products[0]?.id || "");
     } catch (reason) {
@@ -152,7 +179,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     try {
       const accepted = files.slice(0, Math.max(0, productSlot.maxCount - products.length));
       validateFiles(productSlot, accepted);
-      const next = await Promise.all(accepted.map(readFile));
+      const next = await Promise.all(accepted.map((file) => readFile(file, 1280)));
       setProducts((current) => [...current, ...next].slice(0, productSlot.maxCount));
       if (next[0]) setPlacingProductId(next[0].id);
     } catch (reason) {
@@ -194,11 +221,9 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     if (!generationConfigured) return setError("Генерация сейчас недоступна: AI provider не настроен.");
     setError("");
     setPhase("processing");
-    setProgress(5);
     try {
       const markedImage = await createPlacementGuideImage(room.dataUrl, products.map((product, index) => ({ point: placements[product.id], number: index + 1 })));
       const operationId = crypto.randomUUID();
-      setProgress(15);
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": operationId },
@@ -217,11 +242,9 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.error || "Не удалось создать рендер.");
       }
-      setProgress(90);
       const finalItem: HistoryItem = { id: operationId, name: "Мебельный кастинг", dataUrl: await blobToDataUrl(await response.blob()), createdAt: new Date().toISOString(), productCount: products.length };
       setHistory((current) => [finalItem, ...current.filter((entry) => entry.id !== finalItem.id)]);
       setLatestResult(finalItem);
-      setProgress(100);
       setPhase("idle");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Генерация не завершилась.");
@@ -243,7 +266,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
           <span>Добавить фото мебели</span>
           <small>{products.length ? `${products.length} из ${productSlot.maxCount}` : "1–5 предметов"}</small>
         </label>
-        <button className="furniture-create-button" type="button" disabled={phase === "processing"} onClick={() => void runGeneration()}>{phase === "processing" ? `Создаём · ${progress}%` : "Создать рендер"}<span>→</span></button>
+        <button className="furniture-create-button" type="button" disabled={phase === "processing"} onClick={() => void runGeneration()}>{phase === "processing" ? "Создаём единый рендер…" : "Создать рендер"}<span>→</span></button>
       </div>
 
       {products.length > 0 && <div className="furniture-product-points" aria-label="Точки размещения мебели">
@@ -269,7 +292,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
           {placingProductId && <em>Поставьте точку для «{activeProduct?.name}»</em>}
           {latestResult && !placingProductId && <em>Нажмите, чтобы открыть на весь экран</em>}
         </button> : <div><span>ROOM DESIGN</span><p>Загрузите фото комнаты, чтобы начать.</p></div>}
-        {phase === "processing" && <div className="furniture-stage-progress" role="status"><i style={{ width: `${progress}%` }} /><b>Создаём единый рендер</b><p>Размещаем все предметы в выбранных точках.</p></div>}
+        {phase === "processing" && <div className="furniture-stage-progress" role="status"><i /><b>Создаём единый рендер · {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, "0")}</b><p>Размещаем все предметы одновременно. Сложный рендер может занять несколько минут.</p></div>}
       </div>
 
       {error && <p className="furniture-error" role="alert">{error}</p>}
