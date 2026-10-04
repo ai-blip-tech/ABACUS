@@ -78,3 +78,10 @@ test("furniture casting uses one point per product and keeps a consumer-facing g
   assert.doesNotMatch(furnitureWorkspaceSource, /Provider usage|Стоимость Room Design|tokenCost|X-Room-AI/);
   assert.match(detailSource, /!isFurnitureCasting && <div className="template-detail-media">/);
 });
+
+test("changing furniture-casting inputs preserves history but resets the active result and point order", () => {
+  assert.match(furnitureWorkspaceSource, /setPlacements\(\{\}\);\s*setLatestResult\(null\);\s*setPlacingProductId\(products\[0\]\?\.id \|\| ""\)/);
+  assert.match(furnitureWorkspaceSource, /setPlacingProductId\(\(current\) => current \|\| next\[0\]\.id\)/);
+  assert.match(furnitureWorkspaceSource, /const point = \{[\s\S]*?setLatestResult\(null\);\s*setPlacements/);
+  assert.doesNotMatch(furnitureWorkspaceSource, /setHistory\(\[\]\)/);
+});

@@ -165,6 +165,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
       validateFiles(roomSlot, [file]);
       setRoom(await readFile(file, 2048));
       setPlacements({});
+      setLatestResult(null);
       setPlacingProductId(products[0]?.id || "");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось добавить комнату.");
@@ -181,7 +182,8 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
       validateFiles(productSlot, accepted);
       const next = await Promise.all(accepted.map((file) => readFile(file, 1280)));
       setProducts((current) => [...current, ...next].slice(0, productSlot.maxCount));
-      if (next[0]) setPlacingProductId(next[0].id);
+      setLatestResult(null);
+      if (next[0]) setPlacingProductId((current) => current || next[0].id);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось добавить мебель.");
     }
@@ -189,12 +191,16 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
 
   const removeProduct = (id: string) => {
     setProducts((current) => current.filter((product) => product.id !== id));
+    setLatestResult(null);
     setPlacements((current) => {
       const next = { ...current };
       delete next[id];
       return next;
     });
-    if (placingProductId === id) setPlacingProductId("");
+    if (placingProductId === id) {
+      const nextProduct = products.find((product) => product.id !== id && !placements[product.id]);
+      setPlacingProductId(nextProduct?.id || "");
+    }
   };
 
   const handleStageClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -204,6 +210,7 @@ export default function FurnitureCastingWorkspace({ template }: { template: Temp
     }
     const bounds = event.currentTarget.getBoundingClientRect();
     const point = { x: (event.clientX - bounds.left) * 100 / bounds.width, y: (event.clientY - bounds.top) * 100 / bounds.height };
+    setLatestResult(null);
     setPlacements((current) => ({ ...current, [placingProductId]: point }));
     const nextProduct = products.find((product) => product.id !== placingProductId && !placements[product.id]);
     setPlacingProductId(nextProduct?.id || "");
