@@ -40,9 +40,34 @@ export const metadata: Metadata = {
     title: "ROOM design — ИИ-платформа для дизайнеров интерьера",
     description: "Визуализируйте мебель в интерьерных проектах с помощью ИИ.",
   },
+  manifest: "/site.webmanifest?v=editorial-r-1",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: [
+      {
+        url: "/favicon.svg?v=editorial-r-1",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/favicon-dark.svg?v=editorial-r-1",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: dark)",
+      },
+      { url: "/favicon.ico?v=editorial-r-1", sizes: "any" },
+      { url: "/favicon-32x32.png?v=editorial-r-1", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png?v=editorial-r-1", type: "image/png", sizes: "16x16" },
+    ],
+    shortcut: "/favicon.ico?v=editorial-r-1",
+    apple: {
+      url: "/apple-touch-icon.png?v=editorial-r-1",
+      type: "image/png",
+      sizes: "180x180",
+    },
+    other: {
+      rel: "mask-icon",
+      url: "/safari-pinned-tab.svg?v=editorial-r-1",
+      color: "#6E242A",
+    },
   },
 };
 

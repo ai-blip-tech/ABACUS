@@ -1,0 +1,19 @@
+{
+  "name": "Room Design",
+  "short_name": "Room Design",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png?v=editorial-r-1",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png?v=editorial-r-1",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#F7F5F1",
+  "background_color": "#F7F5F1",
+  "display": "standalone"
+}
