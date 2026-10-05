@@ -124,3 +124,15 @@ test("all selected points remain visible until generation starts", () => {
   assert.match(editorialWorkbenchSource, /showDraft && Object\.entries\(placements\)\.map/);
   assert.match(editorialWorkbenchSource, /setEditingDraft\(false\)/);
 });
+
+test("multi-result templates open one keyboard-accessible lightbox gallery", () => {
+  assert.match(scenarioWorkbenchSource, /type LightboxState = \{ items: GenerationItem\[\]; index: number \}/);
+  assert.match(scenarioWorkbenchSource, /batchId/);
+  assert.match(scenarioWorkbenchSource, /event\.key === "ArrowLeft"/);
+  assert.match(scenarioWorkbenchSource, /event\.key === "ArrowRight"/);
+  assert.match(scenarioWorkbenchSource, /aria-label="Предыдущий результат"/);
+  assert.match(scenarioWorkbenchSource, /aria-label="Следующий результат"/);
+  assert.match(scenarioWorkbenchSource, /lightbox\.index \+ 1/);
+  assert.match(templatesCssSource, /\.editorial-lightbox-nav\.is-previous/);
+  assert.match(templatesCssSource, /\.editorial-lightbox-caption/);
+});

@@ -8,7 +8,8 @@ import { getTemplateWorkbenchScenario } from "@/lib/templates/workbench";
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
 
 type UploadedFile = { id: string; name: string; type: string; size: number; dataUrl: string; sourceUrl?: string; createdAt: string };
-type GenerationItem = { id: string; label: string; dataUrl: string; createdAt: string };
+type GenerationItem = { id: string; batchId: string; label: string; dataUrl: string; createdAt: string };
+type LightboxState = { items: GenerationItem[]; index: number };
 type User = { id: string; email: string };
 type Phase = "idle" | "processing" | "failed";
 
@@ -129,7 +130,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
   const [assetHistory, setAssetHistory] = useState<UploadedFile[]>([]);
   const [generationHistory, setGenerationHistory] = useState<GenerationItem[]>([]);
   const [latestResults, setLatestResults] = useState<GenerationItem[]>([]);
-  const [lightbox, setLightbox] = useState<GenerationItem | null>(null);
+  const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [error, setError] = useState("");
@@ -162,6 +163,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
           .filter((generation: { operation?: string; prompt?: string }) => generation.operation === "global_edit" && generation.prompt?.startsWith(prefix))
           .map((generation: { id: string; created_at: string; prompt: string }) => ({
             id: generation.id,
+            batchId: generation.prompt.match(/batch:([^;\]]+)/)?.[1]?.trim() || `legacy:${generation.created_at.slice(0, 16)}`,
             label: generation.prompt.match(/output:([^\]]+)/)?.[1]?.trim() || scenario.resultTitle,
             dataUrl: `/api/account/generations/${generation.id}`,
             createdAt: generation.created_at,
@@ -182,10 +184,23 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
 
   useEffect(() => {
     if (!lightbox) return;
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setLightbox(null); };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
+    const navigate = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLightbox(null);
+      if (event.key === "ArrowLeft") setLightbox((current) => current ? { ...current, index: Math.max(0, current.index - 1) } : null);
+      if (event.key === "ArrowRight") setLightbox((current) => current ? { ...current, index: Math.min(current.items.length - 1, current.index + 1) } : null);
+    };
+    window.addEventListener("keydown", navigate);
+    return () => window.removeEventListener("keydown", navigate);
   }, [lightbox]);
+
+  const openLightbox = (items: GenerationItem[], id: string) => {
+    const ordered = [...items].sort((left, right) => {
+      const leftIndex = scenario.outputLabels.indexOf(left.label);
+      const rightIndex = scenario.outputLabels.indexOf(right.label);
+      return (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex) - (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
+    });
+    setLightbox({ items: ordered, index: Math.max(0, ordered.findIndex((item) => item.id === id)) });
+  };
 
   const validationErrors = useMemo(() => {
     const issues: string[] = [];
@@ -263,9 +278,10 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       }).filter(Boolean).join("\n");
       const count = generationCount(template, scenario.outputLabels, uploads);
       const labels = scenario.outputLabels.slice(0, count);
+      const batchId = crypto.randomUUID();
       const generated = await Promise.all(labels.map(async (label) => {
         const operationId = crypto.randomUUID();
-        const historyMarker = `[template:${template.slug}; output:${label}]`;
+        const historyMarker = `[template:${template.slug}; batch:${batchId}; output:${label}]`;
         const response = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Idempotency-Key": operationId },
@@ -286,7 +302,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
           const payload = await response.json().catch(() => ({}));
           throw new Error(payload.error || `Не удалось создать «${label}».`);
         }
-        return { id: operationId, label, dataUrl: await blobToDataUrl(await response.blob()), createdAt: new Date().toISOString() } satisfies GenerationItem;
+        return { id: operationId, batchId, label, dataUrl: await blobToDataUrl(await response.blob()), createdAt: new Date().toISOString() } satisfies GenerationItem;
       }));
       setLatestResults(generated);
       setGenerationHistory((current) => [...generated, ...current.filter((item) => !generated.some((result) => result.id === item.id))]);
@@ -321,7 +337,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       <section className="editorial-result-panel" aria-label="Результат">
         <header><p>РЕЗУЛЬТАТ</p><span>GOOD ROOMS<br />BETTER LIVES</span></header>
         <div className={`editorial-result-stage${latestResults.length ? " has-result" : ""}`}>
-          {latestResults.length > 1 ? <div className={`editorial-result-collection count-${Math.min(latestResults.length, 4)}`}>{latestResults.map((item) => <button type="button" key={item.id} onClick={() => setLightbox(item)}><img src={item.dataUrl} alt={item.label} /><span>{item.label}</span></button>)}</div> : stageImage ? <button type="button" onClick={() => latestResults[0] && setLightbox(latestResults[0])} aria-label={latestResults[0] ? "Открыть результат" : "Основное изображение"}><img src={stageImage} alt={latestResults[0]?.label || "Основное изображение"} /></button> : <div className="editorial-result-empty"><b>ROOM DESIGN</b><p>Добавьте исходные материалы — здесь появится результат сценария.</p></div>}
+          {latestResults.length > 1 ? <div className={`editorial-result-collection count-${Math.min(latestResults.length, 4)}`}>{latestResults.map((item) => <button type="button" key={item.id} onClick={() => openLightbox(latestResults, item.id)}><img src={item.dataUrl} alt={item.label} /><span>{item.label}</span></button>)}</div> : stageImage ? <button type="button" onClick={() => latestResults[0] && openLightbox(latestResults, latestResults[0].id)} aria-label={latestResults[0] ? "Открыть результат" : "Основное изображение"}><img src={stageImage} alt={latestResults[0]?.label || "Основное изображение"} /></button> : <div className="editorial-result-empty"><b>ROOM DESIGN</b><p>Добавьте исходные материалы — здесь появится результат сценария.</p></div>}
           {phase === "processing" && <div className="editorial-result-progress" role="status"><i /><b>Создаём {scenario.outputLabels.length > 1 ? "варианты" : "результат"} · {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, "0")}</b><p>Все варианты создаются из одного набора исходных материалов.</p></div>}
           {phase === "failed" && <div className="editorial-result-error" role="alert"><b>Результат не создан</b><p>{error || "Попробуйте запустить сценарий ещё раз."}</p></div>}
         </div>
@@ -334,10 +350,16 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
         {assetHistory.map((file) => <article key={file.id}><img src={file.dataUrl} alt="" /><div><b>{file.name}</b><small>{new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(file.createdAt))}</small></div><button type="button" onClick={() => addFromHistory(file)}>Использовать</button></article>)}
       </HistoryRail>
       <HistoryRail id="scenario-generation-history-title" title="История генераций" description={`Предыдущие результаты «${template.title}».`} count={generationHistory.length} empty="После первой генерации здесь появятся сохранённые результаты.">
-        {generationHistory.map((item) => <button className="editorial-generation-card" type="button" key={item.id} onClick={() => setLightbox(item)}><img src={item.dataUrl} alt={item.label} /><span><b>{item.label}</b><small>{new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt))}</small></span></button>)}
+        {generationHistory.map((item) => <button className="editorial-generation-card" type="button" key={item.id} onClick={() => openLightbox(generationHistory.filter((entry) => entry.batchId === item.batchId), item.id)}><img src={item.dataUrl} alt={item.label} /><span><b>{item.label}</b><small>{new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt))}</small></span></button>)}
       </HistoryRail>
     </div>
 
-    {lightbox && <div className="editorial-lightbox" role="dialog" aria-modal="true" aria-label="Просмотр результата"><button type="button" aria-label="Закрыть" onClick={() => setLightbox(null)}>×</button><img src={lightbox.dataUrl} alt={lightbox.label} /></div>}
+    {lightbox && <div className="editorial-lightbox" role="dialog" aria-modal="true" aria-label="Просмотр результатов">
+      <button className="editorial-lightbox-close" type="button" aria-label="Закрыть" onClick={() => setLightbox(null)}>×</button>
+      {lightbox.items.length > 1 && <button className="editorial-lightbox-nav is-previous" type="button" aria-label="Предыдущий результат" disabled={lightbox.index === 0} onClick={() => setLightbox((current) => current ? { ...current, index: Math.max(0, current.index - 1) } : null)}>←</button>}
+      <img src={lightbox.items[lightbox.index].dataUrl} alt={lightbox.items[lightbox.index].label} />
+      {lightbox.items.length > 1 && <button className="editorial-lightbox-nav is-next" type="button" aria-label="Следующий результат" disabled={lightbox.index === lightbox.items.length - 1} onClick={() => setLightbox((current) => current ? { ...current, index: Math.min(current.items.length - 1, current.index + 1) } : null)}>→</button>}
+      <p className="editorial-lightbox-caption"><b>{lightbox.items[lightbox.index].label}</b>{lightbox.items.length > 1 && <span>{lightbox.index + 1} / {lightbox.items.length}</span>}</p>
+    </div>}
   </section>;
 }

@@ -489,7 +489,7 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
     </div>
 
     {lightbox && <div className="editorial-lightbox" role="dialog" aria-modal="true" aria-label="Просмотр готового рендера">
-      <button type="button" aria-label="Закрыть полноэкранный просмотр" onClick={() => setLightbox(null)}>×</button>
+      <button className="editorial-lightbox-close" type="button" aria-label="Закрыть полноэкранный просмотр" onClick={() => setLightbox(null)}>×</button>
       <img src={lightbox.dataUrl} alt={lightbox.name} />
     </div>}
   </section>;
