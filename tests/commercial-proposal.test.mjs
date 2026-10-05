@@ -68,6 +68,7 @@ test("proposal endpoints enforce auth, ownership and byte-based image detection"
   assert.match(pdfRoute, /requireTenantUser\(request\)/);
   assert.match(pdfRoute, /tenant_id = \? AND user_id = \?/);
   assert.match(pdfRoute, /allowedObjectIds/);
+  assert.match(pdfRoute, /savedState\.proposalItems/);
   assert.match(pdfRoute, /normalizeProposalImage/);
   assert.match(metadataRoute, /tenant_id = \? AND user_id = \?/);
   assert.match(metadataRoute, /proposalDocument/);

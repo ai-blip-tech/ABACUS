@@ -9,6 +9,7 @@ const globalCss = await readFile(new URL("../app/globals.css", import.meta.url),
 const dashboardCss = await readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8");
 const proposalRoute = await readFile(new URL("../app/api/proposal/route.ts", import.meta.url), "utf8");
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+const projectRoute = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
 
 test("proposal images are detected by their bytes before an unreliable MIME header", () => {
   assert.equal(proposalImageFormat(Uint8Array.from([0xff, 0xd8, 0xff, 0xe0]), "image/png"), "jpeg");
@@ -23,6 +24,14 @@ test("commercial proposal opens an editor and downloads PDF only after confirmat
   assert.match(page, /Создать коммерческое предложение/);
   assert.match(proposalRoute, /"Content-Type": "application\/pdf"/);
   assert.match(proposalRoute, /"Content-Disposition": `attachment;/);
+});
+
+test("each render history version restores its own commercial proposal product snapshot", () => {
+  assert.match(page, /type HistoryItem = \{[^}]*proposalItems\?: PlanItem\[\]/);
+  assert.match(page, /setProposalItems\(version\.proposalItems \|\| \[\]\)/);
+  assert.match(page, /addHistoryVersion\(newInterior,[\s\S]*?nextProposalItems\)/);
+  assert.match(projectRoute, /proposalItems: sanitizeItems\(item\.proposalItems, `history-\$\{index\}-proposal-item`\)/);
+  assert.match(projectRoute, /historyVersions:[\s\S]*?proposalItems: \(version\.proposalItems \|\| \[\]\)/);
 });
 
 test("remove flow sends a point-guided remove operation and restores editor controls", () => {

@@ -179,8 +179,8 @@ export async function POST(request: Request) {
       .bind(body.projectId, user.tenantId, user.id)
       .first<{ state_json: string | null }>();
     if (!project?.state_json) return Response.json({ error: "Сохранённый проект не найден." }, { status: 404 });
-    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }> };
-    const allowedObjectIds = new Set((savedState.planItems || []).map((item) => item.id).filter((id): id is string => Boolean(id)));
+    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }>; proposalItems?: Array<{ id?: string }> };
+    const allowedObjectIds = new Set([...(savedState.planItems || []), ...(savedState.proposalItems || [])].map((item) => item.id).filter((id): id is string => Boolean(id)));
     if (products.some((product) => !product.objectIds?.length || product.objectIds.some((id) => !allowedObjectIds.has(id)))) {
       return Response.json({ error: "Состав коммерческого предложения не соответствует проекту." }, { status: 403 });
     }

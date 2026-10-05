@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { approvedProposalFixture } from "../fixtures/commercial-proposal-approved";
 
 const image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
-const selectedImage = `data:image/png;base64,${(await sharp({ create: { width: 2, height: 2, channels: 4, background: "#8f1024" } }).png().toBuffer()).toString("base64")}`;
+const selectedImage = `data:image/png;base64,${(await sharp({ create: { width: 2, height: 3, channels: 4, background: "#8f1024" } }).png().toBuffer()).toString("base64")}`;
 
 test("approved proposal visual fixture keeps the exact reference content", async () => {
   expect(approvedProposalFixture.document.offerNumber).toBe("№ 112");
@@ -51,6 +51,8 @@ test("commercial proposal editor supports catalog and reference products before 
   expect(selectionTitle && selectionSubtitle && selectionTitle.y + selectionTitle.height <= selectionSubtitle.y).toBe(true);
   expect(aboutHero && aboutHeading && aboutHero.y + aboutHero.height <= aboutHeading.y).toBe(true);
   expect(aboutHeading && benefits && aboutHeading.y + aboutHeading.height <= benefits.y).toBe(true);
+  const aboutPage = await page.locator(".proposal-about-page").boundingBox();
+  expect(aboutHero && aboutPage && aboutHero.height < aboutPage.height * .4).toBe(true);
   await expect(page.locator(".proposal-product-page").nth(0).locator("img")).toHaveAttribute("src", image);
   await expect(page.locator(".proposal-product-page").nth(1).locator("img")).toHaveAttribute("src", selectedImage);
   await expect(page.getByLabel("Наименование")).toHaveCount(3);
@@ -157,13 +159,21 @@ test("commercial proposal snapshots the history version selected in Studio", asy
     name: "Selected render", projectType: "Квартира", state: {
       interiorImage: image, generatedImage: selectedImage, generated: true, activeHistoryId: "render-b",
       historyVersions: [
-        { id: "render-a", name: "Render A", image, generated: true },
-        { id: "render-b", name: "Render B", image: selectedImage, generated: true },
+        { id: "render-a", name: "Render A", image, generated: true, proposalItems: [{ id: "render-a-sofa", kind: "sofa", name: "Old Sofa", x: 30, y: 40, width: 1900, depth: 900, rotation: 0, referenceImage: image, referenceProductId: "old-sofa" }] },
+        { id: "render-b", name: "Render B", image: selectedImage, generated: true, proposalItems: [{ id: "render-b-table", kind: "table", name: "Final Table", x: 60, y: 60, width: 900, depth: 600, rotation: 0, referenceImage: image, referenceProductId: "final-table" }] },
       ],
       planItems: [{ id: "reference-chair", kind: "chair", name: "Кресло", x: 30, y: 40, width: 800, depth: 800, rotation: 0, referenceImage: image, referenceName: "Кресло" }],
     },
   } });
   expect(save.ok()).toBe(true);
+  const reopened = await context.request.get(`/api/projects/${created.project.id}`);
+  const reopenedPayload = await reopened.json() as { state: { historyVersions: Array<{ proposalItems?: Array<{ id: string }> }> } };
+  expect(reopenedPayload.state.historyVersions[0].proposalItems?.map((item) => item.id)).toEqual(["render-a-sofa"]);
+  expect(reopenedPayload.state.historyVersions[1].proposalItems?.map((item) => item.id)).toEqual(["render-b-table"]);
+  await page.route("**/api/catalog?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [
+    { id: "old-sofa", name: "Old Sofa", image, images: [image], price: 100000, widthMm: 1900, depthMm: 900 },
+    { id: "final-table", name: "Final Table", image, images: [image], price: 70000, widthMm: 900, depthMm: 600 },
+  ] }) }));
   const snapshots: string[] = [];
   await page.route(`**/api/projects/${created.project.id}/proposal`, async (route) => {
     const body = route.request().postDataJSON() as { visualization?: string };
@@ -179,6 +189,8 @@ test("commercial proposal snapshots the history version selected in Studio", asy
   let popup = await popupPromise;
   await popup.waitForURL(/\/proposal\//);
   await expect(popup.locator(".proposal-selection-page img")).toBeVisible();
+  await expect(popup.locator(".proposal-summary-table")).toContainText("Old Sofa");
+  await expect(popup.locator(".proposal-summary-table")).not.toContainText("Final Table");
   await popup.close();
 
   await page.getByRole("button", { name: "Render B", exact: true }).click();
@@ -186,6 +198,8 @@ test("commercial proposal snapshots the history version selected in Studio", asy
   await page.getByRole("button", { name: "Создать коммерческое предложение" }).click();
   popup = await popupPromise;
   await popup.waitForURL(/\/proposal\//);
+  await expect(popup.locator(".proposal-summary-table")).toContainText("Final Table");
+  await expect(popup.locator(".proposal-summary-table")).not.toContainText("Old Sofa");
   await expect.poll(() => snapshots.length).toBe(2);
   expect(snapshots[0]).not.toBe(snapshots[1]);
   await popup.close();
@@ -205,8 +219,10 @@ test("commercial proposal creates a real PDF from a saved reference product", as
       interiorImage: representativeImage, generatedImage: webpImage, generated: true,
       planItems: [
         { id: "reference-chair", kind: "chair", name: "Кресло", x: 30, y: 40, width: 2200, depth: 950, rotation: 0, referenceImage: webpImage, referenceName: "Диван Миллер с реклайнером", referenceHeightMm: 900 },
-        { id: "catalog-table", kind: "table", name: "Стол", x: 55, y: 55, width: 900, depth: 600, rotation: 0, referenceImage: webpImage, referenceProductId: "NRM00116" },
         { id: "reference-rug", kind: "rug", name: "Ковёр", x: 45, y: 64, width: 2300, depth: 2000, rotation: 0, referenceImage: webpImage, referenceName: "Ковёр COLUMBIA" },
+      ],
+      proposalItems: [
+        { id: "catalog-table", kind: "table", name: "Стол", x: 55, y: 55, width: 900, depth: 600, rotation: 0, referenceImage: webpImage, referenceProductId: "NRM00116" },
       ],
     },
   } });

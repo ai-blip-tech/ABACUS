@@ -1,7 +1,7 @@
 import { ensureStore, requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 
-type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string };
+type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string; proposalItems?: SavedPlanItem[] };
 type SavedPlanParameter = { name: string; value: string };
 type SavedProposalOverride = { name?: string; width?: number; depth?: number; height?: number; price?: number; quantity?: number; article?: string; category?: string; brand?: string; configuration?: string; option?: string; characteristics?: string[]; notes?: string };
 type SavedPlanItem = {
@@ -68,7 +68,14 @@ function hydrateState(projectId: string, state: SavedState) {
     interiorImage: state.interiorAsset ? assetUrl(projectId, state.interiorAsset) : "",
     generatedImage: state.generatedAsset ? assetUrl(projectId, state.generatedAsset) : "",
     proposalVisualization: state.proposalVisualizationAsset ? assetUrl(projectId, state.proposalVisualizationAsset) : "",
-    historyVersions: (state.historyVersions || []).map((version) => ({ ...version, image: assetUrl(projectId, version.asset) })),
+    historyVersions: (state.historyVersions || []).map((version) => ({
+      ...version,
+      image: assetUrl(projectId, version.asset),
+      proposalItems: (version.proposalItems || []).map(({ referenceAsset, ...item }) => ({
+        ...item,
+        referenceImage: referenceAsset ? assetUrl(projectId, referenceAsset) : item.referenceImage,
+      })),
+    })),
     planItems: (state.planItems || []).map(({ referenceAsset, ...item }) => ({
       ...item,
       referenceImage: referenceAsset ? assetUrl(projectId, referenceAsset) : item.referenceImage,
@@ -151,14 +158,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const collectImage = (asset: string, image: unknown) => { if (typeof image === "string" && image.startsWith("data:")) images.set(asset, image); };
   collectImage("interior", draft.interiorImage);
   collectImage("current", draft.generatedImage);
-  const historyInput = Array.isArray(draft.historyVersions) ? draft.historyVersions.slice(-8) : [];
-  const historyVersions: SavedHistoryItem[] = historyInput.flatMap((entry, index) => {
-    if (!entry || typeof entry !== "object") return [];
-    const item = entry as Record<string, unknown>;
-    const asset = `history-${index}`;
-    collectImage(asset, item.image);
-    return [{ id: typeof item.id === "string" ? item.id.slice(0, 120) : crypto.randomUUID(), name: typeof item.name === "string" ? item.name.slice(0, 160) : "Визуализация", generated: Boolean(item.generated), asset }];
-  });
   const sanitizeItems = (value: unknown, assetPrefix: string): SavedPlanItem[] => (Array.isArray(value) ? value.slice(0, 100) : []).flatMap((entry, index) => {
     if (!entry || typeof entry !== "object") return [];
     const item = entry as Record<string, unknown>;
@@ -221,6 +220,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   });
   const planItems = sanitizeItems(draft.planItems, "plan-item");
   const proposalItems = sanitizeItems(draft.proposalItems, "proposal-item");
+  const historyInput = Array.isArray(draft.historyVersions) ? draft.historyVersions.slice(-8) : [];
+  const historyVersions: SavedHistoryItem[] = historyInput.flatMap((entry, index) => {
+    if (!entry || typeof entry !== "object") return [];
+    const item = entry as Record<string, unknown>;
+    const asset = `history-${index}`;
+    collectImage(asset, item.image);
+    return [{
+      id: typeof item.id === "string" ? item.id.slice(0, 120) : crypto.randomUUID(),
+      name: typeof item.name === "string" ? item.name.slice(0, 160) : "Визуализация",
+      generated: Boolean(item.generated),
+      asset,
+      proposalItems: sanitizeItems(item.proposalItems, `history-${index}-proposal-item`),
+    }];
+  });
   const planRoomInput = draft.planRoom && typeof draft.planRoom === "object" ? draft.planRoom as Record<string, unknown> : {};
   const planRoom = { width: finiteNumber(planRoomInput.width, 6000, 500, 30000), length: finiteNumber(planRoomInput.length, 4500, 500, 30000) };
   const planFloorReference = planSurfaceReference(draft.planFloorReference, "plan-floor", collectImage);
