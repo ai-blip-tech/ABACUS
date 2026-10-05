@@ -3,9 +3,11 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { featuredTemplates, previewTemplates, templateRegistry } from "../lib/templates/registry.ts";
+import { templateWorkbenchScenarios } from "../lib/templates/workbench.ts";
 
 const workspaceSource = await readFile(new URL("../app/templates/[slug]/template-workspace.tsx", import.meta.url), "utf8");
 const editorialWorkbenchSource = await readFile(new URL("../app/templates/[slug]/template-editorial-workbench.tsx", import.meta.url), "utf8");
+const scenarioWorkbenchSource = await readFile(new URL("../app/templates/[slug]/template-scenario-workbench.tsx", import.meta.url), "utf8");
 const detailSource = await readFile(new URL("../app/templates/[slug]/page.tsx", import.meta.url), "utf8");
 const generateRouteSource = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const templateAssetsRouteSource = await readFile(new URL("../app/api/account/template-assets/route.ts", import.meta.url), "utf8");
@@ -40,8 +42,17 @@ test("furniture casting has the approved room plus one-to-five product schema", 
   assert.equal(template.inputSlots[1].maxCount, 5);
 });
 
-test("unsupported flows remain honest fixtures while the live workbench uses the existing endpoint", () => {
-  assert.match(workspaceSource, /PREVIEW RESULT · AI НЕ ЗАПУСКАЛСЯ/);
+test("all templates use an editorial workbench and every scenario is configured", () => {
+  assert.deepEqual(Object.keys(templateWorkbenchScenarios).sort(), templateRegistry.map((template) => template.slug).sort());
+  assert.match(workspaceSource, /TemplateEditorialWorkbench/);
+  assert.match(workspaceSource, /TemplateScenarioWorkbench/);
+  assert.doesNotMatch(workspaceSource, /GenericTemplateWorkspace|PREFLIGHT|AI НЕ ЗАПУСКАЛСЯ/);
+  const battle = templateWorkbenchScenarios["design-battle"];
+  assert.deepEqual(battle.outputLabels, ["Решение A", "Решение B"]);
+  assert.match(battle.generationBrief, /два самостоятельных интерьерных решения/i);
+});
+
+test("furniture casting keeps its specialized endpoint and other image scenarios use the additive template adapter", () => {
   assert.match(editorialWorkbenchSource, /fetch\("\/api\/generate"/);
   assert.match(editorialWorkbenchSource, /Idempotency-Key/);
   assert.match(editorialWorkbenchSource, /operation: "place"/);
@@ -54,10 +65,17 @@ test("unsupported flows remain honest fixtures while the live workbench uses the
   assert.match(generateRouteSource, /referenceBlobs\.forEach/);
   assert.match(generateRouteSource, /providerInputImagesCount: diagnosticProviderInputImages/);
   assert.doesNotMatch(editorialWorkbenchSource, /createPlacementMask|placement: \{ \.\.\.placement, mask \}/);
-  assert.match(workspaceSource, /!canRunReal && !realFurnitureFlow/);
-  assert.match(workspaceSource, /fetch\("\/api\/projects"/);
+  assert.match(scenarioWorkbenchSource, /templateEdit: \{/);
+  assert.match(scenarioWorkbenchSource, /operation: "global_edit"/);
+  assert.match(scenarioWorkbenchSource, /Promise\.all\(labels\.map/);
+  assert.match(scenarioWorkbenchSource, /validationErrors/);
+  assert.match(scenarioWorkbenchSource, /История материалов/);
+  assert.match(scenarioWorkbenchSource, /История генераций/);
+  assert.match(generateRouteSource, /templateEditPrompt/);
+  assert.match(generateRouteSource, /diagnosticBranch === "template_edit"/);
+  assert.match(generateRouteSource, /template-reference-/);
   assert.match(detailSource, /generateStaticParams/);
-  assert.doesNotMatch(`${workspaceSource}${editorialWorkbenchSource}`, /pipelineKey|OPENAI_API_KEY|providerSecret/);
+  assert.doesNotMatch(`${workspaceSource}${editorialWorkbenchSource}${scenarioWorkbenchSource}`, /pipelineKey|OPENAI_API_KEY|providerSecret/);
 });
 
 test("editorial workbench uses one point per active image and one final generation", () => {

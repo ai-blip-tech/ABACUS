@@ -31,12 +31,14 @@ after(async () => { globalThis.fetch = originalFetch; await rm(root, { recursive
 const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl4bAAAAABJRU5ErkJggg==";
 const pointEdit = { x: 50, y: 50, markedImage: png };
 const globalEdit = { prompt: "Сделай стены светлее", roomImage: png, globalEdit: { instruction: "Сделай стены светлее" } };
+const templateEdit = { operation: "global_edit", prompt: "[template:design-battle; output:Решение A]", roomImage: png, templateEdit: { templateId: "design-battle", instructions: "Создай решение A", outputLabel: "Решение A", referenceImages: [png, png] } };
 const operations = [
   { name: "material", body: { operation: "material", prompt: "Измени материал", roomImage: png, referenceImage: png, pointEdit, material: { instruction: "Применить материал" } }, images: 3 },
   { name: "replace", body: { operation: "replace", prompt: "Замени диван", roomImage: png, referenceImage: png, pointEdit, replacement: { name: "диван" } }, images: 3 },
   { name: "remove", body: { operation: "remove", prompt: "Удали диван", roomImage: png, pointEdit, removal: { name: "диван" } }, images: 2 },
   { name: "place", body: { operation: "place", prompt: "Добавь кресло", roomImage: png, referenceImage: png, pointEdit, placement: { x: 50, y: 50 } }, images: 3 },
   { name: "global_edit", body: globalEdit, images: 1 },
+  { name: "template_edit", body: templateEdit, images: 3 },
 ];
 let nextId = 0;
 const request = (body, id = `safety-${++nextId}`) => new Request("http://localhost/api/generate", { method: "POST", headers: { Cookie: `room_session=${session}`, "Content-Type": "application/json", "Idempotency-Key": id }, body: JSON.stringify(body) });
@@ -112,14 +114,16 @@ test("success sends clean plus marked images, never a segmentation mask, and cha
       assert.equal(options.body.getAll("image[]").length, images);
       assert.equal(options.body.get("mask"), null);
       const providerPrompt = String(options.body.get("prompt"));
-      if (name !== "global_edit") assert.match(providerPrompt, /temporary crosshair marker/);
+      if (!["global_edit", "template_edit"].includes(name)) assert.match(providerPrompt, /temporary crosshair marker/);
       if (name === "material") assert.match(providerPrompt, /exclusively as a source of colour, material, texture/);
+      if (name === "template_edit") assert.match(providerPrompt, /Images 2–3 are supporting references/);
       return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 11, output_tokens: 22, total_tokens: 33 } });
     };
     const generatedResponse = await POST(request(body, id));
     assert.equal(generatedResponse.status, 200);
-    const cost = (await billing.quoteAiOperation(name)).tokenCost;
-    assert.equal(generatedResponse.headers.get("X-Room-AI-Operation"), name);
+    const operation = body.operation || name;
+    const cost = (await billing.quoteAiOperation(operation)).tokenCost;
+    assert.equal(generatedResponse.headers.get("X-Room-AI-Operation"), operation);
     assert.equal(generatedResponse.headers.get("X-Room-AI-Token-Cost"), String(cost));
     assert.equal(generatedResponse.headers.get("X-Room-AI-Charging"), "enabled");
     assert.equal(generatedResponse.headers.get("X-Room-AI-Input-Tokens"), "11");

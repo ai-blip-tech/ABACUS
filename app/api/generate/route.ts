@@ -11,7 +11,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
+  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -79,6 +79,17 @@ async function generateResponse(request: Request) {
     `Apply the user's instruction to the current image: ${body.globalEdit.instruction}`,
     "Change only what the instruction requires. Preserve all unrelated architecture, furniture, materials, lighting, people, perspective, and composition.",
     "Return a photorealistic full-frame result. No text, logos, or watermark unless the user's instruction explicitly requires existing text to remain.",
+  ].join("\n") : "";
+  const templateReferenceImages = (body.templateEdit?.referenceImages || []).slice(0, 10);
+  const templateEditPrompt = body.templateEdit?.instructions ? [
+    "Create one polished photorealistic Room Design result for the supplied Template scenario.",
+    "Image 1 is the primary source and must remain the authoritative camera, architecture, proportions and spatial context.",
+    templateReferenceImages.length ? `Images 2–${templateReferenceImages.length + 1} are supporting references. Use each only for the role described by the brief.` : "There are no supporting reference images.",
+    `Template: ${body.templateEdit.templateId || "room-design"}.`,
+    `Result: ${body.templateEdit.outputLabel || "final result"}.`,
+    body.templateEdit.instructions,
+    "Preserve unrelated architecture and content. Return exactly one coherent full-frame result.",
+    "No people unless supplied with consent, no added text, no logos, no watermark.",
   ].join("\n") : "";
   const materialPrompt = body.material ? [
     "Use image 1 as the clean completed interior.",
@@ -174,7 +185,7 @@ async function generateResponse(request: Request) {
     return new Blob([await sample.arrayBuffer()], { type: sample.headers.get("content-type") || "image/jpeg" });
   };
 
-  const inferredOperation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.furnitureCasting || body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  const inferredOperation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.templateEdit || body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.furnitureCasting || body.placement ? "place" : body.adjustment ? "adjust" : "generate";
   const requestedOperation = body.operation?.trim();
   const supportedOperations = new Set(["plan_render", "upscale", "material", "global_edit", "remove", "replace", "place", "adjust", "generate"]);
   if (requestedOperation && (!supportedOperations.has(requestedOperation) || requestedOperation !== inferredOperation)) {
@@ -187,7 +198,12 @@ async function generateResponse(request: Request) {
   if (["global_edit", "material", "remove", "replace", "place"].includes(operation)) {
     try {
       await validatedEditImage(body.roomImage, "текущее изображение");
-      if (operation === "global_edit" && !body.globalEdit?.instruction?.trim()) throw new Error("Опишите изменение изображения.");
+      if (operation === "global_edit" && !body.globalEdit?.instruction?.trim() && !body.templateEdit?.instructions?.trim()) throw new Error("Опишите изменение изображения.");
+      if (body.templateEdit) {
+        if (!/^[a-z0-9-]{1,80}$/.test(body.templateEdit.templateId || "")) throw new Error("Некорректный идентификатор Template.");
+        if (templateReferenceImages.length > 10) throw new Error("Можно использовать не более десяти референсов.");
+        for (const [index, source] of templateReferenceImages.entries()) await validatedEditImage(source, `референс ${index + 1}`);
+      }
       if (body.furnitureCasting) {
         if (operation !== "place" || furnitureCastingItems.length < 1 || furnitureCastingItems.length > 5) throw new Error("Добавьте от одного до пяти предметов мебели.");
         await validatedEditImage(body.furnitureCasting.markedImage, "изображение со всеми точками");
@@ -215,6 +231,7 @@ async function generateResponse(request: Request) {
   }
   const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
   const diagnosticBranch = body.roomImage && body.furnitureCasting?.markedImage && furnitureCastingItems.length ? "furniture_casting"
+    : body.roomImage && body.templateEdit?.instructions ? "template_edit"
     : body.roomImage && body.referenceImage && body.material && body.pointEdit?.markedImage ? "material"
     : body.roomImage && body.globalEdit?.instruction ? "global_edit"
     : body.roomImage && body.referenceImage && body.replacement && body.pointEdit?.markedImage ? "replace"
@@ -223,6 +240,7 @@ async function generateResponse(request: Request) {
     : "other";
   const diagnosticMaskPresent = Boolean(body.adjustment?.mask);
   const diagnosticProviderInputImages = diagnosticBranch === "furniture_casting" ? 2 + furnitureCastingItems.length
+    : diagnosticBranch === "template_edit" ? 1 + templateReferenceImages.length
     : diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 3
     : diagnosticBranch === "remove" || diagnosticBranch === "add" || Boolean(body.roomImage) && Boolean(body.pointEdit?.markedImage) ? 2
     : diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
@@ -298,6 +316,17 @@ async function generateResponse(request: Request) {
       form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
       const materialBlob = await imageSourceToBlob(body.referenceImage, providerTimeout);
       form.append("image[]", materialBlob, `material-reference.${materialBlob.type.split("/")[1] || "jpg"}`);
+      form.append("size", outputSize);
+      form.append("quality", "medium");
+      form.append("output_format", "webp");
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.templateEdit?.instructions) {
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", templateEditPrompt);
+      form.append("image[]", dataUrlToBlob(body.roomImage), "primary-source.png");
+      const referenceBlobs = await Promise.all(templateReferenceImages.map((source) => imageSourceToBlob(source, providerTimeout)));
+      referenceBlobs.forEach((referenceBlob, index) => form.append("image[]", referenceBlob, `template-reference-${index + 1}.${referenceBlob.type.split("/")[1] || "jpg"}`));
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
