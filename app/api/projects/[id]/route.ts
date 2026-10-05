@@ -47,6 +47,7 @@ type SavedState = {
   preserved?: string[];
   creativity?: string;
   planItems?: SavedPlanItem[];
+  proposalItems?: SavedPlanItem[];
   planRoom?: { width: number; length: number };
   planFloorReference?: SavedSurfaceReference | null;
   planWallReference?: SavedSurfaceReference | null;
@@ -69,6 +70,10 @@ function hydrateState(projectId: string, state: SavedState) {
     proposalVisualization: state.proposalVisualizationAsset ? assetUrl(projectId, state.proposalVisualizationAsset) : "",
     historyVersions: (state.historyVersions || []).map((version) => ({ ...version, image: assetUrl(projectId, version.asset) })),
     planItems: (state.planItems || []).map(({ referenceAsset, ...item }) => ({
+      ...item,
+      referenceImage: referenceAsset ? assetUrl(projectId, referenceAsset) : item.referenceImage,
+    })),
+    proposalItems: (state.proposalItems || []).map(({ referenceAsset, ...item }) => ({
       ...item,
       referenceImage: referenceAsset ? assetUrl(projectId, referenceAsset) : item.referenceImage,
     })),
@@ -134,11 +139,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const persistedOverrides = new Map<string, unknown>();
   if (existingProject?.state_json) {
     try {
-      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalDocument?: Record<string, string>; planItems?: Array<{ id?: string; proposalOverride?: unknown }> };
+      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalDocument?: Record<string, string>; planItems?: Array<{ id?: string; proposalOverride?: unknown }>; proposalItems?: Array<{ id?: string; proposalOverride?: unknown }> };
       persistedShowPrices = persisted.proposalShowPrices !== false;
       persistedProposalVisualizationAsset = persisted.proposalVisualizationAsset;
       persistedProposalDocument = persisted.proposalDocument;
       for (const item of persisted.planItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
+      for (const item of persisted.proposalItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
     } catch { /* a normal project save will replace an unreadable legacy state */ }
   }
   const images = new Map<string, string>();
@@ -153,10 +159,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     collectImage(asset, item.image);
     return [{ id: typeof item.id === "string" ? item.id.slice(0, 120) : crypto.randomUUID(), name: typeof item.name === "string" ? item.name.slice(0, 160) : "Визуализация", generated: Boolean(item.generated), asset }];
   });
-  const planItems: SavedPlanItem[] = (Array.isArray(draft.planItems) ? draft.planItems.slice(0, 100) : []).flatMap((entry, index) => {
+  const sanitizeItems = (value: unknown, assetPrefix: string): SavedPlanItem[] => (Array.isArray(value) ? value.slice(0, 100) : []).flatMap((entry, index) => {
     if (!entry || typeof entry !== "object") return [];
     const item = entry as Record<string, unknown>;
-    const referenceAsset = `plan-item-${index}`;
+    const referenceAsset = `${assetPrefix}-${index}`;
     collectImage(referenceAsset, item.referenceImage);
     const referenceImage = storedImageUrl(item.referenceImage);
     const parameters: SavedPlanParameter[] = (Array.isArray(item.referenceParameters) ? item.referenceParameters.slice(0, 40) : []).flatMap((parameter) => {
@@ -213,6 +219,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       })(),
     }];
   });
+  const planItems = sanitizeItems(draft.planItems, "plan-item");
+  const proposalItems = sanitizeItems(draft.proposalItems, "proposal-item");
   const planRoomInput = draft.planRoom && typeof draft.planRoom === "object" ? draft.planRoom as Record<string, unknown> : {};
   const planRoom = { width: finiteNumber(planRoomInput.width, 6000, 500, 30000), length: finiteNumber(planRoomInput.length, 4500, 500, 30000) };
   const planFloorReference = planSurfaceReference(draft.planFloorReference, "plan-floor", collectImage);
@@ -247,6 +255,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     preserved: Array.isArray(draft.preserved) ? draft.preserved.filter((item): item is string => typeof item === "string").slice(0, 12) : [],
     creativity: typeof draft.creativity === "string" ? draft.creativity.slice(0, 80) : "Средняя",
     planItems,
+    proposalItems,
     planRoom,
     planFloorReference,
     planWallReference,

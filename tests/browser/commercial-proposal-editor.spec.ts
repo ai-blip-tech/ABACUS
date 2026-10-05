@@ -23,10 +23,15 @@ test("commercial proposal editor supports catalog and reference products before 
     state: { generatedImage: image, proposalVisualization: selectedImage, proposalShowPrices: true, planItems: [
       { id: "catalog-sofa-a", kind: "sofa", name: "Диван", width: 2200, depth: 900, referenceImage: image, referenceProductId: "sofa-1" },
       { id: "reference-chair-a", kind: "chair", name: "Кресло", width: 2200, depth: 950, referenceHeightMm: 900, referenceImage: selectedImage, referenceName: "Диван Миллер с реклайнером" },
+    ], proposalItems: [
+      { id: "editor-table-a", kind: "table", name: "Стол", width: 900, depth: 600, referenceImage: image, referenceProductId: "table-1" },
     ] },
   }) }));
   await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ user: { firstName: "Кирилл", lastName: "Волосников", email: "kirill@example.com" } }) }));
-  await page.route("**/api/catalog?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [{ id: "sofa-1", name: "NORR Sofa", image, images: [image], price: 100000, widthMm: 2200, depthMm: 900, heightMm: 760 }] }) }));
+  await page.route("**/api/catalog?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [
+    { id: "sofa-1", name: "NORR Sofa", image, images: [image], price: 100000, widthMm: 2200, depthMm: 900, heightMm: 760 },
+    { id: "table-1", name: "NORR Table", image, images: [image], price: 70000, widthMm: 900, depthMm: 600, heightMm: 400 },
+  ] }) }));
   await page.route("**/api/projects/project-preview-12345/proposal", async (route) => { saves.push(route.request().postDataJSON()); await route.fulfill({ contentType: "application/json", body: "{\"ok\":true}" }); });
   await page.route("**/api/proposal", async (route) => { pdfPayloads.push(route.request().postDataJSON() as Record<string, unknown>); await route.fulfill({ contentType: "application/pdf", body: Buffer.alloc(1600) }); });
 
@@ -36,11 +41,22 @@ test("commercial proposal editor supports catalog and reference products before 
   await expect(page.getByLabel("Проект")).toHaveValue("Гостиная Preview");
   await expect(page.locator(".proposal-selection-page img")).toHaveAttribute("src", selectedImage);
   await expect(page.locator(".proposal-about-page img")).toHaveAttribute("src", selectedImage);
+  const [selectionTitle, selectionSubtitle, aboutHero, aboutHeading, benefits] = await Promise.all([
+    page.locator(".proposal-selection-page h2").boundingBox(),
+    page.locator(".proposal-selection-page > p").boundingBox(),
+    page.locator(".proposal-about-hero").boundingBox(),
+    page.locator(".proposal-about-page h3").boundingBox(),
+    page.locator(".proposal-benefits").boundingBox(),
+  ]);
+  expect(selectionTitle && selectionSubtitle && selectionTitle.y + selectionTitle.height <= selectionSubtitle.y).toBe(true);
+  expect(aboutHero && aboutHeading && aboutHero.y + aboutHero.height <= aboutHeading.y).toBe(true);
+  expect(aboutHeading && benefits && aboutHeading.y + aboutHeading.height <= benefits.y).toBe(true);
   await expect(page.locator(".proposal-product-page").nth(0).locator("img")).toHaveAttribute("src", image);
   await expect(page.locator(".proposal-product-page").nth(1).locator("img")).toHaveAttribute("src", selectedImage);
-  await expect(page.getByLabel("Наименование")).toHaveCount(2);
+  await expect(page.getByLabel("Наименование")).toHaveCount(3);
   await expect(page.getByLabel("Наименование").nth(0)).toHaveValue("NORR Sofa");
   await expect(page.getByLabel("Наименование").nth(1)).toHaveValue("Диван Миллер с реклайнером");
+  await expect(page.getByLabel("Наименование").nth(2)).toHaveValue("NORR Table");
   await expect(page.locator(".proposal-manager-page")).toContainText("Кирилл Волосников");
   await expect(page.locator(".proposal-manager-person")).not.toContainText("ВАШ ЧЕЛОВЕК В NORR");
   await expect(page.getByLabel("Должность")).toHaveValue("Персональный менеджер");
@@ -59,8 +75,8 @@ test("commercial proposal editor supports catalog and reference products before 
   await expect.poll(() => pdfPayloads.length).toBe(2);
   expect(pdfPayloads[1].withPrices).toBe(true);
   expect(pdfPayloads[1].coverImage).toBe(selectedImage);
-  expect((pdfPayloads[1].products as unknown[]).length).toBe(2);
-  expect((pdfPayloads[1].products as Array<{ referenceImage: string }>).map((product) => product.referenceImage)).toEqual([image, selectedImage]);
+  expect((pdfPayloads[1].products as unknown[]).length).toBe(3);
+  expect((pdfPayloads[1].products as Array<{ referenceImage: string }>).map((product) => product.referenceImage)).toEqual([image, selectedImage, image]);
   expect(saves.some((entry) => JSON.stringify(entry).includes("250000"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Ткань букле, электрический реклайнер"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Анна Петрова"))).toBe(true);
@@ -92,6 +108,42 @@ test("commercial proposal saves a newly created project before opening the edito
   const popup = await popupPromise;
   await popup.waitForURL(/\/proposal\//);
   await expect(popup.locator(".proposal-editor-shell")).toBeVisible();
+});
+
+test("saved Image Editor catalog products survive reload and appear in the proposal", async ({ page, context, browserName }, testInfo) => {
+  test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium-1440");
+  const email = `proposal-editor-products-${Date.now()}@example.com`;
+  const register = await context.request.post("/api/auth/register", { data: { email, password: "ProposalProducts123!", firstName: "Catalog" } });
+  expect(register.ok()).toBe(true);
+  const create = await context.request.post("/api/projects", { data: { name: "Товары из редактора", projectType: "Квартира" } });
+  const created = await create.json() as { project: { id: string } };
+  const save = await context.request.put(`/api/projects/${created.project.id}`, { data: {
+    name: "Товары из редактора", projectType: "Квартира", state: {
+      interiorImage: image, generatedImage: selectedImage, generated: true, planItems: [],
+      proposalItems: [
+        { id: "editor-sofa", kind: "sofa", name: "Catalog Sofa", x: 44, y: 52, width: 2200, depth: 900, rotation: 0, referenceImage: image, referenceProductId: "editor-sofa-product" },
+        { id: "editor-table", kind: "table", name: "Catalog Table", x: 61, y: 67, width: 900, depth: 600, rotation: 0, referenceImage: image, referenceProductId: "editor-table-product" },
+        { id: "editor-lamp", kind: "lamp", name: "Catalog Lamp", x: 74, y: 41, width: 500, depth: 500, rotation: 0, referenceImage: image, referenceProductId: "editor-lamp-product" },
+      ],
+    },
+  } });
+  expect(save.ok()).toBe(true);
+  const reopened = await context.request.get(`/api/projects/${created.project.id}`);
+  expect(reopened.ok()).toBe(true);
+  const reopenedPayload = await reopened.json() as { state: { proposalItems?: unknown[] } };
+  expect(reopenedPayload.state.proposalItems).toHaveLength(3);
+
+  await page.route("**/api/catalog?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [
+    { id: "editor-sofa-product", name: "Catalog Sofa", image, images: [image], price: 180000, widthMm: 2200, depthMm: 900 },
+    { id: "editor-table-product", name: "Catalog Table", image, images: [image], price: 80000, widthMm: 900, depthMm: 600 },
+    { id: "editor-lamp-product", name: "Catalog Lamp", image, images: [image], price: 42000, widthMm: 500, depthMm: 500 },
+  ] }) }));
+  await page.goto(`/proposal/${created.project.id}`);
+  await expect(page.locator(".proposal-product-page")).toHaveCount(3);
+  await expect(page.getByLabel("Количество предметов")).toHaveValue("3 предмета");
+  await expect(page.locator(".proposal-summary-table")).toContainText("Catalog Sofa");
+  await expect(page.locator(".proposal-summary-table")).toContainText("Catalog Table");
+  await expect(page.locator(".proposal-summary-table")).toContainText("Catalog Lamp");
 });
 
 test("commercial proposal snapshots the history version selected in Studio", async ({ page, context, browserName }, testInfo) => {

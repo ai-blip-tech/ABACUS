@@ -11,7 +11,7 @@ type User = { firstName?: string; lastName?: string; email?: string; phone?: str
 type ProjectPayload = {
   project?: { name?: string; project_type?: string };
   state?: {
-    planItems?: ProposalPlanItem[]; proposalShowPrices?: boolean; proposalVisualization?: string;
+    planItems?: ProposalPlanItem[]; proposalItems?: ProposalPlanItem[]; proposalShowPrices?: boolean; proposalVisualization?: string;
     generatedImage?: string; interiorImage?: string; proposalDocument?: Partial<ProposalDocument>;
   };
 };
@@ -75,7 +75,10 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         const payload = await response.json() as ProjectPayload & { error?: string };
         const auth = await authResponse.json().catch(() => ({ user: {} })) as { user?: User };
         if (!response.ok) throw new Error(payload.error || "Не удалось открыть проект.");
-        const items = payload.state?.planItems || [];
+        const items = [...new Map([
+          ...(payload.state?.planItems || []),
+          ...(payload.state?.proposalItems || []),
+        ].map((item) => [item.id, item])).values()];
         const ids = [...new Set(items.map((item) => item.referenceProductId).filter((id): id is string => Boolean(id)))];
         let catalog = new Map<string, ProposalCatalogProduct>();
         if (ids.length) {

@@ -66,17 +66,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (objectId) requested.set(objectId, candidate.proposalOverride);
   }
   const state = JSON.parse(project.state_json) as Record<string, unknown>;
-  const planItems = Array.isArray(state.planItems) ? state.planItems : [];
-  state.planItems = planItems.map((entry) => {
-    if (!entry || typeof entry !== "object") return entry;
-    const item = entry as Record<string, unknown>;
-    const objectId = typeof item.id === "string" ? item.id : "";
-    if (!requested.has(objectId)) return item;
-    const proposalOverride = cleanOverride(requested.get(objectId));
-    const rest = { ...item };
-    delete rest.proposalOverride;
-    return proposalOverride ? { ...rest, proposalOverride } : rest;
-  });
+  const applyOverrides = (value: unknown) => (Array.isArray(value) ? value : []).map((entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const item = entry as Record<string, unknown>;
+      const objectId = typeof item.id === "string" ? item.id : "";
+      if (!requested.has(objectId)) return item;
+      const proposalOverride = cleanOverride(requested.get(objectId));
+      const rest = { ...item };
+      delete rest.proposalOverride;
+      return proposalOverride ? { ...rest, proposalOverride } : rest;
+    });
+  state.planItems = applyOverrides(state.planItems);
+  state.proposalItems = applyOverrides(state.proposalItems);
   if (typeof body.showPrices === "boolean") state.proposalShowPrices = body.showPrices;
   const document = cleanDocument(body.document);
   if (document) state.proposalDocument = document;
