@@ -69,6 +69,13 @@ test("landing, auth, projects, account dropdown, account and Studio", async ({ p
   await page.getByRole("button", { name: /Создать проект/ }).click();
 
   await expect(page.locator("main.studio-shell")).toBeVisible();
+  const createdProjectId = new URL(page.url()).searchParams.get("project");
+  expect(createdProjectId).toBeTruthy();
+  const overview = await page.evaluate(async () => fetch("/api/account/overview").then((response) => response.json()));
+  expect(overview.projects).toEqual(expect.arrayContaining([expect.objectContaining({ id: createdProjectId, name: `Smoke ${testInfo.project.name}` })]));
+  await page.reload();
+  await expect(page.locator("main.studio-shell")).toBeVisible();
+  await expect(page.getByText(`Smoke ${testInfo.project.name}`, { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Редактор изображений" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Создание интерьера" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Меню пользователя/ })).toBeVisible();
@@ -80,6 +87,17 @@ test("landing, auth, projects, account dropdown, account and Studio", async ({ p
     const planItem = page.getByRole("button", { name: /Диван: перемещать/ }).first();
     await expect(planItem).toBeVisible();
     await expect(planItem).toHaveAttribute("draggable", "false");
+    await planItem.click({ button: "right" });
+    const contextMenu = page.locator(".plan-context-menu");
+    await expect(contextMenu).toBeVisible();
+    const contextMenuMetrics = await contextMenu.evaluate((element) => ({
+      width: element.getBoundingClientRect().width,
+      fontSize: Number.parseFloat(getComputedStyle(element.querySelector("button")!).fontSize),
+    }));
+    expect(contextMenuMetrics.width).toBeGreaterThanOrEqual(170);
+    expect(contextMenuMetrics.fontSize).toBeGreaterThanOrEqual(12);
+    await planItem.click({ button: "right" });
+    await expect(contextMenu).toBeHidden();
     const before = await planItem.evaluate((element) => (element as HTMLElement).style.left);
     const itemBox = await planItem.boundingBox();
     const boardBox = await page.locator(".planogram-editor-board").boundingBox();

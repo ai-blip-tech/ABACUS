@@ -82,11 +82,15 @@ test("planogram keeps menus readable, rugs below furniture, and supports bedside
   const stylesSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
   assert.match(pageSource, /type:\s*"nightstand"\s*,\s*name:\s*"Прикроватная тумба"/);
+  assert.match(pageSource, /type:\s*"cabinet"\s*,\s*name:\s*"Шкаф"/);
   assert.match(pageSource, /kind:\s*"nightstand"\s*,\s*name:\s*"Прикроватная тумба"/);
   assert.match(catalogSource, /type\s*===\s*"nightstand"/);
+  assert.match(catalogSource, /type\s*===\s*"cabinet"/);
   assert.match(controlsSource, /keepMenuHorizontal/);
   assert.match(controlsSource, /--no-rotation/);
   assert.match(stylesSource, /\.planogram-furniture\.rug[^}]*z-index:\s*1!important/);
   assert.match(stylesSource, /\.planogram-furniture:not\(\.rug\)[^{]*\{z-index:\s*2\}/);
   assert.match(stylesSource, /\.planogram-editor-board \.planogram-furniture>span\{display:none!important\}/);
+  assert.match(stylesSource, /\.planogram-workspace \.plan-context-menu\{[^}]*width:190px!important/);
+  assert.match(stylesSource, /\.planogram-workspace \.plan-context-menu button\{[^}]*font-size:12px!important/);
 });

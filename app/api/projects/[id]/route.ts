@@ -119,7 +119,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   if (!validProjectId(id)) return Response.json({ error: "Некорректный проект." }, { status: 400 });
   const project = await database.prepare("SELECT id, name, project_type, description, created_at, updated_at, state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first<{ id: string; name: string; project_type: string; description: string | null; created_at: string; updated_at: string; state_json: string | null }>();
-  if (!project || !project.state_json) return Response.json({ error: "Сохранённый проект не найден." }, { status: 404 });
+  if (!project) return Response.json({ error: "Проект не найден." }, { status: 404 });
+  if (!project.state_json) return Response.json({ project: { ...project, state_json: undefined }, state: null });
   try {
     return Response.json({ project: { ...project, state_json: undefined }, state: hydrateState(id, JSON.parse(project.state_json) as SavedState) });
   } catch {

@@ -7,10 +7,11 @@ const styles = readFileSync(new URL("../app/create-project.css", import.meta.url
 const tokens = readFileSync(new URL("../app/concept-d.css", import.meta.url), "utf8");
 
 test("Concept D create-project page preserves the existing project handoff", () => {
-  assert.match(page, /const nextProjectId = crypto\.randomUUID\(\)/);
-  assert.match(page, /setProjectId\(nextProjectId\)/);
+  assert.match(page, /fetch\("\/api\/projects", \{ method:"POST"/);
+  assert.match(page, /body:JSON\.stringify\(\{name,projectType,description:projectDescription\}\)/);
+  assert.match(page, /setProjectId\(String\(payload\.project\.id\)\)/);
   assert.match(page, /setProjectSaved\(false\)/);
-  assert.match(page, /navigate\("studio", nextProjectId\)/);
+  assert.match(page, /navigate\("studio", String\(payload\.project\.id\)\)/);
   assert.match(page, /<option>Квартира<\/option><option>Дом<\/option><option>Офис<\/option><option>Гостеприимство<\/option><option>Другое<\/option>/);
 });
 
