@@ -37,10 +37,13 @@ export type ItCatalogProduct = {
   heightMm: number | null;
 };
 
+export type ItUiTarget = "replace" | "planogram" | "planogram-sofa" | "planogram-armchair";
+
 export type ItUiAction =
   | { type: "navigate"; target: "image-editor" | "planogram" }
-  | { type: "focus"; target: "replace" }
-  | { type: "highlight"; target: "replace" };
+  | { type: "focus"; target: ItUiTarget }
+  | { type: "highlight"; target: ItUiTarget }
+  | { type: "guide"; target: ItUiTarget };
 
 export type ItTurn = {
   text: string;
@@ -52,11 +55,13 @@ export type ItTurn = {
 export type ItConversationMessage = {
   role: "user" | "assistant";
   text: string;
+  image?: string;
   products?: ItCatalogProduct[];
 };
 
 export type ItRequest = {
   message: string;
+  image?: string;
   context: RoomDesignContext;
   history?: ItConversationMessage[];
 };

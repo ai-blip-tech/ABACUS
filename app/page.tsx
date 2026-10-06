@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import type React from "react";
 import AccountDropdown from "./account-dropdown";
 import ItOrb from "./it-orb";
-import type { ItUiAction, RoomDesignContext } from "@/lib/it/types";
+import type { ItUiAction, ItUiTarget, RoomDesignContext } from "@/lib/it/types";
 import "./account-dropdown.css";
 import { normalizePlanReferenceImages } from "@/lib/plan-render";
 import { clonePlanogramItem, isEditablePlanogramShortcutTarget } from "@/lib/planogram-clipboard";
@@ -525,21 +525,38 @@ export default function Home() {
       if (action.target === "image-editor") setFurnitureMode("choice");
       return;
     }
+    const findTarget = (target: ItUiTarget) => {
+      if (target === "planogram") return document.querySelector<HTMLButtonElement>(".planogram-tool");
+      if (target === "planogram-sofa" || target === "planogram-armchair") {
+        const label = target === "planogram-sofa" ? "Диван" : "Кресло";
+        return Array.from(document.querySelectorAll<HTMLButtonElement>(".inspector button"))
+          .find((button) => button.textContent?.trim() === label) || null;
+      }
+      return Array.from(document.querySelectorAll<HTMLButtonElement>(".furniture-switch button,.furniture-action-bar button"))
+        .find((button) => button.textContent?.trim() === "Заменить") || null;
+    };
+    const revealTarget = (targetName: ItUiTarget) => window.setTimeout(() => {
+      const target = findTarget(targetName);
+      if (!target) return;
+      if (action.type === "focus") target.focus({ preventScroll: true });
+      if (action.type === "highlight" || action.type === "guide") {
+        target.classList.add("it-guided-target");
+        window.setTimeout(() => target.classList.remove("it-guided-target"), 4200);
+      }
+      if (action.type === "guide") {
+        const rect = target.getBoundingClientRect();
+        window.dispatchEvent(new CustomEvent("it:guide", { detail: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } }));
+      }
+    }, 100);
+
     if (action.target === "replace") {
       setActiveTool("Добавить мебель");
       setFurnitureAction("replace");
       setFurnitureMode("choice");
-      window.setTimeout(() => {
-        const target = Array.from(document.querySelectorAll<HTMLButtonElement>(".furniture-switch button,.furniture-action-bar button"))
-          .find((button) => button.textContent?.trim() === "Заменить");
-        if (!target) return;
-        if (action.type === "focus") target.focus({ preventScroll: true });
-        if (action.type === "highlight") {
-          target.classList.add("it-guided-target");
-          window.setTimeout(() => target.classList.remove("it-guided-target"), 4200);
-        }
-      }, 80);
+      revealTarget(action.target);
+      return;
     }
+    revealTarget(action.target);
   };
   if (view === "home") return <main className="home-page reference-home">
     <header className="reference-nav"><div className="reference-nav-inner"><button className="reference-wordmark" onClick={() => navigate("home")} aria-label="ROOM design">ROOM <span>design</span></button><nav><a href="#возможности">Возможности</a><a href="#процесс">Процесс</a>{user?<AccountDropdown user={user}/>:<button onClick={() => openAuth("login")}>Войти</button>}</nav></div></header>
