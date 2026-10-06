@@ -234,7 +234,7 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
   return (
     <aside className={`it-layer ${open ? "is-open" : "is-closed"}${guideOffset ? " is-guiding" : ""}`} style={guideOffset ? { "--it-guide-x": `${guideOffset.x}px`, "--it-guide-y": `${guideOffset.y}px` } as CSSProperties : undefined} data-state={state} aria-label="Оно — интеллект Room Design">
       {open && (
-        <section className="it-surface" aria-label="Разговор с Оно">
+        <section className={`it-surface${messages.length === 0 ? " is-empty" : ""}`} aria-label="Разговор с Оно">
           <header className="it-surface-head">
             <div>
               <span>ОНО · ROOM DESIGN</span>
@@ -243,16 +243,7 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
             <button type="button" onClick={toggle} aria-label="Закрыть Оно">×</button>
           </header>
 
-          <div className="it-transcript" ref={transcriptRef} aria-live="polite">
-            {messages.length === 0 && (
-              <div className="it-intro">
-                <span>{context.section === "planogram" ? "СОЗДАНИЕ ИНТЕРЬЕРА" : "РЕДАКТОР ИЗОБРАЖЕНИЙ"}</span>
-                <h2>Я вижу, где вы.</h2>
-                <p>{context.render.hasSource
-                  ? "Могу показать следующий шаг, найти предмет в каталоге или помочь с интерьерным решением."
-                  : "Начните с вопроса. Если для действия понадобится интерьер, я подскажу, когда его загрузить."}</p>
-              </div>
-            )}
+          {messages.length > 0 && <div className="it-transcript" ref={transcriptRef} aria-live="polite">
             {messages.map((message) => (
               <article key={message.id} className={`it-message it-message-${message.role}`}>
                 <span>{message.role === "it" ? "ОНО" : "ВЫ"}</span>
@@ -275,7 +266,7 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
             {(state === "thinking" || state === "searching") && (
               <div className="it-process"><span/><span/><span/><p>{stateLabel[state]}</p></div>
             )}
-          </div>
+          </div>}
 
           {messages.length === 0 && (
             <div className="it-suggestions">
