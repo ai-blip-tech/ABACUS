@@ -1,4 +1,11 @@
-import type { ItCatalogProduct, ItRequest, ItTurn, RoomDesignContext } from "./types";
+import type {
+  ItCatalogProduct,
+  ItConversationMessage,
+  ItRequest,
+  ItTurn,
+  ItUiAction,
+  RoomDesignContext,
+} from "./types";
 
 export type CatalogSearchInput = {
   query?: string;
@@ -11,9 +18,18 @@ export type CatalogSearchInput = {
   limit?: number;
 };
 
+export type ConversationInput = {
+  message: string;
+  history: ItConversationMessage[];
+  context: RoomDesignContext;
+  products: ItCatalogProduct[];
+  actions: ItUiAction[];
+  toolFacts: string[];
+};
+
 export type ItAdapters = {
   searchCatalog(input: CatalogSearchInput): Promise<ItCatalogProduct[]>;
-  answerKnowledge?(input: { message: string; context: RoomDesignContext }): Promise<string | null>;
+  answerConversation(input: ConversationInput): Promise<string | null>;
 };
 
 const normalize = (value: string) => value.toLocaleLowerCase("ru-RU").replace(/ё/g, "е").trim();
@@ -27,96 +43,95 @@ const priceFromMessage = (message: string) => {
   return Number.isFinite(value) ? Math.round(value * multiplier) : undefined;
 };
 
-const categoryFromMessage = (message: string) => {
-  const value = normalize(message);
-  if (/кресл/.test(value)) return "armchair";
-  if (/диван/.test(value)) return "sofa";
-  if (/стул/.test(value)) return "chair";
-  if (/стол/.test(value)) return "table";
-  if (/кроват/.test(value)) return "bed";
-  if (/ков[её]р/.test(value)) return "rug";
-  if (/ламп|торшер|светильник|люстр/.test(value)) return "light";
+const categoryFromText = (value: string) => {
+  const text = normalize(value);
+  if (/кресл/.test(text)) return "armchair";
+  if (/диван/.test(text)) return "sofa";
+  if (/стул/.test(text)) return "chair";
+  if (/стол/.test(text)) return "table";
+  if (/кроват/.test(text)) return "bed";
+  if (/ков[её]р/.test(text)) return "rug";
+  if (/ламп|торшер|светильник|люстр/.test(text)) return "light";
   return undefined;
 };
 
-const russianCount = (count: number, one: string, few: string, many: string) => {
-  const lastTwo = count % 100;
-  if (lastTwo >= 11 && lastTwo <= 14) return many;
-  const last = count % 10;
-  if (last === 1) return one;
-  if (last >= 2 && last <= 4) return few;
-  return many;
+const recentProducts = (history: ItConversationMessage[]) => [...history]
+  .reverse()
+  .find((item) => item.products?.length)?.products || [];
+
+const recentConversationText = (history: ItConversationMessage[], limit = 6) => history
+  .slice(-limit)
+  .map((item) => item.text)
+  .join(" ");
+
+const categoryFromProducts = (products: ItCatalogProduct[]) => categoryFromText(
+  products.map((product) => `${product.category} ${product.name}`).join(" "),
+);
+
+const shouldSearchCatalog = (message: string, hasPreviousProducts: boolean, hasPriorSubject: boolean) => {
+  const text = normalize(message);
+  return /найди|подбери|покажи варианты|ищу|нужно? найти/.test(text)
+    || (hasPreviousProducts && /подешевле|дешевле|бюджетнее|другие варианты/.test(text))
+    || (hasPriorSubject && /хочу другой|другой вариант|покажи другой/.test(text));
 };
 
+const shouldGuideReplace = (message: string, history: ItConversationMessage[], context: RoomDesignContext) => {
+  const text = normalize(message);
+  if (/как\s+(?:мне\s+)?замен|покажи.{0,30}замен|где.{0,30}замен/.test(text)) return true;
+  if (!/^(покажи|да|давай|что дальше)[.!?\s]*$/.test(text)) return false;
+  return context.furnitureAction === "replace" || /замен/.test(normalize(recentConversationText(history)));
+};
+
+const unavailableText = "Сейчас не могу сформировать ответ: модель временно недоступна. Попробуйте ещё раз.";
+
 export async function runItTurn(request: ItRequest, adapters: ItAdapters): Promise<ItTurn> {
-  const message = normalize(request.message);
+  const history = (request.history || []).slice(-12);
+  const message = request.message.trim();
+  const normalizedMessage = normalize(message);
+  const previousProducts = recentProducts(history);
+  const actions: ItUiAction[] = [];
+  const toolFacts: string[] = [];
+  let products: ItCatalogProduct[] = [];
 
-  if (/погод|курс валют|биткоин|рецепт|футбол/.test(message)) {
-    return { text: "Я специализируюсь на Room Design, интерьерах и архитектуре.", state: "speaking" };
-  }
-
-  const asksForReplaceHelp = /как\s+(?:мне\s+)?замен|покажи.{0,30}замен|где.{0,30}замен/.test(message)
-    || (message.includes("что дальше") && request.context.furnitureAction === "replace");
-  if (asksForReplaceHelp) {
+  if (shouldGuideReplace(message, history, request.context)) {
     const hasSource = request.context.render.hasSource;
-    return {
-      text: hasSource
-        ? "Покажу. Нажмите «Заменить», затем поставьте точку в центре дивана и выберите новый предмет из каталога или загрузите референс."
-        : "Сначала загрузите интерьер. Затем откройте «Заменить», поставьте точку в центре дивана и выберите новый предмет.",
-      state: "moving",
-      actions: hasSource ? [
-        { type: "navigate", target: "image-editor" },
-        { type: "focus", target: "replace" },
-        { type: "highlight", target: "replace" },
-      ] : [{ type: "navigate", target: "image-editor" }],
-    };
-  }
-
-  const category = categoryFromMessage(message);
-  if (category && /найди|подбери|покажи|ищу|нуж/.test(message)) {
-    const maxPrice = priceFromMessage(message);
-    const products = await adapters.searchCatalog({ category, maxPrice, limit: 5 });
-    if (!products.length) {
-      return { text: "В каталоге не нашлось точных совпадений. Попробуйте расширить бюджет или уточнить материал и цвет.", state: "speaking" };
-    }
-    const budget = maxPrice ? ` до ${new Intl.NumberFormat("ru-RU").format(maxPrice)} ₽` : "";
-    const resultWord = category === "armchair"
-      ? russianCount(products.length, "кресло", "кресла", "кресел")
-      : russianCount(products.length, "вариант", "варианта", "вариантов");
-    return {
-      text: `Нашло ${products.length} ${resultWord}${budget}. Сначала показываю позиции в наличии с самой спокойной палитрой.`,
-      state: "success",
-      products,
-    };
-  }
-
-  if (adapters.answerKnowledge) {
-    try {
-      const answer = await adapters.answerKnowledge({ message: request.message.trim(), context: request.context });
-      if (answer) return { text: answer, state: "speaking" };
-    } catch {
-      // Keep the core available when the language-model provider is unavailable.
+    actions.push({ type: "navigate", target: "image-editor" });
+    if (hasSource) {
+      actions.push({ type: "focus", target: "replace" }, { type: "highlight", target: "replace" });
+      toolFacts.push("Подготовлена навигация к Image Editor и подсветка кнопки «Заменить». После этого пользователь должен поставить точку на предмете.");
+    } else {
+      toolFacts.push("Интерьер ещё не загружен, поэтому Replace нельзя показать до загрузки изображения.");
     }
   }
 
-  if (/материал|обивк|ткан/.test(message) && /диван|кресл|мебел/.test(message)) {
-    return {
-      text: "Для спокойного современного интерьера лучше взять плотную фактурную рогожку или мягкий шенилл в тёплом серо-бежевом тоне. Рогожка выглядит архитектурнее и практичнее, шенилл — мягче и глубже по цвету. Если диван используется каждый день, берите ткань от 40 000 циклов Мартиндейла.",
-      state: "speaking",
-    };
+  const explicitCategory = categoryFromText(message);
+  const inheritedCategory = categoryFromProducts(previousProducts) || categoryFromText(recentConversationText(history));
+  const category = explicitCategory || inheritedCategory;
+  if (category && shouldSearchCatalog(message, previousProducts.length > 0, Boolean(inheritedCategory))) {
+    let maxPrice = priceFromMessage(message);
+    if (!maxPrice && previousProducts.length && /подешевле|дешевле|бюджетнее/.test(normalizedMessage)) {
+      const priced = previousProducts.map((product) => product.price).filter((price) => price > 0);
+      if (priced.length) maxPrice = Math.max(1, Math.min(...priced) - 1);
+    }
+    products = await adapters.searchCatalog({ category, maxPrice, limit: 5 });
+    toolFacts.push(products.length
+      ? `Catalog search returned ${products.length} real available products. Use only the attached structured product data for names, prices and properties.`
+      : "Catalog search returned no matching products. Do not invent alternatives or prices.");
   }
 
-  if (/цвет/.test(message) && /кресл|диван|мебел/.test(message)) {
-    return {
-      text: "Здесь подойдут тёплый табачный или глубокий оливковый. Первый поддержит дерево, второй даст спокойный контраст. Для точного выбора откройте нужный интерьер — я учту его контекст.",
-      state: "speaking",
-    };
-  }
+  const text = await adapters.answerConversation({
+    message,
+    history,
+    context: request.context,
+    products,
+    actions,
+    toolFacts,
+  }).catch(() => null);
 
   return {
-    text: request.context.section === "planogram"
-      ? `Сейчас открыта планограмма, в ней ${request.context.planogram.itemCount} элементов. Могу помочь с расстановкой, размерами или подбором мебели.`
-      : "Могу показать нужный инструмент, подобрать реальную мебель из каталога или помочь с цветом, материалом и композицией интерьера.",
-    state: "speaking",
+    text: text || unavailableText,
+    state: text ? products.length ? "success" : actions.length ? "moving" : "speaking" : "error",
+    ...(products.length ? { products } : {}),
+    ...(actions.length ? { actions } : {}),
   };
 }

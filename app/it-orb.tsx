@@ -74,7 +74,15 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
       const response = await fetch("/api/it", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, context }),
+        body: JSON.stringify({
+          message: text,
+          context,
+          history: messages.slice(-12).map((item) => ({
+            role: item.role === "it" ? "assistant" : "user",
+            text: item.text,
+            products: item.products,
+          })),
+        }),
       });
       const payload = await response.json() as ItTurn & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Не удалось получить ответ.");
