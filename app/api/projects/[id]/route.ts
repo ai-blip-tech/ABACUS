@@ -52,6 +52,7 @@ type SavedState = {
   planFloorReference?: SavedSurfaceReference | null;
   planWallReference?: SavedSurfaceReference | null;
   planCamera?: SavedPlanCamera | null;
+  planInstruction?: string;
   proposalShowPrices?: boolean;
   proposalVisualizationAsset?: string;
   proposalDocument?: Record<string, string>;
@@ -274,6 +275,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     planFloorReference,
     planWallReference,
     planCamera,
+    planInstruction: typeof draft.planInstruction === "string" ? draft.planInstruction.trim().slice(0, 2000) : "",
     proposalShowPrices: typeof draft.proposalShowPrices === "boolean" ? draft.proposalShowPrices : persistedShowPrices,
     proposalVisualizationAsset: persistedProposalVisualizationAsset,
     proposalDocument: persistedProposalDocument,

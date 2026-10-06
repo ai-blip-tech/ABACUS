@@ -11,7 +11,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[] } };
+  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -87,12 +87,14 @@ async function generateResponse(request: Request) {
     "Improve only resolution, edge clarity, compression artifacts, and fine material detail while keeping every element and its pixel position visually the same.",
     "No new content, no text, no logos, no watermark.",
   ].join("\n");
+  const planInstruction = body.planRender?.instruction?.trim().slice(0, 2000) || "";
   const planRenderPrompt = [
     "Use the first image as a top-down floor plan that is the authoritative spatial brief for an interior render.",
     "Create one photorealistic eye-level interior visualisation that faithfully follows this plan: item placement, scale, circulation, and relative orientation must match.",
     body.prompt?.trim() || "Use a calm premium residential interior with light walls, natural wood flooring, and daylight.",
+    planInstruction ? `The user's explicit additional instruction is mandatory: ${planInstruction}` : "",
     body.planRender?.referenceImages?.length ? "The following images are mandatory visual references named in the brief. They may include floor and wall finishes as well as real furniture; follow the brief to apply each reference only to its specified element." : "Use furniture that matches the plan dimensions and categories.",
-    "Keep the room dimensions and all objects proportional. Do not add extra furniture. No people, no text, no logos, no watermark.",
+    `Keep the room dimensions and all objects proportional. Do not add extra furniture${planInstruction ? " unless the explicit additional instruction requires it" : ""}. ${planInstruction ? "Do not add people unless explicitly requested in the additional instruction." : "No people."} No text, logos, or watermark.`,
   ].join("\n");
   const replacementPrompt = body.replacement?.name ? [
     "Use image 1 as the clean finished interior to preserve.",

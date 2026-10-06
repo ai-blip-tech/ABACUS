@@ -100,3 +100,15 @@ test("planogram keeps menus readable, rugs below furniture, and supports bedside
   assert.match(stylesSource, /\.planogram-workspace \.plan-context-menu\{[^}]*width:190px!important/);
   assert.match(stylesSource, /\.planogram-workspace \.plan-context-menu button\{[^}]*font-size:12px!important/);
 });
+
+test("planogram keeps a remembered render instruction separate from immediate image editing", async () => {
+  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const generateSource = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const projectSource = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+
+  assert.match(pageSource, /plan-instruction-panel/);
+  assert.match(pageSource, />Запомнить<\/button>/);
+  assert.match(pageSource, /referenceImages,instruction:planInstruction,outputSize/);
+  assert.match(generateSource, /explicit additional instruction is mandatory/);
+  assert.match(projectSource, /planInstruction:\s*typeof draft\.planInstruction/);
+});

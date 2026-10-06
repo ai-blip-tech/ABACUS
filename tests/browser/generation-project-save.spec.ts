@@ -173,6 +173,60 @@ test("planogram pouf and cabinet open their matching catalog categories", async 
   await expect.poll(() => catalogTypes.at(-1)).toBe("cabinet");
 });
 
+test("planogram remembers an instruction without generating and sends it only with create render", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-1440");
+  const projectId = "planogram-render-instruction";
+  const instruction = "В комнате сидит чёрная кошка";
+  let generationRequests = 0;
+  let generationBody: { planRender?: { instruction?: string } } | null = null;
+  let savedBody: { state?: { planInstruction?: string } } | null = null;
+
+  await page.route("**/api/auth/me", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ user: { id: "user-4", email: "instruction@example.com", role: "user", firstName: "Render", lastName: "Brief" } }),
+  }));
+  await page.route(`**/api/projects/${projectId}`, (route) => {
+    if (route.request().method() === "PUT") {
+      savedBody = route.request().postDataJSON() as { state?: { planInstruction?: string } };
+      return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+    }
+    const initialState = { planItems: [{ id: "sofa-1", kind: "sofa", name: "Диван", x: 20, y: 20, width: 2200, depth: 950, rotation: 0 }], planRoom: { width: 6000, length: 4500 } };
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        project: { id: projectId, name: "Инструкция рендера", project_type: "Квартира" },
+        state: savedBody?.state || initialState,
+      }),
+    });
+  });
+  await page.route("**/api/generate", (route) => {
+    generationRequests += 1;
+    generationBody = route.request().postDataJSON() as { planRender?: { instruction?: string } };
+    return route.fulfill({ status: 200, contentType: "image/png", body: imageBytes });
+  });
+
+  await page.goto(`/?project=${projectId}#студия`);
+  await page.getByRole("button", { name: "Создание интерьера" }).click();
+  await page.getByLabel("ЧТО ДОБАВИТЬ ИЛИ ИЗМЕНИТЬ?").fill(instruction);
+  const remember = page.getByRole("button", { name: "Запомнить" });
+  await remember.click();
+  await expect(remember).toHaveAttribute("aria-pressed", "true");
+  expect(generationRequests).toBe(0);
+
+  await page.locator(".planogram-toolbar").getByRole("button", { name: "Сохранить проект" }).click();
+  await expect.poll(() => savedBody?.state?.planInstruction).toBe(instruction);
+  expect(generationRequests).toBe(0);
+
+  await page.reload();
+  await page.getByRole("button", { name: "Создание интерьера" }).click();
+  await expect(page.getByLabel("ЧТО ДОБАВИТЬ ИЛИ ИЗМЕНИТЬ?")).toHaveValue(instruction);
+  await expect(page.getByRole("button", { name: "Запомнить" })).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Создать рендер" }).click();
+  await expect.poll(() => generationRequests).toBe(1);
+  expect((generationBody as { planRender?: { instruction?: string } } | null)?.planRender?.instruction).toBe(instruction);
+});
+
 test("an uploaded project interior survives reload before a manual save click", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.endsWith("-1440"));
   let savedBody: Record<string, unknown> | null = null;
