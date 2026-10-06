@@ -31,3 +31,5 @@
 @keyframes it-target-color{0%,100%{filter:none}50%{background-color:#c2681d;color:#fff;filter:saturate(1.2)}}
 @keyframes it-recording{0%,100%{box-shadow:0 0 0 0 rgba(167,72,61,.24)}50%{box-shadow:0 0 0 6px rgba(167,72,61,0)}}
 @media(max-width:700px){.it-composer{grid-template-columns:28px 28px minmax(0,1fr) 36px;gap:2px}.it-layer.is-guiding .it-orb{width:52px;height:52px}}
+.it-surface.is-empty .it-suggestions{margin-top:18px}
+.it-surface.is-empty .it-composer{margin-top:auto}

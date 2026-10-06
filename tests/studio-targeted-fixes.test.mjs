@@ -12,6 +12,7 @@ const proposalPptxRoute = await readFile(new URL("../app/api/proposal/pptx/route
 const proposalEditor = await readFile(new URL("../app/proposal/[projectId]/proposal-editor.tsx", import.meta.url), "utf8");
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const projectRoute = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+const itOrb = await readFile(new URL("../app/it-orb.tsx", import.meta.url), "utf8");
 
 test("proposal images are detected by their bytes before an unreliable MIME header", () => {
   assert.equal(proposalImageFormat(Uint8Array.from([0xff, 0xd8, 0xff, 0xe0]), "image/png"), "jpeg");
@@ -83,4 +84,10 @@ test("latest generations expose a restrained hover only for precise hover pointe
   assert.match(dashboardCss, /@media\(hover:hover\) and \(pointer:fine\)/);
   assert.match(dashboardCss, /\.projects-dashboard-generation:hover/);
   assert.match(dashboardCss, /transform:scale\(1\.025\)/);
+});
+
+test("the empty It chat starts with quick questions instead of an editor intro block", () => {
+  assert.doesNotMatch(itOrb, /Я вижу, где вы|РЕДАКТОР ИЗОБРАЖЕНИЙ|СОЗДАНИЕ ИНТЕРЬЕРА/);
+  assert.match(itOrb, /messages\.length > 0 && <div className="it-transcript"/);
+  assert.match(itOrb, /messages\.length === 0 && \(/);
 });
