@@ -37,6 +37,7 @@ const proposalPrice = (value?: number) => value ? `${new Intl.NumberFormat("ru-R
 const proposalKindForProduct = (product: CatalogProduct): PlanItem["kind"] => {
   const identity = `${product.category} ${product.subtype} ${product.name}`.toLowerCase();
   if (/диван|sofa/.test(identity)) return "sofa";
+  if (/пуф|банкетк|оттоманк|ottoman|pouf/.test(identity)) return "stool";
   if (/кресл|chair/.test(identity)) return "chair";
   if (/стол|table/.test(identity)) return "table";
   if (/торшер|свет|ламп|light|lamp/.test(identity)) return "lamp";
@@ -657,7 +658,7 @@ function LayerGallery({background,source,objects,layers,hidden,selected,onSelect
 function ObjectThumbnail({item}:{item:DetectedObject}){const [preview,setPreview]=useState("");useEffect(()=>{const source=document.querySelector<HTMLImageElement>(".room-canvas > img");if(!source||!source.complete)return;const width=source.naturalWidth,height=source.naturalHeight;if(!width||!height)return;const padding=Math.max(10,Math.round(Math.min(width,height)*.015));const left=Math.max(0,Math.round(width*item.x/100)-padding),top=Math.max(0,Math.round(height*item.y/100)-padding),cropWidth=Math.min(width-left,Math.round(width*item.width/100)+padding*2),cropHeight=Math.min(height-top,Math.round(height*item.height/100)+padding*2);const canvas=document.createElement("canvas");canvas.width=cropWidth;canvas.height=cropHeight;const context=canvas.getContext("2d");if(!context)return;context.fillStyle="#fff";context.fillRect(0,0,cropWidth,cropHeight);context.drawImage(source,left,top,cropWidth,cropHeight,0,0,cropWidth,cropHeight);setPreview(canvas.toDataURL("image/jpeg",.86));},[item.id,item.x,item.y,item.width,item.height]);return <span className="object-thumbnail">{preview?<img src={preview} alt={`Слой: ${item.name}`}/>:<i/>}</span>}
 const furnitureCatalogCategories = [
   {type:"sofa",name:"Диван",icon:"sofa"}, {type:"armchair",name:"Кресло",icon:"chair"},
-  {type:"chair",name:"Стул",icon:"stool"}, {type:"dining_table",name:"Стол обеденный",icon:"table"},
+  {type:"chair",name:"Стул",icon:"stool"}, {type:"ottoman",name:"Пуфы",icon:"stool"}, {type:"dining_table",name:"Стол обеденный",icon:"table"},
   {type:"coffee_table",name:"Стол журнальный",icon:"table"}, {type:"desk_table",name:"Стол письменный и туалетный",icon:"table"},
   {type:"bed",name:"Кровать",icon:"bed"}, {type:"rug",name:"Ковёр",icon:"rug"},
   {type:"light",name:"Светильник",icon:"lamp"}, {type:"decor",name:"Декор для дома",icon:"decor"},
@@ -700,7 +701,7 @@ function ReferencePanel({action,referenceName,setReferenceName,referenceImage,se
 const planTemplates: Array<Pick<PlanItem,"kind"|"name"|"width"|"depth">> = [
   { kind:"sofa", name:"Диван", width:2200, depth:950 }, { kind:"table", name:"Стол обеденный", width:1600, depth:900 },
   { kind:"table", name:"Стол журнальный", width:1100, depth:650 }, { kind:"table", name:"Стол письменный и туалетный", width:1200, depth:600 },
-  { kind:"chair", name:"Кресло", width:800, depth:800 }, { kind:"stool", name:"Стул", width:480, depth:480 },
+  { kind:"chair", name:"Кресло", width:800, depth:800 }, { kind:"stool", name:"Стул", width:480, depth:480 }, { kind:"stool", name:"Пуф", width:600, depth:600 },
   { kind:"rug", name:"Ковер", width:2000, depth:1400 }, { kind:"bed", name:"Кровать", width:2000, depth:1600 },
   { kind:"cabinet", name:"Шкаф", width:1100, depth:550 }, { kind:"lamp", name:"Светильник", width:400, depth:400 },
   { kind:"decor", name:"Декор для дома", width:500, depth:300 },

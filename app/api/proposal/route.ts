@@ -1,6 +1,7 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFImage, PDFFont, rgb } from "pdf-lib";
 import { normalizeProposalImage, type ProposalImageRole } from "@/lib/proposal-pdf-image";
+import { paginateProposalSpecification } from "@/lib/commercial-proposal";
 import { requireTenantUser } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 
@@ -283,37 +284,44 @@ export async function POST(request: Request) {
     }
 
     const total = products.reduce((sum, product) => sum + (product.price ?? product.referencePrice ?? 0) * (product.quantity || 1), 0);
-    const summary = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawPageChrome(summary, font, "05", "Итог и условия");
-    summary.drawText("Спецификация", { x: 36, y: 520, font: serif, size: 27, color: BROWN });
-    const columns = [42, 72, 370, 490, 555, 660];
-    summary.drawRectangle({ x: 36, y: 468, width: 764, height: 28, color: INK });
-    ["№", "ПОЗИЦИЯ", "АРТИКУЛ", "КОЛ-ВО", "ЦЕНА", "СУММА"].forEach((value, index) => summary.drawText(value, { x: columns[index], y: 480, font: fontBold, size: 7, color: WHITE }));
-    products.forEach((product, index) => {
-      const y = 442 - index * 34;
-      const row = [String(index + 1).padStart(2, "0"), textValue(product.name), textValue(product.article || product.referenceArticle), String(product.quantity || 1), body.withPrices ? formatPrice(product.price) : "по запросу", body.withPrices && product.price ? formatPrice(product.price * (product.quantity || 1)) : "по запросу"];
-      if (index % 2 === 1) summary.drawRectangle({ x: 36, y: y - 11, width: 764, height: 33, color: rgb(248 / 255, 246 / 255, 242 / 255) });
-      row.forEach((value, column) => summary.drawText(value.slice(0, column === 1 ? 40 : 20), { x: columns[column], y, font: column === 0 || column === 5 ? fontBold : font, size: 8, color: BROWN }));
-      summary.drawLine({ start: { x: 36, y: y - 10 }, end: { x: 800, y: y - 10 }, thickness: .5, color: WARM_LINE });
+    const specificationPages = paginateProposalSpecification(products);
+    let specificationOffset = 0;
+    specificationPages.forEach((pageProducts, pageIndex) => {
+      const finalPage = pageIndex === specificationPages.length - 1;
+      const summary = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      drawPageChrome(summary, font, String(products.length + 2 + pageIndex).padStart(2, "0"), finalPage ? "Итог и условия" : "Спецификация");
+      summary.drawText(pageIndex ? "Спецификация — продолжение" : "Спецификация", { x: 36, y: 520, font: serif, size: 27, color: BROWN });
+      const columns = [42, 72, 370, 490, 555, 660];
+      summary.drawRectangle({ x: 36, y: 468, width: 764, height: 28, color: INK });
+      ["№", "ПОЗИЦИЯ", "АРТИКУЛ", "КОЛ-ВО", "ЦЕНА", "СУММА"].forEach((value, index) => summary.drawText(value, { x: columns[index], y: 480, font: fontBold, size: 7, color: WHITE }));
+      pageProducts.forEach((product, index) => {
+        const y = 442 - index * 34;
+        const row = [String(specificationOffset + index + 1).padStart(2, "0"), textValue(product.name), textValue(product.article || product.referenceArticle), String(product.quantity || 1), body.withPrices ? formatPrice(product.price) : "по запросу", body.withPrices && product.price ? formatPrice(product.price * (product.quantity || 1)) : "по запросу"];
+        if (index % 2 === 1) summary.drawRectangle({ x: 36, y: y - 11, width: 764, height: 33, color: rgb(248 / 255, 246 / 255, 242 / 255) });
+        row.forEach((value, column) => summary.drawText(value.slice(0, column === 1 ? 40 : 20), { x: columns[column], y, font: column === 0 || column === 5 ? fontBold : font, size: 8, color: BROWN }));
+        summary.drawLine({ start: { x: 36, y: y - 10 }, end: { x: 800, y: y - 10 }, thickness: .5, color: WARM_LINE });
+      });
+      specificationOffset += pageProducts.length;
+      if (!finalPage) return;
+      const summaryY = 250;
+      summary.drawText("ИТОГО ИЗВЕСТНЫХ ПОЗИЦИЙ", { x: 42, y: summaryY + 18, font: fontBold, size: 6.5, color: BURGUNDY });
+      drawLines(summary, wrapText(textValue(proposal.summaryNote), font, 8, 365, 3), { x: 42, y: summaryY, font, size: 8, lineHeight: 10, color: MUTED });
+      const totalText = body.withPrices && total ? formatPrice(total) : "Цена по запросу";
+      summary.drawRectangle({ x: 421, y: summaryY - 26, width: 379, height: 65, color: PALE });
+      summary.drawText("ПРЕДВАРИТЕЛЬНЫЙ ИТОГ", { x: 438, y: summaryY + 18, font: fontBold, size: 7, color: BURGUNDY });
+      summary.drawText(totalText, { x: 438, y: summaryY - 10, font: serif, size: 19, color: BROWN });
+      summary.drawText("Условия предложения", { x: 42, y: 215, font: serif, size: 17, color: BROWN });
+      [["СРОК ПОСТАВКИ", proposal.leadTime], ["ДОСТАВКА И СБОРКА", proposal.delivery], ["ОПЛАТА", proposal.payment]].forEach(([label, value], index) => {
+        const x = 42 + index * 253; summary.drawRectangle({ x, y: 92, width: 235, height: 92, color: PALE });
+        if (index) summary.drawLine({ start: { x, y: 106 }, end: { x, y: 170 }, thickness: .5, color: WARM_LINE });
+        summary.drawText(label!, { x: x + 14, y: 160, font: fontBold, size: 7, color: BURGUNDY });
+        drawLines(summary, wrapText(textValue(value), font, 8.5, 205, 4), { x: x + 14, y: 139, font, size: 8.5, lineHeight: 11 });
+      });
+      summary.drawText("Финальные характеристики, стоимость, сроки и условия фиксируются в счёте и договоре после согласования всех опций.", { x: 42, y: 76, font, size: 5.5, color: MUTED });
     });
-    const summaryY = Math.max(250, 404 - products.length * 34);
-    summary.drawText("ИТОГО ИЗВЕСТНЫХ ПОЗИЦИЙ", { x: 42, y: summaryY + 18, font: fontBold, size: 6.5, color: BURGUNDY });
-    drawLines(summary, wrapText(textValue(proposal.summaryNote), font, 8, 365, 3), { x: 42, y: summaryY, font, size: 8, lineHeight: 10, color: MUTED });
-    const totalText = body.withPrices && total ? formatPrice(total) : "Цена по запросу";
-    summary.drawRectangle({ x: 421, y: summaryY - 26, width: 379, height: 65, color: PALE });
-    summary.drawText("ПРЕДВАРИТЕЛЬНЫЙ ИТОГ", { x: 438, y: summaryY + 18, font: fontBold, size: 7, color: BURGUNDY });
-    summary.drawText(totalText, { x: 438, y: summaryY - 10, font: serif, size: 19, color: BROWN });
-    summary.drawText("Условия предложения", { x: 42, y: 215, font: serif, size: 17, color: BROWN });
-    [["СРОК ПОСТАВКИ", proposal.leadTime], ["ДОСТАВКА И СБОРКА", proposal.delivery], ["ОПЛАТА", proposal.payment]].forEach(([label, value], index) => {
-      const x = 42 + index * 253; summary.drawRectangle({ x, y: 92, width: 235, height: 92, color: PALE });
-      if (index) summary.drawLine({ start: { x, y: 106 }, end: { x, y: 170 }, thickness: .5, color: WARM_LINE });
-      summary.drawText(label!, { x: x + 14, y: 160, font: fontBold, size: 7, color: BURGUNDY });
-      drawLines(summary, wrapText(textValue(value), font, 8.5, 205, 4), { x: x + 14, y: 139, font, size: 8.5, lineHeight: 11 });
-    });
-    summary.drawText("Финальные характеристики, стоимость, сроки и условия фиксируются в счёте и договоре после согласования всех опций.", { x: 42, y: 76, font, size: 5.5, color: MUTED });
 
     const about = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawPageChrome(about, font, "06", "О NORR möbler");
+    drawPageChrome(about, font, String(products.length + 2 + specificationPages.length).padStart(2, "0"), "О NORR möbler");
     about.drawText("Европейский дизайн. Индивидуальный сценарий.", { x: 42, y: 516, font: serif, size: 25, color: BROWN });
     drawImageContain(about, visualisation, { x: 44.5, y: 300, width: 376.5, height: 205 });
     about.drawRectangle({ x: 421, y: 300, width: 385, height: 205, color: INK });
@@ -338,7 +346,7 @@ export async function POST(request: Request) {
 
     const manager = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     manager.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: IVORY });
-    drawPageChrome(manager, font, "07", "Ваш персональный менеджер");
+    drawPageChrome(manager, font, String(products.length + 3 + specificationPages.length).padStart(2, "0"), "Ваш персональный менеджер");
     manager.drawEllipse({ x: 238, y: 350, xScale: 145, yScale: 145, borderColor: WARM_LINE, borderWidth: 1 });
     const managerArc = (t: number) => {
       const angle = Math.PI * (1.18 + .64 * t);

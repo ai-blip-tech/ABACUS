@@ -8,6 +8,8 @@ const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8")
 const globalCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const dashboardCss = await readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8");
 const proposalRoute = await readFile(new URL("../app/api/proposal/route.ts", import.meta.url), "utf8");
+const proposalPptxRoute = await readFile(new URL("../app/api/proposal/pptx/route.ts", import.meta.url), "utf8");
+const proposalEditor = await readFile(new URL("../app/proposal/[projectId]/proposal-editor.tsx", import.meta.url), "utf8");
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const projectRoute = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
 
@@ -24,6 +26,13 @@ test("commercial proposal opens an editor and downloads PDF only after confirmat
   assert.match(page, /Создать коммерческое предложение/);
   assert.match(proposalRoute, /"Content-Type": "application\/pdf"/);
   assert.match(proposalRoute, /"Content-Disposition": `attachment;/);
+});
+
+test("commercial proposal supports a secured PPTX export", () => {
+  assert.match(proposalEditor, /Скачать PPT/);
+  assert.match(proposalEditor, /\/api\/proposal\/pptx/);
+  assert.match(proposalPptxRoute, /requireTenantUser/);
+  assert.match(proposalPptxRoute, /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/);
 });
 
 test("each render history version restores its own commercial proposal product snapshot", () => {

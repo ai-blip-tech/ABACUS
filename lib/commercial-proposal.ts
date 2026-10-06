@@ -119,3 +119,16 @@ export const proposalOverrideFor = (product: ProposalProduct): ProposalOverride 
   quantity: product.quantity, article: product.article, category: product.category, brand: product.brand,
   configuration: product.configuration, option: product.option, characteristics: product.characteristics, notes: product.notes,
 });
+
+export function paginateProposalSpecification<T>(items: T[], detailCapacity = 9, finalCapacity = 5): T[][] {
+  if (items.length <= finalCapacity) return [items];
+  const pages: T[][] = [];
+  let offset = 0;
+  while (items.length - offset > finalCapacity) {
+    const count = Math.min(detailCapacity, items.length - offset - finalCapacity);
+    pages.push(items.slice(offset, offset + count));
+    offset += count;
+  }
+  pages.push(items.slice(offset));
+  return pages;
+}

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
+import JSZip from "jszip";
 import sharp from "sharp";
 import { approvedProposalFixture } from "../fixtures/commercial-proposal-approved";
 
@@ -18,6 +19,7 @@ test("approved proposal visual fixture keeps the exact reference content", async
 test("commercial proposal editor supports catalog and reference products before PDF", async ({ page }) => {
   const saves: unknown[] = [];
   const pdfPayloads: Array<Record<string, unknown>> = [];
+  const pptxPayloads: Array<Record<string, unknown>> = [];
   await page.route("**/api/projects/project-preview-12345", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({
     project: { name: "Гостиная Preview" },
     state: { generatedImage: image, proposalVisualization: selectedImage, proposalShowPrices: true, planItems: [
@@ -34,6 +36,7 @@ test("commercial proposal editor supports catalog and reference products before 
   ] }) }));
   await page.route("**/api/projects/project-preview-12345/proposal", async (route) => { saves.push(route.request().postDataJSON()); await route.fulfill({ contentType: "application/json", body: "{\"ok\":true}" }); });
   await page.route("**/api/proposal", async (route) => { pdfPayloads.push(route.request().postDataJSON() as Record<string, unknown>); await route.fulfill({ contentType: "application/pdf", body: Buffer.alloc(1600) }); });
+  await page.route("**/api/proposal/pptx", async (route) => { pptxPayloads.push(route.request().postDataJSON() as Record<string, unknown>); await route.fulfill({ contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", body: Buffer.alloc(1600) }); });
 
   await page.goto("/proposal/project-preview-12345");
   await expect(page.locator(".proposal-cover-page h1")).toContainText("Коммерческое");
@@ -79,6 +82,9 @@ test("commercial proposal editor supports catalog and reference products before 
   expect(pdfPayloads[1].coverImage).toBe(selectedImage);
   expect((pdfPayloads[1].products as unknown[]).length).toBe(3);
   expect((pdfPayloads[1].products as Array<{ referenceImage: string }>).map((product) => product.referenceImage)).toEqual([image, selectedImage, image]);
+  await page.getByRole("button", { name: "Скачать PPT" }).click();
+  await expect.poll(() => pptxPayloads.length).toBe(1);
+  expect((pptxPayloads[0].products as unknown[]).length).toBe(3);
   expect(saves.some((entry) => JSON.stringify(entry).includes("250000"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Ткань букле, электрический реклайнер"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Анна Петрова"))).toBe(true);
@@ -223,6 +229,7 @@ test("commercial proposal creates a real PDF from a saved reference product", as
       ],
       proposalItems: [
         { id: "catalog-table", kind: "table", name: "Стол", x: 55, y: 55, width: 900, depth: 600, rotation: 0, referenceImage: webpImage, referenceProductId: "NRM00116" },
+        ...Array.from({ length: 11 }, (_, index) => ({ id: `extra-reference-${index + 1}`, kind: "chair", name: `Дополнительный предмет ${index + 1}`, x: 10 + index, y: 20 + index, width: 700, depth: 700, rotation: 0, referenceImage: webpImage, referenceName: `Дополнительный предмет ${index + 1}` })),
       ],
     },
   } });
@@ -238,5 +245,34 @@ test("commercial proposal creates a real PDF from a saved reference product", as
   const path = await download.path();
   expect(path).toBeTruthy();
   const pdf = await PDFDocument.load(await readFile(path!));
-  expect(pdf.getPageCount()).toBe(8);
+  expect(pdf.getPageCount()).toBe(20);
+
+  const pptxDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Скачать PPT" }).click();
+  const pptxDownload = await pptxDownloadPromise;
+  if (process.env.PROPOSAL_PPTX_OUTPUT) await pptxDownload.saveAs(process.env.PROPOSAL_PPTX_OUTPUT);
+  const pptxPath = await pptxDownload.path();
+  expect(pptxPath).toBeTruthy();
+  const archive = await JSZip.loadAsync(await readFile(pptxPath!));
+  expect(archive.file("ppt/presentation.xml")).toBeTruthy();
+  expect(Object.keys(archive.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))).toHaveLength(20);
+});
+
+test("long specification is split before totals and conditions", async ({ page, browserName }, testInfo) => {
+  test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium-1440");
+  const products = Array.from({ length: 14 }, (_, index) => ({
+    id: `item-${index + 1}`, kind: "chair", name: `Предмет ${index + 1}`, width: 800, depth: 800,
+    referenceImage: image, referenceName: `Предмет ${index + 1}`,
+  }));
+  await page.route("**/api/projects/project-many-items", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({
+    project: { name: "Большая спецификация" }, state: { generatedImage: image, proposalItems: products },
+  }) }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: "{\"user\":{}}" }));
+  await page.goto("/proposal/project-many-items");
+  await expect(page.locator(".proposal-summary-page")).toHaveCount(2);
+  await expect(page.locator(".proposal-summary-page.is-continuation .proposal-summary-table > div")).toHaveCount(10);
+  await expect(page.locator(".proposal-summary-page.has-final-summary .proposal-summary-table > div")).toHaveCount(6);
+  const finalTable = await page.locator(".proposal-summary-page.has-final-summary .proposal-summary-table").boundingBox();
+  const finalTotal = await page.locator(".proposal-summary-page.has-final-summary .proposal-summary-total").boundingBox();
+  expect(finalTable && finalTotal && finalTable.y + finalTable.height <= finalTotal.y).toBe(true);
 });

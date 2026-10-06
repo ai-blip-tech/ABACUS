@@ -67,6 +67,7 @@ const matchesCatalogType = (product: CatalogProduct, type: string, categoryTrail
   if (type === "sofa") return /диван|модул|кушет/.test(text);
   if (type === "armchair") return /кресл/.test(text);
   if (type === "chair") return /стул/.test(text);
+  if (type === "ottoman") return /пуф|банкетк|оттоманк/.test(text);
   if (type === "dining_table") return /обеденн/.test(text);
   if (type === "coffee_table") return /журнальн|приставн/.test(text);
   if (type === "desk_table") return /письменн|туалетн/.test(text);
