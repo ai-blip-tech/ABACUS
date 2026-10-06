@@ -71,6 +71,74 @@ test("a saved generation becomes one reopenable project without duplicate creati
   expect(created).toBe(1);
 });
 
+test("planogram save persists through the project API without downloading JSON", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-1440");
+  const projectId = "planogram-save-project";
+  let savedBody: { state?: { planItems?: unknown[]; interiorImage?: string } } | null = null;
+  let downloads = 0;
+  page.on("download", () => { downloads += 1; });
+  await page.route("**/api/auth/me", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ user: { id: "user-1", email: "plan@example.com", role: "user", firstName: "Plan", lastName: "User" } }),
+  }));
+  await page.route(`**/api/projects/${projectId}`, async (route) => {
+    if (route.request().method() === "PUT") {
+      savedBody = route.request().postDataJSON() as { state?: { planItems?: unknown[]; interiorImage?: string } };
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        project: { id: projectId, name: "Планировка гостиной", project_type: "Квартира", description: null },
+        state: {
+          planItems: [{ id: "sofa-1", kind: "sofa", name: "Диван", x: 10, y: 10, width: 2200, depth: 950, rotation: 0 }],
+          planRoom: { width: 6000, length: 4500 },
+        },
+      }),
+    });
+  });
+
+  await page.goto(`/?project=${projectId}#студия`);
+  await page.getByRole("button", { name: "Создание интерьера" }).click();
+  await page.locator(".planogram-toolbar").getByRole("button", { name: "Сохранить проект" }).click();
+  await expect.poll(() => savedBody).not.toBeNull();
+  const persisted = savedBody as { state?: { planItems?: unknown[]; interiorImage?: string } } | null;
+  expect(persisted?.state?.planItems).toHaveLength(1);
+  expect(persisted?.state?.interiorImage).toBe("");
+  expect(downloads).toBe(0);
+});
+
+test("planogram save creates a named project when no project exists", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-1440");
+  const projectId = "new-planogram-project";
+  let created = 0;
+  let updated = 0;
+  await page.route("**/api/auth/me", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ user: { id: "user-2", email: "new-plan@example.com", role: "user", firstName: "New", lastName: "Plan" } }),
+  }));
+  await page.route("**/api/projects", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    created += 1;
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ project: { id: projectId } }) });
+  });
+  await page.route(`**/api/projects/${projectId}`, async (route) => {
+    if (route.request().method() === "PUT") updated += 1;
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+
+  await page.goto("/#студия");
+  await page.getByRole("button", { name: "Создание интерьера" }).click();
+  await page.locator(".plan-template-grid").getByRole("button", { name: "Диван", exact: true }).click();
+  await page.locator(".planogram-toolbar").getByRole("button", { name: "Сохранить проект" }).click();
+  await expect(page.getByRole("dialog", { name: "Сохранить как проект" })).toBeVisible();
+  await page.getByLabel("Название проекта").fill("Новая планировка");
+  await page.getByRole("dialog", { name: "Сохранить как проект" }).getByRole("button", { name: "Сохранить", exact: true }).click();
+  await expect.poll(() => ({ created, updated })).toEqual({ created: 1, updated: 1 });
+  await expect(page).toHaveURL(new RegExp(`\\?project=${projectId}#`));
+});
+
 test("an uploaded project interior survives reload before a manual save click", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.endsWith("-1440"));
   let savedBody: Record<string, unknown> | null = null;

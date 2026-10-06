@@ -33,10 +33,12 @@ test("one account dropdown is used by project and Studio headers", () => {
   assert.match(dropdownCss, /width:min\(344px/);
 });
 
-test("both existing save actions share one visual control without changing handlers", () => {
+test("both save actions persist the project instead of downloading plan JSON", () => {
   assert.match(homeSource, /className=\{projectSaved \? "project-save-control project-save-head saved"/);
   assert.match(homeSource, /className="project-save-control plan-save" onClick=\{exportPlan\}/);
   assert.match(homeSource, /onClick=\{\(\)=>void saveProject\(\)\}/);
+  assert.match(homeSource, /window\.dispatchEvent\(new Event\("room-save-project"\)\)/);
+  assert.doesNotMatch(homeSource, /room-design-plan-\$\{Date\.now\(\)\}\.json/);
   assert.match(globalCss, /\.canvas-actions \.project-save-control,\.planogram-toolbar-actions \.project-save-control/);
 });
 
