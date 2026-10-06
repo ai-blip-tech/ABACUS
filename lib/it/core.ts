@@ -4,6 +4,7 @@ import type {
   ItRequest,
   ItTurn,
   ItUiAction,
+  ItUiTarget,
   RoomDesignContext,
 } from "./types";
 
@@ -76,18 +77,62 @@ const shouldSearchCatalog = (message: string, hasPreviousProducts: boolean, hasP
     || (hasPriorSubject && /хочу другой|другой вариант|покажи другой/.test(text));
 };
 
-const planogramGuidanceTarget = (message: string, history: ItConversationMessage[], context: RoomDesignContext) => {
+const productGuidance = (message: string, history: ItConversationMessage[], context: RoomDesignContext): { target: ItUiTarget; fact: string } | undefined => {
   const text = normalize(message);
   const recent = normalize(recentConversationText(history));
+  const selected = context.planogram.selectedItem;
+  if (context.section === "planogram" && /референс.{0,24}пол|пол.{0,24}референс/.test(text)) {
+    return { target: "planogram-floor-reference", fact: "Референс пола добавляется или заменяется кнопкой «Добавить референс пола» под планом." };
+  }
+  if (context.section === "planogram" && /референс.{0,24}стен|стен.{0,24}референс/.test(text)) {
+    return { target: "planogram-wall-reference", fact: "Референс стен добавляется или заменяется кнопкой «Добавить референс стен» под планом." };
+  }
+  if (context.section === "planogram" && /(?:что|как).{0,36}(?:делает|работает|сохранить)|сохранить проект/.test(text) && /сохран/.test(text)) {
+    return { target: "planogram-save", fact: "Кнопка «Сохранить проект» в верхней панели планограммы скачивает JSON-файл с размерами комнаты и предметами; это не сохранение проекта в аккаунт." };
+  }
+  if (context.section === "planogram" && selected) {
+    if (/референс|изображен|картинк|фото|каталог|заменить.{0,24}(?:вид|модел|обивк)/.test(text)) {
+      return {
+        target: "planogram-selected-item",
+        fact: `Сейчас выбрано «${selected.name}» ${selected.widthMm} × ${selected.depthMm} мм, поворот ${selected.rotation}°. Чтобы добавить или заменить его изображение/референс, нужно нажать по этому предмету правой кнопкой и выбрать «Загрузить референс». Прямой привязки товара из каталога к предмету планограммы сейчас нет; каталог мебели работает в редакторе изображений. Скриншот для этого не нужен. Для точных размеров используются поля справа; двойной клик показывает восемь маркеров размера и вращение.`,
+      };
+    }
+    if (/редакт|размер|ширин|глубин|габарит|поверн|удалить/.test(text)) {
+      return {
+        target: "planogram-properties",
+        fact: `Сейчас выбрано «${selected.name}» ${selected.widthMm} × ${selected.depthMm} мм. Справа уже открыты его свойства: поля ширины и глубины, «Повернуть на 90°» и «Удалить предмет». Предмет перемещается перетаскиванием; двойной клик показывает восемь маркеров и вращение.`,
+      };
+    }
+  }
+  if (
+    context.section === "planogram"
+    && context.planogram.itemCount > 0
+    && /референс|изображен|картинк|фото|каталог|редакт|размер|ширин|глубин|габарит|поверн|удалить|заменить/.test(text)
+  ) {
+    return {
+      target: "planogram-selected-item",
+      fact: "Предмет на плане сейчас не выделен. Нужно показать сам предмет: пользователь нажимает его один раз, после чего справа открываются поля ширины и глубины, поворот и удаление. Для добавления или замены изображения нужно нажать по предмету правой кнопкой и выбрать «Загрузить референс». Прямой привязки товара каталога к предмету планограммы нет; скриншот не нужен.",
+    };
+  }
+  if (context.section === "planogram" && /(?:как|где|что).{0,36}(?:создать|сделать|запустить).{0,24}рендер|кнопк.{0,20}рендер/.test(text)) {
+    return { target: "planogram-create-render", fact: `Кнопка «Создать рендер» находится под планом и доступна, когда на плане есть хотя бы один предмет. Сейчас предметов: ${context.planogram.itemCount}.` };
+  }
   const asksForPlanogram = /(?:как|где|что).{0,45}(?:попасть|перейти|открыть|нажать).{0,35}(?:план|создани[ея] интерьер)|планограмм/.test(text);
   const followsPlanPlacement = /^(?:на|в) план[.!?\s]*$/.test(text) && /добавить.{0,45}(?:диван|кресл)/.test(recent);
   const asksToAddOnPlan = context.section === "planogram" && /(?:как|где).{0,35}добавить.{0,45}(?:диван|кресл)/.test(text);
-  if (!asksForPlanogram && !followsPlanPlacement && !asksToAddOnPlan) return undefined;
-  if (context.section !== "planogram") return "planogram" as const;
-  const subject = `${text} ${recent}`;
-  if (/диван/.test(subject)) return "planogram-sofa" as const;
-  if (/кресл/.test(subject)) return "planogram-armchair" as const;
-  return "planogram" as const;
+  if (asksForPlanogram || followsPlanPlacement || asksToAddOnPlan) {
+    if (context.section !== "planogram") return { target: "planogram", fact: "Нужно показать кнопку «Создание интерьера» в левой навигации; пользователь нажимает её самостоятельно." };
+    const subject = `${text} ${recent}`;
+    if (/диван/.test(subject)) return { target: "planogram-sofa", fact: "Планограмма уже открыта. Кнопка «Диван» находится в блоке «Добавить предмет» справа." };
+    if (/кресл/.test(subject)) return { target: "planogram-armchair", fact: "Планограмма уже открыта. Кнопка «Кресло» находится в блоке «Добавить предмет» справа." };
+    return { target: "planogram", fact: "Планограмма уже открыта в разделе «Создание интерьера»." };
+  }
+  if (/где.{0,30}(?:истори|рендер|верси)|прошлые.{0,20}рендер|скачать.{0,20}рендер|апскейл/.test(text)) return { target: "history", fact: `История рендеров находится под изображением и хранит до восьми версий. Сейчас версий: ${context.workspace.historyCount}.` };
+  if (/как.{0,24}сохран|где.{0,24}сохран/.test(text)) return { target: "save-project", fact: "Кнопка «Сохранить проект» в редакторе изображений сохраняет проект в аккаунте; для этого нужен вход." };
+  if (context.section === "image-editor" && !context.render.hasSource && /загруз|добавить.{0,20}(?:фото|изображен|интерьер)/.test(text)) return { target: "image-upload", fact: "Своё изображение интерьера загружается через блок «Загрузите интерьер» в правой панели." };
+  if (context.section === "image-editor" && /как.{0,32}добавить.{0,40}каталог|добавить.{0,24}(?:диван|кресл|мебел).{0,28}каталог/.test(text)) return { target: "editor-catalog", fact: "Для добавления из каталога нужно поставить точку на изображении, нажать «Добавить из каталога», выбрать товар и затем нажать «Создать интерьер»." };
+  if (context.section === "image-editor" && /как.{0,32}удалить/.test(text)) return { target: "editor-remove", fact: "Для удаления нужно выбрать «Удалить» и поставить точку на предмете; изменяющее действие выполняет пользователь." };
+  return undefined;
 };
 
 const shouldGuideReplace = (message: string, history: ItConversationMessage[], context: RoomDesignContext) => {
@@ -108,15 +153,13 @@ export async function runItTurn(request: ItRequest, adapters: ItAdapters): Promi
   const toolFacts: string[] = [];
   let products: ItCatalogProduct[] = [];
 
-  const planogramTarget = planogramGuidanceTarget(message, history, request.context);
-  if (planogramTarget) {
-    actions.push({ type: "focus", target: planogramTarget }, { type: "highlight", target: planogramTarget }, { type: "guide", target: planogramTarget });
-    toolFacts.push(planogramTarget === "planogram"
-      ? "Нужно показать пользователю кнопку «Создание интерьера» в левой навигации. Оно физически подведёт сферу к этой кнопке; пользователь нажимает её самостоятельно."
-      : `Планограмма уже открыта. Нужно показать кнопку «${planogramTarget === "planogram-sofa" ? "Диван" : "Кресло"}» в правой панели; пользователь нажимает её самостоятельно.`);
+  const guidance = productGuidance(message, history, request.context);
+  if (guidance) {
+    actions.push({ type: "focus", target: guidance.target }, { type: "highlight", target: guidance.target }, { type: "guide", target: guidance.target });
+    toolFacts.push(`${guidance.fact} Оно физически подведёт сферу к соответствующему элементу; пользователь выполняет действие самостоятельно.`);
   }
 
-  if (shouldGuideReplace(message, history, request.context)) {
+  if (!guidance && shouldGuideReplace(message, history, request.context)) {
     const hasSource = request.context.render.hasSource;
     actions.push({ type: "navigate", target: "image-editor" });
     if (hasSource) {

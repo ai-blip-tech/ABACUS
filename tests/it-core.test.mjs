@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { runItTurn } from "../lib/it/core.ts";
+import { ROOM_DESIGN_PRODUCT_KNOWLEDGE } from "../lib/it/product-knowledge.ts";
 
 const context = {
   route: "#студия",
@@ -147,6 +148,79 @@ test("planogram follow-up guides to the sofa control already visible in the curr
     { searchCatalog: async () => [], answerConversation: async () => "Показываю кнопку «Диван» справа." },
   );
   assert.equal(turn.actions?.some((action) => action.type === "guide" && action.target === "planogram-sofa"), true);
+});
+
+test("a selected planogram item exposes exact editing and reference instructions without asking for a screenshot", async () => {
+  const calls = [];
+  const selectedContext = {
+    ...context,
+    section: "planogram",
+    activeTool: "Планограмма",
+    planogram: {
+      itemCount: 1,
+      selectedItemId: "chair-1",
+      selectedItem: { id: "chair-1", name: "Кресло", kind: "chair", widthMm: 800, depthMm: 800, rotation: 0, hasReference: false, referenceName: null },
+      room: { widthMm: 6000, lengthMm: 4500 },
+      hasFloorReference: false,
+      hasWallReference: false,
+      hasCamera: false,
+    },
+    workspace: { isAuthenticated: true, projectSaved: false, historyCount: 0, queuedEditCount: 0, hasFurnitureReference: false },
+  };
+  const turn = await runItTurn(
+    { message: "Как кресло, которое добавил в планограмму, отредактировать и заменить изображение?", context: selectedContext },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Нажмите по креслу правой кнопкой и выберите «Загрузить референс».") },
+  );
+  assert.equal(turn.actions?.some((action) => action.type === "guide" && action.target === "planogram-selected-item"), true);
+  assert.equal(turn.actions?.some((action) => action.type === "navigate"), false);
+  assert.match(calls[0].toolFacts.join(" "), /правой кнопкой/);
+  assert.match(calls[0].toolFacts.join(" "), /800 × 800/);
+  assert.match(calls[0].toolFacts.join(" "), /Скриншот для этого не нужен/);
+});
+
+test("an unselected planogram item is still pointed out before editing guidance", async () => {
+  const calls = [];
+  const planogramContext = {
+    ...context,
+    section: "planogram",
+    activeTool: "Планограмма",
+    planogram: { itemCount: 1, selectedItemId: null, selectedItem: null, room: { widthMm: 6000, lengthMm: 4500 }, hasFloorReference: false, hasWallReference: false, hasCamera: false },
+    workspace: { isAuthenticated: true, projectSaved: false, historyCount: 0, queuedEditCount: 0, hasFurnitureReference: false },
+  };
+  const turn = await runItTurn(
+    { message: "Как мне отредактировать кресло и заменить его изображение?", context: planogramContext },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Сначала нажмите на кресло." ) },
+  );
+  assert.equal(turn.actions?.some((action) => action.type === "guide" && action.target === "planogram-selected-item"), true);
+  assert.match(calls[0].toolFacts.join(" "), /сейчас не выделен/);
+  assert.match(calls[0].toolFacts.join(" "), /скриншот не нужен/);
+});
+
+test("planogram surface references and save point to their own controls", async () => {
+  const planogramContext = {
+    ...context,
+    section: "planogram",
+    activeTool: "Планограмма",
+    planogram: { itemCount: 1, selectedItemId: null, selectedItem: null, room: { widthMm: 6000, lengthMm: 4500 }, hasFloorReference: false, hasWallReference: false, hasCamera: false },
+    workspace: { isAuthenticated: true, projectSaved: false, historyCount: 0, queuedEditCount: 0, hasFurnitureReference: false },
+  };
+  const floor = await runItTurn(
+    { message: "Как добавить референс пола?", context: planogramContext },
+    { searchCatalog: async () => [], answerConversation: async () => "Показываю кнопку пола." },
+  );
+  const save = await runItTurn(
+    { message: "Что делает кнопка Сохранить проект в планограмме?", context: planogramContext },
+    { searchCatalog: async () => [], answerConversation: async () => "Она скачивает JSON плана." },
+  );
+  assert.equal(floor.actions?.some((action) => action.type === "guide" && action.target === "planogram-floor-reference"), true);
+  assert.equal(save.actions?.some((action) => action.type === "guide" && action.target === "planogram-save"), true);
+});
+
+test("the verified product knowledge covers both editors and known limitations", () => {
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.planogram.reference, /правой кнопкой/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.planogram.camera, /двойной клик/i);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.replace, /поставить точку/i);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.material, /Каталог материалов пока не готов/);
 });
 
 test("cheaper follow-up inherits product category and budget from history", async () => {
