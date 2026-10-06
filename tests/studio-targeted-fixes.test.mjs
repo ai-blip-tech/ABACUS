@@ -11,6 +11,7 @@ const proposalRoute = await readFile(new URL("../app/api/proposal/route.ts", imp
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const projectRoute = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
 const itOrb = await readFile(new URL("../app/it-orb.tsx", import.meta.url), "utf8");
+const itOrbCss = await readFile(new URL("../app/it-orb.css", import.meta.url), "utf8");
 
 test("proposal images are detected by their bytes before an unreliable MIME header", () => {
   assert.equal(proposalImageFormat(Uint8Array.from([0xff, 0xd8, 0xff, 0xe0]), "image/png"), "jpeg");
@@ -81,4 +82,6 @@ test("the empty It chat starts with quick questions instead of an editor intro b
   assert.doesNotMatch(itOrb, /Я вижу, где вы|РЕДАКТОР ИЗОБРАЖЕНИЙ|СОЗДАНИЕ ИНТЕРЬЕРА/);
   assert.match(itOrb, /messages\.length > 0 && <div className="it-transcript"/);
   assert.match(itOrb, /messages\.length === 0 && \(/);
+  assert.match(itOrbCss, /\.it-surface\.is-empty\{height:auto\}/);
+  assert.match(itOrbCss, /\.it-surface\.is-empty \.it-composer\{margin-top:0\}/);
 });
