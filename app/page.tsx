@@ -542,7 +542,7 @@ export default function Home() {
       queuedEditCount: furnitureEdits.length,
       hasFurnitureReference: Boolean(referenceImage),
     },
-    availableActions: ["get_current_context", "navigate_to", "focus_element", "highlight_element", "open_panel", "search_catalog"],
+    availableActions: ["get_current_context", "search_catalog"],
   };
   const handleItAction = (action: ItUiAction) => {
     if (action.type === "navigate") {

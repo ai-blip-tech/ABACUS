@@ -47,15 +47,15 @@ test("an attached room image is forwarded to the multimodal conversation model",
   assert.equal(calls[0].image, image);
 });
 
-test("Replace uses tools but its final text still comes from the model", async () => {
+test("Replace stays text-only while its final text comes from the model", async () => {
   const calls = [];
   const turn = await runItTurn(
     { message: "Как заменить диван?", context },
-    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Да, можно. Показываю кнопку «Заменить».") },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Откройте редактор изображений и нажмите «Заменить».") },
   );
-  assert.equal(turn.text, "Да, можно. Показываю кнопку «Заменить».");
-  assert.deepEqual(turn.actions?.map((action) => action.type), ["navigate", "focus", "highlight"]);
-  assert.match(calls[0].toolFacts.join(" "), /подсветка кнопки/);
+  assert.equal(turn.text, "Откройте редактор изображений и нажмите «Заменить».");
+  assert.equal(turn.actions, undefined);
+  assert.match(calls[0].toolFacts.join(" "), /только текстом/);
 });
 
 test("a short follow-up retains Replace context", async () => {
@@ -69,7 +69,8 @@ test("a short follow-up retains Replace context", async () => {
     { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Показываю.") },
   );
   assert.equal(calls[0].history.length, 2);
-  assert.equal(turn.actions?.some((action) => action.type === "highlight"), true);
+  assert.equal(turn.actions, undefined);
+  assert.match(calls[0].toolFacts.join(" "), /нажать «Заменить»/);
 });
 
 test("another-item follow-up inherits the furniture subject and searches catalog", async () => {
@@ -89,14 +90,14 @@ test("another-item follow-up inherits the furniture subject and searches catalog
   assert.equal(turn.products?.length, 2);
 });
 
-test("multi-intent keeps UI action and lets the model answer the full question", async () => {
+test("multi-intent stays text-only and lets the model answer the full question", async () => {
   const calls = [];
   const message = "Как заменить диван и какой цвет сюда лучше поставить?";
   const turn = await runItTurn(
     { message, context },
     { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Показываю Replace. По цвету попробуйте глубокий оливковый.") },
   );
-  assert.ok(turn.actions?.length);
+  assert.equal(turn.actions, undefined);
   assert.equal(calls[0].message, message);
   assert.match(turn.text, /Replace.*оливковый/);
 });
@@ -130,24 +131,27 @@ test("showing available sofas under a budget triggers a cheapest-first catalog s
   assert.equal(searchInput.maxPrice, 500_000);
 });
 
-test("planogram guidance points at the real navigation button without navigating for the user", async () => {
+test("planogram guidance explains the real navigation button without UI actions", async () => {
+  const calls = [];
   const turn = await runItTurn(
     { message: "Что нажать, чтобы попасть в планограмму?", context },
-    { searchCatalog: async () => [], answerConversation: async () => "Показываю кнопку «Создание интерьера» слева." },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Нажмите «Создание интерьера» слева.") },
   );
-  assert.deepEqual(turn.actions?.map((action) => action.type), ["focus", "highlight", "guide"]);
-  assert.equal(turn.actions?.every((action) => action.target === "planogram"), true);
+  assert.equal(turn.actions, undefined);
+  assert.match(calls[0].toolFacts.join(" "), /только текстом/);
   assert.match(turn.text, /Создание интерьера/);
 });
 
-test("planogram follow-up guides to the sofa control already visible in the current section", async () => {
+test("planogram follow-up explains the sofa control without UI actions", async () => {
+  const calls = [];
   const planogramContext = { ...context, section: "planogram", activeTool: "Планограмма" };
   const history = [{ role: "user", text: "Как добавить диван и кресло?" }];
   const turn = await runItTurn(
     { message: "На план", context: planogramContext, history },
-    { searchCatalog: async () => [], answerConversation: async () => "Показываю кнопку «Диван» справа." },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Нажмите кнопку «Диван» справа.") },
   );
-  assert.equal(turn.actions?.some((action) => action.type === "guide" && action.target === "planogram-sofa"), true);
+  assert.equal(turn.actions, undefined);
+  assert.match(calls[0].toolFacts.join(" "), /Кнопка «Диван»/);
 });
 
 test("a selected planogram item exposes exact editing and reference instructions without asking for a screenshot", async () => {
@@ -171,14 +175,13 @@ test("a selected planogram item exposes exact editing and reference instructions
     { message: "Как кресло, которое добавил в планограмму, отредактировать и заменить изображение?", context: selectedContext },
     { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Нажмите по креслу правой кнопкой и выберите «Загрузить референс».") },
   );
-  assert.equal(turn.actions?.some((action) => action.type === "guide" && action.target === "planogram-selected-item"), true);
-  assert.equal(turn.actions?.some((action) => action.type === "navigate"), false);
+  assert.equal(turn.actions, undefined);
   assert.match(calls[0].toolFacts.join(" "), /правой кнопкой/);
   assert.match(calls[0].toolFacts.join(" "), /800 × 800/);
   assert.match(calls[0].toolFacts.join(" "), /Скриншот для этого не нужен/);
 });
 
-test("an unselected planogram item is still pointed out before editing guidance", async () => {
+test("an unselected planogram item still gets text-only editing guidance", async () => {
   const calls = [];
   const planogramContext = {
     ...context,
@@ -191,12 +194,14 @@ test("an unselected planogram item is still pointed out before editing guidance"
     { message: "Как мне отредактировать кресло и заменить его изображение?", context: planogramContext },
     { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Сначала нажмите на кресло." ) },
   );
-  assert.equal(turn.actions?.some((action) => action.type === "guide" && action.target === "planogram-selected-item"), true);
+  assert.equal(turn.actions, undefined);
   assert.match(calls[0].toolFacts.join(" "), /сейчас не выделен/);
   assert.match(calls[0].toolFacts.join(" "), /скриншот не нужен/);
 });
 
 test("planogram surface references and save point to their own controls", async () => {
+  const floorCalls = [];
+  const saveCalls = [];
   const planogramContext = {
     ...context,
     section: "planogram",
@@ -206,14 +211,16 @@ test("planogram surface references and save point to their own controls", async 
   };
   const floor = await runItTurn(
     { message: "Как добавить референс пола?", context: planogramContext },
-    { searchCatalog: async () => [], answerConversation: async () => "Показываю кнопку пола." },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(floorCalls, "Нажмите кнопку пола.") },
   );
   const save = await runItTurn(
     { message: "Что делает кнопка Сохранить проект в планограмме?", context: planogramContext },
-    { searchCatalog: async () => [], answerConversation: async () => "Она скачивает JSON плана." },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(saveCalls, "Она скачивает JSON плана.") },
   );
-  assert.equal(floor.actions?.some((action) => action.type === "guide" && action.target === "planogram-floor-reference"), true);
-  assert.equal(save.actions?.some((action) => action.type === "guide" && action.target === "planogram-save"), true);
+  assert.equal(floor.actions, undefined);
+  assert.equal(save.actions, undefined);
+  assert.match(floorCalls[0].toolFacts.join(" "), /Референс пола/);
+  assert.match(saveCalls[0].toolFacts.join(" "), /JSON-файл/);
 });
 
 test("the verified product knowledge covers both editors and known limitations", () => {
@@ -221,6 +228,8 @@ test("the verified product knowledge covers both editors and known limitations",
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.planogram.camera, /двойной клик/i);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.replace, /поставить точку/i);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.material, /Каталог материалов пока не готов/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /только текстом/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /не перемещается/);
 });
 
 test("cheaper follow-up inherits product category and budget from history", async () => {
