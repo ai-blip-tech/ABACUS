@@ -143,6 +143,7 @@ const shouldGuideReplace = (message: string, history: ItConversationMessage[], c
 };
 
 const unavailableText = "Сейчас не могу сформировать ответ: модель временно недоступна. Попробуйте ещё раз.";
+const IT_VISUAL_GUIDANCE_ENABLED = false;
 
 export async function runItTurn(request: ItRequest, adapters: ItAdapters): Promise<ItTurn> {
   const history = (request.history || []).slice(-12);
@@ -155,18 +156,22 @@ export async function runItTurn(request: ItRequest, adapters: ItAdapters): Promi
 
   const guidance = productGuidance(message, history, request.context);
   if (guidance) {
-    actions.push({ type: "focus", target: guidance.target }, { type: "highlight", target: guidance.target }, { type: "guide", target: guidance.target });
-    toolFacts.push(`${guidance.fact} Оно физически подведёт сферу к соответствующему элементу; пользователь выполняет действие самостоятельно.`);
+    if (IT_VISUAL_GUIDANCE_ENABLED) {
+      actions.push({ type: "focus", target: guidance.target }, { type: "highlight", target: guidance.target }, { type: "guide", target: guidance.target });
+    }
+    toolFacts.push(`${guidance.fact} Объясни следующий шаг только текстом: не говори, что показываешь или подсвечиваешь элемент.`);
   }
 
   if (!guidance && shouldGuideReplace(message, history, request.context)) {
     const hasSource = request.context.render.hasSource;
-    actions.push({ type: "navigate", target: "image-editor" });
+    if (IT_VISUAL_GUIDANCE_ENABLED) {
+      actions.push({ type: "navigate", target: "image-editor" });
+      if (hasSource) actions.push({ type: "focus", target: "replace" }, { type: "highlight", target: "replace" });
+    }
     if (hasSource) {
-      actions.push({ type: "focus", target: "replace" }, { type: "highlight", target: "replace" });
-      toolFacts.push("Подготовлена навигация к Image Editor и подсветка кнопки «Заменить». После этого пользователь должен поставить точку на предмете.");
+      toolFacts.push("Для замены предмета нужно открыть «Редактор изображений», нажать «Заменить» и поставить точку в центре предмета. Объясни это только текстом: не говори, что переходишь, показываешь или подсвечиваешь интерфейс.");
     } else {
-      toolFacts.push("Интерьер ещё не загружен, поэтому Replace нельзя показать до загрузки изображения.");
+      toolFacts.push("Интерьер ещё не загружен. Сначала нужно открыть «Редактор изображений» и загрузить изображение, затем нажать «Заменить» и поставить точку на предмете. Объясни это только текстом.");
     }
   }
 
