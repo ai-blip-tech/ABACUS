@@ -49,7 +49,14 @@ export type ItTurn = {
   actions?: ItUiAction[];
 };
 
+export type ItConversationMessage = {
+  role: "user" | "assistant";
+  text: string;
+  products?: ItCatalogProduct[];
+};
+
 export type ItRequest = {
   message: string;
   context: RoomDesignContext;
+  history?: ItConversationMessage[];
 };
