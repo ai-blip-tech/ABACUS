@@ -507,6 +507,7 @@ export default function Home() {
   }, []);
   useEffect(() => { void fetch("/api/auth/me").then((response) => response.ok ? response.json() : { user: null }).then((payload) => setUser(payload.user || null)).catch(() => setUser(null)); }, []);
   useEffect(() => { const handlePlanSave = () => { void saveProject(); }; window.addEventListener("room-save-project", handlePlanSave); return () => window.removeEventListener("room-save-project", handlePlanSave); });
+  const selectedPlanItemForIt = planItems.find((item) => item.id === planSelectedId) || null;
   const itContext: RoomDesignContext = {
     route: view === "studio" ? "#студия" : `#${view}`,
     projectId: projectId || null,
@@ -516,7 +517,31 @@ export default function Home() {
     furnitureAction,
     selectedObject: selectedObject ? { id: selectedObject.id, name: selectedObject.name } : null,
     render: { hasSource: Boolean(interiorImage), hasResult: Boolean(generatedImage), isGenerating },
-    planogram: { itemCount: planItems.length, selectedItemId: planSelectedId },
+    planogram: {
+      itemCount: planItems.length,
+      selectedItemId: planSelectedId,
+      selectedItem: selectedPlanItemForIt ? {
+        id: selectedPlanItemForIt.id,
+        name: selectedPlanItemForIt.name,
+        kind: selectedPlanItemForIt.kind,
+        widthMm: selectedPlanItemForIt.width,
+        depthMm: selectedPlanItemForIt.depth,
+        rotation: selectedPlanItemForIt.rotation,
+        hasReference: Boolean(selectedPlanItemForIt.referenceImage),
+        referenceName: selectedPlanItemForIt.referenceName || null,
+      } : null,
+      room: { widthMm: planRoom.width, lengthMm: planRoom.length },
+      hasFloorReference: Boolean(planFloorReference),
+      hasWallReference: Boolean(planWallReference),
+      hasCamera: Boolean(planCamera),
+    },
+    workspace: {
+      isAuthenticated: Boolean(user),
+      projectSaved,
+      historyCount: historyVersions.length,
+      queuedEditCount: furnitureEdits.length,
+      hasFurnitureReference: Boolean(referenceImage),
+    },
     availableActions: ["get_current_context", "navigate_to", "focus_element", "highlight_element", "open_panel", "search_catalog"],
   };
   const handleItAction = (action: ItUiAction) => {
@@ -526,14 +551,27 @@ export default function Home() {
       return;
     }
     const findTarget = (target: ItUiTarget) => {
-      if (target === "planogram") return document.querySelector<HTMLButtonElement>(".planogram-tool");
-      if (target === "planogram-sofa" || target === "planogram-armchair") {
-        const label = target === "planogram-sofa" ? "Диван" : "Кресло";
-        return Array.from(document.querySelectorAll<HTMLButtonElement>(".inspector button"))
-          .find((button) => button.textContent?.trim() === label) || null;
-      }
-      return Array.from(document.querySelectorAll<HTMLButtonElement>(".furniture-switch button,.furniture-action-bar button"))
-        .find((button) => button.textContent?.trim() === "Заменить") || null;
+      const selectors: Record<ItUiTarget, string> = {
+        "image-editor": "[data-it-target='image-editor']",
+        "image-upload": ".furniture-choice .upload-zone",
+        "editor-add": ".furniture-action-bar button:first-child",
+        replace: ".furniture-action-bar button:nth-child(2),.furniture-switch button:nth-child(2)",
+        "editor-remove": ".furniture-action-bar .danger",
+        "editor-catalog": ".furniture-choice .catalog-option",
+        "save-project": ".project-save-head",
+        history: ".history-strip",
+        upscale: ".upscale-panel .generate",
+        planogram: "[data-it-target='planogram']",
+        "planogram-sofa": ".plan-template-grid button:first-child",
+        "planogram-armchair": ".plan-template-grid button:nth-child(5)",
+        "planogram-selected-item": ".planogram-furniture.selected, .planogram-furniture",
+        "planogram-properties": ".plan-properties",
+        "planogram-floor-reference": ".plan-final-actions .plan-surface-reference:first-child",
+        "planogram-wall-reference": ".plan-final-actions .plan-surface-reference:nth-child(2)",
+        "planogram-save": ".plan-save",
+        "planogram-create-render": ".plan-create-reference",
+      };
+      return document.querySelector<HTMLElement>(selectors[target]);
     };
     const revealTarget = (targetName: ItUiTarget) => window.setTimeout(() => {
       const target = findTarget(targetName);
@@ -627,8 +665,8 @@ export default function Home() {
   return <main className="studio-shell">
     <header className="topbar"><div className="wordmark">ROOM<span>DESIGN</span></div><div className="crumb"><button onClick={() => window.history.back()}>← Проекты</button><i>›</i><b>{projectName || "Новый проект"}</b><i>›</i><span>Гостиная</span></div><div className="top-actions"><button className="help">?</button>{user?<AccountDropdown user={user} studio/>:<button className="avatar" title="Аккаунт" onClick={()=>openAuth("login")}>?</button>}</div></header>
     <section className="studio"><aside className="tools" aria-label="Добавить мебель">
-      <button onClick={() => { setActiveTool("Добавить мебель"); setFurnitureAction("add"); setFurnitureMode("choice"); }} className={activeTool === "Добавить мебель" ? "tool active furniture-tool" : "tool furniture-tool"} aria-label="Редактор изображений"><em className="furniture-symbol" aria-hidden="true"><i/><i/><i/></em><span>Редактор изображений</span></button>
-      <button onClick={() => setActiveTool("Планограмма")} className={activeTool === "Планограмма" ? "tool planogram-tool active" : "tool planogram-tool"} aria-label="Создание интерьера"><em aria-hidden="true">⌗</em><span>Создание интерьера</span></button>
+      <button data-it-target="image-editor" onClick={() => { setActiveTool("Добавить мебель"); setFurnitureAction("add"); setFurnitureMode("choice"); }} className={activeTool === "Добавить мебель" ? "tool active furniture-tool" : "tool furniture-tool"} aria-label="Редактор изображений"><em className="furniture-symbol" aria-hidden="true"><i/><i/><i/></em><span>Редактор изображений</span></button>
+      <button data-it-target="planogram" onClick={() => setActiveTool("Планограмма")} className={activeTool === "Планограмма" ? "tool planogram-tool active" : "tool planogram-tool"} aria-label="Создание интерьера"><em aria-hidden="true">⌗</em><span>Создание интерьера</span></button>
       <div className="tool-spacer"/></aside>
       <section className="canvas-area">{activeTool === "Планограмма" ? <PlanogramWorkspace items={planItems} room={planRoom} selectedId={planSelectedId} onSelect={setPlanSelectedId} onChange={setPlanItems} onRoomChange={setPlanRoom} floorReference={planFloorReference} wallReference={planWallReference} onFloorReferenceChange={setPlanFloorReference} onWallReferenceChange={setPlanWallReference} camera={planCamera} onCameraChange={setPlanCamera} onCreateReference={createPlanReference} isCreatingReference={isPlanRendering}/> : <><div className="canvas-head"><div><span className="status-dot"/> {isLoadingProject ? "Загружаем проект…" : generated ? "Визуализация готова" : "Исходное изображение"}</div><div className="canvas-actions"><button type="button" className={projectSaved ? "project-save-control project-save-head saved" : "project-save-control project-save-head"} onClick={()=>void saveProject()} disabled={isSavingProject||isLoadingProject}>{isLoadingProject ? "Загружаем…" : isSavingProject ? "Сохраняем…" : projectSaved ? "Сохранено" : "Сохранить проект"}</button><div className="proposal-control"><button type="button" className="proposal-print proposal-editor-open" onClick={()=>void openCommercialProposal()} disabled={isSavingProject||isLoadingProject} aria-label="Создать коммерческое предложение" title="Создать коммерческое предложение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2 2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 13h10v8H7z"/></svg><span>Создать коммерческое предложение</span></button>{proposalError&&<span className="proposal-inline-error" role="alert">{proposalError}</span>}</div><button className="favorite-icon" onClick={() => setFavorite(!favorite)} aria-label={favorite ? "Убрать из избранного" : "Добавить в избранное"} title={favorite ? "Убрать из избранного" : "Добавить в избранное"}>{favorite ? "♥" : "♡"}</button></div></div>
         <div className={isGenerating ? "room-canvas processing" : "room-canvas"} style={{aspectRatio:canvasRatio,flex:"0 1 auto"}}><img src={generatedImage || "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=90"} alt={generated ? "Сгенерированная интерьерная визуализация" : "Исходная гостиная"}/><div className="canvas-shade"/>{activeTool === "Слои" && interiorImage && <div role="application" aria-label="Обвести предмет кистью" onMouseDown={beginLayerBrush} onMouseMove={continueLayerBrush} onMouseUp={finishLayerBrush} onMouseLeave={finishLayerBrush} style={{position:"absolute",inset:0,zIndex:2,cursor:"crosshair",touchAction:"none"}}><svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:"100%",height:"100%",overflow:"visible",pointerEvents:"none"}}>{layerStrokes.map((stroke)=><path key={stroke.id} d={`M ${stroke.points.map((point)=>`${point[0]} ${point[1]}`).join(" L ")} Z`} fill="rgba(213,232,90,.16)" stroke="#d5e85a" strokeWidth=".45" vectorEffect="non-scaling-stroke"/>)}{layerDrawing&&layerDrawing.length>1&&<path d={`M ${layerDrawing.map((point)=>`${point[0]} ${point[1]}`).join(" L ")}`} fill="none" stroke="#d5e85a" strokeWidth=".45" vectorEffect="non-scaling-stroke" strokeLinecap="round"/>}</svg><span style={{position:"absolute",left:12,top:12,padding:"6px 8px",background:"#242520",borderRadius:4,color:"#fff",fontSize:11,fontWeight:700,pointerEvents:"none"}}>Зажмите и обведите предмет</span></div>}{activeTool === "Добавить мебель" && interiorImage && <><div className="furniture-switch"><button className={furnitureAction === "add" ? "active" : ""} onClick={()=>{setFurnitureAction("add");setPlacementPoint(null);setReplacementTarget(null);setFurnitureMode("choice")}}>Добавить</button><button className={furnitureAction === "replace" ? "active" : ""} onClick={()=>{setFurnitureAction("replace");setPlacementPoint(null);setReplacementTarget(null);setFurnitureMode("choice")}}>Заменить</button></div><button type="button" aria-label={furnitureAction === "replace" ? "Поставить точку в центре предмета для замены" : "Поставить точку размещения предмета"} onClick={(event)=>{const next=layerCursorPosition(event);if(placementPoint&&Math.hypot(next.x-placementPoint.x,next.y-placementPoint.y)<4)setPlacementPoint(null);else setPlacementPoint(next)}} style={{position:"absolute",inset:0,zIndex:3,border:0,padding:0,background:"transparent",cursor:"crosshair"}}>{placementPoint&&<span style={{position:"absolute",left:`${placementPoint.x}%`,top:`${placementPoint.y}%`,width:28,height:28,transform:"translate(-50%,-50%)",borderRadius:"50%",border:"2px solid #d5e85a",background:"#1f201c",color:"#fff",display:"grid",placeItems:"center",fontSize:22,fontWeight:400,boxShadow:"0 2px 10px #0008",pointerEvents:"none"}}>+</span>}</button></>}{activeTool === "Заменить" && Object.entries(exactPolygons).map(([id,polygons])=>{const item=detectedObjects.find((object)=>object.id===id);if(!item)return null;const active=selectedObject?.id===id||hoveredObject===id;const path=polygons.map((polygon)=>polygon.length?`M ${polygon.map((point,index)=>`${index?"L":""}${point[0]} ${point[1]}`).join(" ")} Z`:"").join(" ");return <button key={id} className="object-contour" style={{position:"absolute",inset:0,zIndex:4,width:"100%",height:"100%",padding:0,border:0,background:"transparent",cursor:"pointer"}} onMouseEnter={()=>setHoveredObject(id)} onMouseLeave={()=>setHoveredObject(null)} onFocus={()=>setHoveredObject(id)} onBlur={()=>setHoveredObject(null)} onClick={()=>previewObject(item)} aria-label={`Выбрать: ${item.name}`}><svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:"100%",height:"100%",overflow:"visible",pointerEvents:"none"}}><path d={path} fill={active?"rgba(213,232,90,.26)":"rgba(213,232,90,.11)"} stroke="#d5e85a" strokeWidth={active?0.46:0.28} vectorEffect="non-scaling-stroke"/></svg>{active&&<span style={{position:"absolute",left:`${item.x}%`,top:`${Math.max(2,item.y-4)}%`,padding:"5px 8px",background:"#242520",borderRadius:4,color:"#fff",fontSize:11,fontWeight:700,pointerEvents:"none"}}>{item.name}</span>}</button>})}{activeTool === "Добавить мебель" && interiorImage && placementPoint&&<div className="material-tool" onClick={(event)=>event.stopPropagation()}><button type="button" className="material-brush-trigger" aria-label="Изменить материал выбранной поверхности" aria-expanded={materialMenuOpen} onClick={()=>{if(materialMenuOpen){setMaterialMenuOpen(false);return;}enterMaterialMode();}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 3.3 6 6-8.4 8.4-6-6 8.4-8.4Z"/><path d="M5.2 12.8c-2.4.9-3.2 2.5-2.9 5 .3 2.4-1.1 3.2-1.1 3.2s4.7.7 6.8-1.5c1.2-1.2 1-3.2.1-4.6"/></svg><span className="sr-only">Материал / отделка</span></button>{materialMenuOpen&&materialSelection&&<div className="material-menu" role="dialog" aria-label="Изменить материал"><input ref={materialInputRef} className="material-reference-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event)=>loadMaterialReference(event.target.files?.[0])}/><button type="button" onClick={()=>materialInputRef.current?.click()}>Загрузить референс</button><button type="button" className="material-catalog-action" onClick={()=>{setGenerationError("Каталог материалов готовится.");setMaterialMenuOpen(false)}}>Добавить из каталога</button></div>}</div>}<div className="canvas-note"><span>{activeTool === "Слои" ? "РУЧНОЕ ВЫДЕЛЕНИЕ СЛОЁВ" : activeTool === "Добавить мебель" ? furnitureAction === "replace" ? "ЗАМЕНА ПРЕДМЕТА" : "ДОБАВЛЕНИЕ ПРЕДМЕТА" : generated ? "ИИ-ВИЗУАЛИЗАЦИЯ" : "ИСХОДНОЕ ИЗОБРАЖЕНИЕ"}</span><strong>{activeTool === "Слои" ? "Зажмите и обведите предмет кистью" : activeTool === "Добавить мебель" ? furnitureAction === "replace" ? "Поставьте точку в центре предмета, который хотите заменить." : "Поставьте точку на изображении, куда хотите установить предмет." : generated ? `Ваша идея / ${creativity.toLowerCase()} креативность` : "Гостиная"}</strong></div>{isGenerating && <div className="generating"><div className="orb"/><strong>Создаём ваш дизайн…</strong><span>Norr AI готовит визуализацию</span></div>}</div>

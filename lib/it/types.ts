@@ -19,7 +19,31 @@ export type RoomDesignContext = {
   furnitureAction: "add" | "replace" | "remove";
   selectedObject: { id: string; name: string } | null;
   render: { hasSource: boolean; hasResult: boolean; isGenerating: boolean };
-  planogram: { itemCount: number; selectedItemId: string | null };
+  planogram: {
+    itemCount: number;
+    selectedItemId: string | null;
+    selectedItem: {
+      id: string;
+      name: string;
+      kind: string;
+      widthMm: number;
+      depthMm: number;
+      rotation: number;
+      hasReference: boolean;
+      referenceName: string | null;
+    } | null;
+    room: { widthMm: number; lengthMm: number };
+    hasFloorReference: boolean;
+    hasWallReference: boolean;
+    hasCamera: boolean;
+  };
+  workspace: {
+    isAuthenticated: boolean;
+    projectSaved: boolean;
+    historyCount: number;
+    queuedEditCount: number;
+    hasFurnitureReference: boolean;
+  };
   availableActions: string[];
 };
 
@@ -37,7 +61,25 @@ export type ItCatalogProduct = {
   heightMm: number | null;
 };
 
-export type ItUiTarget = "replace" | "planogram" | "planogram-sofa" | "planogram-armchair";
+export type ItUiTarget =
+  | "image-editor"
+  | "image-upload"
+  | "editor-add"
+  | "replace"
+  | "editor-remove"
+  | "editor-catalog"
+  | "save-project"
+  | "history"
+  | "upscale"
+  | "planogram"
+  | "planogram-sofa"
+  | "planogram-armchair"
+  | "planogram-selected-item"
+  | "planogram-properties"
+  | "planogram-floor-reference"
+  | "planogram-wall-reference"
+  | "planogram-save"
+  | "planogram-create-render";
 
 export type ItUiAction =
   | { type: "navigate"; target: "image-editor" | "planogram" }
