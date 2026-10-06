@@ -215,12 +215,13 @@ test("planogram surface references and save point to their own controls", async 
   );
   const save = await runItTurn(
     { message: "Что делает кнопка Сохранить проект в планограмме?", context: planogramContext },
-    { searchCatalog: async () => [], answerConversation: modelAdapter(saveCalls, "Она скачивает JSON плана.") },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(saveCalls, "Она сохраняет план в проекте аккаунта.") },
   );
   assert.equal(floor.actions, undefined);
   assert.equal(save.actions, undefined);
   assert.match(floorCalls[0].toolFacts.join(" "), /Референс пола/);
-  assert.match(saveCalls[0].toolFacts.join(" "), /JSON-файл/);
+  assert.match(saveCalls[0].toolFacts.join(" "), /проекте аккаунта/);
+  assert.match(saveCalls[0].toolFacts.join(" "), /JSON-файл не скачивается/);
 });
 
 test("the verified product knowledge covers both editors and known limitations", () => {
@@ -229,21 +230,23 @@ test("the verified product knowledge covers both editors and known limitations",
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.planogram.camera, /двойной клик/i);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.replace, /поставить точку/i);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.commercialProposal.download, /Скачать PDF/);
-  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.commercialProposal.formats, /PowerPoint\/PPTX нет/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.commercialProposal.download, /Скачать PPT/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.commercialProposal.formats, /PowerPoint/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.material, /Каталог материалов пока не готов/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /только текстом/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /не перемещается/);
 });
 
-test("commercial proposal guidance states the exact editor flow and export limitation", async () => {
+test("commercial proposal guidance states the exact editor flow and both export formats", async () => {
   const calls = [];
   const turn = await runItTurn(
     { message: "Как скачать коммерческое предложение в PowerPoint?", context },
-    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Откройте редактор предложения и нажмите «Скачать PDF». Экспорта в PowerPoint пока нет.") },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Откройте редактор предложения и нажмите «Скачать PPT» для PowerPoint.") },
   );
   assert.equal(turn.actions, undefined);
   assert.match(calls[0].toolFacts.join(" "), /Скачать PDF/);
-  assert.match(calls[0].toolFacts.join(" "), /PowerPoint\/PPTX не поддерживается/);
+  assert.match(calls[0].toolFacts.join(" "), /Скачать PPT/);
+  assert.match(calls[0].toolFacts.join(" "), /PowerPoint в формате PPTX/);
   assert.match(calls[0].toolFacts.join(" "), /Скриншот для этого не нужен/);
 });
 
