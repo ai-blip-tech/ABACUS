@@ -3,3 +3,31 @@
 @media(max-width:700px){.it-layer{right:10px;bottom:10px}.it-surface{right:0;bottom:55px;width:calc(100vw - 20px);height:min(620px,calc(100dvh - 82px));border-radius:18px 18px 40px 18px}.it-layer.is-open .it-orb{right:6px;bottom:5px;width:78px;height:78px}.it-intro h2{font-size:30px}.it-transcript{padding-right:17px;padding-left:17px}.it-surface-head{padding-right:17px;padding-left:17px}.it-suggestions{margin-right:17px;margin-left:17px}}
 @media(prefers-reduced-motion:reduce){.it-layer *{scroll-behavior:auto!important}.it-orb,.it-surface,.it-liquid,.it-process>span{animation:none!important;transition:none!important}}
 .it-guided-target{position:relative!important;z-index:20!important;animation:it-target 1s ease-in-out 4!important;box-shadow:0 0 0 4px rgba(213,232,90,.55),0 0 0 9px rgba(24,24,20,.18)!important}@keyframes it-target{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+
+/* Multimodal composer and cursor-like guide motion. */
+.it-composer{grid-template-columns:30px 30px minmax(0,1fr) 38px;align-items:center;gap:4px}
+.it-file-input{display:none!important}
+.it-composer .it-composer-tool{position:relative;width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:#69665e;font-size:18px;cursor:pointer}
+.it-composer .it-composer-tool:hover{background:#f0ece4;color:#171713}
+.it-composer .it-composer-tool:first-of-type{font-size:0}
+.it-composer .it-composer-tool:first-of-type:before{content:"";position:absolute;left:8px;top:7px;width:12px;height:14px;border:1.5px solid currentColor;border-radius:6px;transform:rotate(42deg)}
+.it-composer .it-composer-tool:first-of-type:after{content:"";position:absolute;left:12px;top:8px;width:6px;height:10px;border:1.5px solid currentColor;border-radius:5px;transform:rotate(42deg)}
+.it-mic span{position:absolute;left:11px;top:6px;width:8px;height:12px;border:1.5px solid currentColor;border-radius:5px}
+.it-mic span:before{content:"";position:absolute;left:-4px;top:5px;width:12px;height:8px;border:1.5px solid currentColor;border-top:0;border-radius:0 0 8px 8px}
+.it-mic span:after{content:"";position:absolute;left:3px;top:13px;width:1.5px;height:5px;background:currentColor;box-shadow:-3px 5px 0 currentColor,3px 5px 0 currentColor}
+.it-composer .it-send{width:36px;height:36px;border:0;border-radius:10px;background:#1e1e1a;color:#fff;font-size:17px;cursor:pointer}
+.it-composer .it-send:disabled{background:#cfcbc2;color:#f4f1eb;cursor:default}
+.it-composer.is-recording{border-color:#a7483d;box-shadow:0 0 0 3px rgba(167,72,61,.09)}
+.it-composer.is-recording .it-mic{background:#a7483d;color:#fff;animation:it-recording 1.2s ease-in-out infinite}
+.it-image-draft{display:grid;grid-template-columns:44px minmax(0,1fr) 28px;align-items:center;gap:9px;margin:0 14px 8px;padding:7px;border:1px solid #ded9cf;border-radius:11px;background:rgba(255,255,255,.8)}
+.it-image-draft img{width:44px;height:38px;border-radius:6px;object-fit:cover}
+.it-image-draft span{color:#5f5b52;font-size:9px}
+.it-image-draft button{width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:#77736a;font-size:18px;cursor:pointer}
+.it-message-image{display:block;width:min(100%,270px);max-height:190px;margin:0 0 10px;border-radius:10px;object-fit:cover}
+.it-composer-error{margin:0 18px 8px;color:#9f3f34;font-size:9px;line-height:1.4}
+.it-layer.is-guiding .it-orb{width:58px;height:58px;transform:translate(var(--it-guide-x),var(--it-guide-y));transition:width .25s ease,height .25s ease,transform .72s cubic-bezier(.2,.78,.2,1);animation:none}
+.it-layer.is-guiding .it-orb-glass{border-color:rgba(194,104,29,.72);box-shadow:inset -8px -10px 18px rgba(25,25,21,.13),inset 8px 8px 15px rgba(255,255,255,.55),0 0 0 4px rgba(194,104,29,.22),0 13px 30px rgba(26,20,15,.28)}
+.it-guided-target{animation:it-target-color 1s ease-in-out 4!important;box-shadow:0 0 0 4px rgba(194,104,29,.34),0 0 0 9px rgba(24,24,20,.14)!important}
+@keyframes it-target-color{0%,100%{filter:none}50%{background-color:#c2681d;color:#fff;filter:saturate(1.2)}}
+@keyframes it-recording{0%,100%{box-shadow:0 0 0 0 rgba(167,72,61,.24)}50%{box-shadow:0 0 0 6px rgba(167,72,61,0)}}
+@media(max-width:700px){.it-composer{grid-template-columns:28px 28px minmax(0,1fr) 36px;gap:2px}.it-layer.is-guiding .it-orb{width:52px;height:52px}}

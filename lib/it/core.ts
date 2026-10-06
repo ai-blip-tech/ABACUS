@@ -20,6 +20,7 @@ export type CatalogSearchInput = {
 
 export type ConversationInput = {
   message: string;
+  image?: string;
   history: ItConversationMessage[];
   context: RoomDesignContext;
   products: ItCatalogProduct[];
@@ -70,9 +71,23 @@ const categoryFromProducts = (products: ItCatalogProduct[]) => categoryFromText(
 
 const shouldSearchCatalog = (message: string, hasPreviousProducts: boolean, hasPriorSubject: boolean) => {
   const text = normalize(message);
-  return /найди|подбери|покажи варианты|ищу|нужно? найти/.test(text)
+  return /найди|подбери|ищу|нужно? найти|самые дешевые|в каталоге|в наличии|покажи.{0,36}(?:вариант|подбор|товар|диван|кресл|стул|стол|кроват|ковер|светильник)/.test(text)
     || (hasPreviousProducts && /подешевле|дешевле|бюджетнее|другие варианты/.test(text))
     || (hasPriorSubject && /хочу другой|другой вариант|покажи другой/.test(text));
+};
+
+const planogramGuidanceTarget = (message: string, history: ItConversationMessage[], context: RoomDesignContext) => {
+  const text = normalize(message);
+  const recent = normalize(recentConversationText(history));
+  const asksForPlanogram = /(?:как|где|что).{0,45}(?:попасть|перейти|открыть|нажать).{0,35}(?:план|создани[ея] интерьер)|планограмм/.test(text);
+  const followsPlanPlacement = /^(?:на|в) план[.!?\s]*$/.test(text) && /добавить.{0,45}(?:диван|кресл)/.test(recent);
+  const asksToAddOnPlan = context.section === "planogram" && /(?:как|где).{0,35}добавить.{0,45}(?:диван|кресл)/.test(text);
+  if (!asksForPlanogram && !followsPlanPlacement && !asksToAddOnPlan) return undefined;
+  if (context.section !== "planogram") return "planogram" as const;
+  const subject = `${text} ${recent}`;
+  if (/диван/.test(subject)) return "planogram-sofa" as const;
+  if (/кресл/.test(subject)) return "planogram-armchair" as const;
+  return "planogram" as const;
 };
 
 const shouldGuideReplace = (message: string, history: ItConversationMessage[], context: RoomDesignContext) => {
@@ -92,6 +107,14 @@ export async function runItTurn(request: ItRequest, adapters: ItAdapters): Promi
   const actions: ItUiAction[] = [];
   const toolFacts: string[] = [];
   let products: ItCatalogProduct[] = [];
+
+  const planogramTarget = planogramGuidanceTarget(message, history, request.context);
+  if (planogramTarget) {
+    actions.push({ type: "focus", target: planogramTarget }, { type: "highlight", target: planogramTarget }, { type: "guide", target: planogramTarget });
+    toolFacts.push(planogramTarget === "planogram"
+      ? "Нужно показать пользователю кнопку «Создание интерьера» в левой навигации. Оно физически подведёт сферу к этой кнопке; пользователь нажимает её самостоятельно."
+      : `Планограмма уже открыта. Нужно показать кнопку «${planogramTarget === "planogram-sofa" ? "Диван" : "Кресло"}» в правой панели; пользователь нажимает её самостоятельно.`);
+  }
 
   if (shouldGuideReplace(message, history, request.context)) {
     const hasSource = request.context.render.hasSource;
@@ -115,12 +138,13 @@ export async function runItTurn(request: ItRequest, adapters: ItAdapters): Promi
     }
     products = await adapters.searchCatalog({ category, maxPrice, limit: 5 });
     toolFacts.push(products.length
-      ? `Catalog search returned ${products.length} real available products. Use only the attached structured product data for names, prices and properties.`
+      ? `Catalog search returned the ${products.length} cheapest real available matching products, sorted by price ascending across the complete filtered catalog result. Use only the attached structured product data for names, prices and properties.`
       : "Catalog search returned no matching products. Do not invent alternatives or prices.");
   }
 
   const text = await adapters.answerConversation({
     message,
+    image: request.image,
     history,
     context: request.context,
     products,

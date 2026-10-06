@@ -151,6 +151,7 @@ export async function GET(request: Request) {
   const subtype = normalize(search.get("subtype") || "");
   const availableOnly = search.get("available") === "1";
   const maxPrice = Math.max(0, Number(search.get("maxPrice")) || 0);
+  const sort = search.get("sort") || "";
   const page = Math.max(1, Number(search.get("page")) || 1);
   const limit = Math.min(30, Math.max(6, Number(search.get("limit")) || 18));
 
@@ -166,6 +167,7 @@ export async function GET(request: Request) {
       if (query && !haystack.includes(query)) return false;
       return !subtype || normalize(product.subtype).includes(subtype);
     });
+    if (sort === "price_asc") matched.sort((left, right) => (left.price || Number.POSITIVE_INFINITY) - (right.price || Number.POSITIVE_INFINITY));
     const subtypes = Array.from(new Set(matched.map((product) => product.subtype).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru")).slice(0, 24);
     const start = (page - 1) * limit;
     const selectedProducts = ids.size ? matched.slice(0, 100) : matched.slice(start, start + limit);
