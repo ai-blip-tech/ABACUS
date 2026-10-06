@@ -152,6 +152,7 @@ export async function GET(request: Request) {
   const query = normalize(search.get("q") || "");
   const subtype = normalize(search.get("subtype") || "");
   const availableOnly = search.get("available") === "1";
+  const maxPrice = Math.max(0, Number(search.get("maxPrice")) || 0);
   const page = Math.max(1, Number(search.get("page")) || 1);
   const limit = Math.min(30, Math.max(6, Number(search.get("limit")) || 18));
 
@@ -162,6 +163,7 @@ export async function GET(request: Request) {
       const trail = product._trail || "";
       if (!matchesCatalogType(product, type, trail)) return false;
       if (availableOnly && !product.available) return false;
+      if (maxPrice && (!product.price || product.price > maxPrice)) return false;
       const haystack = normalize(`${product.name} ${product.article} ${product.subtype} ${product.color} ${product.material}`);
       if (query && !haystack.includes(query)) return false;
       return !subtype || normalize(product.subtype).includes(subtype);
