@@ -225,11 +225,36 @@ test("planogram surface references and save point to their own controls", async 
 
 test("the verified product knowledge covers both editors and known limitations", () => {
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.planogram.reference, /правой кнопкой/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.planogram.catalogReference, /Добавить из каталога/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.planogram.camera, /двойной клик/i);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.replace, /поставить точку/i);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.commercialProposal.download, /Скачать PDF/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.commercialProposal.formats, /PowerPoint\/PPTX нет/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.material, /Каталог материалов пока не готов/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /только текстом/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /не перемещается/);
+});
+
+test("commercial proposal guidance states the exact editor flow and export limitation", async () => {
+  const calls = [];
+  const turn = await runItTurn(
+    { message: "Как скачать коммерческое предложение в PowerPoint?", context },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(calls, "Откройте редактор предложения и нажмите «Скачать PDF». Экспорта в PowerPoint пока нет.") },
+  );
+  assert.equal(turn.actions, undefined);
+  assert.match(calls[0].toolFacts.join(" "), /Скачать PDF/);
+  assert.match(calls[0].toolFacts.join(" "), /PowerPoint\/PPTX не поддерживается/);
+  assert.match(calls[0].toolFacts.join(" "), /Скриншот для этого не нужен/);
+});
+
+test("current visualization download guidance names the real WebP format", async () => {
+  const calls = [];
+  await runItTurn(
+    { message: "Как скачать текущую визуализацию?", context },
+    { searchCatalog: async () => [], answerConversation: modelAdapter(calls) },
+  );
+  assert.match(calls[0].toolFacts.join(" "), /WebP/);
+  assert.match(calls[0].toolFacts.join(" "), /истории рендеров/);
 });
 
 test("cheaper follow-up inherits product category and budget from history", async () => {
