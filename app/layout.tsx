@@ -6,6 +6,7 @@ import "./home-override.css";
 import "./create-project.css";
 import "./account-dashboard-concept-d.css";
 import "./studio-preview-iteration.css";
+import "./it-orb.css";
 
 const cormorantGaramond = localFont({
   src: [

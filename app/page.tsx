@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import type React from "react";
 import AccountDropdown from "./account-dropdown";
+import ItOrb from "./it-orb";
+import type { ItUiAction, RoomDesignContext } from "@/lib/it/types";
 import "./account-dropdown.css";
 import { normalizePlanReferenceImages } from "@/lib/plan-render";
 import { clonePlanogramItem, isEditablePlanogramShortcutTarget } from "@/lib/planogram-clipboard";
@@ -474,6 +476,40 @@ export default function Home() {
     return () => {cancelAnimationFrame(frame);window.removeEventListener("popstate", onPopState);};
   }, []);
   useEffect(() => { void fetch("/api/auth/me").then((response) => response.ok ? response.json() : { user: null }).then((payload) => setUser(payload.user || null)).catch(() => setUser(null)); }, []);
+  const itContext: RoomDesignContext = {
+    route: view === "studio" ? "#студия" : `#${view}`,
+    projectId: projectId || null,
+    projectName: projectName || "Новый проект",
+    section: activeTool === "Планограмма" ? "planogram" : "image-editor",
+    activeTool,
+    furnitureAction,
+    selectedObject: selectedObject ? { id: selectedObject.id, name: selectedObject.name } : null,
+    render: { hasSource: Boolean(interiorImage), hasResult: Boolean(generatedImage), isGenerating },
+    planogram: { itemCount: planItems.length, selectedItemId: planSelectedId },
+    availableActions: ["get_current_context", "navigate_to", "focus_element", "highlight_element", "open_panel", "search_catalog"],
+  };
+  const handleItAction = (action: ItUiAction) => {
+    if (action.type === "navigate") {
+      setActiveTool(action.target === "planogram" ? "Планограмма" : "Добавить мебель");
+      if (action.target === "image-editor") setFurnitureMode("choice");
+      return;
+    }
+    if (action.target === "replace") {
+      setActiveTool("Добавить мебель");
+      setFurnitureAction("replace");
+      setFurnitureMode("choice");
+      window.setTimeout(() => {
+        const target = Array.from(document.querySelectorAll<HTMLButtonElement>(".furniture-switch button,.furniture-action-bar button"))
+          .find((button) => button.textContent?.trim() === "Заменить");
+        if (!target) return;
+        if (action.type === "focus") target.focus({ preventScroll: true });
+        if (action.type === "highlight") {
+          target.classList.add("it-guided-target");
+          window.setTimeout(() => target.classList.remove("it-guided-target"), 4200);
+        }
+      }, 80);
+    }
+  };
   if (view === "home") return <main className="home-page reference-home">
     <header className="reference-nav"><div className="reference-nav-inner"><button className="reference-wordmark" onClick={() => navigate("home")} aria-label="ROOM design">ROOM <span>design</span></button><nav><a href="#возможности">Возможности</a><a href="#процесс">Процесс</a>{user?<AccountDropdown user={user}/>:<button onClick={() => openAuth("login")}>Войти</button>}</nav></div></header>
     <section className="reference-hero"><div className="reference-hero-inner"><div className="reference-copy"><p className="reference-kicker">ИИ-пространство для дизайнеров интерьера</p><h1>Ваш<br/>интерьер.<br/>Ваше<br/><strong>видение.</strong></h1><p>Исследуйте идеи, меняйте пространство и визуализируйте любые предметы в своём проекте.</p><button className="reference-primary" onClick={continueToProject}>Начать <span>→</span></button></div><div className="reference-stage"><img src="https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=1400&q=90" alt="Современный интерьер"/><span>ПРОСТРАНСТВО ДЛЯ ИДЕЙ</span></div></div></section>
@@ -550,6 +586,7 @@ export default function Home() {
         {upscaleVersion&&<section className="upscale-panel" aria-label="Апскейл выбранной версии"><div className="upscale-preview"><img src={upscaleVersion.image} alt={`Предпросмотр: ${upscaleVersion.name}`}/><span>Предпросмотр перед апскейлом</span></div><div className="upscale-copy"><label>КАЧЕСТВО ИЗОБРАЖЕНИЯ</label><h2>Сделать апскейл</h2><p>Улучшим детализацию и чёткость выбранной версии. Композиция, предметы и кадр останутся прежними.</p><button className="generate" type="button" onClick={()=>void upscaleHistoryVersion()} disabled={isGenerating}>{isGenerating?"Улучшаем качество…":"✦ Сделать апскейл"}</button>{generationError&&<p className="generation-error" role="alert">{generationError}</p>}</div></section>}
         {activeTool === "Слои" && <LayerGallery background={layerBackground} source={interiorImage || generatedImage || ""} objects={detectedObjects} layers={layerImages} hidden={hiddenLayerIds} selected={selectedObject} onSelect={previewObject} onReplace={replaceSelectedObject} onRemove={(item)=>setHiddenLayerIds((items)=>items.includes(item.id)?items.filter((id)=>id!==item.id):[...items,item.id])} isBuilding={isBuildingLayers}/>}</>}</section>
       <aside className="inspector"><div className="inspector-title"><div><span>СТУДИЯ КОМНАТЫ</span><h1>{productMode ? "Редактор изображений" : activeTool === "Планограмма" ? "Создание интерьера" : activeTool}</h1></div><button>•••</button></div>{activeTool === "Планограмма" ? <>{generationError&&<p className="panel-error" role="alert">{generationError}</p>}<PlanogramPanel items={planItems} room={planRoom} selectedId={planSelectedId} onSelect={setPlanSelectedId} onChange={setPlanItems}/></> : activeTool === "Слои" ? <LayersPanel isBuilding={isBuildingLayers} error={detectionError} onBuild={buildLayers} onUpload={loadInterior} imageName={interiorName} points={layerStrokes.map((stroke)=>({id:stroke.id,x:0,y:0,width:0,height:0,name:stroke.name}))} onRemovePoint={(id)=>setLayerStrokes((strokes)=>strokes.filter((stroke)=>stroke.id!==id))}/> : activeTool === "Заменить" ? <ObjectPanel objects={detectedObjects} selected={selectedObject} isDetecting={isDetecting} isGenerating={isGenerating || isSegmenting} error={detectionError || generationError} onDetect={detectObjects} onSelect={previewObject} onUpload={loadInterior} imageName={interiorName} onReplace={replaceSelectedObject} onRemove={removeSelectedObject}/> : productMode ? <FurnitureChoice action={furnitureAction} onUpload={loadInterior} imageName={interiorName} interiorImage={interiorImage} referenceName={referenceName} setReferenceName={setReferenceName} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={generate} queuedEdits={furnitureEdits} onQueueCatalogProduct={queueCatalogProduct} onRemoveQueued={(id)=>setFurnitureEdits((items)=>items.filter((item)=>item.id!==id))} onGenerateQueued={generateFurnitureEdits} placementPrompt={placementPrompt} setPlacementPrompt={setPlacementPrompt} onAdjust={editCurrentImage} canAdjust={Boolean(interiorImage)} isGenerating={isGenerating || isSegmenting} generationError={generationError}/> : <DesignPanel prompt={prompt} setPrompt={setPrompt} generate={generate} isGenerating={isGenerating || isSegmenting} generationError={generationError} selected={selected} onProducts={() => { setActiveTool("Добавить мебель"); setFurnitureMode("choice"); }} preserved={preserved} setPreserved={setPreserved} creativity={creativity} setCreativity={setCreativity}/>}</aside></section>
+    <ItOrb context={itContext} onAction={handleItAction}/>
     {saveProjectDialogOpen&&<div className="auth-overlay save-project-overlay" role="dialog" aria-modal="true" aria-labelledby="save-project-title"><form className="auth-card save-project-card" onSubmit={saveGenerationAsProject}><button className="auth-close" type="button" aria-label="Закрыть" onClick={()=>setSaveProjectDialogOpen(false)}>×</button><span>НОВЫЙ ПРОЕКТ</span><h2 id="save-project-title">Сохранить как проект</h2><p>Назовите проект, чтобы продолжить работу с этой визуализацией позже.</p><label htmlFor="save-project-name">Название проекта<input id="save-project-name" value={saveProjectName} onChange={(event)=>{setSaveProjectName(event.target.value);if(saveProjectError)setSaveProjectError("");}} required maxLength={120} placeholder="Например, гостиная на Патриарших"/></label>{saveProjectError&&<p className="auth-error" role="alert">{saveProjectError}</p>}<button className="auth-submit" disabled={isSavingProject}>{isSavingProject?"Сохраняем…":"Сохранить"}</button></form></div>}
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);}}/>}
     {adminOpen && <AdminDashboard onClose={()=>setAdminOpen(false)}/>}
