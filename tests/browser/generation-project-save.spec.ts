@@ -139,6 +139,40 @@ test("planogram save creates a named project when no project exists", async ({ p
   await expect(page).toHaveURL(new RegExp(`\\?project=${projectId}#`));
 });
 
+test("planogram pouf and cabinet open their matching catalog categories", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-1440");
+  const projectId = "planogram-catalog-types";
+  const catalogTypes: string[] = [];
+  await page.route("**/api/auth/me", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ user: { id: "user-3", email: "catalog@example.com", role: "user", firstName: "Catalog", lastName: "User" } }),
+  }));
+  await page.route(`**/api/projects/${projectId}`, (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ project: { id: projectId, name: "Каталог планограммы", project_type: "Квартира" }, state: { planItems: [], planRoom: { width: 6000, length: 4500 } } }),
+  }));
+  await page.route("**/api/catalog?**", (route) => {
+    catalogTypes.push(new URL(route.request().url()).searchParams.get("type") || "");
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [], total: 0, subtypes: [] }) });
+  });
+
+  await page.goto(`/?project=${projectId}#студия`);
+  await page.getByRole("button", { name: "Создание интерьера" }).click();
+
+  await page.locator(".plan-template-grid").getByRole("button", { name: "Пуф", exact: true }).click();
+  await page.getByRole("button", { name: /Пуф: перемещать/ }).click({ button: "right" });
+  await page.locator(".plan-context-menu").getByRole("button", { name: "Добавить из каталога" }).click();
+  await expect.poll(() => catalogTypes.at(-1)).toBe("ottoman");
+  await page.getByRole("button", { name: "Закрыть каталог" }).click();
+
+  await page.locator(".plan-template-grid").getByRole("button", { name: "Шкаф", exact: true }).click();
+  await page.getByRole("button", { name: /Шкаф: перемещать/ }).click({ button: "right" });
+  const cabinetCatalog = page.locator(".plan-context-menu").getByRole("button", { name: "Добавить из каталога" });
+  await expect(cabinetCatalog).toBeVisible();
+  await cabinetCatalog.click();
+  await expect.poll(() => catalogTypes.at(-1)).toBe("cabinet");
+});
+
 test("an uploaded project interior survives reload before a manual save click", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.endsWith("-1440"));
   let savedBody: Record<string, unknown> | null = null;

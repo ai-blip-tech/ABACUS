@@ -91,6 +91,8 @@ test("planogram keeps menus readable, rugs below furniture, and supports bedside
   assert.match(catalogSource, /type\s*===\s*"cabinet"/);
   assert.match(catalogSource, /type\s*===\s*"ottoman"/);
   assert.match(controlsSource, /keepMenuHorizontal/);
+  assert.match(controlsSource, /classList\.contains\("stool"\)[^\n]+\? "ottoman" : "chair"/);
+  assert.match(controlsSource, /classList\.contains\("cabinet"\)\) return "cabinet"/);
   assert.match(controlsSource, /--no-rotation/);
   assert.match(stylesSource, /\.planogram-furniture\.rug[^}]*z-index:\s*1!important/);
   assert.match(stylesSource, /\.planogram-furniture:not\(\.rug\)[^{]*\{z-index:\s*2\}/);
