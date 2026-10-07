@@ -15,6 +15,19 @@ type Phase = "idle" | "processing" | "failed";
 
 const isValueSlot = (slot: TemplateInputSlot) => slot.kind === "choice" || slot.kind === "short_text" || slot.kind === "range";
 const isImage = (file: UploadedFile) => file.type.startsWith("image/");
+const imageTypeByExtension: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+const normalizedFileType = (file: Pick<File, "name" | "type">) => {
+  const type = file.type.toLowerCase();
+  if (type === "image/jpg" || type === "image/pjpeg") return "image/jpeg";
+  if (type) return type;
+  return imageTypeByExtension[file.name.split(".").pop()?.toLowerCase() || ""] || "";
+};
+const acceptedFileTypes = (slot: TemplateInputSlot) => [
+  ...slot.acceptedMimeTypes,
+  ...(slot.acceptedMimeTypes.includes("image/jpeg") ? [".jpg", ".jpeg"] : []),
+  ...(slot.acceptedMimeTypes.includes("image/png") ? [".png"] : []),
+  ...(slot.acceptedMimeTypes.includes("image/webp") ? [".webp"] : []),
+].join(",");
 
 const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
@@ -24,18 +37,20 @@ const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
 });
 
 const readFile = (file: File, maxDimension = 1800) => new Promise<UploadedFile>((resolve, reject) => {
+  const fileType = normalizedFileType(file);
   const reader = new FileReader();
   reader.onload = () => {
-    const dataUrl = String(reader.result || "");
-    if (!file.type.startsWith("image/")) {
-      resolve({ id: crypto.randomUUID(), name: file.name, type: file.type, size: file.size, dataUrl, createdAt: new Date().toISOString() });
+    const rawDataUrl = String(reader.result || "");
+    const dataUrl = fileType && rawDataUrl.startsWith("data:") ? rawDataUrl.replace(/^data:[^;,]*/, `data:${fileType}`) : rawDataUrl;
+    if (!fileType.startsWith("image/")) {
+      resolve({ id: crypto.randomUUID(), name: file.name, type: fileType, size: file.size, dataUrl, createdAt: new Date().toISOString() });
       return;
     }
     const image = new Image();
     image.onload = () => {
       const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
       if (scale === 1) {
-        resolve({ id: crypto.randomUUID(), name: file.name, type: file.type, size: file.size, dataUrl, createdAt: new Date().toISOString() });
+        resolve({ id: crypto.randomUUID(), name: file.name, type: fileType, size: file.size, dataUrl, createdAt: new Date().toISOString() });
         return;
       }
       const canvas = document.createElement("canvas");
@@ -60,7 +75,8 @@ const resolveDataUrl = async (file: UploadedFile) => file.dataUrl.startsWith("da
 }));
 
 const validateFile = (slot: TemplateInputSlot, file: File) => {
-  if (slot.acceptedMimeTypes.length && !slot.acceptedMimeTypes.includes(file.type)) throw new Error(`${file.name}: неподдерживаемый формат.`);
+  const fileType = normalizedFileType(file);
+  if (slot.acceptedMimeTypes.length && !slot.acceptedMimeTypes.includes(fileType)) throw new Error(`${file.name}: неподдерживаемый формат. Используйте JPG, PNG или WEBP.`);
   if (slot.maxBytes && file.size > slot.maxBytes) throw new Error(`${file.name}: файл превышает допустимый размер.`);
 };
 
@@ -380,7 +396,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
           {isValueSlot(slot) ? slot.kind === "choice" ? <div className="editorial-choice-grid">{slot.options?.map((option) => <button className={values[slot.id] === option ? "is-selected" : ""} aria-pressed={values[slot.id] === option} type="button" key={option} onClick={() => setInputValue(slot.id, option)}>{option}</button>)}</div> : slot.kind === "range" ? <RangeControl slot={slot} value={values[slot.id] || ""} onChange={(value) => setInputValue(slot.id, value)} /> : <textarea className="editorial-text-input" value={values[slot.id] || ""} placeholder={slot.placeholder} onChange={(event) => setInputValue(slot.id, event.target.value)} /> : <>
             <div className={`editorial-dynamic-files${slot.id === primarySlot?.id ? " is-primary" : ""}${draggedAssetId && canAddHistoryToSlot(assetHistory.find((file) => file.id === draggedAssetId), slot) ? " is-drop-ready" : ""}${dropTargetSlotId === slot.id ? " is-drop-active" : ""}`} onDragOver={(event) => allowHistoryDrop(event, slot)} onDragLeave={() => setDropTargetSlotId("")} onDrop={(event) => dropHistoryAsset(event, slot)}>
               {(uploads[slot.id] || []).map((file) => <FileCard key={file.id} file={file} onRemove={() => removeFile(slot.id, file.id)} />)}
-              {(uploads[slot.id]?.length || 0) < slot.maxCount && <label className="editorial-dynamic-add"><input type="file" multiple={slot.maxCount > 1} accept={slot.acceptedMimeTypes.join(",")} onChange={(event) => void uploadFiles(slot, event)} /><b>+</b><span>{uploads[slot.id]?.length ? "Добавить ещё" : "Добавить файл"}</span></label>}
+              {(uploads[slot.id]?.length || 0) < slot.maxCount && <label className="editorial-dynamic-add"><input type="file" multiple={slot.maxCount > 1} accept={acceptedFileTypes(slot)} aria-label={slot.label} onChange={(event) => void uploadFiles(slot, event)} /><b>+</b><span>{uploads[slot.id]?.length ? "Добавить ещё" : "Добавить файл"}</span></label>}
             </div>
             {slot.consent && slot.consent !== "none" && Boolean(uploads[slot.id]?.length) && <label className="editorial-consent"><input type="checkbox" checked={Boolean(consents[slot.id])} onChange={(event) => setConsents((current) => ({ ...current, [slot.id]: event.target.checked }))} /><span>{slot.consent === "people" ? "У меня есть согласие людей на использование фотографий" : slot.consent === "audio" ? "У меня есть право использовать этот аудиофрагмент" : "Владелец материала подтвердил участие"}</span></label>}
           </>}

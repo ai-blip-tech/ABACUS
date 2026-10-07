@@ -98,6 +98,15 @@ test("light scenarios offers an exclusive preset-or-kelvin control and preserves
   assert.match(scenarioWorkbenchSource, /exclusiveValueGroups/);
 });
 
+test("scenario image upload remains clickable across browsers and accepts common JPEG metadata variants", () => {
+  assert.match(scenarioWorkbenchSource, /type === "image\/jpg" \|\| type === "image\/pjpeg"/);
+  assert.match(scenarioWorkbenchSource, /imageTypeByExtension/);
+  assert.match(scenarioWorkbenchSource, /accept=\{acceptedFileTypes\(slot\)\}/);
+  assert.match(scenarioWorkbenchSource, /aria-label=\{slot\.label\}/);
+  assert.match(templatesCssSource, /\.editorial-dynamic-add input\{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer\}/);
+  assert.doesNotMatch(templatesCssSource, /\.editorial-dynamic-add input\{[^}]*pointer-events:none/);
+});
+
 test("furniture casting keeps its specialized endpoint and other image scenarios use the additive template adapter", () => {
   assert.match(editorialWorkbenchSource, /fetch\("\/api\/generate"/);
   assert.match(editorialWorkbenchSource, /Idempotency-Key/);

@@ -11,7 +11,7 @@ const room = (label = "Загрузите фото вашей комнаты", m
   id: "room",
   kind: "room_image",
   label,
-  helper: maxCount > 1 ? `JPG, PNG или WEBP · до ${maxCount} фотографий` : "Снимок без сильного размытия, людей и водяных знаков",
+  helper: maxCount > 1 ? `JPG, PNG или WEBP · до ${maxCount} фотографий` : "JPG, PNG или WEBP · до 15 МБ · без сильного размытия, людей и водяных знаков",
   required: true,
   minCount: 1,
   maxCount,
