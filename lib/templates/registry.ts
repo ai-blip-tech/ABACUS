@@ -232,7 +232,7 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
   }),
 ];
 
-const templatePriority = ["light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"];
+const templatePriority = ["design-battle", "light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"];
 
 export const templateRegistry: TemplateDefinition[] = [...unorderedTemplateRegistry]
   .sort((left, right) => {

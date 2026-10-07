@@ -125,7 +125,7 @@ function ScrollScrubHero({ onStartProject }: { onStartProject: () => void }) {
 export default function TemplatesHome({ accountControl, onStartProject }: { accountControl: ReactNode; onStartProject: () => void }) {
   const [audience, setAudience] = useState<TemplateAudience>("personal");
   const matchesAudience = (template: TemplateDefinition) => template.audience === "both" || template.audience === audience;
-  const homepagePriority = ["light-scenarios", "design-battle", "next-chapter", "moodboard-to-room"];
+  const homepagePriority = ["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room"];
   const matchedFeatured = [...featuredTemplates].sort((left, right) => {
     const leftPriority = homepagePriority.indexOf(left.slug);
     const rightPriority = homepagePriority.indexOf(right.slug);

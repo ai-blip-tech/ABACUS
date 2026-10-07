@@ -22,7 +22,7 @@ test("registry contains exactly thirty-four unique versioned templates", () => {
   assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 34);
   for (const removed of ["memory-room", "home-swap", "architectural-xray", "window-portal", "inside-the-walls", "house-awake"]) assert.equal(templateRegistry.some((template) => template.slug === removed), false);
   assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 34 }, (_, index) => index + 1));
-  assert.deepEqual(templateRegistry.slice(0, 5).map((template) => template.slug), ["light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"]);
+  assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"]);
   for (const template of templateRegistry) {
     assert.equal(template.version, 1);
     assert.ok(template.inputSlots.length > 0, `${template.slug} must have input slots`);
@@ -34,8 +34,8 @@ test("registry contains exactly thirty-four unique versioned templates", () => {
 
 test("foundation exposes all reviewable records and the approved featured mix", () => {
   assert.equal(previewTemplates.length, 34);
-  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["light-scenarios", "furniture-casting", "declutter", "moodboard-to-room", "material-preview", "next-chapter", "design-battle", "roast-my-room"]);
-  assert.match(templatesHomeSource, /\["light-scenarios", "design-battle", "next-chapter", "moodboard-to-room"\]/);
+  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "declutter", "moodboard-to-room", "material-preview", "next-chapter", "roast-my-room"]);
+  assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room"\]/);
 });
 
 test("homepage hero scrubs approved media with scroll and keeps accessible fallbacks", () => {
