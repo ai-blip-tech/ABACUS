@@ -12,12 +12,17 @@ const detailSource = await readFile(new URL("../app/templates/[slug]/page.tsx", 
 const generateRouteSource = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const templateAssetsRouteSource = await readFile(new URL("../app/api/account/template-assets/route.ts", import.meta.url), "utf8");
 const templatesCssSource = await readFile(new URL("../app/templates-foundation.css", import.meta.url), "utf8");
+const templatesHomeSource = await readFile(new URL("../app/templates-home.tsx", import.meta.url), "utf8");
+const templatesHomeCssSource = await readFile(new URL("../app/templates-home-v2.css", import.meta.url), "utf8");
+const nextConfigSource = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
 
-test("registry contains exactly forty unique versioned templates", () => {
-  assert.equal(templateRegistry.length, 40);
-  assert.equal(new Set(templateRegistry.map((template) => template.id)).size, 40);
-  assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 40);
-  assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 40 }, (_, index) => index + 1));
+test("registry contains exactly thirty-four unique versioned templates", () => {
+  assert.equal(templateRegistry.length, 34);
+  assert.equal(new Set(templateRegistry.map((template) => template.id)).size, 34);
+  assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 34);
+  for (const removed of ["memory-room", "home-swap", "architectural-xray", "window-portal", "inside-the-walls", "house-awake"]) assert.equal(templateRegistry.some((template) => template.slug === removed), false);
+  assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 34 }, (_, index) => index + 1));
+  assert.deepEqual(templateRegistry.slice(0, 5).map((template) => template.slug), ["light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"]);
   for (const template of templateRegistry) {
     assert.equal(template.version, 1);
     assert.ok(template.inputSlots.length > 0, `${template.slug} must have input slots`);
@@ -28,8 +33,34 @@ test("registry contains exactly forty unique versioned templates", () => {
 });
 
 test("foundation exposes all reviewable records and the approved featured mix", () => {
-  assert.equal(previewTemplates.length, 40);
-  assert.deepEqual(featuredTemplates.map((template) => template.id), ["01", "03", "04", "07", "11", "12"]);
+  assert.equal(previewTemplates.length, 34);
+  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["light-scenarios", "furniture-casting", "declutter", "moodboard-to-room", "material-preview", "next-chapter", "design-battle", "roast-my-room"]);
+  assert.match(templatesHomeSource, /\["light-scenarios", "design-battle", "next-chapter", "moodboard-to-room"\]/);
+});
+
+test("homepage hero scrubs approved media with scroll and keeps accessible fallbacks", () => {
+  assert.match(templatesHomeSource, /room-design-hero\.mp4/);
+  assert.match(templatesHomeSource, /room-design-hero-poster\.png/);
+  assert.match(templatesHomeSource, /video\.currentTime = targetTime/);
+  assert.match(templatesHomeSource, /prefers-reduced-motion: reduce/);
+  assert.match(templatesHomeSource, /connection\?\.saveData/);
+  assert.match(templatesHomeSource, /muted/);
+  assert.match(templatesHomeSource, /playsInline/);
+  assert.match(templatesHomeSource, />Начать проект </);
+  assert.doesNotMatch(templatesHomeSource, /Смотреть шаблоны/);
+  assert.doesNotMatch(templatesHomeSource, /Начать создавать|ROOM DESIGN \/ 2026|EDITORIAL AI INTERIORS/);
+  assert.match(templatesHomeSource, /<i aria-hidden="true" \/> ШАБЛОНЫ/);
+  assert.doesNotMatch(templatesHomeSource, /01 \/ ROOM|02 \/ TRANSFORM|03 \/ RESULT|SCROLL TO TRANSFORM/);
+  assert.match(templatesHomeSource, /Открыть все \{templateRegistry\.length\} шаблона/);
+});
+
+test("preview hides framework chrome and branded calls to action have visible feedback", () => {
+  assert.match(nextConfigSource, /devIndicators:\s*false/);
+  assert.match(templatesHomeCssSource, /templates-nav-actions>button:last-child:hover/);
+  assert.match(templatesHomeCssSource, /templates-nav-actions>button:first-child:not\(:last-child\):hover/);
+  assert.match(templatesHomeCssSource, /home-hero-overlay \.templates-hero-actions>button:hover/);
+  assert.match(templatesHomeCssSource, /transform:translateY\(-3px\)/);
+  assert.match(templatesHomeCssSource, /prefers-reduced-motion:reduce/);
 });
 
 test("furniture casting has the approved room plus one-to-five product schema", () => {
@@ -50,6 +81,21 @@ test("all templates use an editorial workbench and every scenario is configured"
   const battle = templateWorkbenchScenarios["design-battle"];
   assert.deepEqual(battle.outputLabels, ["Решение A", "Решение B"]);
   assert.match(battle.generationBrief, /два самостоятельных интерьерных решения/i);
+});
+
+test("light scenarios offers an exclusive preset-or-kelvin control and preserves the interior", () => {
+  const template = templateRegistry.find((item) => item.slug === "light-scenarios");
+  assert.ok(template);
+  assert.deepEqual(template.requireAnyOf, [["lighting", "temperature"]]);
+  assert.deepEqual(template.exclusiveValueGroups, [["lighting", "temperature"]]);
+  const temperature = template.inputSlots.find((slot) => slot.id === "temperature");
+  assert.equal(temperature?.kind, "range");
+  assert.equal(temperature?.range?.min, 2200);
+  assert.equal(temperature?.range?.max, 6500);
+  assert.deepEqual(temperature?.range?.presets.map((preset) => preset.value), [2200, 2700, 3000, 3500, 4000, 5000, 6500]);
+  assert.match(templateWorkbenchScenarios["light-scenarios"].generationBrief, /Строго сохранить интерьер, архитектуру, геометрию, мебель, материалы, декор, композицию/);
+  assert.match(scenarioWorkbenchSource, /editorial-range-control/);
+  assert.match(scenarioWorkbenchSource, /exclusiveValueGroups/);
 });
 
 test("furniture casting keeps its specialized endpoint and other image scenarios use the additive template adapter", () => {
@@ -112,12 +158,19 @@ test("source history uses server media storage and active slots remain separate"
   assert.match(editorialWorkbenchSource, /Array\.from\(\{ length: maxSlots \}/);
   assert.match(editorialWorkbenchSource, /removeActive/);
   assert.match(editorialWorkbenchSource, /addFromHistory/);
+  assert.match(editorialWorkbenchSource, /draggable=\{!selected && !full\}/);
+  assert.match(editorialWorkbenchSource, /onDrop=\{\(event\) => dropHistoryAsset/);
+  assert.match(editorialWorkbenchSource, /fetch\("\/api\/account\/template-assets"\)/);
+  assert.match(scenarioWorkbenchSource, /draggable onDragStart/);
+  assert.match(scenarioWorkbenchSource, /onDrop=\{\(event\) => dropHistoryAsset/);
+  assert.match(scenarioWorkbenchSource, /fetch\("\/api\/account\/template-assets"\)/);
   assert.match(editorialWorkbenchSource, /Удалите одно из активных изображений/);
   assert.match(editorialWorkbenchSource, /scrollBy\(\{ left: direction/);
   assert.match(editorialWorkbenchSource, /event\.shiftKey/);
   assert.match(templatesCssSource, /\.editorial-history-viewport\{display:flex/);
   assert.match(templatesCssSource, /overflow-x:auto/);
   assert.match(templatesCssSource, /\.editorial-history-viewport>article\.is-selected/);
+  assert.match(templatesCssSource, /\.editorial-dynamic-files\.is-drop-active/);
 });
 
 test("all selected points remain visible until generation starts", () => {

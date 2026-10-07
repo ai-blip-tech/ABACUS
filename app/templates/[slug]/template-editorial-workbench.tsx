@@ -2,7 +2,7 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions -- scrollable history regions are intentionally keyboard-focusable */
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent, type ReactNode, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type MouseEvent, type ReactNode, type WheelEvent } from "react";
 
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
 
@@ -218,6 +218,8 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [generationConfigured, setGenerationConfigured] = useState(false);
+  const [draggedAssetId, setDraggedAssetId] = useState("");
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
 
   const activeImages = useMemo(() => activeIds.map((id) => id ? sourceHistory.find((item) => item.id === id) || null : null), [activeIds, sourceHistory]);
   const selectedImages = useMemo(() => activeImages.filter((item): item is SourceImage => Boolean(item)), [activeImages]);
@@ -241,7 +243,7 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
       setGenerationConfigured(Boolean(health.imageGeneration?.configured));
       if (!me.user) return;
       const [assetResponse, generationResponse, legacyAssets] = await Promise.all([
-        fetch(`/api/account/template-assets?templateId=${encodeURIComponent(template.slug)}`),
+        fetch("/api/account/template-assets"),
         fetch("/api/account/generations"),
         loadLegacyAssets(me.user.id),
       ]);
@@ -343,10 +345,34 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
     if (activeIds.includes(image.id)) return;
     const index = activeIds.findIndex((id) => !id);
     if (index < 0) return setError("Удалите одно из активных изображений, чтобы добавить другое.");
-    setActiveIds((current) => current.map((id, itemIndex) => itemIndex === index ? image.id : id));
+    addFromHistoryToSlot(image, index);
+  };
+
+  const canDropHistoryAt = (image: SourceImage | undefined, slotIndex: number) => Boolean(image && !activeIds.includes(image.id) && !activeIds[slotIndex] && additionalSlot?.acceptedMimeTypes.includes(image.type));
+
+  const addFromHistoryToSlot = (image: SourceImage, slotIndex: number) => {
+    if (!canDropHistoryAt(image, slotIndex)) return setError("Освободите этот слот или выберите другой материал.");
+    setActiveIds((current) => current.map((id, itemIndex) => itemIndex === slotIndex ? image.id : id));
     setPlacingId(image.id);
     setEditingDraft(true);
     setError("");
+  };
+
+  const allowHistoryDrop = (event: DragEvent<HTMLElement>, slotIndex: number) => {
+    const image = sourceHistory.find((item) => item.id === draggedAssetId);
+    if (!canDropHistoryAt(image, slotIndex)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDropTargetIndex(slotIndex);
+  };
+
+  const dropHistoryAsset = (event: DragEvent<HTMLElement>, slotIndex: number) => {
+    event.preventDefault();
+    const id = event.dataTransfer.getData("application/x-room-design-asset") || draggedAssetId;
+    const image = sourceHistory.find((item) => item.id === id);
+    if (image) addFromHistoryToSlot(image, slotIndex);
+    setDraggedAssetId("");
+    setDropTargetIndex(null);
   };
 
   const selectPlacement = (image: SourceImage) => {
@@ -430,7 +456,8 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
             {Array.from({ length: maxSlots }, (_, index) => {
               const image = activeImages[index];
               const state = slotStates[index];
-              return <article key={index} className={`${image ? "is-filled" : "is-empty"}${image && placingId === image.id ? " is-placing" : ""}${state === "error" ? " is-error" : ""}`}>
+              const draggedImage = sourceHistory.find((item) => item.id === draggedAssetId);
+              return <article key={index} className={`${image ? "is-filled" : "is-empty"}${image && placingId === image.id ? " is-placing" : ""}${state === "error" ? " is-error" : ""}${draggedAssetId && canDropHistoryAt(draggedImage, index) ? " is-drop-ready" : ""}${dropTargetIndex === index ? " is-drop-active" : ""}`} onDragOver={(event) => allowHistoryDrop(event, index)} onDragLeave={() => setDropTargetIndex(null)} onDrop={(event) => dropHistoryAsset(event, index)}>
                 <span className="editorial-slot-number">{String(index + 1).padStart(2, "0")}</span>
                 {image ? <>
                   <button type="button" className="editorial-slot-preview" onClick={() => selectPlacement(image)} aria-label={`Указать точку для ${image.name}`}><img src={image.dataUrl} alt="" /></button>
@@ -469,12 +496,12 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
     </div>
 
     <div className="editorial-histories">
-      <HistoryRail id="source-history-title" title="История предметов" description={activeIds.includes(null) ? "Ранее загруженные изображения. Используйте снова." : "Удалите одно из активных изображений, чтобы добавить другое."} count={sourceHistory.length} empty="Загруженные дополнительные изображения появятся здесь.">
+      <HistoryRail id="source-history-title" title="История предметов" description={activeIds.includes(null) ? "Перетащите предмет в свободный слот или нажмите «Использовать»." : "Удалите одно из активных изображений, чтобы добавить другое."} count={sourceHistory.length} empty="Загруженные дополнительные изображения появятся здесь.">
         {sourceHistory.map((image) => {
           const selected = activeIds.includes(image.id);
           const full = !activeIds.includes(null);
-          return <article className={selected ? "is-selected" : ""} key={image.id}>
-            <img src={image.dataUrl} alt="" />
+          return <article className={`${selected ? "is-selected" : ""}${draggedAssetId === image.id ? " is-dragging" : ""}`} key={image.id} draggable={!selected && !full} onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-room-design-asset", image.id); setDraggedAssetId(image.id); }} onDragEnd={() => { setDraggedAssetId(""); setDropTargetIndex(null); }} title={selected ? "Уже добавлен" : full ? "Освободите слот" : "Перетащите в свободный слот"}>
+            <img src={image.dataUrl} alt="" draggable={false} />
             <div><b>{image.name}</b><small>{new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(image.createdAt))}</small></div>
             <button type="button" onClick={() => addFromHistory(image)} disabled={selected || full}>{selected ? "Активно" : full ? "Нет места" : "Использовать"}</button>
           </article>;

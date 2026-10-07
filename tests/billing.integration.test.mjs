@@ -58,8 +58,16 @@ test("exchange rate and brutto changes affect new quotes while snapshots remain 
 
 test("failed AI operation refund and duplicate protection preserve balance", async () => {
   await billing.updateGlobalSettings("source", { token_charging_enabled: true });
+  const freeBefore = (await billing.getTokenAccount("target")).balance;
+  const freeReservation = await billing.reserveAiTokens("target", "generate", "free-op", "reserve-free-op");
+  assert.equal(freeReservation.transaction, null);
+  assert.equal(freeReservation.quote.chargingEnabled, false);
+  assert.equal((await billing.getTokenAccount("target")).balance, freeBefore);
+  await database.prepare("INSERT INTO plans (id, code, name, price, currency, billing_period, included_tokens, limits_json, active, sort_order, created_at, updated_at) VALUES ('plan_paid_test', 'paid-test', 'Paid test', 100, 'RUB', 'month', 0, '{}', 1, 10, ?, ?)").bind(now, now).run();
+  await database.prepare("INSERT INTO subscriptions (id, user_id, plan_id, status, started_at, created_at, updated_at) VALUES ('subscription_paid_test', 'target', 'plan_paid_test', 'active', ?, ?, ?)").bind(now, now, now).run();
   const before = (await billing.getTokenAccount("target")).balance;
   const reserved = await billing.reserveAiTokens("target", "generate", "failed-op", "reserve-failed-op");
+  assert.ok(reserved.transaction);
   await billing.refundAiTokens("target", "failed-op", reserved.quote.tokenCost, "technical failure");
   await billing.refundAiTokens("target", "failed-op", reserved.quote.tokenCost, "duplicate retry");
   assert.equal((await billing.getTokenAccount("target")).balance, before);

@@ -2,7 +2,7 @@ export type TemplateStatus = "draft" | "internal" | "beta" | "live" | "paused" |
 export type TemplateResultType = "image" | "image_series" | "video";
 export type TemplateCategory = "home" | "make_yours" | "control" | "visualization" | "experiments" | "delivery";
 export type TemplateAudience = "personal" | "professional" | "both";
-export type TemplateInputKind = "room_image" | "reference_image" | "product_images" | "people_images" | "second_room_image" | "floor_plan" | "audio" | "choice" | "short_text";
+export type TemplateInputKind = "room_image" | "reference_image" | "product_images" | "people_images" | "second_room_image" | "floor_plan" | "audio" | "choice" | "short_text" | "range";
 
 export type TemplateInputSlot = {
   id: string;
@@ -18,6 +18,14 @@ export type TemplateInputSlot = {
   consent?: "none" | "people" | "audio" | "collaborator";
   options?: string[];
   placeholder?: string;
+  range?: {
+    min: number;
+    max: number;
+    step: number;
+    unit: string;
+    defaultValue: number;
+    presets: Array<{ value: number; label: string; description: string }>;
+  };
 };
 
 export type TemplateDefinition = {
@@ -35,6 +43,7 @@ export type TemplateDefinition = {
   inputSummary: string;
   inputSlots: TemplateInputSlot[];
   requireAnyOf?: string[][];
+  exclusiveValueGroups?: string[][];
   preview: {
     type: "placeholder";
     src: string;

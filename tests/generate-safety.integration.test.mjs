@@ -22,6 +22,8 @@ const user = { id: "safety-user", email: "safety@example.test", role: "admin", t
 const now = new Date().toISOString();
 await database.prepare("INSERT INTO users (id, email, password_hash, password_salt, password_algorithm, password_iterations, global_role, first_name, created_at) VALUES (?, ?, 'x', 'x', 'google-only', 600000, 'admin', 'Test', ?)").bind(user.id, user.email, now).run();
 await database.prepare("INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at) VALUES (?, ?, 'member', ?)").bind(user.tenantId, user.id, now).run();
+await database.prepare("INSERT INTO plans (id, code, name, price, currency, billing_period, included_tokens, limits_json, active, sort_order, created_at, updated_at) VALUES ('plan_safety_paid', 'safety-paid', 'Safety paid', 100, 'RUB', 'month', 0, '{}', 1, 10, ?, ?)").bind(now, now).run();
+await database.prepare("INSERT INTO subscriptions (id, user_id, plan_id, status, started_at, created_at, updated_at) VALUES ('subscription_safety_paid', ?, 'plan_safety_paid', 'active', ?, ?, ?)").bind(user.id, now, now, now).run();
 const session = await auth.createSession(user);
 await billing.creditTokens({ userId: user.id, type: "correction", amount: 1_000_000, idempotencyKey: "safety-seed" });
 await billing.updateGlobalSettings(user.id, { token_charging_enabled: true });

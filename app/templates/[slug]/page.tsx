@@ -28,9 +28,9 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
   return (
     <main className="template-detail-page">
       <TemplatesHeader />
-      <div className="template-detail-back"><Link href="/templates">← Все шаблоны</Link><span>{template.id} / 40</span></div>
+      <div className="template-detail-back"><Link href="/templates">← Все шаблоны</Link><span>{template.id} / {templateRegistry.length}</span></div>
       <section className="template-editorial-heading">
-        <p><b>{template.id} / 40</b><i aria-hidden="true" /></p>
+        <p><b>{template.id} / {templateRegistry.length}</b><i aria-hidden="true" /></p>
         <div><h1>{template.title}</h1><h2>{template.hook}.</h2></div>
         <p>{template.description}</p>
         <aside>БОЛЬШЕ, ЧЕМ<br />ИНТЕРЬЕР<i aria-hidden="true" /></aside>

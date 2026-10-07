@@ -2,7 +2,7 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions -- horizontal histories are keyboard-scrollable */
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode, type WheelEvent } from "react";
 
 import { getTemplateWorkbenchScenario } from "@/lib/templates/workbench";
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
@@ -13,7 +13,7 @@ type LightboxState = { items: GenerationItem[]; index: number };
 type User = { id: string; email: string };
 type Phase = "idle" | "processing" | "failed";
 
-const isValueSlot = (slot: TemplateInputSlot) => slot.kind === "choice" || slot.kind === "short_text";
+const isValueSlot = (slot: TemplateInputSlot) => slot.kind === "choice" || slot.kind === "short_text" || slot.kind === "range";
 const isImage = (file: UploadedFile) => file.type.startsWith("image/");
 
 const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
@@ -111,6 +111,21 @@ function FileCard({ file, onRemove }: { file: UploadedFile; onRemove: () => void
   </article>;
 }
 
+function RangeControl({ slot, value, onChange }: { slot: TemplateInputSlot; value: string; onChange: (value: string) => void }) {
+  const range = slot.range;
+  if (!range) return null;
+  const displayValue = value ? Number(value) : range.defaultValue;
+  const selectedPreset = range.presets.find((preset) => preset.value === displayValue);
+  return <div className={`editorial-range-control${value ? " is-selected" : ""}`}>
+    <div className="editorial-range-value"><b>{displayValue}</b><span>{range.unit}</span><small>{value ? selectedPreset?.label || "Пользовательское значение" : "Передвиньте ползунок или выберите пресет"}</small></div>
+    <input type="range" min={range.min} max={range.max} step={range.step} value={displayValue} aria-label={`${slot.label}, ${displayValue} ${range.unit}`} onChange={(event) => onChange(event.target.value)} />
+    <div className="editorial-range-scale" aria-hidden="true"><span>{range.min} {range.unit}</span><span>{range.max} {range.unit}</span></div>
+    <div className="editorial-range-presets" role="group" aria-label="Быстрые пресеты температуры света">
+      {range.presets.map((preset) => <button type="button" key={preset.value} aria-pressed={value === String(preset.value)} onClick={() => onChange(String(preset.value))}><b>{preset.value} {range.unit}</b><span>{preset.label}</span><small>{preset.description}</small></button>)}
+    </div>
+  </div>;
+}
+
 const generationCount = (template: TemplateDefinition, outputLabels: string[], uploads: Record<string, UploadedFile[]>) => {
   if (["wall-color", "floor-preview", "object-replacement"].includes(template.slug)) {
     const references = template.inputSlots.slice(1).reduce((count, slot) => count + (uploads[slot.id]?.length || 0), 0);
@@ -137,6 +152,8 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [generationConfigured, setGenerationConfigured] = useState(false);
+  const [draggedAssetId, setDraggedAssetId] = useState("");
+  const [dropTargetSlotId, setDropTargetSlotId] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -150,7 +167,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       setGenerationConfigured(Boolean(health.imageGeneration?.configured));
       if (!me.user) return;
       const [assetsResponse, generationsResponse] = await Promise.all([
-        fetch(`/api/account/template-assets?templateId=${encodeURIComponent(template.slug)}`),
+        fetch("/api/account/template-assets"),
         fetch("/api/account/generations"),
       ]);
       const assetsPayload = await assetsResponse.json().catch(() => ({ assets: [] }));
@@ -215,7 +232,10 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       if (count && slot.consent && slot.consent !== "none" && !consents[slot.id]) issues.push(`${slot.label}: подтвердите согласие.`);
     }
     for (const group of template.requireAnyOf || []) {
-      if (!group.some((id) => Boolean(values[id]?.trim()) || Boolean(uploads[id]?.length))) issues.push("Добавьте хотя бы один из предложенных материалов.");
+      if (!group.some((id) => Boolean(values[id]?.trim()) || Boolean(uploads[id]?.length))) {
+        const labels = group.map((id) => template.inputSlots.find((slot) => slot.id === id)?.label.toLowerCase()).filter(Boolean);
+        issues.push(labels.length ? `${labels.join(" или ")}: выберите один вариант.` : "Добавьте хотя бы один из предложенных материалов.");
+      }
     }
     const primary = uploads[primarySlot?.id]?.[0];
     if (primary && !isImage(primary)) issues.push("Для запуска генерации первым материалом должно быть изображение.");
@@ -225,6 +245,19 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
   const ready = validationErrors.length === 0 && Boolean(user) && generationConfigured && phase !== "processing";
   const primaryFiles = uploads[primarySlot?.id] || [];
   const stageImage = latestResults[0]?.dataUrl || primaryFiles.find(isImage)?.dataUrl;
+
+  const setInputValue = (slotId: string, value: string) => {
+    setValues((current) => {
+      const next = { ...current, [slotId]: value };
+      for (const group of template.exclusiveValueGroups || []) {
+        if (!group.includes(slotId)) continue;
+        for (const otherId of group) if (otherId !== slotId) delete next[otherId];
+      }
+      return next;
+    });
+    setLatestResults([]);
+    setError("");
+  };
 
   const uploadFiles = async (slot: TemplateInputSlot, event: ChangeEvent<HTMLInputElement>) => {
     const incoming = Array.from(event.target.files || []);
@@ -255,9 +288,34 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
   const addFromHistory = (file: UploadedFile) => {
     const compatible = [...fileSlots.slice(1), ...fileSlots.slice(0, 1)].find((slot) => slot.acceptedMimeTypes.includes(file.type) && (uploads[slot.id]?.length || 0) < slot.maxCount && !(uploads[slot.id] || []).some((item) => item.id === file.id));
     if (!compatible) return setError("Освободите подходящий слот, чтобы использовать этот материал снова.");
-    setUploads((current) => ({ ...current, [compatible.id]: [...(current[compatible.id] || []), file] }));
+    addHistoryToSlot(file, compatible);
+  };
+
+  const canAddHistoryToSlot = (file: UploadedFile | undefined, slot: TemplateInputSlot) => Boolean(file && slot.acceptedMimeTypes.includes(file.type) && (uploads[slot.id]?.length || 0) < slot.maxCount && !(uploads[slot.id] || []).some((item) => item.id === file.id));
+
+  const addHistoryToSlot = (file: UploadedFile, slot: TemplateInputSlot) => {
+    if (!canAddHistoryToSlot(file, slot)) return setError(`${slot.label}: материал нельзя добавить в этот слот.`);
+    setUploads((current) => ({ ...current, [slot.id]: [...(current[slot.id] || []), file] }));
     setLatestResults([]);
     setError("");
+  };
+
+  const droppedHistoryAsset = (event: DragEvent<HTMLElement>) => assetHistory.find((file) => file.id === event.dataTransfer.getData("application/x-room-design-asset") || file.id === draggedAssetId);
+
+  const allowHistoryDrop = (event: DragEvent<HTMLElement>, slot: TemplateInputSlot) => {
+    const file = assetHistory.find((item) => item.id === draggedAssetId);
+    if (!canAddHistoryToSlot(file, slot)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDropTargetSlotId(slot.id);
+  };
+
+  const dropHistoryAsset = (event: DragEvent<HTMLElement>, slot: TemplateInputSlot) => {
+    event.preventDefault();
+    const file = droppedHistoryAsset(event);
+    if (file) addHistoryToSlot(file, slot);
+    setDraggedAssetId("");
+    setDropTargetSlotId("");
   };
 
   const runGeneration = async () => {
@@ -319,8 +377,8 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       <div className="editorial-source-column">
         {template.inputSlots.map((slot, index) => <section className="editorial-source-panel editorial-dynamic-panel" key={slot.id}>
           <header><span>{index + 1}.</span><div><h3>{slot.label}{!isValueSlot(slot) && <b> ({uploads[slot.id]?.length || 0}/{slot.maxCount})</b>}</h3><p>{slot.helper || (slot.required ? "Обязательный материал" : "Необязательно")}</p></div></header>
-          {isValueSlot(slot) ? slot.kind === "choice" ? <div className="editorial-choice-grid">{slot.options?.map((option) => <button className={values[slot.id] === option ? "is-selected" : ""} type="button" key={option} onClick={() => { setValues((current) => ({ ...current, [slot.id]: option })); setLatestResults([]); }}>{option}</button>)}</div> : <textarea className="editorial-text-input" value={values[slot.id] || ""} placeholder={slot.placeholder} onChange={(event) => { setValues((current) => ({ ...current, [slot.id]: event.target.value })); setLatestResults([]); }} /> : <>
-            <div className={`editorial-dynamic-files${slot.id === primarySlot?.id ? " is-primary" : ""}`}>
+          {isValueSlot(slot) ? slot.kind === "choice" ? <div className="editorial-choice-grid">{slot.options?.map((option) => <button className={values[slot.id] === option ? "is-selected" : ""} aria-pressed={values[slot.id] === option} type="button" key={option} onClick={() => setInputValue(slot.id, option)}>{option}</button>)}</div> : slot.kind === "range" ? <RangeControl slot={slot} value={values[slot.id] || ""} onChange={(value) => setInputValue(slot.id, value)} /> : <textarea className="editorial-text-input" value={values[slot.id] || ""} placeholder={slot.placeholder} onChange={(event) => setInputValue(slot.id, event.target.value)} /> : <>
+            <div className={`editorial-dynamic-files${slot.id === primarySlot?.id ? " is-primary" : ""}${draggedAssetId && canAddHistoryToSlot(assetHistory.find((file) => file.id === draggedAssetId), slot) ? " is-drop-ready" : ""}${dropTargetSlotId === slot.id ? " is-drop-active" : ""}`} onDragOver={(event) => allowHistoryDrop(event, slot)} onDragLeave={() => setDropTargetSlotId("")} onDrop={(event) => dropHistoryAsset(event, slot)}>
               {(uploads[slot.id] || []).map((file) => <FileCard key={file.id} file={file} onRemove={() => removeFile(slot.id, file.id)} />)}
               {(uploads[slot.id]?.length || 0) < slot.maxCount && <label className="editorial-dynamic-add"><input type="file" multiple={slot.maxCount > 1} accept={slot.acceptedMimeTypes.join(",")} onChange={(event) => void uploadFiles(slot, event)} /><b>+</b><span>{uploads[slot.id]?.length ? "Добавить ещё" : "Добавить файл"}</span></label>}
             </div>
@@ -346,8 +404,8 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     </div>
 
     <div className="editorial-histories">
-      <HistoryRail id="asset-history-title" title="История материалов" description="Ранее загруженные изображения можно использовать снова." count={assetHistory.length} empty="Загруженные изображения появятся здесь.">
-        {assetHistory.map((file) => <article key={file.id}><img src={file.dataUrl} alt="" /><div><b>{file.name}</b><small>{new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(file.createdAt))}</small></div><button type="button" onClick={() => addFromHistory(file)}>Использовать</button></article>)}
+      <HistoryRail id="asset-history-title" title="История материалов" description="Перетащите материал в нужное поле или нажмите «Использовать»." count={assetHistory.length} empty="Загруженные изображения появятся здесь.">
+        {assetHistory.map((file) => <article className={draggedAssetId === file.id ? "is-dragging" : ""} key={file.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-room-design-asset", file.id); setDraggedAssetId(file.id); }} onDragEnd={() => { setDraggedAssetId(""); setDropTargetSlotId(""); }} title="Перетащите в нужное поле"><img src={file.dataUrl} alt="" draggable={false} /><div><b>{file.name}</b><small>{new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(file.createdAt))}</small></div><button type="button" onClick={() => addFromHistory(file)}>Использовать</button></article>)}
       </HistoryRail>
       <HistoryRail id="scenario-generation-history-title" title="История генераций" description={`Предыдущие результаты «${template.title}».`} count={generationHistory.length} empty="После первой генерации здесь появятся сохранённые результаты.">
         {generationHistory.map((item) => <button className="editorial-generation-card" type="button" key={item.id} onClick={() => openLightbox(generationHistory.filter((entry) => entry.batchId === item.batchId), item.id)}><img src={item.dataUrl} alt={item.label} /><span><b>{item.label}</b><small>{new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt))}</small></span></button>)}
