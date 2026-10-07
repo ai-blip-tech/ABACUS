@@ -34,6 +34,8 @@
 .home-template-card{min-width:0;display:flex;flex-direction:column;background:#faf7f0;border:1px solid var(--th-line);color:inherit;text-decoration:none;transition:transform .2s ease,box-shadow .2s ease}
 .home-template-card:hover,.home-template-card:focus-visible{transform:translateY(-3px);box-shadow:0 16px 35px rgba(47,35,27,.1);outline:1px solid var(--th-wine);outline-offset:-1px}
 .home-template-triptych{position:relative;display:grid;grid-template-columns:repeat(3,1fr);min-height:220px;overflow:hidden;background:#b9aa99}
+.home-template-triptych.has-video-preview{display:block;background:#211d1b}
+.home-template-video-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;pointer-events:none}
 .home-featured-grid>.home-template-card:first-child .home-template-triptych{flex:1;min-height:390px}
 .home-template-stage{position:relative;display:flex;align-items:flex-end;padding:12px;background:linear-gradient(145deg,#d9d0c3,#a99a89);border-right:1px solid rgba(255,255,255,.7)}
 .home-template-stage.stage-2{background:linear-gradient(145deg,#a38e78,#6e6258)}.home-template-stage.stage-3{background:linear-gradient(145deg,#d3bd9f,#87715f)}

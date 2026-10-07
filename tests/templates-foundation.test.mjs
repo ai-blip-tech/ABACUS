@@ -38,6 +38,15 @@ test("foundation exposes all reviewable records and the approved featured mix", 
   assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room"\]/);
 });
 
+test("homepage uses the approved Design Battle video preview", () => {
+  assert.match(templatesHomeSource, /\/media\/templates\/design-battle-preview\.mp4/);
+  assert.match(templatesHomeSource, /showVideoPreview=\{template\.slug === "design-battle"\}/);
+  assert.match(templatesHomeSource, /prefers-reduced-motion: reduce/);
+  assert.match(templatesHomeSource, /muted/);
+  assert.match(templatesHomeSource, /playsInline/);
+  assert.match(templatesHomeCssSource, /\.home-template-video-preview/);
+});
+
 test("homepage hero scrubs approved media with scroll and keeps accessible fallbacks", () => {
   assert.match(templatesHomeSource, /room-design-hero\.mp4/);
   assert.match(templatesHomeSource, /room-design-hero-poster\.png/);

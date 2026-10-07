@@ -16,23 +16,51 @@ const homeSections: Array<{ category: TemplateCategory; title: string }> = [
   { category: "delivery", title: "Post-production и клиентская выдача" },
 ];
 
-function TemplateTriptych({ template, compact = false }: { template: TemplateDefinition; compact?: boolean }) {
+function DesignBattleVideoPreview() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (!video || reducedMotion.matches) return;
+
+    void video.play().catch(() => undefined);
+    return () => video.pause();
+  }, []);
+
   return (
-    <div className={`home-template-triptych${compact ? " is-compact" : ""}`} aria-label={`Asset slot для preview шаблона «${template.title}»`}>
-      {["Исходник", "Трансформация", "Результат"].map((label, index) => (
-        <div className={`home-template-stage stage-${index + 1}`} key={label}>
-          <span>{label}</span>{index === 1 && <i aria-hidden="true">→</i>}
-        </div>
-      ))}
-      <small>APPROVED MEDIA · ASSET SLOT</small>
+    <video
+      ref={videoRef}
+      className="home-template-video-preview"
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-label="Видео-превью шаблона «Дизайн-баттл»"
+    >
+      <source src="/media/templates/design-battle-preview.mp4" type="video/mp4" />
+      Ваш браузер не поддерживает видео-превью.
+    </video>
+  );
+}
+
+function TemplateTriptych({ template, compact = false, showVideoPreview = false }: { template: TemplateDefinition; compact?: boolean; showVideoPreview?: boolean }) {
+  return (
+    <div className={`home-template-triptych${compact ? " is-compact" : ""}${showVideoPreview ? " has-video-preview" : ""}`} aria-label={`Превью шаблона «${template.title}»`}>
+      {showVideoPreview ? <DesignBattleVideoPreview /> : ["Исходник", "Трансформация", "Результат"].map((label, index) => (
+          <div className={`home-template-stage stage-${index + 1}`} key={label}>
+            <span>{label}</span>{index === 1 && <i aria-hidden="true">→</i>}
+          </div>
+        ))}
+      <small>{showVideoPreview ? "DESIGN BATTLE · VIDEO PREVIEW" : "APPROVED MEDIA · ASSET SLOT"}</small>
     </div>
   );
 }
 
-function EditorialCard({ template, compact = false }: { template: TemplateDefinition; compact?: boolean }) {
+function EditorialCard({ template, compact = false, showVideoPreview = false }: { template: TemplateDefinition; compact?: boolean; showVideoPreview?: boolean }) {
   return (
     <Link className={`home-template-card${compact ? " is-compact" : ""}`} href={`/templates/${template.slug}`}>
-      <TemplateTriptych template={template} compact={compact} />
+      <TemplateTriptych template={template} compact={compact} showVideoPreview={showVideoPreview} />
       <div className="home-template-card-copy">
         <div><small>{template.id} / {categoryLabels[template.category]}</small><span>{template.inputSummary}</span></div>
         <h3>{template.title}</h3>
@@ -152,7 +180,7 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
           <div className="home-audience-switch" role="group" aria-label="Аудитория шаблонов"><button type="button" aria-pressed={audience === "personal"} onClick={() => setAudience("personal")}>Для себя</button><button type="button" aria-pressed={audience === "professional"} onClick={() => setAudience("professional")}>Для профессионалов</button></div>
           <Link href="/templates">Все шаблоны <span>→</span></Link>
         </div>
-        <div className="home-featured-grid">{featured.map((template, index) => <EditorialCard key={template.slug} template={template} compact={index > 2} />)}</div>
+        <div className="home-featured-grid">{featured.map((template, index) => <EditorialCard key={template.slug} template={template} compact={index > 2} showVideoPreview={template.slug === "design-battle"} />)}</div>
       </section>
 
       {homeSections.map((section, sectionIndex) => {
