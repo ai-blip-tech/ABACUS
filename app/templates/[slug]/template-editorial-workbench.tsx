@@ -516,7 +516,7 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
     </div>
 
     {lightbox && <div className="editorial-lightbox" role="dialog" aria-modal="true" aria-label="Просмотр готового рендера">
-      <a className="editorial-lightbox-download" href={lightbox.dataUrl} download={`room-design-${template.slug}-${lightbox.id}.webp`} aria-label="Скачать готовый рендер">⇩ <span>Скачать</span></a>
+      <a className="editorial-lightbox-download" href={lightbox.dataUrl} download={`room-design-${template.slug}-${lightbox.id}.webp`} aria-label="Скачать готовый рендер" title="Скачать"><span className="history-download-icon" aria-hidden="true"><i /></span></a>
       <button className="editorial-lightbox-close" type="button" aria-label="Закрыть полноэкранный просмотр" onClick={() => setLightbox(null)}>×</button>
       <img src={lightbox.dataUrl} alt={lightbox.name} />
     </div>}

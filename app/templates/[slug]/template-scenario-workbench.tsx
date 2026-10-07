@@ -429,7 +429,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     </div>
 
     {lightbox && <div className="editorial-lightbox" role="dialog" aria-modal="true" aria-label="Просмотр результатов">
-      <a className="editorial-lightbox-download" href={lightbox.items[lightbox.index].dataUrl} download={`room-design-${template.slug}-${lightbox.items[lightbox.index].id}.webp`} aria-label="Скачать выбранный результат">⇩ <span>Скачать</span></a>
+      <a className="editorial-lightbox-download" href={lightbox.items[lightbox.index].dataUrl} download={`room-design-${template.slug}-${lightbox.items[lightbox.index].id}.webp`} aria-label="Скачать выбранный результат" title="Скачать"><span className="history-download-icon" aria-hidden="true"><i /></span></a>
       <button className="editorial-lightbox-close" type="button" aria-label="Закрыть" onClick={() => setLightbox(null)}>×</button>
       {lightbox.items.length > 1 && <button className="editorial-lightbox-nav is-previous" type="button" aria-label="Предыдущий результат" disabled={lightbox.index === 0} onClick={() => setLightbox((current) => current ? { ...current, index: Math.max(0, current.index - 1) } : null)}>←</button>}
       <img src={lightbox.items[lightbox.index].dataUrl} alt={lightbox.items[lightbox.index].label} />

@@ -205,5 +205,8 @@ test("every template result lightbox offers a named image download", () => {
   assert.match(scenarioWorkbenchSource, /className="editorial-lightbox-download"/);
   assert.match(scenarioWorkbenchSource, /lightbox\.items\[lightbox\.index\]\.id/);
   assert.match(scenarioWorkbenchSource, /aria-label="Скачать выбранный результат"/);
+  assert.match(editorialWorkbenchSource, /className="history-download-icon"/);
+  assert.match(scenarioWorkbenchSource, /className="history-download-icon"/);
+  assert.doesNotMatch(`${editorialWorkbenchSource}${scenarioWorkbenchSource}`, />⇩ <span>Скачать<\/span>/);
   assert.match(templatesCssSource, /\.editorial-lightbox-download\{/);
 });
