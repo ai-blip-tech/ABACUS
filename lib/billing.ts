@@ -180,8 +180,14 @@ export async function quoteAiOperation(operation: string) {
   return { operation, nettoUsd, bruttoCoefficient: settings.brutto_coefficient, tokenCost: Math.max(0, Math.ceil(rubles * settings.token_exchange_rate)), chargingEnabled: settings.token_charging_enabled };
 }
 
-export async function reserveAiTokens(userId: string, operation: string, referenceId: string, idempotencyKey: string) {
+export async function quoteAiOperationForUser(userId: string, operation: string) {
   const quote = await quoteAiOperation(operation);
+  const activePlan = await database.prepare("SELECT plans.code FROM subscriptions JOIN plans ON plans.id = subscriptions.plan_id WHERE subscriptions.user_id = ? AND subscriptions.status = 'active' ORDER BY subscriptions.created_at DESC LIMIT 1").bind(userId).first<{ code: string }>();
+  return { ...quote, chargingEnabled: quote.chargingEnabled && Boolean(activePlan && activePlan.code !== "free") };
+}
+
+export async function reserveAiTokens(userId: string, operation: string, referenceId: string, idempotencyKey: string) {
+  const quote = await quoteAiOperationForUser(userId, operation);
   if (!quote.chargingEnabled || quote.tokenCost === 0) return { quote, transaction: null };
   const transaction = await debitTokens({ userId, type: "generation", amount: quote.tokenCost, referenceType: "ai_operation", referenceId, description: `Резерв токенов: ${operation}`, metadata: quote, idempotencyKey });
   return { quote, transaction };

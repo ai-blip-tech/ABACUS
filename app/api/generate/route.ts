@@ -11,7 +11,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string } };
+  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -50,6 +50,16 @@ async function generateResponse(request: Request) {
     "Match perspective, scale, lighting, material realism and contact shadows. Preserve the rest of the room as closely as possible.",
     "No people, no text, no logos, no watermark.",
   ].join("\n");
+  const furnitureCastingItems = body.furnitureCasting?.items || [];
+  const furnitureCastingPrompt = [
+    "Create one unified photorealistic edit that places every supplied furniture reference into the room at the same time.",
+    "Image 1 is the clean original room and is the composition, camera, architecture and lighting source to preserve.",
+    "Image 2 is the same room with numbered location markers. Remove every marker from the final result.",
+    ...furnitureCastingItems.map((item, index) => `Image ${index + 3} is furniture item ${index + 1}${item.name ? ` (${item.name})` : ""}. Place it exactly once at marker ${index + 1}, centred near ${Math.round(item.x || 0)}% from the left and ${Math.round(item.y || 0)}% from the top.`),
+    `The final room must contain all ${furnitureCastingItems.length} supplied furniture items together in one coherent image. Do not omit an item and do not return intermediate variants.`,
+    "Match believable scale, perspective, lighting, occlusion and contact shadows for every inserted item. Preserve everything else in the room as closely as possible.",
+    "Return exactly one final image. No people, no text, no logos, no watermark.",
+  ].join("\n");
   const catalogPlacementPrompt = [
     "Use image 1 as the clean completed interior to preserve.",
     "Image 2 is the same interior with a temporary crosshair marker. The marker centre is the insertion location and must not appear in the result.",
@@ -69,6 +79,17 @@ async function generateResponse(request: Request) {
     `Apply the user's instruction to the current image: ${body.globalEdit.instruction}`,
     "Change only what the instruction requires. Preserve all unrelated architecture, furniture, materials, lighting, people, perspective, and composition.",
     "Return a photorealistic full-frame result. No text, logos, or watermark unless the user's instruction explicitly requires existing text to remain.",
+  ].join("\n") : "";
+  const templateReferenceImages = (body.templateEdit?.referenceImages || []).slice(0, 10);
+  const templateEditPrompt = body.templateEdit?.instructions ? [
+    "Create one polished photorealistic Room Design result for the supplied Template scenario.",
+    "Image 1 is the primary source and must remain the authoritative camera, architecture, proportions and spatial context.",
+    templateReferenceImages.length ? `Images 2–${templateReferenceImages.length + 1} are supporting references. Use each only for the role described by the brief.` : "There are no supporting reference images.",
+    `Template: ${body.templateEdit.templateId || "room-design"}.`,
+    `Result: ${body.templateEdit.outputLabel || "final result"}.`,
+    body.templateEdit.instructions,
+    "Preserve unrelated architecture and content. Return exactly one coherent full-frame result.",
+    "No people unless supplied with consent, no added text, no logos, no watermark.",
   ].join("\n") : "";
   const materialPrompt = body.material ? [
     "Use image 1 as the clean completed interior.",
@@ -166,7 +187,7 @@ async function generateResponse(request: Request) {
     return new Blob([await sample.arrayBuffer()], { type: sample.headers.get("content-type") || "image/jpeg" });
   };
 
-  const inferredOperation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  const inferredOperation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.templateEdit || body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.furnitureCasting || body.placement ? "place" : body.adjustment ? "adjust" : "generate";
   const requestedOperation = body.operation?.trim();
   const supportedOperations = new Set(["plan_render", "upscale", "material", "global_edit", "remove", "replace", "place", "adjust", "generate"]);
   if (requestedOperation && (!supportedOperations.has(requestedOperation) || requestedOperation !== inferredOperation)) {
@@ -179,12 +200,26 @@ async function generateResponse(request: Request) {
   if (["global_edit", "material", "remove", "replace", "place"].includes(operation)) {
     try {
       await validatedEditImage(body.roomImage, "текущее изображение");
-      if (operation === "global_edit" && !body.globalEdit?.instruction?.trim()) throw new Error("Опишите изменение изображения.");
-      if (operation !== "global_edit") {
+      if (operation === "global_edit" && !body.globalEdit?.instruction?.trim() && !body.templateEdit?.instructions?.trim()) throw new Error("Опишите изменение изображения.");
+      if (body.templateEdit) {
+        if (!/^[a-z0-9-]{1,80}$/.test(body.templateEdit.templateId || "")) throw new Error("Некорректный идентификатор Template.");
+        if (templateReferenceImages.length > 10) throw new Error("Можно использовать не более десяти референсов.");
+        for (const [index, source] of templateReferenceImages.entries()) await validatedEditImage(source, `референс ${index + 1}`);
+      }
+      if (body.furnitureCasting) {
+        if (operation !== "place" || furnitureCastingItems.length < 1 || furnitureCastingItems.length > 5) throw new Error("Добавьте от одного до пяти предметов мебели.");
+        await validatedEditImage(body.furnitureCasting.markedImage, "изображение со всеми точками");
+        for (const [index, item] of furnitureCastingItems.entries()) {
+          if (!Number.isFinite(item.x) || !Number.isFinite(item.y) || (item.x as number) < 0 || (item.x as number) > 100 || (item.y as number) < 0 || (item.y as number) > 100) throw new Error(`Укажите точку для предмета ${index + 1}.`);
+          if (!item.referenceImage) throw new Error(`Загрузите референс предмета ${index + 1}.`);
+          if (item.referenceImage.startsWith("data:")) await validatedEditImage(item.referenceImage, `референс предмета ${index + 1}`);
+          else await imageSourceToBlob(item.referenceImage);
+        }
+      } else if (operation !== "global_edit") {
         if (!Number.isFinite(body.pointEdit?.x) || !Number.isFinite(body.pointEdit?.y) || (body.pointEdit?.x as number) < 0 || (body.pointEdit?.x as number) > 100 || (body.pointEdit?.y as number) < 0 || (body.pointEdit?.y as number) > 100) throw new Error("Поставьте точку на изображении.");
         await validatedEditImage(body.pointEdit?.markedImage, "изображение с маркером");
       }
-      if (["material", "replace"].includes(operation) || operation === "place" && !body.product) {
+      if (!body.furnitureCasting && (["material", "replace"].includes(operation) || operation === "place" && !body.product)) {
         if (!body.referenceImage) throw new Error(operation === "material" ? "Загрузите референс материала." : "Загрузите референс предмета.");
         if (body.referenceImage.startsWith("data:")) await validatedEditImage(body.referenceImage, operation === "material" ? "референс материала" : "референс предмета");
         else {
@@ -197,14 +232,18 @@ async function generateResponse(request: Request) {
     }
   }
   const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
-  const diagnosticBranch = body.roomImage && body.referenceImage && body.material && body.pointEdit?.markedImage ? "material"
+  const diagnosticBranch = body.roomImage && body.furnitureCasting?.markedImage && furnitureCastingItems.length ? "furniture_casting"
+    : body.roomImage && body.templateEdit?.instructions ? "template_edit"
+    : body.roomImage && body.referenceImage && body.material && body.pointEdit?.markedImage ? "material"
     : body.roomImage && body.globalEdit?.instruction ? "global_edit"
     : body.roomImage && body.referenceImage && body.replacement && body.pointEdit?.markedImage ? "replace"
     : body.roomImage && body.removal && body.pointEdit?.markedImage ? "remove"
     : body.roomImage && body.placement && body.pointEdit?.markedImage && (body.referenceImage || body.product) ? "add"
     : "other";
   const diagnosticMaskPresent = Boolean(body.adjustment?.mask);
-  const diagnosticProviderInputImages = diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 3
+  const diagnosticProviderInputImages = diagnosticBranch === "furniture_casting" ? 2 + furnitureCastingItems.length
+    : diagnosticBranch === "template_edit" ? 1 + templateReferenceImages.length
+    : diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 3
     : diagnosticBranch === "remove" || diagnosticBranch === "add" || Boolean(body.roomImage) && Boolean(body.pointEdit?.markedImage) ? 2
     : diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
     : 0;
@@ -229,8 +268,9 @@ async function generateResponse(request: Request) {
       refunded = true;
     }
   };
-  const providerTimeout = ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(180_000) : undefined;
+  const providerTimeout = ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(body.furnitureCasting ? 360_000 : 180_000) : undefined;
   const providerTimedOut = (error?: unknown) => providerTimeout?.aborted || error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+  const providerTimeoutMessage = body.furnitureCasting ? "Создание единого рендера заняло больше 6 минут. Попробуйте ещё раз с фотографиями меньшего размера." : "Сервис генерации не ответил вовремя. Попробуйте ещё раз.";
 
   let response: Response;
   try {
@@ -245,6 +285,18 @@ async function generateResponse(request: Request) {
         return ["image/jpeg", "image/png", "image/webp"].includes(image.type) ? image : null;
       }))).filter((image): image is Blob => Boolean(image));
       referenceBlobs.forEach((image, index) => form.append("image[]", image, `furniture-reference-${index + 1}.${image.type.split("/")[1] || "png"}`));
+      form.append("size", outputSize);
+      form.append("quality", "medium");
+      form.append("output_format", "webp");
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.furnitureCasting?.markedImage && furnitureCastingItems.length) {
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", furnitureCastingPrompt);
+      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
+      form.append("image[]", dataUrlToBlob(body.furnitureCasting.markedImage), "numbered-placement-guide.png");
+      const referenceBlobs = await Promise.all(furnitureCastingItems.map((item) => imageSourceToBlob(item.referenceImage as string, providerTimeout)));
+      referenceBlobs.forEach((referenceBlob, index) => form.append("image[]", referenceBlob, `furniture-item-${index + 1}.${referenceBlob.type.split("/")[1] || "jpg"}`));
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
@@ -266,6 +318,17 @@ async function generateResponse(request: Request) {
       form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
       const materialBlob = await imageSourceToBlob(body.referenceImage, providerTimeout);
       form.append("image[]", materialBlob, `material-reference.${materialBlob.type.split("/")[1] || "jpg"}`);
+      form.append("size", outputSize);
+      form.append("quality", "medium");
+      form.append("output_format", "webp");
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.templateEdit?.instructions) {
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", templateEditPrompt);
+      form.append("image[]", dataUrlToBlob(body.roomImage), "primary-source.png");
+      const referenceBlobs = await Promise.all(templateReferenceImages.map((source) => imageSourceToBlob(source, providerTimeout)));
+      referenceBlobs.forEach((referenceBlob, index) => form.append("image[]", referenceBlob, `template-reference-${index + 1}.${referenceBlob.type.split("/")[1] || "jpg"}`));
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
@@ -342,15 +405,15 @@ async function generateResponse(request: Request) {
     }
   } catch (error) {
     await refundReservation("Возврат после технической ошибки подготовки AI-операции");
-    return Response.json({ error: providerTimedOut(error) ? "Сервис генерации не ответил вовремя. Попробуйте ещё раз." : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
+    return Response.json({ error: providerTimedOut(error) ? providerTimeoutMessage : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
   }
   console.info("[generate-runtime-diagnostic]", JSON.stringify({
     requestId: operationId,
     operation,
     materialPresent: Boolean(body.material),
-    referencePresent: Boolean(body.referenceImage),
+    referencePresent: Boolean(body.referenceImage || furnitureCastingItems.length),
     maskPresent: diagnosticMaskPresent,
-    placementPresent: Boolean(body.placement),
+    placementPresent: Boolean(body.placement || body.furnitureCasting),
     replacementPresent: Boolean(body.replacement),
     removalPresent: Boolean(body.removal),
     backendBranch: diagnosticBranch,
@@ -363,7 +426,7 @@ async function generateResponse(request: Request) {
     responseText = await response.text();
   } catch {
     await refundReservation("Возврат после ошибки чтения ответа AI-провайдера");
-    return Response.json({ error: providerTimedOut() ? "Сервис генерации не ответил вовремя. Попробуйте ещё раз." : "Не удалось получить ответ сервиса генерации." }, { status: providerTimedOut() ? 504 : 502 });
+    return Response.json({ error: providerTimedOut() ? providerTimeoutMessage : "Не удалось получить ответ сервиса генерации." }, { status: providerTimedOut() ? 504 : 502 });
   }
   let result: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string }; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } } = {};
   try {
@@ -401,7 +464,18 @@ async function generateResponse(request: Request) {
     await refundReservation("Возврат после ошибки сохранения результата AI-операции");
     return Response.json({ error: error instanceof Error ? error.message : "Не удалось сохранить результат генерации." }, { status: 503 });
   }
-  return new Response(binary, { headers: { "Content-Type": "image/webp", "Cache-Control": "no-store" } });
+  const usageHeaders: Record<string, string> = {
+    "Content-Type": "image/webp",
+    "Cache-Control": "no-store",
+    "X-Room-AI-Model": model,
+    "X-Room-AI-Operation": operation,
+    "X-Room-AI-Token-Cost": String(reservation.quote.tokenCost),
+    "X-Room-AI-Charging": reservation.quote.chargingEnabled ? "enabled" : "estimate-only",
+  };
+  if (result.usage?.input_tokens !== undefined) usageHeaders["X-Room-AI-Input-Tokens"] = String(result.usage.input_tokens);
+  if (result.usage?.output_tokens !== undefined) usageHeaders["X-Room-AI-Output-Tokens"] = String(result.usage.output_tokens);
+  if (result.usage?.total_tokens !== undefined) usageHeaders["X-Room-AI-Total-Tokens"] = String(result.usage.total_tokens);
+  return new Response(binary, { headers: usageHeaders });
 }
 
 // Keep route-level failures from being converted into an HTML 500 response by
