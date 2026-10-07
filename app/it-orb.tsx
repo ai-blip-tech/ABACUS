@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import type { ItTurn, ItUiAction, ItVisualState, RoomDesignContext } from "@/lib/it/types";
+import OnoOrb, { type OnoState } from "./ono-orb";
 
 type TranscriptItem = {
   id: string;
@@ -29,6 +30,19 @@ const stateLabel: Record<ItVisualState, string> = {
   error: "Нужна пауза",
 };
 
+const onoState: Record<ItVisualState, OnoState> = {
+  closed: "idle",
+  idle: "idle",
+  listening: "listening",
+  thinking: "thinking",
+  speaking: "speaking",
+  searching: "thinking",
+  moving: "moving",
+  acting: "thinking",
+  success: "success",
+  error: "error",
+};
+
 const suggestions = [
   "Как заменить диван?",
   "Найди кресло до 150 тысяч",
@@ -50,6 +64,9 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
   const [value, setValue] = useState("");
   const [pendingImage, setPendingImage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [orbHovered, setOrbHovered] = useState(false);
+  const [orbKeyboardFocused, setOrbKeyboardFocused] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [composerError, setComposerError] = useState("");
   const [guideOffset, setGuideOffset] = useState<{ x: number; y: number } | null>(null);
@@ -60,10 +77,17 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioFrameRef = useRef<number | null>(null);
   const guideTimerRef = useRef<number | null>(null);
   const openRef = useRef(open);
 
   useEffect(() => { openRef.current = open; }, [open]);
+
+  useEffect(() => () => {
+    if (audioFrameRef.current) cancelAnimationFrame(audioFrameRef.current);
+    void audioContextRef.current?.close().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -190,6 +214,8 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
     if (recorderRef.current?.state === "recording") {
       recorderRef.current.stop();
       setIsRecording(false);
+      setAudioLevel(0);
+      if (audioFrameRef.current) cancelAnimationFrame(audioFrameRef.current);
       if (recordingTimerRef.current) window.clearTimeout(recordingTimerRef.current);
       return;
     }
@@ -201,9 +227,38 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const preferredType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
       const recorder = new MediaRecorder(stream, preferredType ? { mimeType: preferredType } : undefined);
+      let audioContext: AudioContext | null = null;
+      try {
+        audioContext = new AudioContext();
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = .72;
+        audioContext.createMediaStreamSource(stream).connect(analyser);
+        audioContextRef.current = audioContext;
+        const samples = new Uint8Array(analyser.frequencyBinCount);
+        const readLevel = () => {
+          analyser.getByteTimeDomainData(samples);
+          let energy = 0;
+          for (const sample of samples) {
+            const centered = (sample - 128) / 128;
+            energy += centered * centered;
+          }
+          setAudioLevel(Math.min(1, Math.sqrt(energy / samples.length) * 4.6));
+          audioFrameRef.current = requestAnimationFrame(readLevel);
+        };
+        readLevel();
+      } catch {
+        // Voice recording must keep working even when Web Audio is unavailable.
+        setAudioLevel(0);
+      }
       recordingChunksRef.current = [];
       recorder.ondataavailable = (event) => { if (event.data.size) recordingChunksRef.current.push(event.data); };
       recorder.onstop = () => {
+        if (audioFrameRef.current) cancelAnimationFrame(audioFrameRef.current);
+        audioFrameRef.current = null;
+        setAudioLevel(0);
+        if (audioContext) void audioContext.close().catch(() => undefined);
+        audioContextRef.current = null;
         stream.getTracks().forEach((track) => track.stop());
         const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         recordingChunksRef.current = [];
@@ -217,6 +272,7 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
       recordingTimerRef.current = window.setTimeout(() => {
         if (recorder.state === "recording") recorder.stop();
         setIsRecording(false);
+        setAudioLevel(0);
       }, 60_000);
     } catch {
       setComposerError("Разрешите доступ к микрофону, чтобы записать сообщение.");
@@ -230,6 +286,15 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
       return !current;
     });
   };
+
+  const visualState: OnoState = (() => {
+    const agentState = onoState[state];
+    if (agentState !== "idle") return agentState;
+    if (open && value.trim()) return "composing";
+    if (open) return "openReady";
+    if (orbHovered || orbKeyboardFocused) return "hoverReady";
+    return "idle";
+  })();
 
   return (
     <aside className={`it-layer ${open ? "is-open" : "is-closed"}${guideOffset ? " is-guiding" : ""}`} style={guideOffset ? { "--it-guide-x": `${guideOffset.x}px`, "--it-guide-y": `${guideOffset.y}px` } as CSSProperties : undefined} data-state={state} aria-label="Оно — интеллект Room Design">
@@ -287,12 +352,25 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
         </section>
       )}
 
-      <button className="it-orb" type="button" onClick={toggle} aria-expanded={open} aria-label={open ? "Свернуть Оно" : "Открыть Оно"}>
-        <span className="it-orb-glass" aria-hidden="true">
-          <i className="it-liquid it-liquid-a"/>
-          <i className="it-liquid it-liquid-b"/>
-          <i className="it-glint"/>
-        </span>
+      <button
+        className="it-orb"
+        type="button"
+        onClick={toggle}
+        onPointerEnter={(event) => { if (event.pointerType !== "touch") setOrbHovered(true); }}
+        onPointerLeave={() => setOrbHovered(false)}
+        onFocus={(event) => setOrbKeyboardFocused(event.currentTarget.matches(":focus-visible"))}
+        onBlur={() => setOrbKeyboardFocused(false)}
+        aria-expanded={open}
+        aria-label={open ? "Свернуть Оно" : "Открыть Оно"}
+      >
+        <OnoOrb
+          state={visualState}
+          size={open ? 96 : 56}
+          expanded={open}
+          velocityX={guideOffset?.x || 0}
+          velocityY={guideOffset?.y || 0}
+          audioLevel={audioLevel}
+        />
         {!open && <em>Оно</em>}
       </button>
     </aside>
