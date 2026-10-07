@@ -189,3 +189,12 @@ test("multi-result templates open one keyboard-accessible lightbox gallery", () 
   assert.match(templatesCssSource, /\.editorial-lightbox-nav\.is-previous/);
   assert.match(templatesCssSource, /\.editorial-lightbox-caption/);
 });
+
+test("every template result lightbox offers a named image download", () => {
+  assert.match(editorialWorkbenchSource, /className="editorial-lightbox-download"/);
+  assert.match(editorialWorkbenchSource, /download=\{`room-design-\$\{template\.slug\}-\$\{lightbox\.id\}\.webp`\}/);
+  assert.match(scenarioWorkbenchSource, /className="editorial-lightbox-download"/);
+  assert.match(scenarioWorkbenchSource, /lightbox\.items\[lightbox\.index\]\.id/);
+  assert.match(scenarioWorkbenchSource, /aria-label="Скачать выбранный результат"/);
+  assert.match(templatesCssSource, /\.editorial-lightbox-download\{/);
+});
