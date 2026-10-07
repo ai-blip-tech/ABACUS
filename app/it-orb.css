@@ -34,3 +34,24 @@
 .it-surface.is-empty{height:auto}
 .it-surface.is-empty .it-suggestions{margin-top:18px}
 .it-surface.is-empty .it-composer{margin-top:0}
+
+/* Photorealistic Ono sphere. The canvas owns the glass and liquid; CSS only
+   provides the physical footprint and the no-WebGL still fallback. */
+.it-orb{
+  width:56px;
+  height:56px;
+  filter:none;
+  transition:width .54s cubic-bezier(.2,.78,.2,1),height .54s cubic-bezier(.2,.78,.2,1),transform .2s ease;
+}
+.it-layer.is-open .it-orb{width:96px;height:96px}
+.it-orb:focus-visible{outline:2px solid rgba(46,43,36,.76);outline-offset:4px;border-radius:50%;transform:translateY(-2px)}
+.ono-orb{position:absolute;inset:0;display:block;width:min(100%,var(--ono-size));height:min(100%,var(--ono-size));border-radius:50%;isolation:isolate;pointer-events:none}
+.ono-orb-canvas{position:absolute;inset:0;z-index:2;display:block;width:100%;height:100%;border-radius:50%}
+.ono-orb-shadow{position:absolute;z-index:0;left:9%;right:3%;bottom:-9%;height:29%;border-radius:50%;background:radial-gradient(ellipse at center,rgba(29,25,21,.34) 0,rgba(53,45,38,.18) 42%,rgba(65,55,46,0) 75%);filter:blur(4px);transform:translateY(1px) scaleX(.92);transition:height .5s ease,filter .5s ease,transform .5s ease}
+.ono-orb.is-expanded .ono-orb-shadow{height:23%;filter:blur(7px);transform:translateY(3px) scaleX(1.08)}
+.ono-orb-fallback{position:absolute;inset:1px;z-index:1;overflow:hidden;border:1px solid rgba(255,255,255,.72);border-radius:50%;background:radial-gradient(circle at 29% 22%,rgba(255,255,255,.95) 0 3%,rgba(255,255,255,.24) 8%,transparent 25%),radial-gradient(ellipse at 35% 76%,#090908 0 27%,#251d1a 38%,transparent 40%),radial-gradient(ellipse at 71% 60%,#171412 0 20%,transparent 22%),radial-gradient(circle at 50% 48%,rgba(230,227,216,.10),rgba(88,84,76,.13) 68%,rgba(18,17,15,.20) 100%);box-shadow:inset 8px 9px 18px rgba(255,255,255,.44),inset -8px -10px 17px rgba(24,22,19,.17),0 0 0 1px rgba(50,47,41,.22)}
+.ono-orb[data-state=hoverReady] .ono-orb-fallback,.ono-orb[data-state=openReady] .ono-orb-fallback,.ono-orb[data-state=composing] .ono-orb-fallback{background:radial-gradient(circle at 29% 22%,rgba(255,255,255,.95) 0 3%,rgba(255,255,255,.24) 8%,transparent 25%),radial-gradient(ellipse at 35% 76%,#23070d 0 25%,#56101b 36%,transparent 40%),radial-gradient(ellipse at 71% 60%,#6b1020 0 18%,transparent 23%),radial-gradient(circle at 50% 48%,rgba(230,227,216,.10),rgba(88,84,76,.13) 68%,rgba(18,17,15,.20) 100%)}
+.it-layer[data-state=success] .ono-orb{filter:none}
+
+@media(max-width:700px){.it-layer.is-open .it-orb{width:92px;height:92px}}
+@media(prefers-reduced-motion:reduce){.ono-orb-shadow{transition:none}}
