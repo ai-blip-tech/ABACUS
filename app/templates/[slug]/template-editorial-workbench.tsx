@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type MouseEvent, type ReactNode, type WheelEvent } from "react";
 
+import { downloadImageAsJpeg } from "@/lib/client-image-download";
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
 
 type SourceImage = { id: string; name: string; type: string; size: number; dataUrl: string; sourceUrl?: string; createdAt: string };
@@ -516,7 +517,7 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
     </div>
 
     {lightbox && <div className="editorial-lightbox" role="dialog" aria-modal="true" aria-label="Просмотр готового рендера">
-      <a className="editorial-lightbox-download" href={lightbox.dataUrl} download={`room-design-${template.slug}-${lightbox.id}.webp`} aria-label="Скачать готовый рендер" title="Скачать"><span className="history-download-icon" aria-hidden="true"><i /></span></a>
+      <button className="editorial-lightbox-download" type="button" onClick={() => void downloadImageAsJpeg(lightbox.dataUrl, `room-design-${template.slug}-${lightbox.id}`).catch(() => setError("Не удалось скачать изображение. Попробуйте ещё раз."))} aria-label="Скачать готовый рендер в JPEG" title="Скачать JPEG"><span className="history-download-icon" aria-hidden="true"><i /></span></button>
       <button className="editorial-lightbox-close" type="button" aria-label="Закрыть полноэкранный просмотр" onClick={() => setLightbox(null)}>×</button>
       <img src={lightbox.dataUrl} alt={lightbox.name} />
     </div>}

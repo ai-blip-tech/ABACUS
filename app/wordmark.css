@@ -1,0 +1,148 @@
+:root {
+  --room-design-header-height: 74px;
+  --room-design-header-gutter: clamp(18px, 3vw, 44px);
+}
+
+/* The homepage wordmark is the single masthead source of truth. */
+.room-design-wordmark {
+  flex: 0 0 auto;
+  color: inherit;
+  font-family: var(--font-cormorant-garamond), Georgia, "Times New Roman", serif !important;
+  font-size: clamp(27px, 2.4vw, 40px) !important;
+  font-weight: 500 !important;
+  font-style: normal;
+  line-height: 1 !important;
+  letter-spacing: -1.8px !important;
+  text-decoration: none;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.templates-nav,
+.template-site-header,
+.project-page-concept .project-nav,
+.topbar,
+.projects-dashboard-header,
+.proposal-editor-header {
+  height: var(--room-design-header-height);
+  padding-left: var(--room-design-header-gutter);
+  padding-right: var(--room-design-header-gutter);
+}
+
+.project-form-wrap,
+.studio {
+  min-height: calc(100vh - var(--room-design-header-height));
+  min-height: calc(100dvh - var(--room-design-header-height));
+}
+
+.studio {
+  height: calc(100vh - var(--room-design-header-height));
+  height: calc(100dvh - var(--room-design-header-height));
+}
+
+.topbar {
+  gap: 24px;
+}
+
+.projects-dashboard-header > strong {
+  font: inherit;
+}
+
+.account-shell.account-shell > aside {
+  padding-top: 22px;
+}
+
+.account-shell .account-logo.room-design-wordmark {
+  align-self: flex-start;
+  width: auto;
+  margin: 0 0 28px var(--room-design-header-gutter);
+  padding: 0;
+  text-align: left;
+  transform: none;
+}
+
+.account-loading.account-loading aside {
+  padding: 22px var(--room-design-header-gutter);
+}
+
+.admin-shell .admin-sidebar {
+  padding-top: 22px;
+}
+
+.admin-sidebar .admin-logo.room-design-wordmark {
+  align-self: flex-start;
+  margin: 0 0 28px;
+  transform: translateX(calc(var(--room-design-header-gutter) - 20px));
+}
+
+.proposal-editor-header > a.room-design-wordmark {
+  color: var(--p-ink);
+}
+
+@media (max-width: 850px) {
+  .topbar {
+    height: 66px;
+    padding: 0 18px;
+    gap: 12px;
+  }
+
+  .studio {
+    height: calc(100vh - 66px);
+    height: calc(100dvh - 66px);
+    min-height: calc(100vh - 66px);
+    min-height: calc(100dvh - 66px);
+  }
+}
+
+@media (max-width: 800px) {
+  .proposal-editor-header {
+    min-height: 66px;
+    height: auto;
+    padding: 12px 18px;
+  }
+}
+
+@media (max-width: 767px) {
+  .project-page-concept .project-nav,
+  .projects-dashboard-header {
+    height: 66px;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .project-form-wrap {
+    min-height: calc(100vh - 66px);
+    min-height: calc(100dvh - 66px);
+  }
+
+  .account-shell .account-menu-trigger {
+    height: 66px;
+    padding: 0 18px;
+  }
+
+  .account-shell .account-menu-backdrop {
+    inset-block-start: 66px;
+  }
+
+  .account-shell.account-shell > aside {
+    inset-block-start: 66px;
+  }
+
+  .account-loading aside {
+    height: 66px;
+    padding: 19px 18px;
+  }
+}
+
+@media (max-width: 680px) {
+  .templates-nav,
+  .template-site-header {
+    min-height: 66px;
+    height: auto;
+    padding: 12px 18px;
+  }
+
+  .templates-home .templates-nav {
+    padding: 19px 18px 12px;
+  }
+}

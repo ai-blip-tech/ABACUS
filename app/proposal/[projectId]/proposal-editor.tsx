@@ -163,7 +163,7 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
   if (error && !project) return <main className="proposal-editor-state"><h1>Коммерческое предложение</h1><p role="alert">{error}</p><Link href="/">Вернуться в Room Design</Link></main>;
   return <main className="proposal-editor-shell">
     <header className="proposal-editor-header">
-      <Link href="/">ROOM<span>DESIGN</span></Link>
+      <Link className="room-design-wordmark" href="/">ROOM DESIGN</Link>
       <div><small>РЕДАКТОР КОММЕРЧЕСКОГО ПРЕДЛОЖЕНИЯ</small><b>{document.projectName || "Проект"}</b></div>
       <div className="proposal-editor-actions">
         <label><input type="checkbox" checked={showPrices} onChange={(event) => setPriceVisibility(event.target.checked)}/> Показывать цены</label>

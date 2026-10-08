@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent, type MouseEvent, type ReactNode, type WheelEvent } from "react";
 
+import { downloadImageAsJpeg } from "@/lib/client-image-download";
 import { getTemplateWorkbenchScenario } from "@/lib/templates/workbench";
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
 
@@ -520,7 +521,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     </div>
 
     {lightbox && <div className="editorial-lightbox" role="dialog" aria-modal="true" aria-label="Просмотр результатов">
-      <a className="editorial-lightbox-download" href={lightbox.items[lightbox.index].dataUrl} download={`room-design-${template.slug}-${lightbox.items[lightbox.index].id}.webp`} aria-label="Скачать выбранный результат" title="Скачать"><span className="history-download-icon" aria-hidden="true"><i /></span></a>
+      <button className="editorial-lightbox-download" type="button" onClick={() => { const item = lightbox.items[lightbox.index]; void downloadImageAsJpeg(item.dataUrl, `room-design-${template.slug}-${item.id}`).catch(() => setError("Не удалось скачать изображение. Попробуйте ещё раз.")); }} aria-label="Скачать выбранный результат в JPEG" title="Скачать JPEG"><span className="history-download-icon" aria-hidden="true"><i /></span></button>
       <button className="editorial-lightbox-close" type="button" aria-label="Закрыть" onClick={() => setLightbox(null)}>×</button>
       {lightbox.items.length > 1 && <button className="editorial-lightbox-nav is-previous" type="button" aria-label="Предыдущий результат" disabled={lightbox.index === 0} onClick={() => setLightbox((current) => current ? { ...current, index: Math.max(0, current.index - 1) } : null)}>←</button>}
       <img src={lightbox.items[lightbox.index].dataUrl} alt={lightbox.items[lightbox.index].label} />

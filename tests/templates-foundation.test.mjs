@@ -236,14 +236,15 @@ test("multi-result templates open one keyboard-accessible lightbox gallery", () 
   assert.match(templatesCssSource, /\.editorial-lightbox-caption/);
 });
 
-test("every template result lightbox offers a named image download", () => {
+test("every template result lightbox converts its download to JPEG", () => {
   assert.match(editorialWorkbenchSource, /className="editorial-lightbox-download"/);
-  assert.match(editorialWorkbenchSource, /download=\{`room-design-\$\{template\.slug\}-\$\{lightbox\.id\}\.webp`\}/);
+  assert.match(editorialWorkbenchSource, /downloadImageAsJpeg\(lightbox\.dataUrl, `room-design-\$\{template\.slug\}-\$\{lightbox\.id\}`\)/);
   assert.match(scenarioWorkbenchSource, /className="editorial-lightbox-download"/);
-  assert.match(scenarioWorkbenchSource, /lightbox\.items\[lightbox\.index\]\.id/);
-  assert.match(scenarioWorkbenchSource, /aria-label="Скачать выбранный результат"/);
+  assert.match(scenarioWorkbenchSource, /downloadImageAsJpeg\(item\.dataUrl, `room-design-\$\{template\.slug\}-\$\{item\.id\}`\)/);
+  assert.match(scenarioWorkbenchSource, /aria-label="Скачать выбранный результат в JPEG"/);
   assert.match(editorialWorkbenchSource, /className="history-download-icon"/);
   assert.match(scenarioWorkbenchSource, /className="history-download-icon"/);
+  assert.doesNotMatch(`${editorialWorkbenchSource}${scenarioWorkbenchSource}`, /download=\{[^}]*\.webp/);
   assert.doesNotMatch(`${editorialWorkbenchSource}${scenarioWorkbenchSource}`, />⇩ <span>Скачать<\/span>/);
   assert.match(templatesCssSource, /\.editorial-lightbox-download\{/);
 });

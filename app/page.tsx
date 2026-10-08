@@ -606,7 +606,7 @@ export default function Home() {
   if (view === "newProject") return <main className="project-page project-page-concept">
     <header className="project-nav">
       <div className="project-brand">
-        <div className="project-wordmark rd-wordmark">ROOM DESIGN</div>
+        <div className="project-wordmark room-design-wordmark">ROOM DESIGN</div>
         <i aria-hidden="true"/>
         <button className="project-back" type="button" onClick={() => user ? navigate("account") : navigate("home")}>← {user ? "Кабинет" : "На главную"}</button>
       </div>
@@ -660,7 +660,7 @@ export default function Home() {
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
   </main>;
   return <main className="studio-shell">
-    <header className="topbar"><div className="wordmark">ROOM<span>DESIGN</span></div><div className="crumb"><button onClick={() => window.history.back()}>← Проекты</button><i>›</i><b>{projectName || "Новый проект"}</b><i>›</i><span>Гостиная</span></div><div className="top-actions"><button className="help">?</button>{user?<AccountDropdown user={user} studio/>:<button className="avatar" title="Аккаунт" onClick={()=>openAuth("login")}>?</button>}</div></header>
+    <header className="topbar"><div className="wordmark room-design-wordmark">ROOM DESIGN</div><div className="crumb"><button onClick={() => window.history.back()}>← Проекты</button><i>›</i><b>{projectName || "Новый проект"}</b><i>›</i><span>Гостиная</span></div><div className="top-actions"><button className="help">?</button>{user?<AccountDropdown user={user} studio/>:<button className="avatar" title="Аккаунт" onClick={()=>openAuth("login")}>?</button>}</div></header>
     <section className="studio"><aside className="tools" aria-label="Добавить мебель">
       <button data-it-target="image-editor" onClick={() => { setActiveTool("Добавить мебель"); setFurnitureAction("add"); setFurnitureMode("choice"); }} className={activeTool === "Добавить мебель" ? "tool active furniture-tool" : "tool furniture-tool"} aria-label="Редактор изображений"><em className="furniture-symbol" aria-hidden="true"><i/><i/><i/></em><span>Редактор изображений</span></button>
       <button data-it-target="planogram" onClick={() => setActiveTool("Планограмма")} className={activeTool === "Планограмма" ? "tool planogram-tool active" : "tool planogram-tool"} aria-label="Создание интерьера"><em aria-hidden="true">⌗</em><span>Создание интерьера</span></button>
@@ -686,7 +686,7 @@ function AccountDashboardWithProfile({user,onUserUpdated,onHome,onCreate,onOpenP
   const [error,setError]=useState("");
   const [profileOpen,setProfileOpen]=useState(false);
   useEffect(()=>{if(!user)return;void fetch("/api/account/overview").then(async(response)=>{const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||"Не удалось загрузить кабинет.");return payload;}).then(setData).catch(()=>setError("Не удалось загрузить данные кабинета. Попробуйте обновить страницу."));},[user?.id]);
-  if(!user)return <main className="account-page"><header className="account-nav"><button onClick={onHome}>← На главную</button><div className="home-wordmark rd-wordmark">ROOM DESIGN</div><button onClick={onLogin}>Войти</button></header><section className="account-empty"><span>ROOM DESIGN</span><h1>Войдите, чтобы открыть кабинет</h1><p>Здесь хранятся проекты, сохранённые визуализации и история использования токенов.</p><button onClick={onLogin}>Войти или зарегистрироваться</button></section></main>;
+  if(!user)return <main className="account-page"><header className="account-nav"><button onClick={onHome}>← На главную</button><div className="home-wordmark room-design-wordmark">ROOM DESIGN</div><button onClick={onLogin}>Войти</button></header><section className="account-empty"><span>ROOM DESIGN</span><h1>Войдите, чтобы открыть кабинет</h1><p>Здесь хранятся проекты, сохранённые визуализации и история использования токенов.</p><button onClick={onLogin}>Войти или зарегистрироваться</button></section></main>;
   const summary=data?.summary||{};
   const greeting=user.firstName?`Ваши проекты, ${user.firstName}.`:"Ваши проекты.";
   const formatDate=(value:string,withTime=false)=>new Intl.DateTimeFormat("ru-RU",withTime?{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}:{day:"numeric",month:"short",year:"numeric"}).format(new Date(value));
@@ -696,7 +696,7 @@ function AccountDashboardWithProfile({user,onUserUpdated,onHome,onCreate,onOpenP
   return <main className="projects-dashboard">
     <section className="projects-dashboard-top">
       <div className="projects-dashboard-paper">
-        <header className="projects-dashboard-header"><strong className="rd-wordmark">ROOM DESIGN</strong><i/><button type="button" onClick={onHome}>←&nbsp;&nbsp;На главную</button></header>
+        <header className="projects-dashboard-header"><strong className="room-design-wordmark">ROOM DESIGN</strong><i/><button type="button" onClick={onHome}>←&nbsp;&nbsp;На главную</button></header>
         <div className="projects-dashboard-copy"><p><b>01</b><i/><span>ЛИЧНЫЙ КАБИНЕТ</span></p><h1>{greeting}</h1><div className="projects-dashboard-description">Продолжайте работу с сохранёнными результатами<br className="projects-dashboard-copy-break"/> или создайте новый проект.</div><div className="projects-dashboard-actions"><button className="projects-dashboard-primary" type="button" onClick={onCreate}>Создать проект <b>→</b></button><button className="projects-dashboard-secondary" type="button" onClick={()=>setProfileOpen(true)}><span className="projects-dashboard-person" aria-hidden="true"/> Личные данные</button></div></div>
       </div>
       <div className="projects-dashboard-media"><img src="/images/room-design/room-design-projects-dashboard-hero-reference.avif" alt=""/><p className="projects-dashboard-good"><i/>Good<br/>Rooms<br/>Better<br/>Lives<i/></p><p className="projects-dashboard-story">ПРОСТРАНСТВО<br/>ДЛЯ ЛУЧШИХ<br/>ИСТОРИЙ<i/></p></div>

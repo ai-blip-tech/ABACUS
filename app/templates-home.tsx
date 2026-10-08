@@ -164,7 +164,7 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
   return (
     <main className="templates-home">
       <header className="templates-nav">
-        <Link className="templates-wordmark" href="/" aria-label="ROOM DESIGN — на главную">ROOM DESIGN</Link>
+        <Link className="templates-wordmark room-design-wordmark" href="/" aria-label="ROOM DESIGN — на главную">ROOM DESIGN</Link>
         <i aria-hidden="true" />
         <nav aria-label="Главная навигация">
           <Link href="/templates">Шаблоны</Link><a href="#templates">Возможности</a><a href="#как-это-работает">Как это работает</a><a href="#для-дизайнеров">Для дизайнеров</a>

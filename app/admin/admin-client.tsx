@@ -70,7 +70,7 @@ export default function GlobalAdminClient({ admin }: { admin: { id: string; emai
 
   return <main className="admin-shell">
     <aside className="admin-sidebar">
-      <a className="admin-logo" href="/">ROOM <span>admin</span></a>
+      <a className="admin-logo room-design-wordmark" href="/">ROOM DESIGN</a>
       <nav>{sections.map(([id, label]) => <button className={section === id ? "active" : ""} key={id} onClick={() => { setSection(id); setSelectedUser(null); }}>{label}</button>)}</nav>
       <div className="admin-person"><b>{[admin.firstName, admin.lastName].filter(Boolean).join(" ") || admin.email}</b><small>{admin.email}</small><a href="/account">Личный кабинет →</a></div>
     </aside>

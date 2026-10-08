@@ -9,6 +9,7 @@ import "./studio-preview-iteration.css";
 import "./it-orb.css";
 import "./templates-foundation.css";
 import "./templates-home-v2.css";
+import "./wordmark.css";
 
 const cormorantGaramond = localFont({
   src: [
