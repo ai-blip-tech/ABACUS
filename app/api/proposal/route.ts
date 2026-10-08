@@ -1,9 +1,10 @@
 import fontkit from "@pdf-lib/fontkit";
-import { PDFDocument, PDFImage, PDFFont, rgb } from "pdf-lib";
+import { clip, endPath, PDFDocument, PDFImage, PDFFont, popGraphicsState, pushGraphicsState, rectangle, rgb } from "pdf-lib";
 import { normalizeProposalImage, type ProposalImageRole } from "@/lib/proposal-pdf-image";
 import { paginateProposalSpecification } from "@/lib/commercial-proposal";
 import { requireTenantUser } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
+import { isLegacyNorrBrand, PROPOSAL_BRAND, PROPOSAL_SELECTION_MODULE } from "@/lib/proposal-brand";
 
 type ProductParameter = { name?: string; value?: string };
 type ProposalProduct = {
@@ -53,6 +54,7 @@ type ProposalBody = {
   proposalCoverImage?: string;
   coverImage?: string;
   coverBrandAsset?: string;
+  managerBrandAsset?: string;
   fontData?: string;
   fontBoldData?: string;
   serifFontData?: string;
@@ -72,7 +74,6 @@ const PALE = rgb(243 / 255, 240 / 255, 234 / 255);
 const IVORY = rgb(247 / 255, 245 / 255, 241 / 255);
 const BURGUNDY = rgb(110 / 255, 36 / 255, 42 / 255);
 const WARM_LINE = rgb(221 / 255, 214 / 255, 203 / 255);
-const STONE = rgb(203 / 255, 195 / 255, 184 / 255);
 const BROWN = INK;
 const WHITE = rgb(1, 1, 1);
 
@@ -118,6 +119,15 @@ const drawImageContain = (page: ReturnType<PDFDocument["addPage"]>, image: PDFIm
   page.drawImage(image, { x: box.x + (box.width - width) / 2, y: box.y + (box.height - height) / 2, width, height });
 };
 
+const drawImageCover = (page: ReturnType<PDFDocument["addPage"]>, image: PDFImage, box: { x: number; y: number; width: number; height: number }) => {
+  const scale = Math.max(box.width / image.width, box.height / image.height);
+  const width = image.width * scale;
+  const height = image.height * scale;
+  page.pushOperators(pushGraphicsState(), rectangle(box.x, box.y, box.width, box.height), clip(), endPath());
+  page.drawImage(image, { x: box.x + (box.width - width) / 2, y: box.y + (box.height - height) / 2, width, height });
+  page.pushOperators(popGraphicsState());
+};
+
 const wrapText = (text: string, font: PDFFont, size: number, maxWidth: number, maxLines = 8) => {
   const words = asText(text).split(" ").filter(Boolean);
   const lines: string[] = [];
@@ -152,8 +162,8 @@ const drawMarker = (page: ReturnType<PDFDocument["addPage"]>, font: PDFFont, num
 
 const drawPageChrome = (page: ReturnType<PDFDocument["addPage"]>, font: PDFFont, number: string, title: string) => {
   drawMarker(page, font, number, title);
-  page.drawText("NORR   /   ПЕРСОНАЛЬНАЯ ПОДБОРКА", { x: 616, y: 572, font, size: 5.2, color: MUTED });
-  page.drawText("NORR möbler   •   norrmobler.ru", { x: 36, y: 18, font, size: 5.2, color: MUTED });
+  const width = font.widthOfTextAtSize(PROPOSAL_BRAND.domain, 5.2);
+  page.drawText(PROPOSAL_BRAND.domain, { x: PAGE_WIDTH - 36 - width, y: 18, font, size: 5.2, color: MUTED });
 };
 
 const drawLabelValue = (page: ReturnType<PDFDocument["addPage"]>, font: PDFFont, label: string, value: string, x: number, y: number, width: number, size = 10) => {
@@ -208,14 +218,15 @@ export async function POST(request: Request) {
     if (!visualisation) throw new Error("Не удалось подготовить изображение визуализации для PDF.");
     const coverBrand = await embedImage(document, body.coverBrandAsset, "cover");
     if (!coverBrand) throw new Error("Не удалось подготовить утверждённую композицию обложки для PDF.");
+    const managerBrand = await embedImage(document, body.managerBrandAsset, "cover");
+    if (!managerBrand) throw new Error("Не удалось подготовить официальный знак NORR MØBLER для PDF.");
 
     const firstPage = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     const coverSplit = 477.5;
     firstPage.drawImage(coverBrand, { x: 0, y: 0, width: coverSplit, height: PAGE_HEIGHT });
     firstPage.drawRectangle({ x: coverSplit, y: 0, width: PAGE_WIDTH - coverSplit, height: PAGE_HEIGHT, color: IVORY });
     const coverX = 525;
-    firstPage.drawText("NORR MÖBLER / PRIVATE SELECTION", { x: coverX, y: 499, font: fontBold, size: 7, color: BURGUNDY });
-    firstPage.drawLine({ start: { x: coverX, y: 486 }, end: { x: coverX + 26, y: 486 }, thickness: 1.2, color: BURGUNDY });
+    firstPage.drawLine({ start: { x: coverX, y: 499 }, end: { x: coverX + 26, y: 499 }, thickness: 1.2, color: BURGUNDY });
     drawLines(firstPage, ["Коммерческое", "предложение"], { x: coverX, y: 448, font: serif, size: 26, lineHeight: 27 });
     firstPage.drawText("Интерьер, собранный вокруг вашей жизни.", { x: coverX, y: 381, font: serifItalic, size: 9.5, color: MUTED });
     drawLabelValue(firstPage, font, "Клиент", textValue(proposal.clientName), coverX, 342, 255, 11);
@@ -223,16 +234,16 @@ export async function POST(request: Request) {
     drawLabelValue(firstPage, font, "Предложение", textValue(proposal.offerNumber), coverX, 242, 105, 10);
     drawLabelValue(firstPage, font, "Дата", textValue(proposal.offerDate), coverX + 130, 242, 105, 10);
     firstPage.drawText(`Действительно до ${textValue(proposal.validUntil)}`, { x: coverX, y: 196, font, size: 7.5, color: MUTED });
-    firstPage.drawLine({ start: { x: coverX, y: 64 }, end: { x: 783, y: 64 }, thickness: .7, color: WARM_LINE });
-    firstPage.drawText("М Е Б Е Л Ь   •   С В Е Т   •   Д Е К О Р", { x: coverX, y: 43, font, size: 5.2, color: MUTED });
-    firstPage.drawText("N O R R M O B L E R . R U", { x: 689, y: 18, font, size: 5.2, color: MUTED });
+    const coverDomainWidth = font.widthOfTextAtSize(PROPOSAL_BRAND.domain, 5.2);
+    firstPage.drawText(PROPOSAL_BRAND.domain, { x: PAGE_WIDTH - 36 - coverDomainWidth, y: 18, font, size: 5.2, color: MUTED });
 
     const visualisationPage = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     drawPageChrome(visualisationPage, font, "01", "Подборка для вашего пространства");
     visualisationPage.drawText("Собрано в единую интерьерную историю", { x: 36, y: 520, font: serif, size: 25, color: BROWN });
     visualisationPage.drawText("Мы объединили мебель, свет и фактуры так, чтобы каждая позиция работала не отдельно, а на общий сценарий пространства.", { x: 36, y: 493, font, size: 8.5, color: MUTED });
-    drawImageContain(visualisationPage, visualisation, { x: 44.5, y: 189, width: 376.5, height: 300.5 });
-    visualisationPage.drawRectangle({ x: 421, y: 189, width: 385, height: 300.5, color: PALE });
+    const selectionBox = PROPOSAL_SELECTION_MODULE.pdf;
+    drawImageCover(visualisationPage, visualisation, { x: selectionBox.x, y: selectionBox.y, width: selectionBox.imageWidth, height: selectionBox.height });
+    visualisationPage.drawRectangle({ x: selectionBox.x + selectionBox.imageWidth, y: selectionBox.y, width: selectionBox.panelWidth, height: selectionBox.height, color: PALE });
     const selectionPanelX = 438;
     drawLabelValue(visualisationPage, font, "Ваша подборка", textValue(proposal.selectionCount), selectionPanelX, 455, 330, 18);
     drawLabelValue(visualisationPage, font, "Категории", textValue(proposal.categories).replace(/,\s*/g, "\n"), selectionPanelX, 392, 330, 9);
@@ -254,9 +265,10 @@ export async function POST(request: Request) {
       const name = asText(product.referenceName || product.name || "Товар");
       const isLamp = /свет|ламп|торшер/i.test(`${category} ${name}`);
       const isRug = /ковр|фактур|шкур/i.test(`${category} ${name}`);
-      const brand = textValue(product.brand, isLamp ? "SEYVAA PARIS" : isRug ? "NORR CARPETS" : "NORR MÖBLER SELECTION");
+      const candidateBrand = asText(product.brand);
+      const brand = isLegacyNorrBrand(candidateBrand) ? "" : candidateBrand || (isLamp ? "SEYVAA PARIS" : isRug ? "NORR CARPETS" : "");
       drawLines(page, wrapText(name, serif, 25, 700, 2), { x: 36, y: 520, font: serif, size: 25, lineHeight: 27 });
-      page.drawText(brand, { x: 36, y: 488, font: fontBold, size: 7, color: BURGUNDY });
+      if (brand) page.drawText(brand, { x: 36, y: 488, font: fontBold, size: 7, color: BURGUNDY });
 
       const [mainImage, secondaryImage] = embeddedProductImages[index];
       if (mainImage) drawImageContain(page, mainImage, { x: 44.5, y: 230, width: 376.5, height: 271.5 });
@@ -324,11 +336,11 @@ export async function POST(request: Request) {
     });
 
     const about = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawPageChrome(about, font, String(products.length + 2 + specificationPages.length).padStart(2, "0"), "О NORR möbler");
+    drawPageChrome(about, font, String(products.length + 2 + specificationPages.length).padStart(2, "0"), PROPOSAL_BRAND.aboutTitle);
     about.drawText("Европейский дизайн. Индивидуальный сценарий.", { x: 42, y: 516, font: serif, size: 25, color: BROWN });
     drawImageContain(about, visualisation, { x: 44.5, y: 300, width: 376.5, height: 205 });
     about.drawRectangle({ x: 421, y: 300, width: 385, height: 205, color: INK });
-    about.drawText("NORR MÖBLER", { x: 438, y: 476, font: fontBold, size: 6.5, color: BURGUNDY });
+    about.drawText(PROPOSAL_BRAND.aboutLabel, { x: 438, y: 476, font: fontBold, size: 6.5, color: BURGUNDY });
     drawLines(about, wrapText("Интерьер начинается не с отдельного предмета, а с ощущения, которое вы хотите сохранить.", serif, 14, 335, 5), { x: 438, y: 448, font: serif, size: 14, lineHeight: 18, color: WHITE });
     drawLines(about, wrapText("Мы соединяем мебель, свет и фактуры в цельный сценарий - спокойный, точный и персональный.", font, 8, 335, 4), { x: 438, y: 377, font, size: 8, lineHeight: 10, color: WARM_LINE });
     about.drawText("Сервис вокруг вашего проекта", { x: 42, y: 270, font: serif, size: 17, color: BROWN });
@@ -345,21 +357,10 @@ export async function POST(request: Request) {
       drawLines(about, wrapText(title, serif, 10, 165, 2), { x: x + 16, y: 238, font: serif, size: 10, lineHeight: 11 });
       drawLines(about, wrapText(description, font, 6.6, 165, 4), { x, y: 209, font, size: 6.6, lineHeight: 8, color: MUTED });
     });
-    about.drawText("N O R R   /   L I V E   B E A U T I F U L L Y", { x: 615, y: 151, font, size: 4.5, color: STONE });
-
     const manager = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     manager.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: IVORY });
-    drawPageChrome(manager, font, String(products.length + 3 + specificationPages.length).padStart(2, "0"), "Ваш персональный менеджер");
-    manager.drawEllipse({ x: 238, y: 350, xScale: 145, yScale: 145, borderColor: WARM_LINE, borderWidth: 1 });
-    const managerArc = (t: number) => {
-      const angle = Math.PI * (1.18 + .64 * t);
-      return { x: 238 + 160 * Math.cos(angle), y: 350 - 160 * Math.sin(angle) };
-    };
-    for (let segment = 0; segment < 32; segment += 1) manager.drawLine({ start: managerArc(segment / 32), end: managerArc((segment + 1) / 32), thickness: 1.2, color: BURGUNDY });
-    manager.drawText("NORR", { x: 176, y: 360, font: serif, size: 38, color: STONE });
-    manager.drawText("M Ö B L E R", { x: 210, y: 332, font: fontBold, size: 6, color: MUTED });
-    manager.drawLine({ start: { x: 208, y: 310 }, end: { x: 268, y: 310 }, thickness: 1, color: BURGUNDY });
-    manager.drawText("Е В Р О П Е Й С К И Е   И Н Т Е Р Ь Е Р Ы", { x: 178, y: 288, font, size: 4.5, color: MUTED });
+    drawMarker(manager, font, String(products.length + 3 + specificationPages.length).padStart(2, "0"), "Ваш персональный менеджер");
+    drawImageContain(manager, managerBrand, { x: 60, y: 245, width: 355, height: 305 });
     manager.drawLine({ start: { x: 42, y: 159 }, end: { x: 63, y: 159 }, thickness: 1, color: BURGUNDY });
     manager.drawText("СЛЕДУЮЩИЙ ШАГ", { x: 42, y: 140, font: fontBold, size: 7, color: BURGUNDY });
     drawLines(manager, wrapText("Подтвердите выбранные позиции или пришлите правки. Менеджер обновит конфигурации, стоимость и сценарий поставки.", font, 9, 375, 3), { x: 42, y: 118, font, size: 9, lineHeight: 12 });
@@ -370,16 +371,13 @@ export async function POST(request: Request) {
     manager.drawText(textValue(body.managerName, "Имя Фамилия"), { x: 540, y: 455, font: serif, size: 20, color: BROWN });
     manager.drawText(textValue(proposal.managerRole, "Персональный менеджер"), { x: 540, y: 435, font, size: 9, color: MUTED });
     let managerY = 352;
-    for (const [label, value] of [["ТЕЛЕФОН", proposal.managerPhone], ["EMAIL", proposal.managerEmail], ["САЙТ", "norrmobler.ru"]] as const) { manager.drawText(label, { x: 480, y: managerY, font: fontBold, size: 7, color: BURGUNDY }); manager.drawText(textValue(value), { x: 480, y: managerY - 20, font, size: 10, color: BROWN }); managerY -= 70; }
+    for (const [label, value] of [["ТЕЛЕФОН", proposal.managerPhone], ["EMAIL", proposal.managerEmail], ["САЙТ", PROPOSAL_BRAND.contactDomain]] as const) { manager.drawText(label, { x: 480, y: managerY, font: fontBold, size: 7, color: BURGUNDY }); manager.drawText(textValue(value), { x: 480, y: managerY - 20, font, size: 10, color: BROWN }); managerY -= 70; }
     manager.drawLine({ start: { x: 480, y: 151 }, end: { x: 756, y: 151 }, thickness: .6, color: WARM_LINE });
     drawLines(manager, wrapText("Я помогу уточнить конфигурации, проверить образцы и довести заказ до установки.", serifItalic, 8.5, 270, 3), { x: 480, y: 130, font: serifItalic, size: 8.5, lineHeight: 11, color: MUTED });
-    manager.drawText("СПАСИБО, ЧТО ВЫБИРАЕТЕ NORR MÖBLER", { x: 480, y: 89, font: fontBold, size: 5.5, color: MUTED });
-    manager.drawLine({ start: { x: 36, y: 36 }, end: { x: 806, y: 36 }, thickness: .6, color: WARM_LINE });
-    manager.drawText("NORR MÖBLER", { x: 36, y: 18, font: fontBold, size: 5.5, color: MUTED });
-    manager.drawText("NORRMOBLER.RU", { x: 710, y: 18, font, size: 5.5, color: MUTED });
+    manager.drawText(PROPOSAL_BRAND.managerThanks, { x: 480, y: 89, font: fontBold, size: 5.5, color: MUTED });
 
-    document.setTitle(`Коммерческое предложение — ${asText(body.projectName || "NORR mobler")}`);
-    document.setAuthor("NORR mobler");
+    document.setTitle(`Коммерческое предложение — ${asText(body.projectName || PROPOSAL_BRAND.domain)}`);
+    document.setAuthor(PROPOSAL_BRAND.contactDomain);
     document.setCreator("ROOM Design");
     const bytes = await document.save();
     const filename = "NORR_Mobler_Commercial_Proposal.pdf";

@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
-  <title>NORR Møbler circle lockup</title>
+  <title>NORR MØBLER circle lockup</title>
   <rect width="1000" height="1000" fill="none"/>
   <circle cx="500" cy="500" r="380" fill="none" stroke="#D8D2CB" stroke-width="3"/>
   <path d="M185 288 A410 410 0 0 1 815 288" fill="none" stroke="#6E242A" stroke-width="4"/>
   <text x="500" y="500" text-anchor="middle" fill="#CBC3B8" font-family="Georgia, 'Times New Roman', serif" font-size="138" letter-spacing="18">NORR</text>
-  <text x="500" y="580" text-anchor="middle" fill="#8D8276" font-family="Arial, Helvetica, sans-serif" font-size="27" letter-spacing="15">MÖBLER</text>
+  <text x="500" y="580" text-anchor="middle" fill="#8D8276" font-family="Arial, Helvetica, sans-serif" font-size="27" letter-spacing="15">MØBLER</text>
   <line x1="420" y1="625" x2="580" y2="625" stroke="#6E242A" stroke-width="4"/>
   <text x="500" y="680" text-anchor="middle" fill="#8D8276" font-family="Arial, Helvetica, sans-serif" font-size="18" letter-spacing="6">ЕВРОПЕЙСКИЕ ИНТЕРЬЕРЫ</text>
 </svg>

@@ -6,6 +6,7 @@ import {
   buildProposalProducts, defaultProposalDocument, mergeProposalDocument, paginateProposalSpecification, proposalItemsForSelection, proposalOverrideFor, proposalTotal,
   type ProposalCatalogProduct, type ProposalDocument, type ProposalPlanItem, type ProposalProduct,
 } from "@/lib/commercial-proposal";
+import { PROPOSAL_BRAND, isLegacyNorrBrand } from "@/lib/proposal-brand";
 
 type User = { firstName?: string; lastName?: string; email?: string; phone?: string; companyRole?: string };
 type ProjectPayload = {
@@ -42,15 +43,15 @@ function PageMark({ number, title }: { number: string; title: string }) {
 }
 
 function ProposalHeader({ number, title }: { number: string; title: string }) {
-  return <><PageMark number={number} title={title}/><div className="proposal-running-head"><b>NORR</b><i>/</i><span>ПЕРСОНАЛЬНАЯ ПОДБОРКА</span></div></>;
+  return <PageMark number={number} title={title}/>;
 }
 
 function ProductHeader({ number, category }: { number: string; category: string }) {
-  return <><PageMark number={number} title=""/><div className="proposal-product-category">{category}</div><div className="proposal-running-head"><b>NORR</b><i>/</i><span>ПЕРСОНАЛЬНАЯ ПОДБОРКА</span></div></>;
+  return <><PageMark number={number} title=""/><div className="proposal-product-category">{category}</div></>;
 }
 
 function ProposalFooter() {
-  return <div className="proposal-page-footer"><b>NORR möbler</b><i>•</i><span>norrmobler.ru</span></div>;
+  return <div className="proposal-page-footer">{PROPOSAL_BRAND.domain}</div>;
 }
 
 export default function ProposalEditor({ projectId }: { projectId: string }) {
@@ -141,14 +142,14 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       await save(products, showPrices, document);
       await window.document.fonts.ready;
-      const [coverImage, coverBrandAsset, fontData, fontBoldData, serifFontData, serifItalicFontData, serifBoldFontData, preparedProducts] = await Promise.all([
-        pdfImage(visual), pdfImage("/proposal/cover-brand-approved.png"), pdfImage("/fonts/Arial.ttf"), pdfImage("/fonts/Arial-Bold.ttf"),
+      const [coverImage, coverBrandAsset, managerBrandAsset, fontData, fontBoldData, serifFontData, serifItalicFontData, serifBoldFontData, preparedProducts] = await Promise.all([
+        pdfImage(visual), pdfImage(PROPOSAL_BRAND.coverAsset), pdfImage(PROPOSAL_BRAND.circleAsset), pdfImage("/fonts/Arial.ttf"), pdfImage("/fonts/Arial-Bold.ttf"),
         pdfImage("/fonts/Georgia.ttf"), pdfImage("/fonts/Georgia-Italic.ttf"), pdfImage("/fonts/Georgia-Bold.ttf"),
         Promise.all(products.map(async (product) => ({ ...product, referenceImage: await pdfImage(product.image) }))),
       ]);
       const response = await fetch(format === "pdf" ? "/api/proposal" : "/api/proposal/pptx", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, projectName: document.projectName, coverImage, coverBrandAsset, fontData, fontBoldData, serifFontData, serifItalicFontData, serifBoldFontData, withPrices: showPrices, products: preparedProducts, document, managerName }),
+        body: JSON.stringify({ projectId, projectName: document.projectName, coverImage, coverBrandAsset, managerBrandAsset, fontData, fontBoldData, serifFontData, serifItalicFontData, serifBoldFontData, withPrices: showPrices, products: preparedProducts, document, managerName }),
       });
       if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || `Не удалось создать ${format === "pdf" ? "PDF" : "PPTX"}.`); }
       const blob = await response.blob(); const href = URL.createObjectURL(blob); const link = window.document.createElement("a");
@@ -172,13 +173,13 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
     <section className="proposal-editor-toolbar"><Link href="/">← Вернуться в проект</Link><span>{status}</span>{error && <strong role="alert">{error}</strong>}</section>
     <section className="proposal-document" aria-label="Предпросмотр коммерческого предложения">
       <article className="proposal-page proposal-cover-page">
-        <div className="proposal-cover-brand" aria-label="NORR MÖBLER — коммерческое предложение"/>
-        <div className="proposal-cover-data"><em>NORR MÖBLER / PRIVATE SELECTION</em><i className="proposal-short-rule"/><h1>Коммерческое<br/>предложение</h1><p>Интерьер, собранный вокруг вашей жизни.</p>
+        <div className="proposal-cover-brand" aria-label={`${PROPOSAL_BRAND.officialName} — коммерческое предложение`}/>
+        <div className="proposal-cover-data"><i className="proposal-short-rule"/><h1>Коммерческое<br/>предложение</h1><p>Интерьер, собранный вокруг вашей жизни.</p>
           <Field label="Клиент" value={document.clientName} onChange={(clientName) => updateDocument({ clientName })}/>
           <Field label="Проект" value={document.projectName} onChange={(projectName) => updateDocument({ projectName })}/>
           <div className="proposal-cover-meta"><Field label="Предложение" value={document.offerNumber} onChange={(offerNumber) => updateDocument({ offerNumber })}/><Field label="Дата" value={document.offerDate} onChange={(offerDate) => updateDocument({ offerDate })}/></div>
           <Field label="Действительно до" value={document.validUntil} onChange={(validUntil) => updateDocument({ validUntil })}/>
-          <div className="proposal-cover-bottom"><i/><span>МЕБЕЛЬ · СВЕТ · ДЕКОР</span><b>NORRMOBLER.RU</b></div>
+          <div className="proposal-cover-bottom"><i/><b>{PROPOSAL_BRAND.domain}</b></div>
         </div>
       </article>
 
@@ -198,7 +199,7 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         return <article className={`proposal-page proposal-product-page ${isLamp ? "proposal-product-lamp" : isRug ? "proposal-product-rug" : "proposal-product-furniture"}`} key={product.key}>
         <ProductHeader number={String(index + 2).padStart(2, "0")} category={product.category}/>
         <Field label="Наименование" className="proposal-product-title" value={product.name} onChange={(name) => updateProduct(product.key, { name })}/>
-        <Field label="Бренд" className="proposal-product-brand" value={product.brand} onChange={(brand) => updateProduct(product.key, { brand })}/>
+        {!isLegacyNorrBrand(product.brand) && <Field label="Бренд" className="proposal-product-brand" value={product.brand} onChange={(brand) => updateProduct(product.key, { brand })}/>}
         <div className="proposal-product-body"><img src={product.image} alt={product.name}/><aside>
           <div className="proposal-dimensions">{(["width", "depth", "height"] as const).map((field) => <label key={field}><span>{field === "width" ? "Ширина" : field === "depth" ? "Глубина" : "Высота"}</span><input aria-label={`${field}: ${product.name}`} type="number" min="0" value={product[field] ?? ""} onChange={(event) => updateProduct(product.key, { [field]: event.target.value ? Number(event.target.value) : undefined })}/><b>мм</b></label>)}</div>
           <Field label="Артикул" value={product.article} onChange={(article) => updateProduct(product.key, { article })}/>
@@ -223,9 +224,9 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         </article>;
       })}
 
-      <article className="proposal-page proposal-about-page"><ProposalHeader number={String(products.length + 2 + specificationPages.length).padStart(2, "0")} title="О NORR möbler"/><h2>Европейский дизайн. Индивидуальный сценарий.</h2><div className="proposal-about-hero"><img src={visual} alt="Интерьер NORR möbler"/><blockquote><small>NORR MÖBLER</small><b>Интерьер начинается не с отдельного предмета, а с ощущения, которое вы хотите сохранить.</b><p>Мы соединяем мебель, свет и фактуры в цельный сценарий — спокойный, точный и персональный.</p></blockquote></div><h3>Сервис вокруг вашего проекта</h3><div className="proposal-benefits">{[["01","Персональная конфигурация","Размеры, модули, ткани и отделки подбираются под ваш интерьер."],["02","Дизайнерская поддержка","Профессиональная консультация, 3D-модели и визуализация помогают принять решение."],["03","Единый сервис","Согласование, заказ, доставка и сборка сопровождаются одним менеджером."],["04","Материалы вживую","Финальный выбор можно подтвердить в шоуруме по реальным образцам."]].map(([number,title,text]) => <div key={number}><small>{number}</small><b>{title}</b><p>{text}</p></div>)}</div><div className="proposal-about-slogan">NORR / LIVE BEAUTIFULLY</div><ProposalFooter/></article>
+      <article className="proposal-page proposal-about-page"><ProposalHeader number={String(products.length + 2 + specificationPages.length).padStart(2, "0")} title={PROPOSAL_BRAND.aboutTitle}/><h2>Европейский дизайн. Индивидуальный сценарий.</h2><div className="proposal-about-hero"><img src={visual} alt="Интерьер проекта"/><blockquote><small>{PROPOSAL_BRAND.aboutLabel}</small><b>Интерьер начинается не с отдельного предмета, а с ощущения, которое вы хотите сохранить.</b><p>Мы соединяем мебель, свет и фактуры в цельный сценарий — спокойный, точный и персональный.</p></blockquote></div><h3>Сервис вокруг вашего проекта</h3><div className="proposal-benefits">{[["01","Персональная конфигурация","Размеры, модули, ткани и отделки подбираются под ваш интерьер."],["02","Дизайнерская поддержка","Профессиональная консультация, 3D-модели и визуализация помогают принять решение."],["03","Единый сервис","Согласование, заказ, доставка и сборка сопровождаются одним менеджером."],["04","Материалы вживую","Финальный выбор можно подтвердить в шоуруме по реальным образцам."]].map(([number,title,text]) => <div key={number}><small>{number}</small><b>{title}</b><p>{text}</p></div>)}</div><ProposalFooter/></article>
 
-      <article className="proposal-page proposal-manager-page"><ProposalHeader number={String(products.length + 3 + specificationPages.length).padStart(2, "0")} title="Ваш персональный менеджер"/><div className="proposal-manager-kicker">NORR / PRIVATE SELECTION</div><div className="proposal-manager-body"><div className="proposal-manager-left"><img src="/proposal/norr-circle.svg" alt="NORR möbler"/><i/><h3>СЛЕДУЮЩИЙ ШАГ</h3><p>Подтвердите выбранные позиции или пришлите правки. Менеджер обновит конфигурации, стоимость и сценарий поставки в одной версии предложения.</p><em>Мебель, свет и декор для интерьеров, в которых хочется жить.</em></div><aside><div className="proposal-manager-person"><div className="proposal-avatar">{initials(managerName)}</div><div><h2>{managerName}</h2><Field label="Должность" value={document.managerRole} onChange={(managerRole) => updateDocument({ managerRole })}/></div></div><Field label="Телефон" value={document.managerPhone} onChange={(managerPhone) => updateDocument({ managerPhone })}/><Field label="Email" value={document.managerEmail} onChange={(managerEmail) => updateDocument({ managerEmail })}/><div className="proposal-site"><span>САЙТ</span><b>norrmobler.ru</b></div><p>Я помогу уточнить конфигурации, проверить образцы и довести заказ до установки.</p><strong>СПАСИБО, ЧТО ВЫБИРАЕТЕ NORR MÖBLER</strong></aside></div><ProposalFooter/></article>
+      <article className="proposal-page proposal-manager-page"><ProposalHeader number={String(products.length + 3 + specificationPages.length).padStart(2, "0")} title="Ваш персональный менеджер"/><div className="proposal-manager-body"><div className="proposal-manager-left"><img src={PROPOSAL_BRAND.circleAsset} alt={PROPOSAL_BRAND.officialName}/><i/><h3>СЛЕДУЮЩИЙ ШАГ</h3><p>Подтвердите выбранные позиции или пришлите правки. Менеджер обновит конфигурации, стоимость и сценарий поставки в одной версии предложения.</p><em>Мебель, свет и декор для интерьеров, в которых хочется жить.</em></div><aside><div className="proposal-manager-person"><div className="proposal-avatar">{initials(managerName)}</div><div><h2>{managerName}</h2><Field label="Должность" value={document.managerRole} onChange={(managerRole) => updateDocument({ managerRole })}/></div></div><Field label="Телефон" value={document.managerPhone} onChange={(managerPhone) => updateDocument({ managerPhone })}/><Field label="Email" value={document.managerEmail} onChange={(managerEmail) => updateDocument({ managerEmail })}/><div className="proposal-site"><span>САЙТ</span><b>{PROPOSAL_BRAND.contactDomain}</b></div><p>Я помогу уточнить конфигурации, проверить образцы и довести заказ до установки.</p><strong>{PROPOSAL_BRAND.managerThanks}</strong></aside></div></article>
       {!products.length && project && <article className="proposal-empty"><h2>Нет товаров для предложения</h2><p>Добавьте в планограмму товары из каталога или предметы с собственными референсами и сохраните проект.</p></article>}
     </section>
   </main>;
