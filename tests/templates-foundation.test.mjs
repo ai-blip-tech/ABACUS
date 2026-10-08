@@ -116,14 +116,23 @@ test("kitchen CAD preview enforces required materials and Geometry Lock", () => 
   assert.equal(template.safetyPolicy, "geometry-lock");
   assert.equal(template.ctaLabel, "Создать визуал");
   assert.deepEqual(template.requireAnyOf, [["backsplashMaterial", "backsplashColor"]]);
-  assert.deepEqual(template.inputSlots.filter((slot) => slot.required).map((slot) => slot.id), ["kitchenCad", "facadePrimary", "facadePrimaryTarget", "countertopMaterial"]);
-  assert.equal(template.inputSlots.filter((slot) => !["choice", "short_text", "range"].includes(slot.kind)).slice(1).reduce((total, slot) => total + slot.maxCount, 0), 10);
+  assert.deepEqual(template.inputSlots.filter((slot) => slot.required).map((slot) => slot.id), ["kitchenCad", "facadeMaterials", "countertopMaterial"]);
+  const facadeMaterials = template.inputSlots.find((slot) => slot.id === "facadeMaterials");
+  assert.equal(facadeMaterials?.minCount, 1);
+  assert.equal(facadeMaterials?.maxCount, 4);
+  assert.equal(template.inputSlots.find((slot) => slot.id === "appliances")?.maxCount, 4);
   assert.match(templateWorkbenchScenarios["kitchen-cad-to-photo"].generationBrief, /GEOMETRY LOCK/);
   assert.match(templateWorkbenchScenarios["kitchen-cad-to-photo"].generationBrief, /Строго сохранить исходную камеру и композицию/);
   assert.match(scenarioWorkbenchSource, /hasGeometryLockConflict/);
   assert.match(scenarioWorkbenchSource, /GEOMETRY LOCK · ВКЛЮЧЁН/);
   assert.match(scenarioWorkbenchSource, /назначение поверхностей подтверждается вручную/);
+  assert.match(scenarioWorkbenchSource, /surfacePointColors = \["#2f8f5b", "#2f69b0"/);
+  assert.match(scenarioWorkbenchSource, /addSurfacePoint/);
+  assert.match(scenarioWorkbenchSource, /Фактура фасадов \$\{index \+ 1\}: поставьте хотя бы одну/);
+  assert.match(scenarioWorkbenchSource, /Supporting Image \$\{referenceIndex \+ 2\}/);
+  assert.match(scenarioWorkbenchSource, /normalized source-image coordinates/);
   assert.match(templatesCssSource, /\.editorial-geometry-lock/);
+  assert.match(templatesCssSource, /\.editorial-surface-point/);
 });
 
 test("scenario image upload remains clickable across browsers and accepts common JPEG metadata variants", () => {
