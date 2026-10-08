@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import type React from "react";
 import AccountDropdown from "./account-dropdown";
-import ItOrb from "./it-orb";
 import type { ItUiAction, ItUiTarget, RoomDesignContext } from "@/lib/it/types";
 import TemplatesHome from "./templates-home";
 import "./account-dropdown.css";
@@ -521,6 +520,7 @@ export default function Home() {
   const selectedPlanItemForIt = planItems.find((item) => item.id === planSelectedId) || null;
   const itContext: RoomDesignContext = {
     route: view === "studio" ? "#студия" : `#${view}`,
+    page: view === "home" ? "landing" : view === "account" ? "projects" : view === "newProject" ? "project-setup" : "studio",
     projectId: projectId || null,
     projectName: projectName || "Новый проект",
     section: activeTool === "Планограмма" ? "planogram" : "image-editor",
@@ -553,6 +553,7 @@ export default function Home() {
       queuedEditCount: furnitureEdits.length,
       hasFurnitureReference: Boolean(referenceImage),
     },
+    template: null,
     availableActions: ["get_current_context", "search_catalog"],
   };
   const handleItAction = (action: ItUiAction) => {
@@ -607,6 +608,18 @@ export default function Home() {
     }
     revealTarget(action.target);
   };
+  const itContextSignature = JSON.stringify(itContext);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("roomdesign:it-context", { detail: JSON.parse(itContextSignature) as RoomDesignContext }));
+  }, [itContextSignature]);
+  useEffect(() => {
+    const handleSitewideItAction = (event: Event) => {
+      const action = (event as CustomEvent<ItUiAction>).detail;
+      if (action) handleItAction(action);
+    };
+    window.addEventListener("roomdesign:it-action", handleSitewideItAction);
+    return () => window.removeEventListener("roomdesign:it-action", handleSitewideItAction);
+  });
   if (view === "home") return <>
     <TemplatesHome accountControl={user ? <AccountDropdown user={user}/> : <><button type="button" onClick={() => openAuth("login")}>Войти</button><button type="button" onClick={() => openAuth("register")}>Зарегистрироваться</button></>} onStartProject={continueToProject}/>
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
@@ -681,7 +694,6 @@ export default function Home() {
         {upscaleVersion&&<section className="upscale-panel" aria-label="Апскейл выбранной версии"><div className="upscale-preview"><img src={upscaleVersion.image} alt={`Предпросмотр: ${upscaleVersion.name}`}/><span>Предпросмотр перед апскейлом</span></div><div className="upscale-copy"><label>КАЧЕСТВО ИЗОБРАЖЕНИЯ</label><h2>Сделать апскейл</h2><p>Улучшим детализацию и чёткость выбранной версии. Композиция, предметы и кадр останутся прежними.</p><button className="generate" type="button" onClick={()=>void upscaleHistoryVersion()} disabled={isGenerating}>{isGenerating?"Улучшаем качество…":"✦ Сделать апскейл"}</button>{generationError&&<p className="generation-error" role="alert">{generationError}</p>}</div></section>}
         {activeTool === "Слои" && <LayerGallery background={layerBackground} source={interiorImage || generatedImage || ""} objects={detectedObjects} layers={layerImages} hidden={hiddenLayerIds} selected={selectedObject} onSelect={previewObject} onReplace={replaceSelectedObject} onRemove={(item)=>setHiddenLayerIds((items)=>items.includes(item.id)?items.filter((id)=>id!==item.id):[...items,item.id])} isBuilding={isBuildingLayers}/>}</>}</section>
       <aside className="inspector"><div className="inspector-title"><div><span>СТУДИЯ КОМНАТЫ</span><h1>{productMode ? "Редактор изображений" : activeTool === "Планограмма" ? "Создание интерьера" : activeTool}</h1></div><button>•••</button></div>{activeTool === "Планограмма" ? <>{generationError&&<p className="panel-error" role="alert">{generationError}</p>}<PlanogramPanel items={planItems} room={planRoom} selectedId={planSelectedId} onSelect={setPlanSelectedId} onChange={setPlanItems}/><section className="plan-instruction-panel" aria-label="Дополнительная инструкция для рендера"><label htmlFor="plan-render-instruction">ЧТО ДОБАВИТЬ ИЛИ ИЗМЕНИТЬ?</label><textarea id="plan-render-instruction" value={planInstructionDraft} onChange={(event)=>setPlanInstructionDraft(event.target.value)} maxLength={2000} placeholder="Например: в комнате сидит чёрная кошка"/><button type="button" aria-pressed={Boolean(planInstruction)&&planInstructionDraft.trim()===planInstruction} className={Boolean(planInstruction)&&planInstructionDraft.trim()===planInstruction?"remembered":""} disabled={!planInstructionDraft.trim()&&!planInstruction} onClick={()=>{const next=planInstructionDraft.trim();setPlanInstruction(next);setPlanInstructionDraft(next);setProjectSaved(false);}}>Запомнить</button><p>{planInstruction&&planInstructionDraft.trim()===planInstruction?"Инструкция сохранена и будет применена при создании рендера.":"Инструкция не запускает генерацию. После её сохранения нажмите «Создать рендер»."}</p></section></> : activeTool === "Слои" ? <LayersPanel isBuilding={isBuildingLayers} error={detectionError} onBuild={buildLayers} onUpload={loadInterior} imageName={interiorName} points={layerStrokes.map((stroke)=>({id:stroke.id,x:0,y:0,width:0,height:0,name:stroke.name}))} onRemovePoint={(id)=>setLayerStrokes((strokes)=>strokes.filter((stroke)=>stroke.id!==id))}/> : activeTool === "Заменить" ? <ObjectPanel objects={detectedObjects} selected={selectedObject} isDetecting={isDetecting} isGenerating={isGenerating || isSegmenting} error={detectionError || generationError} onDetect={detectObjects} onSelect={previewObject} onUpload={loadInterior} imageName={interiorName} onReplace={replaceSelectedObject} onRemove={removeSelectedObject}/> : productMode ? <FurnitureChoice action={furnitureAction} onUpload={loadInterior} imageName={interiorName} interiorImage={interiorImage} referenceName={referenceName} setReferenceName={setReferenceName} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={generate} queuedEdits={furnitureEdits} onQueueCatalogProduct={queueCatalogProduct} onRemoveQueued={(id)=>setFurnitureEdits((items)=>items.filter((item)=>item.id!==id))} onGenerateQueued={generateFurnitureEdits} placementPrompt={placementPrompt} setPlacementPrompt={setPlacementPrompt} onAdjust={editCurrentImage} canAdjust={Boolean(interiorImage)} isGenerating={isGenerating || isSegmenting} generationError={generationError}/> : <DesignPanel prompt={prompt} setPrompt={setPrompt} generate={generate} isGenerating={isGenerating || isSegmenting} generationError={generationError} selected={selected} onProducts={() => { setActiveTool("Добавить мебель"); setFurnitureMode("choice"); }} preserved={preserved} setPreserved={setPreserved} creativity={creativity} setCreativity={setCreativity}/>}</aside></section>
-    <ItOrb context={itContext} onAction={handleItAction}/>
     {saveProjectDialogOpen&&<div className="auth-overlay save-project-overlay" role="dialog" aria-modal="true" aria-labelledby="save-project-title"><form className="auth-card save-project-card" onSubmit={saveGenerationAsProject}><button className="auth-close" type="button" aria-label="Закрыть" onClick={()=>setSaveProjectDialogOpen(false)}>×</button><span>НОВЫЙ ПРОЕКТ</span><h2 id="save-project-title">Сохранить как проект</h2><p>Назовите проект, чтобы продолжить работу с этой визуализацией позже.</p><label htmlFor="save-project-name">Название проекта<input id="save-project-name" value={saveProjectName} onChange={(event)=>{setSaveProjectName(event.target.value);if(saveProjectError)setSaveProjectError("");}} required maxLength={120} placeholder="Например, гостиная на Патриарших"/></label>{saveProjectError&&<p className="auth-error" role="alert">{saveProjectError}</p>}<button className="auth-submit" disabled={isSavingProject}>{isSavingProject?"Сохраняем…":"Сохранить"}</button></form></div>}
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);}}/>}
     {adminOpen && <AdminDashboard onClose={()=>setAdminOpen(false)}/>}

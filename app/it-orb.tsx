@@ -15,6 +15,8 @@ type TranscriptItem = {
 type ItOrbProps = {
   context: RoomDesignContext;
   onAction: (action: ItUiAction) => void;
+  suggestions?: string[];
+  closedLabel?: string;
 };
 
 const stateLabel: Record<ItVisualState, string> = {
@@ -43,7 +45,7 @@ const onoState: Record<ItVisualState, OnoState> = {
   error: "error",
 };
 
-const suggestions = [
+const defaultSuggestions = [
   "Как заменить диван?",
   "Найди кресло до 150 тысяч",
   "Какой материал дивана выбрать?",
@@ -58,7 +60,7 @@ const imageAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => 
   reader.readAsDataURL(file);
 });
 
-export default function ItOrb({ context, onAction }: ItOrbProps) {
+export default function ItOrb({ context, onAction, suggestions = defaultSuggestions, closedLabel = "Оно" }: ItOrbProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<ItVisualState>("closed");
   const [value, setValue] = useState("");
@@ -81,6 +83,8 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
   const audioFrameRef = useRef<number | null>(null);
   const guideTimerRef = useRef<number | null>(null);
   const openRef = useRef(open);
+  const composerPlaceholder = context.template ? "Спросите об этом шаблоне" : context.page === "templates" ? "Опишите задачу — подберу шаблон" : "Спросите о проекте или интерьере";
+  const contextLabel = context.template ? `Контекст: ${context.template.title}` : context.page === "templates" ? "Каталог шаблонов известен" : "Контекст страницы включён";
 
   useEffect(() => { openRef.current = open; }, [open]);
 
@@ -345,10 +349,10 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
             <input ref={imageInputRef} className="it-file-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void attachImage(event.target.files?.[0])}/>
             <button className="it-composer-tool" type="button" onClick={() => imageInputRef.current?.click()} aria-label="Прикрепить изображение" title="Прикрепить изображение">⌕</button>
             <button className="it-composer-tool it-mic" type="button" onClick={() => void toggleRecording()} aria-label={isRecording ? "Остановить и отправить голосовое сообщение" : "Записать голосовое сообщение"} title={isRecording ? "Остановить запись" : "Записать голосом"}><span aria-hidden="true"/></button>
-            <input ref={inputRef} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Спросите о проекте или интерьере" aria-label="Сообщение для Оно"/>
+            <input ref={inputRef} value={value} onChange={(event) => setValue(event.target.value)} placeholder={composerPlaceholder} aria-label="Сообщение для Оно"/>
             <button className="it-send" type="submit" disabled={(!value.trim() && !pendingImage) || state === "thinking" || state === "searching" || isRecording || isTranscribing} aria-label="Отправить">↑</button>
           </form>
-          <footer><span>Контекст проекта включён</span><i/><span>Действия под вашим контролем</span></footer>
+          <footer><span>{contextLabel}</span><i/><span>Действия под вашим контролем</span></footer>
         </section>
       )}
 
@@ -361,7 +365,7 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
         onFocus={(event) => setOrbKeyboardFocused(event.currentTarget.matches(":focus-visible"))}
         onBlur={() => setOrbKeyboardFocused(false)}
         aria-expanded={open}
-        aria-label={open ? "Свернуть Оно" : "Открыть Оно"}
+        aria-label={open ? "Свернуть Оно" : `Открыть Оно: ${closedLabel}`}
       >
         <OnoOrb
           state={visualState}
@@ -371,7 +375,7 @@ export default function ItOrb({ context, onAction }: ItOrbProps) {
           velocityY={guideOffset?.y || 0}
           audioLevel={audioLevel}
         />
-        {!open && <em>Оно</em>}
+        {!open && <em>{closedLabel}</em>}
       </button>
     </aside>
   );

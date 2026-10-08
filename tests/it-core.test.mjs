@@ -5,6 +5,7 @@ import { ROOM_DESIGN_PRODUCT_KNOWLEDGE } from "../lib/it/product-knowledge.ts";
 
 const context = {
   route: "#студия",
+  page: "studio",
   projectId: "project-1",
   projectName: "Гостиная",
   section: "image-editor",
@@ -13,6 +14,7 @@ const context = {
   selectedObject: null,
   render: { hasSource: true, hasResult: false, isGenerating: false },
   planogram: { itemCount: 0, selectedItemId: null },
+  template: null,
   availableActions: ["navigate_to", "focus_element", "highlight_element", "search_catalog"],
 };
 
@@ -235,6 +237,23 @@ test("the verified product knowledge covers both editors and known limitations",
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.material, /Каталог материалов пока не готов/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /только текстом/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /не перемещается/);
+});
+
+test("Ono knows every registered template, its availability, inputs and result", () => {
+  const definitions = ROOM_DESIGN_PRODUCT_KNOWLEDGE.templates.definitions;
+  assert.equal(definitions.length, 35);
+  assert.equal(new Set(definitions.map((template) => template.slug)).size, definitions.length);
+  for (const template of definitions) {
+    assert.ok(template.title);
+    assert.ok(template.status);
+    assert.ok(template.inputSummary);
+    assert.ok(template.resultType);
+    assert.ok(template.inputs.length > 0);
+    assert.ok(template.inputs.every((input) => input.label && typeof input.required === "boolean"));
+  }
+  assert.equal(definitions.find((template) => template.slug === "design-battle")?.title, "Дизайн-баттл");
+  assert.match(definitions.find((template) => template.slug === "light-scenarios")?.inputSummary || "", /сценарий|Kelvin/i);
+  assert.match(definitions.find((template) => template.slug === "kitchen-cad-to-photo")?.safetyPolicy || "", /geometry-lock/);
 });
 
 test("commercial proposal guidance states the exact editor flow and both export formats", async () => {

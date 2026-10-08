@@ -1,5 +1,33 @@
+import { categoryLabels, resultLabels, statusLabels, templateRegistry } from "../templates/registry.ts";
+
+const templateKnowledge = templateRegistry.map((template) => ({
+  id: template.id,
+  slug: template.slug,
+  title: template.title,
+  status: statusLabels[template.status],
+  category: categoryLabels[template.category],
+  audience: template.audience,
+  hook: template.hook,
+  description: template.description,
+  inputSummary: template.inputSummary,
+  resultType: resultLabels[template.resultType],
+  inputs: template.inputSlots.map((slot) => ({
+    id: slot.id,
+    kind: slot.kind,
+    label: slot.label,
+    helper: slot.helper || "",
+    required: slot.required,
+    minCount: slot.minCount,
+    maxCount: slot.maxCount,
+    options: slot.options || [],
+  })),
+  requirements: template.requireAnyOf || [],
+  exclusions: template.exclusiveValueGroups || [],
+  safetyPolicy: template.safetyPolicy || "",
+}));
+
 export const ROOM_DESIGN_PRODUCT_KNOWLEDGE = {
-  version: "2026-10-08.1",
+  version: "2026-10-09.1",
   navigation: {
     studioSections: [
       { label: "Редактор изображений", purpose: "Добавление, замена и удаление предметов на изображении интерьера; применение материалов и текстовых изменений." },
@@ -7,6 +35,13 @@ export const ROOM_DESIGN_PRODUCT_KNOWLEDGE = {
     ],
     projects: "Из личного кабинета можно создать новый проект или открыть сохранённый. В новом проекте обязательны название и тип: «Квартира», «Дом», «Офис», «Гостеприимство» или «Другое»; описание необязательно.",
     account: "В личном кабинете доступны проекты и сохранённые генерации. Отдельная страница профиля содержит разделы «Профиль», «Тариф и токены», «Купить токены», «История токенов», «История рендеров», «Платежи», «Настройки» и «Безопасность».",
+    templates: "В каталоге /templates собраны все сценарии. На карточке и внутри шаблона помощник объясняет назначение, необходимые файлы, доступность и ожидаемый результат. Статус «Скоро» означает, что сценарий нельзя выдавать за уже работающий.",
+  },
+  templates: {
+    total: templateRegistry.length,
+    sharedFlow: "Открыть каталог шаблонов, выбрать сценарий, загрузить обязательные входы и заполнить необходимые параметры. Кнопка запуска становится доступной только после заполнения обязательных полей. Результат появляется в правой части рабочего пространства; его можно открыть крупно и скачать в JPEG. Помощник объясняет сценарий, но сам не запускает генерацию и не загружает файлы.",
+    statuses: "Preview и Beta — тестовые работающие сценарии; «Доступен» — рабочий сценарий; «Скоро» — ещё недоступен. Нельзя обещать генерацию для шаблона со статусом «Скоро».",
+    definitions: templateKnowledge,
   },
   planogram: {
     addItems: "В правой панели в блоке «Добавить предмет» нажать нужный тип. Доступны диван, три вида столов, кресло, стул, пуф, ковёр, кровать, шкаф, светильник, декор, растение, комод, прикроватная тумба и TV-тумба.",

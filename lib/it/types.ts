@@ -12,9 +12,10 @@ export type ItVisualState =
 
 export type RoomDesignContext = {
   route: string;
+  page: "landing" | "projects" | "project-setup" | "studio" | "templates" | "template" | "account" | "admin" | "proposal" | "other";
   projectId: string | null;
   projectName: string;
-  section: "image-editor" | "planogram";
+  section: "image-editor" | "planogram" | "templates" | "template-workspace" | "account" | "admin" | "proposal" | "project-setup" | "other";
   activeTool: string;
   furnitureAction: "add" | "replace" | "remove";
   selectedObject: { id: string; name: string } | null;
@@ -44,6 +45,17 @@ export type RoomDesignContext = {
     queuedEditCount: number;
     hasFurnitureReference: boolean;
   };
+  template: {
+    slug: string;
+    title: string;
+    status: string;
+    category: string;
+    audience: string;
+    description: string;
+    inputSummary: string;
+    resultType: string;
+    inputs: Array<{ label: string; required: boolean; minCount: number; maxCount: number }>;
+  } | null;
   availableActions: string[];
 };
 

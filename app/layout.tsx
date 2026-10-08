@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Suspense } from "react";
+import SitewideIt from "./sitewide-it";
 import "./globals.css";
 import "./concept-d.css";
 import "./home-override.css";
@@ -84,6 +86,7 @@ export default function RootLayout({
     <html lang="ru">
       <body className={`${cormorantGaramond.variable} ${manrope.variable} antialiased`}>
         {children}
+        <Suspense fallback={null}><SitewideIt/></Suspense>
       </body>
     </html>
   );
