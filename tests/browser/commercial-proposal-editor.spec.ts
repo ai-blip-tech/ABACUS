@@ -195,8 +195,12 @@ test("commercial proposal snapshots the history version selected in Studio", asy
   let popup = await popupPromise;
   await popup.waitForURL(/\/proposal\//);
   await expect(popup.locator(".proposal-selection-page img")).toBeVisible();
+  await expect(popup.locator(".proposal-product-page")).toHaveCount(1);
   await expect(popup.locator(".proposal-summary-table")).toContainText("Old Sofa");
   await expect(popup.locator(".proposal-summary-table")).not.toContainText("Final Table");
+  await expect(popup.locator(".proposal-summary-table")).not.toContainText("Кресло");
+  const firstSnapshot = await (await context.request.get(`/api/projects/${created.project.id}`)).json() as { state: { proposalHistoryId?: string } };
+  expect(firstSnapshot.state.proposalHistoryId).toBe("render-a");
   await popup.close();
 
   await page.getByRole("button", { name: "Render B", exact: true }).click();
@@ -204,8 +208,12 @@ test("commercial proposal snapshots the history version selected in Studio", asy
   await page.getByRole("button", { name: "Создать коммерческое предложение" }).click();
   popup = await popupPromise;
   await popup.waitForURL(/\/proposal\//);
+  await expect(popup.locator(".proposal-product-page")).toHaveCount(1);
   await expect(popup.locator(".proposal-summary-table")).toContainText("Final Table");
   await expect(popup.locator(".proposal-summary-table")).not.toContainText("Old Sofa");
+  await expect(popup.locator(".proposal-summary-table")).not.toContainText("Кресло");
+  const secondSnapshot = await (await context.request.get(`/api/projects/${created.project.id}`)).json() as { state: { proposalHistoryId?: string } };
+  expect(secondSnapshot.state.proposalHistoryId).toBe("render-b");
   await expect.poll(() => snapshots.length).toBe(2);
   expect(snapshots[0]).not.toBe(snapshots[1]);
   await popup.close();

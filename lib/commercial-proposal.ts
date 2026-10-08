@@ -20,6 +20,25 @@ export type ProposalPlanItem = {
   referenceParameters?: Array<{ name: string; value: string }>; proposalOverride?: ProposalOverride;
 };
 
+type ProposalSelectionState = {
+  planItems?: ProposalPlanItem[];
+  proposalItems?: ProposalPlanItem[];
+  proposalHistoryId?: string | null;
+  historyVersions?: Array<{ id?: string; proposalItems?: ProposalPlanItem[] }>;
+};
+
+export function proposalItemsForSelection(state?: ProposalSelectionState) {
+  if (!state) return [];
+  if (state.proposalHistoryId) {
+    const selectedVersion = (state.historyVersions || []).find((version) => version.id === state.proposalHistoryId);
+    return selectedVersion?.proposalItems || [];
+  }
+  return [...new Map([
+    ...(state.planItems || []),
+    ...(state.proposalItems || []),
+  ].map((item) => [item.id, item])).values()];
+}
+
 export type ProposalCatalogProduct = {
   id: string; name: string; article?: string; image?: string; images?: string[]; url?: string;
   price?: number; oldPrice?: number; category?: string; subtype?: string; color?: string; material?: string;

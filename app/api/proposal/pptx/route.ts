@@ -83,8 +83,11 @@ export async function POST(request: Request) {
     const project = await database.prepare("SELECT state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?")
       .bind(body.projectId, user.tenantId, user.id).first<{ state_json: string | null }>();
     if (!project?.state_json) return Response.json({ error: "Сохранённый проект не найден." }, { status: 404 });
-    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }>; proposalItems?: Array<{ id?: string }> };
-    const allowedIds = new Set([...(savedState.planItems || []), ...(savedState.proposalItems || [])].map((item) => item.id).filter((id): id is string => Boolean(id)));
+    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }>; proposalItems?: Array<{ id?: string }>; proposalHistoryId?: string | null; historyVersions?: Array<{ id?: string; proposalItems?: Array<{ id?: string }> }> };
+    const selectedHistoryItems = savedState.proposalHistoryId
+      ? savedState.historyVersions?.find((version) => version.id === savedState.proposalHistoryId)?.proposalItems || []
+      : null;
+    const allowedIds = new Set((selectedHistoryItems || [...(savedState.planItems || []), ...(savedState.proposalItems || [])]).map((item) => item.id).filter((id): id is string => Boolean(id)));
     if (products.some((product) => !product.objectIds?.length || product.objectIds.some((id) => !allowedIds.has(id)))) {
       return Response.json({ error: "Состав коммерческого предложения не соответствует проекту." }, { status: 403 });
     }

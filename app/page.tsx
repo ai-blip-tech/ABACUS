@@ -230,12 +230,20 @@ export default function Home() {
     setProjectSaved(false);
     setProposalError("");
     try {
-      const proposalVisualization = await imageForProjectSave(generatedImage || interiorImage);
-      await persistProject(targetId, name);
+      const selectedVersion = historyVersions.find((version) => version.id === activeHistoryId);
+      if (activeHistoryId && !selectedVersion) throw new Error("Выбранная версия рендера не найдена. Выберите изображение повторно.");
+      const selectedItems = selectedVersion?.proposalItems || proposalItems;
+      const selectedImage = selectedVersion?.image || generatedImage || interiorImage;
+      const proposalVisualization = await imageForProjectSave(selectedImage);
+      await persistProject(targetId, name, {
+        generatedImage: selectedImage,
+        activeHistoryId: selectedVersion?.id || activeHistoryId,
+        proposalItems: selectedItems,
+      });
       const snapshotResponse = await fetch(`/api/projects/${encodeURIComponent(targetId)}/proposal`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: [], visualization: proposalVisualization }),
+        body: JSON.stringify({ items: [], visualization: proposalVisualization, historyId: selectedVersion?.id || null }),
       });
       const snapshotPayload = await snapshotResponse.json().catch(() => ({}));
       if (!snapshotResponse.ok) throw new Error(snapshotPayload.error || "Не удалось зафиксировать выбранную визуализацию.");
@@ -469,7 +477,8 @@ export default function Home() {
       if(!imageBlob.size)throw new Error("Модель не вернула визуализацию.");
       const imageUrl=URL.createObjectURL(imageBlob);
       const nextInterior=await blobToDataUrl(imageBlob);
-      setGeneratedImage(imageUrl);setInteriorImage(nextInterior);setInteriorName("Интерьер по планограмме");setGenerated(true);setRatioFromImage(imageUrl);setProposalItems([]);addHistoryVersion(imageUrl,"Интерьер по планограмме",true,[]);setActiveTool("Добавить мебель");setFurnitureMode("choice");
+      const renderedPlanItems = planItems.map((item) => ({ ...item }));
+      setGeneratedImage(imageUrl);setInteriorImage(nextInterior);setInteriorName("Интерьер по планограмме");setGenerated(true);setRatioFromImage(imageUrl);setProposalItems(renderedPlanItems);addHistoryVersion(imageUrl,"Интерьер по планограмме",true,renderedPlanItems);setActiveTool("Добавить мебель");setFurnitureMode("choice");
     } catch(error) {
       setGenerationError(error instanceof Error?error.message:"Не удалось создать визуализацию по плану.");
     } finally {

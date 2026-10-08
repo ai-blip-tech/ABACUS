@@ -24,7 +24,7 @@ test("proposal images are detected by their bytes before an unreliable MIME head
 });
 
 test("commercial proposal opens an editor and downloads PDF only after confirmation", () => {
-  assert.match(page, /await persistProject\(targetId, name\);[\s\S]*?\/proposal\/\$\{encodeURIComponent\(targetId\)\}/);
+  assert.match(page, /const selectedVersion = historyVersions\.find[\s\S]*?await persistProject\(targetId, name, \{[\s\S]*?proposalItems: selectedItems[\s\S]*?historyId: selectedVersion\?\.id \|\| null[\s\S]*?\/proposal\/\$\{encodeURIComponent\(targetId\)\}/);
   assert.match(page, /Создать коммерческое предложение/);
   assert.match(proposalRoute, /"Content-Type": "application\/pdf"/);
   assert.match(proposalRoute, /"Content-Disposition": `attachment;/);
@@ -41,8 +41,10 @@ test("each render history version restores its own commercial proposal product s
   assert.match(page, /type HistoryItem = \{[^}]*proposalItems\?: PlanItem\[\]/);
   assert.match(page, /setProposalItems\(version\.proposalItems \|\| \[\]\)/);
   assert.match(page, /addHistoryVersion\(newInterior,[\s\S]*?nextProposalItems\)/);
+  assert.match(page, /const renderedPlanItems = planItems\.map[\s\S]*?addHistoryVersion\(imageUrl,"Интерьер по планограмме",true,renderedPlanItems\)/);
   assert.match(projectRoute, /proposalItems: sanitizeItems\(item\.proposalItems, `history-\$\{index\}-proposal-item`\)/);
   assert.match(projectRoute, /historyVersions:[\s\S]*?proposalItems: \(version\.proposalItems \|\| \[\]\)/);
+  assert.match(proposalEditor, /proposalItemsForSelection\(payload\.state\)/);
 });
 
 test("remove flow sends a point-guided remove operation and restores editor controls", () => {

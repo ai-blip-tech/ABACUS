@@ -51,7 +51,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
   const { id } = await params;
   if (!validProjectId(id)) return Response.json({ error: "Некорректный проект." }, { status: 400 });
-  const body = await request.json().catch(() => null) as { showPrices?: unknown; items?: unknown; visualization?: unknown; document?: unknown } | null;
+  const body = await request.json().catch(() => null) as { showPrices?: unknown; items?: unknown; visualization?: unknown; historyId?: unknown; document?: unknown } | null;
   if (!body || !Array.isArray(body.items)) return Response.json({ error: "Некорректные данные коммерческого предложения." }, { status: 400 });
   const project = await database.prepare("SELECT state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?")
     .bind(id, user.tenantId, user.id)
@@ -78,6 +78,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
   state.planItems = applyOverrides(state.planItems);
   state.proposalItems = applyOverrides(state.proposalItems);
+  if (typeof body.historyId === "string" && body.historyId) {
+    const historyId = text(body.historyId, 120);
+    const historyVersions = Array.isArray(state.historyVersions) ? state.historyVersions : [];
+    if (!historyVersions.some((entry) => entry && typeof entry === "object" && (entry as Record<string, unknown>).id === historyId)) {
+      return Response.json({ error: "Выбранная версия рендера не найдена." }, { status: 400 });
+    }
+    state.proposalHistoryId = historyId;
+  } else if (body.historyId === null) {
+    state.proposalHistoryId = null;
+  }
+  if (typeof state.proposalHistoryId === "string" && Array.isArray(state.historyVersions)) {
+    state.historyVersions = state.historyVersions.map((entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const version = entry as Record<string, unknown>;
+      return version.id === state.proposalHistoryId ? { ...version, proposalItems: applyOverrides(version.proposalItems) } : version;
+    });
+  }
   if (typeof body.showPrices === "boolean") state.proposalShowPrices = body.showPrices;
   const document = cleanDocument(body.document);
   if (document) state.proposalDocument = document;

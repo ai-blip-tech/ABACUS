@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  buildProposalProducts, defaultProposalDocument, mergeProposalDocument, paginateProposalSpecification, proposalOverrideFor, proposalTotal,
+  buildProposalProducts, defaultProposalDocument, mergeProposalDocument, paginateProposalSpecification, proposalItemsForSelection, proposalOverrideFor, proposalTotal,
   type ProposalCatalogProduct, type ProposalDocument, type ProposalPlanItem, type ProposalProduct,
 } from "@/lib/commercial-proposal";
 
@@ -12,6 +12,7 @@ type ProjectPayload = {
   project?: { name?: string; project_type?: string };
   state?: {
     planItems?: ProposalPlanItem[]; proposalItems?: ProposalPlanItem[]; proposalShowPrices?: boolean; proposalVisualization?: string;
+    proposalHistoryId?: string | null; historyVersions?: Array<{ id: string; proposalItems?: ProposalPlanItem[] }>;
     generatedImage?: string; interiorImage?: string; proposalDocument?: Partial<ProposalDocument>;
   };
 };
@@ -75,10 +76,7 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         const payload = await response.json() as ProjectPayload & { error?: string };
         const auth = await authResponse.json().catch(() => ({ user: {} })) as { user?: User };
         if (!response.ok) throw new Error(payload.error || "Не удалось открыть проект.");
-        const items = [...new Map([
-          ...(payload.state?.planItems || []),
-          ...(payload.state?.proposalItems || []),
-        ].map((item) => [item.id, item])).values()];
+        const items = proposalItemsForSelection(payload.state);
         const ids = [...new Set(items.map((item) => item.referenceProductId).filter((id): id is string => Boolean(id)))];
         let catalog = new Map<string, ProposalCatalogProduct>();
         if (ids.length) {

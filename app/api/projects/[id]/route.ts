@@ -55,6 +55,7 @@ type SavedState = {
   planInstruction?: string;
   proposalShowPrices?: boolean;
   proposalVisualizationAsset?: string;
+  proposalHistoryId?: string | null;
   proposalDocument?: Record<string, string>;
 };
 
@@ -144,13 +145,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const existingProject = await database.prepare("SELECT id, state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first<{ id: string; state_json: string | null }>();
   let persistedShowPrices = true;
   let persistedProposalVisualizationAsset: string | undefined;
+  let persistedProposalHistoryId: string | null | undefined;
   let persistedProposalDocument: Record<string, string> | undefined;
   const persistedOverrides = new Map<string, unknown>();
   if (existingProject?.state_json) {
     try {
-      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalDocument?: Record<string, string>; planItems?: Array<{ id?: string; proposalOverride?: unknown }>; proposalItems?: Array<{ id?: string; proposalOverride?: unknown }> };
+      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalHistoryId?: string | null; proposalDocument?: Record<string, string>; planItems?: Array<{ id?: string; proposalOverride?: unknown }>; proposalItems?: Array<{ id?: string; proposalOverride?: unknown }> };
       persistedShowPrices = persisted.proposalShowPrices !== false;
       persistedProposalVisualizationAsset = persisted.proposalVisualizationAsset;
+      persistedProposalHistoryId = persisted.proposalHistoryId;
       persistedProposalDocument = persisted.proposalDocument;
       for (const item of persisted.planItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
       for (const item of persisted.proposalItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
@@ -278,6 +281,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     planInstruction: typeof draft.planInstruction === "string" ? draft.planInstruction.trim().slice(0, 2000) : "",
     proposalShowPrices: typeof draft.proposalShowPrices === "boolean" ? draft.proposalShowPrices : persistedShowPrices,
     proposalVisualizationAsset: persistedProposalVisualizationAsset,
+    proposalHistoryId: persistedProposalHistoryId,
     proposalDocument: persistedProposalDocument,
   };
   const now = new Date().toISOString();
