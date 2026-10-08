@@ -27,6 +27,7 @@ test("Studio keeps the source image uncropped and overlays one render-history ri
   assert.match(styles, /@media\(hover:none\),\(pointer:coarse\)/);
   assert.match(page, /openHistoryVersion\(version\)/);
   assert.match(page, /downloadHistoryVersion\(version\)/);
+  assert.match(page, /downloadImageAsJpeg\(version\.image, version\.name\)/);
 });
 
 test("dashboard account trigger remains the existing accessible dropdown", () => {

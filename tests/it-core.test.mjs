@@ -250,13 +250,13 @@ test("commercial proposal guidance states the exact editor flow and both export 
   assert.match(calls[0].toolFacts.join(" "), /Скриншот для этого не нужен/);
 });
 
-test("current visualization download guidance names the real WebP format", async () => {
+test("current visualization download guidance names the real JPEG format", async () => {
   const calls = [];
   await runItTurn(
     { message: "Как скачать текущую визуализацию?", context },
     { searchCatalog: async () => [], answerConversation: modelAdapter(calls) },
   );
-  assert.match(calls[0].toolFacts.join(" "), /WebP/);
+  assert.match(calls[0].toolFacts.join(" "), /JPEG/);
   assert.match(calls[0].toolFacts.join(" "), /истории рендеров/);
 });
 
