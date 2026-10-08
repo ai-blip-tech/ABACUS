@@ -16,12 +16,12 @@ const templatesHomeSource = await readFile(new URL("../app/templates-home.tsx", 
 const templatesHomeCssSource = await readFile(new URL("../app/templates-home-v2.css", import.meta.url), "utf8");
 const nextConfigSource = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
 
-test("registry contains exactly thirty-four unique versioned templates", () => {
-  assert.equal(templateRegistry.length, 34);
-  assert.equal(new Set(templateRegistry.map((template) => template.id)).size, 34);
-  assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 34);
+test("registry contains exactly thirty-five unique versioned templates", () => {
+  assert.equal(templateRegistry.length, 35);
+  assert.equal(new Set(templateRegistry.map((template) => template.id)).size, 35);
+  assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 35);
   for (const removed of ["memory-room", "home-swap", "architectural-xray", "window-portal", "inside-the-walls", "house-awake"]) assert.equal(templateRegistry.some((template) => template.slug === removed), false);
-  assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 34 }, (_, index) => index + 1));
+  assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 35 }, (_, index) => index + 1));
   assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"]);
   for (const template of templateRegistry) {
     assert.equal(template.version, 1);
@@ -33,9 +33,9 @@ test("registry contains exactly thirty-four unique versioned templates", () => {
 });
 
 test("foundation exposes all reviewable records and the approved featured mix", () => {
-  assert.equal(previewTemplates.length, 34);
-  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "declutter", "moodboard-to-room", "material-preview", "next-chapter", "roast-my-room"]);
-  assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room"\]/);
+  assert.equal(previewTemplates.length, 35);
+  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "declutter", "moodboard-to-room", "material-preview", "next-chapter", "roast-my-room", "kitchen-cad-to-photo"]);
+  assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
 });
 
 test("homepage uses the approved Design Battle video preview", () => {
@@ -105,6 +105,25 @@ test("light scenarios offers an exclusive preset-or-kelvin control and preserves
   assert.match(templateWorkbenchScenarios["light-scenarios"].generationBrief, /Строго сохранить интерьер, архитектуру, геометрию, мебель, материалы, декор, композицию/);
   assert.match(scenarioWorkbenchSource, /editorial-range-control/);
   assert.match(scenarioWorkbenchSource, /exclusiveValueGroups/);
+});
+
+test("kitchen CAD preview enforces required materials and Geometry Lock", () => {
+  const template = templateRegistry.find((item) => item.slug === "kitchen-cad-to-photo");
+  assert.ok(template);
+  assert.equal(template.status, "internal");
+  assert.equal(template.audience, "professional");
+  assert.equal(template.resultType, "image");
+  assert.equal(template.safetyPolicy, "geometry-lock");
+  assert.equal(template.ctaLabel, "Создать визуал");
+  assert.deepEqual(template.requireAnyOf, [["backsplashMaterial", "backsplashColor"]]);
+  assert.deepEqual(template.inputSlots.filter((slot) => slot.required).map((slot) => slot.id), ["kitchenCad", "facadePrimary", "facadePrimaryTarget", "countertopMaterial"]);
+  assert.equal(template.inputSlots.filter((slot) => !["choice", "short_text", "range"].includes(slot.kind)).slice(1).reduce((total, slot) => total + slot.maxCount, 0), 10);
+  assert.match(templateWorkbenchScenarios["kitchen-cad-to-photo"].generationBrief, /GEOMETRY LOCK/);
+  assert.match(templateWorkbenchScenarios["kitchen-cad-to-photo"].generationBrief, /Строго сохранить исходную камеру и композицию/);
+  assert.match(scenarioWorkbenchSource, /hasGeometryLockConflict/);
+  assert.match(scenarioWorkbenchSource, /GEOMETRY LOCK · ВКЛЮЧЁН/);
+  assert.match(scenarioWorkbenchSource, /назначение поверхностей подтверждается вручную/);
+  assert.match(templatesCssSource, /\.editorial-geometry-lock/);
 });
 
 test("scenario image upload remains clickable across browsers and accepts common JPEG metadata variants", () => {

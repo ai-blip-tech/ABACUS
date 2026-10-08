@@ -39,6 +39,7 @@ export type TemplateDefinition = {
   title: string;
   hook: string;
   description: string;
+  ctaLabel?: string;
   resultType: TemplateResultType;
   inputSummary: string;
   inputSlots: TemplateInputSlot[];

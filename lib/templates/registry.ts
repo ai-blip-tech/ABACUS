@@ -230,6 +230,26 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
     title: "Клиентская выдача", hook: "Собери варианты в ясную презентацию", description: "Скомпонуйте выбранные кадры и короткое пояснение в клиентскую подборку.", resultType: "image_series", inputSummary: "2–8 кадров + подпись", badges: [], requiredCapabilities: ["presentation_layout", "export"],
     inputSlots: [image({ id: "renders", kind: "reference_image", label: "Добавьте финальные кадры", required: true, minCount: 2, maxCount: 8, allowReorder: true }), { id: "note", kind: "short_text", label: "Добавьте короткое пояснение", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], placeholder: "Концепция и ключевые решения" }],
   }),
+  definition({
+    id: "35", slug: "kitchen-cad-to-photo", status: "internal", wave: "experimental", category: "visualization", sortOrder: 35, featured: true, previewIndex: 0, audience: "professional",
+    title: "Кухня: CAD → Photo", hook: "Из 3D-модели — в профессиональную фотографию", description: "Загрузите модель кухни и материалы — получите кадр как из интерьерного журнала, не меняя проект.", ctaLabel: "Создать визуал", resultType: "image", inputSummary: "CAD + материалы кухни", badges: ["BETA"], safetyPolicy: "geometry-lock",
+    requiredCapabilities: ["image_to_image", "geometry_lock", "multi_reference_material_transfer", "appliance_reference", "relighting", "photorealistic_upscale"],
+    requireAnyOf: [["backsplashMaterial", "backsplashColor"]],
+    inputSlots: [
+      image({ id: "kitchenCad", kind: "room_image", label: "Загрузите 3D CAD-вид кухни", helper: "Перспективный вид без интерфейса и размерных линий · кухня целиком в кадре", required: true, minCount: 1, maxCount: 1 }),
+      reference("facadePrimary", "Добавьте основную фактуру фасадов", "Шпон, эмаль, пластик или камень · фото образца или бесшовная текстура"),
+      { id: "facadePrimaryTarget", kind: "choice", label: "Куда применить основную фактуру", helper: "PREVIEW · подтвердите поверхность вручную", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], options: ["Все фасады", "Нижние фасады", "Верхние фасады", "Высокие шкафы"] },
+      reference("countertopMaterial", "Добавьте фактуру столешницы", "Фото образца или бесшовная текстура с реалистичным масштабом"),
+      reference("backsplashMaterial", "Добавьте материал фартука", "Фотография или текстура · вместо неё можно указать цвет ниже", 0, 1, false),
+      { id: "backsplashColor", kind: "short_text", label: "Или укажите цвет фартука", helper: "Достаточно материала выше или точного описания цвета", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], placeholder: "Например: тёплый серо-бежевый, NCS S 2005-Y20R" },
+      reference("facadeSecondary", "Дополнительная фактура фасадов", "Необязательно · для кухни с двумя и более отделками", 0, 1, false),
+      { id: "facadeSecondaryTarget", kind: "choice", label: "Куда применить дополнительную фактуру", helper: "Необязательно · выберите поверхность для второй отделки", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], options: ["Нижние фасады", "Верхние фасады", "Высокие шкафы", "Открытые элементы"] },
+      image({ id: "appliances", kind: "product_images", label: "Добавьте изображения техники", helper: "Необязательно · духовка, варочная поверхность, холодильник, вытяжка · до 4 файлов", required: false, minCount: 0, maxCount: 4, allowReorder: true }),
+      { id: "appliancePlacement", kind: "short_text", label: "Подтвердите расположение техники", helper: "Необязательно · укажите, какой референс относится к какому месту", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], placeholder: "Например: духовка — левая высокая колонна; вытяжка — над варочной панелью" },
+      image({ id: "extraObjects", kind: "product_images", label: "Добавьте дополнительные предметы", helper: "Необязательно · мойка, смеситель, ручки, светильники или стулья · до 2 файлов", required: false, minCount: 0, maxCount: 2, allowReorder: true }),
+      { id: "additionalPrompt", kind: "short_text", label: "Дополнительный prompt", helper: "Управляйте светом, стенами, полом, декором и атмосферой — геометрия кухни останется заблокированной", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], placeholder: "Например: свет из большого окна слева, тёплый дубовый пол, минимальный декор" },
+    ],
+  }),
 ];
 
 const templatePriority = ["design-battle", "light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"];

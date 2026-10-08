@@ -20,7 +20,7 @@ export default function TemplateCard({ template }: { template: TemplateDefinitio
         <p>{template.hook}</p>
         <div className="template-card-footer">
           <span>{template.badges.join(" · ") || "ROOM DESIGN"}</span>
-          <strong>{available ? "Использовать" : "Посмотреть preview"} <i>→</i></strong>
+          <strong>{template.ctaLabel || (available ? "Использовать" : "Посмотреть preview")} <i>→</i></strong>
         </div>
       </div>
     </Link>

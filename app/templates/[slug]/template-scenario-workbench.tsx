@@ -29,6 +29,14 @@ const acceptedFileTypes = (slot: TemplateInputSlot) => [
   ...(slot.acceptedMimeTypes.includes("image/webp") ? [".webp"] : []),
 ].join(",");
 
+const hasGeometryLockConflict = (value: string) => {
+  if (!value.trim()) return false;
+  const action = "(?:добав(?:ить|ь|ьте)|созда(?:ть|й|йте)|перенес(?:ти|и|ите)|передвин(?:уть|ь|ьте)|перестав(?:ить|ь|ьте)|удал(?:ить|и|ите)|убер(?:ите|и)|измен(?:ить|и|ите)|увелич(?:ить|ь|ьте)|уменьш(?:ить|ь|ьте)|расшир(?:ить|ь|ьте)|замен(?:ить|и|ите))";
+  const structure = "(?:остров|шкаф|модул|столешниц|стен|окн|двер|проём|планиров|архитектур|геометри)";
+  const newStructure = "(?:нов(?:ый|ая|ое|ую)|дополнительн(?:ый|ая|ое|ую))";
+  return new RegExp(`${action}[^\\n]{0,70}${structure}|${newStructure}[^\\n]{0,50}${structure}`, "i").test(value);
+};
+
 const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result || ""));
@@ -255,8 +263,11 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     }
     const primary = uploads[primarySlot?.id]?.[0];
     if (primary && !isImage(primary)) issues.push("Для запуска генерации первым материалом должно быть изображение.");
+    if (template.safetyPolicy === "geometry-lock" && hasGeometryLockConflict(values.additionalPrompt || "")) {
+      issues.push("Дополнительный prompt просит изменить геометрию кухни. В режиме Geometry Lock можно менять только окружение, свет и визуальную подачу.");
+    }
     return issues;
-  }, [consents, primarySlot?.id, template.inputSlots, template.requireAnyOf, uploads, values]);
+  }, [consents, primarySlot?.id, template.inputSlots, template.requireAnyOf, template.safetyPolicy, uploads, values]);
 
   const ready = validationErrors.length === 0 && Boolean(user) && generationConfigured && phase !== "processing";
   const primaryFiles = uploads[primarySlot?.id] || [];
@@ -391,6 +402,12 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     <h2 className="sr-only" id="scenario-workbench-title">Рабочая область {template.title}</h2>
     <div className="editorial-workbench-grid">
       <div className="editorial-source-column">
+        {template.safetyPolicy === "geometry-lock" && <aside className="editorial-geometry-lock" aria-label="Ограничения Geometry Lock">
+          <span>GEOMETRY LOCK · ВКЛЮЧЁН</span>
+          <h3>Проект кухни остаётся неизменным</h3>
+          <p>Фиксируем камеру, модули, фасады, столешницу, ручки и расположение техники. Меняются только материалы, свет, окружение и качество изображения.</p>
+          <small>PREVIEW · назначение поверхностей подтверждается вручную</small>
+        </aside>}
         {template.inputSlots.map((slot, index) => <section className="editorial-source-panel editorial-dynamic-panel" key={slot.id}>
           <header><span>{index + 1}.</span><div><h3>{slot.label}{!isValueSlot(slot) && <b> ({uploads[slot.id]?.length || 0}/{slot.maxCount})</b>}</h3><p>{slot.helper || (slot.required ? "Обязательный материал" : "Необязательно")}</p></div></header>
           {isValueSlot(slot) ? slot.kind === "choice" ? <div className="editorial-choice-grid">{slot.options?.map((option) => <button className={values[slot.id] === option ? "is-selected" : ""} aria-pressed={values[slot.id] === option} type="button" key={option} onClick={() => setInputValue(slot.id, option)}>{option}</button>)}</div> : slot.kind === "range" ? <RangeControl slot={slot} value={values[slot.id] || ""} onChange={(value) => setInputValue(slot.id, value)} /> : <textarea className="editorial-text-input" value={values[slot.id] || ""} placeholder={slot.placeholder} onChange={(event) => setInputValue(slot.id, event.target.value)} /> : <>

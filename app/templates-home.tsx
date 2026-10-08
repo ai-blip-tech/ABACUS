@@ -65,7 +65,7 @@ function EditorialCard({ template, compact = false, showVideoPreview = false }: 
         <div><small>{template.id} / {categoryLabels[template.category]}</small><span>{template.inputSummary}</span></div>
         <h3>{template.title}</h3>
         {!compact && <p>{template.hook}</p>}
-        <b>Открыть шаблон <span>→</span></b>
+        <b>{template.ctaLabel || "Открыть шаблон"} <span>→</span></b>
       </div>
     </Link>
   );
@@ -153,7 +153,7 @@ function ScrollScrubHero({ onStartProject }: { onStartProject: () => void }) {
 export default function TemplatesHome({ accountControl, onStartProject }: { accountControl: ReactNode; onStartProject: () => void }) {
   const [audience, setAudience] = useState<TemplateAudience>("personal");
   const matchesAudience = (template: TemplateDefinition) => template.audience === "both" || template.audience === audience;
-  const homepagePriority = ["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room"];
+  const homepagePriority = ["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"];
   const matchedFeatured = [...featuredTemplates].sort((left, right) => {
     const leftPriority = homepagePriority.indexOf(left.slug);
     const rightPriority = homepagePriority.indexOf(right.slug);
