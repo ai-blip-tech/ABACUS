@@ -31,13 +31,17 @@ export default function GlobalAdminClient({ admin }: { admin: { id: string; emai
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [usersFilter, setUsersFilter] = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const paths = ["overview", "ai-finance", "users", "token-transactions", "plans", "token-packages", "payments", "tenants", "generations", "settings", "audit-log"];
+      const usersQuery = typeof window === "undefined" ? "" : window.location.search;
+      const paths = ["overview", "ai-finance", `users${usersQuery}`, "token-transactions", "plans", "token-packages", "payments", "tenants", "generations", "settings", "audit-log"];
       const payloads = await Promise.all(paths.map((path) => api(`/api/admin/${path}`)));
-      setData(Object.assign({}, ...payloads));
+      const nextData = Object.assign({}, ...payloads);
+      setData(nextData);
+      setUsersFilter(nextData.usersFilter || null);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось загрузить админку."); }
     finally { setLoading(false); }
   }, []);
@@ -50,8 +54,19 @@ export default function GlobalAdminClient({ admin }: { admin: { id: string; emai
   };
   const search = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const q = String(new FormData(event.currentTarget).get("q") || "");
-    try { const result = await api(`/api/admin/users?q=${encodeURIComponent(q)}`); setData((current: any) => ({ ...current, users: result.users })); }
+    const form = new FormData(event.currentTarget);
+    const params = new URLSearchParams();
+    for (const key of ["search", "tenant", "from", "to"]) {
+      const value = String(form.get(key) || "").trim();
+      if (value) params.set(key, value);
+    }
+    const query = params.toString();
+    try {
+      const result = await api(`/api/admin/users${query ? `?${query}` : ""}`);
+      window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+      setUsersFilter(result.usersFilter || null);
+      setData((current: any) => ({ ...current, ...result }));
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Поиск не выполнен."); }
   };
   const saveSettings = async (event: FormEvent<HTMLFormElement>) => {
@@ -81,7 +96,7 @@ export default function GlobalAdminClient({ admin }: { admin: { id: string; emai
       {loading ? <p className="admin-empty">Загружаем реальные данные…</p> : <>
         {section === "overview" && <Overview data={data.overview}/>}
         {section === "finance" && <AiFinance initial={data.finance} onError={setError}/>}
-        {section === "users" && (selectedUser ? <UserDetail user={selectedUser} plans={data.plans || []} onBack={() => setSelectedUser(null)} onChanged={() => void openUser(selectedUser.profile.id)}/> : <Users users={data.users || []} onSearch={search} onOpen={openUser}/>)}
+        {section === "users" && (selectedUser ? <UserDetail user={selectedUser} plans={data.plans || []} onBack={() => setSelectedUser(null)} onChanged={() => void openUser(selectedUser.profile.id)}/> : <Users users={data.users || []} totals={data.usersTotals || {}} filter={usersFilter || data.usersFilter} tenants={data.tenants || []} onSearch={search} onOpen={openUser}/>)}
         {section === "tokens" && <Tokens users={data.users || []} transactions={data.transactions || []} onTransfer={transfer}/>}
         {section === "plans" && <Plans plans={data.plans || []}/>}
         {section === "packages" && <Packages packages={data.packages || []}/>}
@@ -120,10 +135,35 @@ function AiFinance({ initial, onError }: { initial: any; onError: (value: string
   </>;
 }
 
-function Users({ users, onSearch, onOpen }: { users: any[]; onSearch: (event: FormEvent<HTMLFormElement>) => void; onOpen: (id: string) => void }) {
-  return <Panel title="Зарегистрированные пользователи" action={<form className="admin-search" onSubmit={onSearch}><input name="q" placeholder="Email, имя или компания"/><button>Найти</button></form>}>
-    {!users.length ? <Empty/> : <div className="admin-table"><div className="admin-row admin-table-head"><span>Пользователь</span><span>Доступ</span><span>Тариф</span><span>Токены</span><span>Проекты / AI</span><span>NET / GROSS</span></div>{users.map((user) => <button className="admin-row" key={user.id} onClick={() => onOpen(user.id)}><span><b>{[user.first_name, user.last_name].filter(Boolean).join(" ") || "Без имени"}</b><small>{user.email}<br/>{user.company_role || "Компания не указана"}</small></span><span><b>{user.global_role}</b><small>{user.memberships?.map((membership: any) => `${membership.name}: ${membership.role}`).join(" · ") || "Без tenant membership"}</small></span><span>{user.plan_name}</span><span>{nf.format(Number(user.token_balance || 0))}</span><span>{user.project_count} / {user.ai_operation_count || 0}</span><span><b>{usdFromMicro(user.ai_net_micro_usd)}</b><small>{usdFromMicro(user.ai_gross_micro_usd)} GROSS</small></span></button>)}</div>}
-  </Panel>;
+function Users({ users, totals, filter, tenants, onSearch, onOpen }: { users: any[]; totals: any; filter: any; tenants: any[]; onSearch: (event: FormEvent<HTMLFormElement>) => void; onOpen: (id: string) => void }) {
+  const params = new URLSearchParams();
+  if (filter?.search) params.set("search", filter.search);
+  if (filter?.tenantId) params.set("tenant", filter.tenantId);
+  if (filter?.fromDate) params.set("from", filter.fromDate);
+  if (filter?.toDate) params.set("to", filter.toDate);
+  const exportHref = `/api/admin/users/export?${params.toString()}`;
+  return <>
+    <Panel title="Фильтры отчёта" subtitle="Период применяется к AI-операциям, токенам и деньгам. Пользователи без активности остаются в списке.">
+      <form className="admin-user-filters" key={params.toString()} onSubmit={onSearch}>
+        <label>Tenant<select name="tenant" defaultValue={filter?.tenantId || ""}><option value="">Все tenant</option>{tenants.map((tenant) => <option value={tenant.id} key={tenant.id}>{tenant.name}</option>)}</select></label>
+        <label>Дата с<input name="from" type="date" required defaultValue={filter?.fromDate || ""}/></label>
+        <label>Дата по<input name="to" type="date" required defaultValue={filter?.toDate || ""}/></label>
+        <label className="admin-user-search">Поиск<input name="search" defaultValue={filter?.search || ""} placeholder="Email, имя или компания"/></label>
+        <button type="submit">Применить</button>
+        <a className="admin-export" href={exportHref}>Скачать Excel</a>
+      </form>
+      <p className="admin-filter-note">Часовой пояс: <b>{filter?.timeZone || "Europe/Moscow"}</b>. Дата «по» включается целиком.</p>
+    </Panel>
+    <div className="admin-finance-strip admin-users-summary">
+      <span><small>Пользователей</small><b>{nf.format(Number(totals.users || 0))}</b></span>
+      <span><small>AI operations за период</small><b>{nf.format(Number(totals.ai_operation_count || 0))}</b></span>
+      <span><small>RD tokens списано</small><b>{nf.format(Number(totals.ai_rd_tokens_charged || 0))}</b></span>
+      <span><small>NET / GROSS</small><b>{usdFromMicro(totals.ai_net_micro_usd)}</b><small>{usdFromMicro(totals.ai_gross_micro_usd)} GROSS</small></span>
+    </div>
+    <Panel title="Зарегистрированные пользователи" subtitle={filter ? `AI-период: ${filter.fromDate} — ${filter.toDate}` : undefined}>
+      {!users.length ? <Empty/> : <div className="admin-table admin-users-table"><div className="admin-row admin-table-head"><span>Пользователь</span><span>Доступ</span><span>Тариф</span><span>Токены</span><span>Проекты всего / AI за период</span><span>NET</span><span>GROSS</span></div>{users.map((user) => <button className="admin-row" key={user.id} onClick={() => onOpen(user.id)}><span><b>{[user.first_name, user.last_name].filter(Boolean).join(" ") || "Без имени"}</b><small>{user.email}<br/>{user.company_role || "Компания не указана"}</small></span><span><b>{user.global_role}</b><small>{user.memberships?.map((membership: any) => `${membership.name}: ${membership.role}`).join(" · ") || "Без tenant membership"}</small></span><span>{user.plan_name}</span><span>{nf.format(Number(user.token_balance || 0))}</span><span>{nf.format(Number(user.project_count || 0))} / {nf.format(Number(user.ai_operation_count || 0))}</span><span><b>{usdFromMicro(user.ai_net_micro_usd)}</b></span><span><b>{usdFromMicro(user.ai_gross_micro_usd)}</b></span></button>)}</div>}
+    </Panel>
+  </>;
 }
 
 function UserDetail({ user, plans, onBack, onChanged }: { user: any; plans: any[]; onBack: () => void; onChanged: () => void }) {

@@ -1,6 +1,7 @@
 import { creditTokens, debitTokens, ensureBillingStore, getTokenAccount, getTokenHistory } from "./billing.ts";
 import { ensureAiCostLedgerStore } from "./ai-cost-ledger.ts";
 import { userAiFinance } from "./admin-ai-finance.ts";
+import { adminUsersReport, type AdminUsersFilter } from "./admin-users-report.ts";
 import { database } from "./server-runtime.ts";
 
 export async function adminOverview() {
@@ -28,35 +29,8 @@ export async function adminOverview() {
   };
 }
 
-export async function adminUsers(search = "") {
-  await ensureBillingStore();
-  await ensureAiCostLedgerStore();
-  const query = `%${search.trim().toLowerCase().slice(0, 160)}%`;
-  const users = await database.prepare(`
-    SELECT users.id, users.email, users.global_role, users.first_name, users.last_name,
-      users.company_role, users.created_at, users.last_login_at,
-      COALESCE(token_accounts.balance, 0) AS token_balance,
-      (SELECT COUNT(*) FROM projects WHERE projects.user_id = users.id) AS project_count,
-      (SELECT COUNT(*) FROM generations WHERE generations.user_id = users.id) AS generation_count,
-      (SELECT COUNT(*) FROM ai_cost_ledger WHERE ai_cost_ledger.user_id = users.id) AS ai_operation_count,
-      (SELECT COALESCE(SUM(rd_tokens_charged), 0) FROM ai_cost_ledger WHERE ai_cost_ledger.user_id = users.id) AS ai_rd_tokens_charged,
-      (SELECT COALESCE(SUM(net_micro_usd), 0) FROM ai_cost_ledger WHERE ai_cost_ledger.user_id = users.id) AS ai_net_micro_usd,
-      (SELECT COALESCE(SUM(gross_micro_usd), 0) FROM ai_cost_ledger WHERE ai_cost_ledger.user_id = users.id) AS ai_gross_micro_usd,
-      (SELECT plans.name FROM subscriptions JOIN plans ON plans.id = subscriptions.plan_id WHERE subscriptions.user_id = users.id ORDER BY subscriptions.created_at DESC LIMIT 1) AS plan_name
-    FROM users LEFT JOIN token_accounts ON token_accounts.user_id = users.id
-    WHERE lower(users.email) LIKE ? OR lower(COALESCE(users.first_name, '') || ' ' || COALESCE(users.last_name, '')) LIKE ? OR lower(COALESCE(users.company_role, '')) LIKE ?
-    ORDER BY users.created_at DESC LIMIT 500
-  `).bind(query, query, query).all<Record<string, unknown>>();
-  const memberships = await database.prepare(`
-    SELECT tenant_memberships.user_id, tenants.id, tenants.slug, tenants.name, tenant_memberships.role
-    FROM tenant_memberships JOIN tenants ON tenants.id = tenant_memberships.tenant_id
-    ORDER BY tenants.name
-  `).all<Record<string, unknown>>();
-  return users.results.map((user) => ({
-    ...user,
-    plan_name: user.plan_name || "Free",
-    memberships: memberships.results.filter((membership) => membership.user_id === user.id),
-  }));
+export async function adminUsers(filter: AdminUsersFilter) {
+  return adminUsersReport(filter);
 }
 
 export async function adminUserDetail(userId: string) {
