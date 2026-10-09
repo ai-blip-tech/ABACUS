@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "start:pm2": "pm2 start ecosystem.config.cjs --env production",
+    "storage:cleanup:dry-run": "node --experimental-transform-types scripts/storage-cleanup.mjs",
+    "storage:cleanup": "node --experimental-transform-types scripts/storage-cleanup.mjs --execute",
     "create-admin": "node scripts/create-admin.mjs",
     "test": "npm run build && node --experimental-transform-types --test tests/*.test.mjs",
     "test:browser": "playwright test",

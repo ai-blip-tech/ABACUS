@@ -210,7 +210,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       if (generationsResponse.ok) {
         const prefix = `[template:${template.slug};`;
         const stored = (generationsPayload.generations || [])
-          .filter((generation: { operation?: string; prompt?: string }) => generation.operation === "global_edit" && generation.prompt?.startsWith(prefix))
+          .filter((generation: { operation?: string; prompt?: string; image_deleted_at?: string | null }) => !generation.image_deleted_at && generation.operation === "global_edit" && generation.prompt?.startsWith(prefix))
           .map((generation: { id: string; created_at: string; prompt: string }) => ({
             id: generation.id,
             batchId: generation.prompt.match(/batch:([^;\]]+)/)?.[1]?.trim() || `legacy:${generation.created_at.slice(0, 16)}`,

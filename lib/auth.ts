@@ -89,6 +89,7 @@ export function ensureStore() {
       database.prepare("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, tenant_id TEXT, token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"),
       database.prepare("CREATE TABLE IF NOT EXISTS generations (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, tenant_id TEXT, operation TEXT NOT NULL, prompt TEXT, output_key TEXT NOT NULL, content_type TEXT NOT NULL, bytes INTEGER NOT NULL DEFAULT 0, input_tokens INTEGER, output_tokens INTEGER, total_tokens INTEGER, created_at TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"),
       database.prepare("CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, tenant_id TEXT, name TEXT NOT NULL, project_type TEXT NOT NULL DEFAULT 'Квартира', description TEXT, state_json TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"),
+      database.prepare("CREATE TABLE IF NOT EXISTS storage_cleanup_runs (id TEXT PRIMARY KEY, cutoff_at TEXT NOT NULL, dry_run INTEGER NOT NULL, scanned INTEGER NOT NULL DEFAULT 0, eligible INTEGER NOT NULL DEFAULT 0, deleted INTEGER NOT NULL DEFAULT 0, missing INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, freed_bytes INTEGER NOT NULL DEFAULT 0, errors_json TEXT, started_at TEXT NOT NULL, completed_at TEXT NOT NULL)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_generations_user_created_at ON generations(user_id, created_at DESC)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_generations_created_at ON generations(created_at DESC)"),
@@ -99,6 +100,8 @@ export function ensureStore() {
     await addColumnIfMissing("projects", "tenant_id", "TEXT");
     await addColumnIfMissing("sessions", "tenant_id", "TEXT");
     await addColumnIfMissing("generations", "tenant_id", "TEXT");
+    await addColumnIfMissing("generations", "image_deleted_at", "TEXT");
+    await addColumnIfMissing("generations", "image_deletion_reason", "TEXT");
     for (const [name, type] of [["first_name", "TEXT"], ["last_name", "TEXT"], ["phone", "TEXT"], ["company_role", "TEXT"]] as const) await addColumnIfMissing("users", name, type);
 
     const now = new Date().toISOString();
@@ -115,6 +118,7 @@ export function ensureStore() {
       database.prepare("CREATE INDEX IF NOT EXISTS idx_generations_tenant_user_created ON generations(tenant_id, user_id, created_at DESC)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_projects_tenant_user_updated ON projects(tenant_id, user_id, updated_at DESC)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_ai_jobs_tenant_user ON ai_jobs(tenant_id, user_id, created_at DESC)"),
+      database.prepare("CREATE INDEX IF NOT EXISTS idx_generations_retention ON generations(image_deleted_at, created_at)"),
     ]);
     await ensureBillingStore();
   })();

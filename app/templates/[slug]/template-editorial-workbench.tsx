@@ -261,7 +261,7 @@ export default function TemplateEditorialWorkbench({ template }: { template: Tem
       if (active) setSourceHistory([...storedAssets, ...migrated].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
       if (!generationResponse.ok || template.slug !== LIVE_PLACEMENT_TEMPLATE) return;
       const storedGenerations = (generationPayload.generations || [])
-        .filter((generation: { operation?: string; prompt?: string }) => generation.operation === "place" && generation.prompt?.startsWith(LIVE_PLACEMENT_PROMPT) && generation.prompt.includes(FINAL_RENDER_MARKER))
+        .filter((generation: { operation?: string; prompt?: string; image_deleted_at?: string | null }) => !generation.image_deleted_at && generation.operation === "place" && generation.prompt?.startsWith(LIVE_PLACEMENT_PROMPT) && generation.prompt.includes(FINAL_RENDER_MARKER))
         .map((generation: { id: string; created_at: string; prompt: string }) => ({
           id: generation.id,
           name: template.title,

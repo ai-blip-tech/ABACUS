@@ -147,7 +147,10 @@ function GenerationGallery({ userId, initialRows, total }: { userId: string; ini
   if (!rows.length) return <Empty/>;
   return <>
     <div className="admin-generation-grid">
-      {rows.map((item) => <button className="admin-generation-card" type="button" key={item.id} onClick={() => setActive(item)} aria-label={`Открыть генерацию ${item.operation} от ${when(item.created_at)}`}>
+      {rows.map((item) => item.image_deleted_at ? <article className="admin-generation-card is-deleted" key={item.id}>
+        <span className="admin-generation-thumb admin-generation-placeholder">Изображение удалено по политике хранения</span>
+        <span className="admin-generation-meta"><b>{item.operation}</b><small>{when(item.created_at)}</small></span>
+      </article> : <button className="admin-generation-card" type="button" key={item.id} onClick={() => setActive(item)} aria-label={`Открыть генерацию ${item.operation} от ${when(item.created_at)}`}>
         <span className="admin-generation-thumb"><img src={`/api/admin/generations/${item.id}?variant=thumbnail`} alt="" loading="lazy" decoding="async"/></span>
         <span className="admin-generation-meta"><b>{item.operation}</b><small>{when(item.created_at)}</small></span>
       </button>)}
