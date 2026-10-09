@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-html-link-for-pages, react-hooks/set-state-in-effect */
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-html-link-for-pages, @next/next/no-img-element, react-hooks/set-state-in-effect */
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import "../account/account.css";
@@ -116,9 +116,51 @@ function UserDetail({ user, plans, onBack, onChanged }: { user: any; plans: any[
     <div className="admin-grid-two"><Panel title="Профиль"><Key label="Компания" value={user.profile.company_role}/><Key label="Телефон" value={user.profile.phone}/><Key label="Регистрация" value={when(user.profile.created_at)}/><Key label="Последний вход" value={when(user.profile.last_login_at)}/></Panel><Panel title="Доступ">{user.memberships.length ? user.memberships.map((item: any) => <p key={item.id}><b>{item.name}</b> · {item.role}</p>) : <p className="admin-note">Tenant memberships отсутствуют.</p>}</Panel></div>
     <div className="admin-grid-two"><Panel title="Тариф"><p>Текущий: <b>{user.plan?.name || "Free"}</b></p><form className="admin-form" onSubmit={assignPlan}><select name="planId" required defaultValue={user.plan?.plan_id || user.plan?.id}>{plans.map((plan) => <option value={plan.id} key={plan.id}>{plan.name}</option>)}</select><button>Назначить тариф</button></form></Panel><Panel title="Токены"><p>Баланс: <b>{nf.format(Number(user.account.balance || 0))}</b></p><form className="admin-form" onSubmit={adjust}><select name="direction"><option value="credit">Начислить</option><option value="debit">Списать</option></select><input name="amount" type="number" min="1" step="1" required placeholder="Количество"/><input name="reason" required maxLength={500} placeholder="Причина / комментарий"/><button>Выполнить</button></form></Panel></div>
     <Panel title={`Проекты (${user.counts.project_count || 0})`}><MiniRows rows={user.projects} render={(item) => <><span><b>{item.name}</b><small>{item.project_type}</small></span><span>{when(item.updated_at)}</span></>}/></Panel>
-    <Panel title={`Генерации (${user.counts.generation_count || 0})`}><MiniRows rows={user.generations} render={(item) => <><span><b>{item.operation}</b><small>Token debit: {text(item.token_cost)}</small></span><span>{when(item.created_at)}</span></>}/></Panel>
+    <Panel title={`Генерации (${user.counts.generation_count || 0})`} subtitle="Нажмите на миниатюру, чтобы открыть исходное изображение."><GenerationGallery userId={user.profile.id} initialRows={user.generations || []} total={Number(user.counts.generation_count || 0)}/></Panel>
     <Panel title="Платежи"><MiniRows rows={user.payments} render={(item) => <><span><b>{money(item.amount, item.currency)}</b><small>{item.provider === "mock" ? "MOCK / TEST" : item.provider} · {item.status}</small></span><span>{when(item.created_at)}</span></>}/></Panel>
     <Panel title="История токенов"><MiniRows rows={user.tokenHistory} render={(item) => <><span><b>{item.type}</b><small>{item.description || "Без комментария"}</small></span><span className={Number(item.amount) >= 0 ? "positive" : "negative"}>{Number(item.amount) >= 0 ? "+" : ""}{nf.format(Number(item.amount))}</span></>}/></Panel>
+  </>;
+}
+
+function GenerationGallery({ userId, initialRows, total }: { userId: string; initialRows: any[]; total: number }) {
+  const [rows, setRows] = useState(initialRows);
+  const [active, setActive] = useState<any>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    if (!active) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setActive(null); };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [active]);
+
+  const loadMore = async () => {
+    setLoadingMore(true); setLoadError("");
+    try {
+      const payload = await api(`/api/admin/users/${userId}/generations?offset=${rows.length}&limit=24`);
+      setRows((current: any[]) => [...current, ...payload.generations.filter((item: any) => !current.some((row) => row.id === item.id))]);
+    } catch (reason) { setLoadError(reason instanceof Error ? reason.message : "Не удалось загрузить генерации."); }
+    finally { setLoadingMore(false); }
+  };
+
+  if (!rows.length) return <Empty/>;
+  return <>
+    <div className="admin-generation-grid">
+      {rows.map((item) => <button className="admin-generation-card" type="button" key={item.id} onClick={() => setActive(item)} aria-label={`Открыть генерацию ${item.operation} от ${when(item.created_at)}`}>
+        <span className="admin-generation-thumb"><img src={`/api/admin/generations/${item.id}?variant=thumbnail`} alt="" loading="lazy" decoding="async"/></span>
+        <span className="admin-generation-meta"><b>{item.operation}</b><small>{when(item.created_at)}</small></span>
+      </button>)}
+    </div>
+    {loadError && <p className="admin-generation-error" role="alert">{loadError}</p>}
+    {rows.length < total && <button className="admin-load-more" type="button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? "Загружаем…" : `Показать ещё (${Math.min(24, total - rows.length)})`}</button>}
+    {active && <div className="admin-generation-modal">
+      <button className="admin-generation-backdrop" type="button" aria-label="Закрыть просмотр" onClick={() => setActive(null)}/>
+      <div className="admin-generation-dialog" role="dialog" aria-modal="true" aria-label={`Генерация ${active.operation}`}>
+        <header><div><b>{active.operation}</b><small>{when(active.created_at)}</small></div><button type="button" aria-label="Закрыть просмотр" onClick={() => setActive(null)}>×</button></header>
+        <div className="admin-generation-full"><img src={`/api/admin/generations/${active.id}`} alt={`Результат генерации ${active.operation}`}/></div>
+      </div>
+    </div>}
   </>;
 }
 
