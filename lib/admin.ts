@@ -63,7 +63,7 @@ export async function adminUserDetail(userId: string) {
     database.prepare("SELECT * FROM plans WHERE code = 'free' AND active = 1").first(),
     database.prepare("SELECT (SELECT COUNT(*) FROM projects WHERE user_id = ?) AS project_count, (SELECT COUNT(*) FROM generations WHERE user_id = ?) AS generation_count").bind(userId, userId).first(),
     database.prepare("SELECT * FROM payments WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").bind(userId).all(),
-    database.prepare("SELECT id, tenant_id, operation, created_at, bytes, content_type, input_tokens, output_tokens, total_tokens, token_transaction_id, token_cost, brutto_coefficient_snapshot FROM generations WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 24").bind(userId).all(),
+    database.prepare("SELECT id, tenant_id, operation, created_at, input_tokens, output_tokens, total_tokens, token_transaction_id, token_cost, brutto_coefficient_snapshot FROM generations WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").bind(userId).all(),
     database.prepare("SELECT id, tenant_id, name, project_type, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100").bind(userId).all(),
   ]);
   const [account, tokenHistory] = await Promise.all([getTokenAccount(userId), getTokenHistory(userId)]);
@@ -78,26 +78,6 @@ export async function adminUserDetail(userId: string) {
     generations: generations.results,
     payments: payments.results,
     tokenHistory,
-  };
-}
-
-export async function adminUserGenerations(userId: string, offset = 0, limit = 24) {
-  await ensureBillingStore();
-  const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.trunc(offset)) : 0;
-  const safeLimit = Number.isFinite(limit) ? Math.min(24, Math.max(1, Math.trunc(limit))) : 24;
-  const [user, count, generations] = await Promise.all([
-    database.prepare("SELECT id FROM users WHERE id = ?").bind(userId).first(),
-    database.prepare("SELECT COUNT(*) AS total FROM generations WHERE user_id = ?").bind(userId).first<{ total: number }>(),
-    database.prepare("SELECT id, tenant_id, operation, created_at, bytes, content_type, token_cost FROM generations WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?").bind(userId, safeLimit, safeOffset).all(),
-  ]);
-  if (!user) return null;
-  const total = Number(count?.total || 0);
-  return {
-    generations: generations.results,
-    total,
-    offset: safeOffset,
-    limit: safeLimit,
-    nextOffset: safeOffset + safeLimit < total ? safeOffset + safeLimit : null,
   };
 }
 

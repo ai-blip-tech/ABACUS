@@ -9,7 +9,6 @@ process.env.ROOM_DESIGN_DATA_DIR = root;
 
 const auth = await import("../lib/auth.ts");
 const admin = await import("../lib/admin.ts");
-const { adminGenerationThumbnail } = await import("../lib/admin-generation-image.ts");
 const { database } = await import("../lib/server-runtime.ts");
 await auth.ensureStore();
 
@@ -39,7 +38,7 @@ test("global admin authorization denies anonymous, ordinary and tenant admin ses
 
 test("all global admin routes use strict global authorization", async () => {
   const routes = [
-    "overview/route.ts", "users/route.ts", "users/[id]/route.ts", "users/[id]/generations/route.ts", "users/[id]/tokens/route.ts", "users/[id]/plan/route.ts",
+    "overview/route.ts", "users/route.ts", "users/[id]/route.ts", "users/[id]/tokens/route.ts", "users/[id]/plan/route.ts",
     "plans/route.ts", "token-packages/route.ts", "payments/route.ts", "tenants/route.ts", "generations/route.ts",
     "generations/[id]/route.ts", "settings/route.ts", "token-transactions/route.ts", "tokens/transfer/route.ts", "audit-log/route.ts",
   ];
@@ -76,25 +75,6 @@ test("plan assignment and user detail use existing billing entities", async () =
   assert.equal(detail.account.balance, 375);
   const audit = await database.prepare("SELECT actor_user_id FROM audit_logs WHERE action = 'plan.assign' AND entity_id = 'ordinary'").first();
   assert.equal(audit.actor_user_id, "global-admin");
-});
-
-test("admin generation gallery pages records and creates compact thumbnails", async () => {
-  const source = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#7c2630"/></svg>');
-  const outputKey = "tenants/norrmobler/users/ordinary/generations/gallery-test.svg";
-  await auth.storage().put(outputKey, source, { httpMetadata: { contentType: "image/svg+xml" } });
-  await auth.recordGeneration(userShape("ordinary", "ordinary@example.test", "user", "member"), { id: "gallery-test", operation: "generate", prompt: "test", outputKey, contentType: "image/svg+xml", bytes: source.byteLength });
-
-  const payload = await admin.adminUserGenerations("ordinary", 0, 24);
-  assert.equal(payload.generations[0].id, "gallery-test");
-  assert.equal(payload.total, 1);
-  assert.equal(payload.nextOffset, null);
-  assert.equal(await admin.adminUserGenerations("missing-user", 0, 24), null);
-  const thumbnail = await adminGenerationThumbnail(source);
-  assert.ok(thumbnail.byteLength > 0);
-  assert.equal(thumbnail[0], 0x52);
-  assert.equal(thumbnail[1], 0x49);
-  assert.equal(thumbnail[2], 0x46);
-  assert.equal(thumbnail[3], 0x46);
 });
 
 test("shared account dropdown exposes admin item only for global role", async () => {

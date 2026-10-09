@@ -1,4 +1,4 @@
-name: Deploy Room Design
+name: Roll back Room Design production
 
 on:
   push:
@@ -6,77 +6,49 @@ on:
       - main
 
 jobs:
-  deploy:
+  rollback:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Amsterdam VPS
+      - name: Restore last working production build
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          command_timeout: 20m
+          command_timeout: 10m
           script: |
             set -eu
             cd ~/ABACUS
 
-            if [ ! -d .next ]; then
-              recovery_dir="$(ls -1dt .next.rollback-* 2>/dev/null | head -n 1 || true)"
-              test -n "$recovery_dir"
-              echo "RECOVERING_INTERRUPTED_DEPLOY_FROM=${recovery_dir}"
-              mv "$recovery_dir" .next
-              pm2 restart roomdesign --update-env
-              curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
-            fi
-
-            previous_sha="$(git rev-parse HEAD)"
-            rollback_dir=".next.rollback-${previous_sha}-$(date +%Y%m%d%H%M%S)"
-            echo "PRODUCTION_SHA_BEFORE=${previous_sha}"
-            pm2 describe roomdesign
+            rollback_sha="54e3418cb399593140b646dd6a13765cd6ff0353"
+            recovery_dir="$(ls -1dt .next.rollback-${rollback_sha}-* 2>/dev/null | head -n 1 || true)"
+            test -n "$recovery_dir"
+            test -d "$recovery_dir"
+            echo "CONFIRMED_ROLLBACK_BUILD=${recovery_dir}"
 
             git status --short
-            test -z "$(git status --porcelain -- . ':(exclude)package-lock.json' ':(exclude)next-env.d.ts' ':(exclude).next.rollback-*' ':(exclude)roomdesign')"
             git restore --source=HEAD -- package-lock.json next-env.d.ts
             git fetch origin main
             git pull --ff-only origin main
             test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
-            echo "PRODUCTION_SHA_BUILD=$(git rev-parse HEAD)"
+            echo "PRODUCTION_CHECKOUT_SHA=$(git rev-parse HEAD)"
 
-            npm ci
+            pkill -f '[n]ext build' || true
+            pm2 stop roomdesign || true
 
-            test ! -e "$rollback_dir"
-            pm2 stop roomdesign
             if [ -d .next ]; then
-              mv .next "$rollback_dir"
+              failed_dir=".next.failed-$(date +%Y%m%d%H%M%S)"
+              mv .next "$failed_dir"
+              echo "INTERRUPTED_BUILD_PRESERVED=${failed_dir}"
             fi
 
-            rollback_build() {
-              result=$?
-              trap - ERR
-              rm -rf .next
-              if [ -d "$rollback_dir" ]; then
-                mv "$rollback_dir" .next
-                pm2 restart roomdesign --update-env
-              fi
-              exit "$result"
-            }
-            trap rollback_build ERR
-
-            npm run build -- --webpack
+            cp -a "$recovery_dir" .next
             pm2 restart roomdesign --update-env
 
-            curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
+            curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
 
-            production_html="$(curl --fail --silent --show-error http://127.0.0.1:3000/)"
-            production_css="$(printf '%s' "$production_html" | grep -oE '/_next/static/[^\" ]+\.css' | sort -u | while IFS= read -r asset; do curl --fail --silent --show-error "http://127.0.0.1:3000${asset}"; done)"
-            printf '%s' "$production_css" | grep -q '\.material-tool'
-            printf '%s' "$production_css" | grep -q '\.material-brush-trigger'
-
-            trap - ERR
-            echo "ROLLBACK_BUILD=${rollback_dir}"
-
-            echo "PRODUCTION_SHA_AFTER=$(git rev-parse HEAD)"
+            echo "RUNTIME_BUILD_ROLLBACK_SHA=${rollback_sha}"
             pm2 describe roomdesign
