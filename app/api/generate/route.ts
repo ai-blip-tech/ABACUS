@@ -1,4 +1,5 @@
 import { recordGeneration, requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
+import { aiCostLedgerHasRequest, completeAiCostLedgerEntry, createAiCostLedgerEntry, recordAiProviderResult, type ImageProviderUsage } from "@/lib/ai-cost-ledger";
 import { refundAiTokens, reserveAiTokens } from "@/lib/billing";
 import { imageModel } from "@/lib/image-model";
 import { openAIKey } from "@/lib/server-config";
@@ -11,7 +12,7 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string } };
+  const body = await request.json() as { projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string } };
   const idea = body.prompt?.trim();
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
@@ -248,7 +249,7 @@ async function generateResponse(request: Request) {
     : diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
     : 0;
   const diagnosticProviderEndpoint = body.roomImage || body.planRender?.planImage ? "openai.images.edits" : "openai.images.generations";
-  if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first()) {
+  if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first() || await aiCostLedgerHasRequest(operationId)) {
     return Response.json({ error: "Эта AI-операция уже выполнена." }, { status: 409 });
   }
   if (["material", "global_edit", "remove", "replace", "place"].includes(operation) && await database.prepare("SELECT id FROM token_transactions WHERE user_id = ? AND idempotency_key = ?").bind(user.id, `ai-refund:${operationId}`).first()) {
@@ -260,6 +261,30 @@ async function generateResponse(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Недостаточно токенов.";
     return Response.json({ error: message }, { status: message.includes("Недостаточно") ? 402 : 400 });
+  }
+  let refererProjectId: string | null = null;
+  try { refererProjectId = new URL(request.headers.get("referer") || "http://localhost").searchParams.get("project")?.trim() || null; } catch { /* malformed Referer is ignored */ }
+  const requestedProjectId = body.projectId?.trim() || refererProjectId;
+  const projectId = requestedProjectId && await database.prepare("SELECT id FROM projects WHERE id = ? AND user_id = ? AND tenant_id = ?").bind(requestedProjectId, user.id, user.tenantId).first()
+    ? requestedProjectId
+    : null;
+  try {
+    await createAiCostLedgerEntry({
+      requestId: operationId,
+      userId: user.id,
+      tenantId: user.tenantId,
+      projectId,
+      operationType: operation,
+      model,
+      endpoint: diagnosticProviderEndpoint,
+      rdTokensCharged: reservation.transaction ? reservation.quote.tokenCost : 0,
+      rdTokensQuoted: reservation.quote.tokenCost,
+      grossCoefficient: reservation.quote.bruttoCoefficient,
+    });
+  } catch (error) {
+    if (reservation.transaction) await refundAiTokens(user.id, operationId, reservation.quote.tokenCost, "Возврат: не удалось открыть финансовый журнал AI-операции");
+    console.error("AI cost ledger creation failed", error);
+    return Response.json({ error: "Не удалось безопасно начать учёт AI-операции." }, { status: 503 });
   }
   let refunded = false;
   const refundReservation = async (reason: string) => {
@@ -404,6 +429,7 @@ async function generateResponse(request: Request) {
       });
     }
   } catch (error) {
+    await completeAiCostLedgerEntry(operationId, "provider_failed", null, providerTimedOut(error) ? "provider_timeout" : "provider_request_failed");
     await refundReservation("Возврат после технической ошибки подготовки AI-операции");
     return Response.json({ error: providerTimedOut(error) ? providerTimeoutMessage : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
   }
@@ -425,17 +451,31 @@ async function generateResponse(request: Request) {
   try {
     responseText = await response.text();
   } catch {
+    await completeAiCostLedgerEntry(operationId, "provider_response_read_failed", null, "provider_response_read_failed");
     await refundReservation("Возврат после ошибки чтения ответа AI-провайдера");
     return Response.json({ error: providerTimedOut() ? providerTimeoutMessage : "Не удалось получить ответ сервиса генерации." }, { status: providerTimedOut() ? 504 : 502 });
   }
-  let result: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string }; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } } = {};
+  let result: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string }; usage?: ImageProviderUsage } = {};
   try {
     result = JSON.parse(responseText);
   } catch {
     // A proxy or a transient gateway error can return HTML instead of JSON.
     // Keep the response actionable without exposing provider internals.
   }
+  const providerRequestId = response.headers.get("x-request-id") || response.headers.get("request-id");
+  await recordAiProviderResult({
+    requestId: operationId,
+    model,
+    endpoint: diagnosticProviderEndpoint,
+    grossCoefficient: reservation.quote.bruttoCoefficient,
+    providerRequestId,
+    providerHttpStatus: response.status,
+    usage: result.usage,
+    status: response.ok ? "provider_succeeded" : "provider_failed",
+    errorCode: response.ok ? null : `provider_http_${response.status}`,
+  });
   if (!response.ok) {
+    await completeAiCostLedgerEntry(operationId, "provider_failed", null, `provider_http_${response.status}`);
     await refundReservation("Возврат после ошибки AI-провайдера");
     console.error("Image edit failed", { status: response.status, operation, message: result.error?.message });
     return Response.json({ error: result.error?.message || `Сервис генерации временно недоступен (код ${response.status}). Попробуйте ещё раз.` }, { status: response.status });
@@ -443,6 +483,7 @@ async function generateResponse(request: Request) {
 
   const encodedImage = result.data?.[0]?.b64_json;
   if (!encodedImage) {
+    await completeAiCostLedgerEntry(operationId, "result_invalid", null, "missing_image");
     await refundReservation("Возврат: AI-провайдер не вернул изображение");
     return Response.json({ error: "Изображение не вернулось от модели." }, { status: 502 });
   }
@@ -452,6 +493,7 @@ async function generateResponse(request: Request) {
     binary = Uint8Array.from(atob(encodedImage), (character) => character.charCodeAt(0));
     if (!binary.byteLength) throw new Error("Пустое изображение.");
   } catch {
+    await completeAiCostLedgerEntry(operationId, "result_invalid", null, "invalid_image");
     await refundReservation("Возврат после некорректного изображения AI-провайдера");
     return Response.json({ error: "Сервис генерации вернул некорректное изображение." }, { status: 502 });
   }
@@ -461,9 +503,11 @@ async function generateResponse(request: Request) {
     const tokenTransaction = reservation.transaction as { id?: string } | null;
     await recordGeneration(user, { id: operationId, operation, prompt: body.prompt || "", outputKey, contentType: "image/webp", bytes: binary.byteLength, inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens, totalTokens: result.usage?.total_tokens, tokenTransactionId: tokenTransaction?.id || null, tokenCost: reservation.quote.tokenCost, bruttoCoefficientSnapshot: reservation.quote.bruttoCoefficient });
   } catch (error) {
+    await completeAiCostLedgerEntry(operationId, "result_save_failed", null, "result_save_failed");
     await refundReservation("Возврат после ошибки сохранения результата AI-операции");
     return Response.json({ error: error instanceof Error ? error.message : "Не удалось сохранить результат генерации." }, { status: 503 });
   }
+  await completeAiCostLedgerEntry(operationId, "succeeded", operationId);
   const usageHeaders: Record<string, string> = {
     "Content-Type": "image/webp",
     "Cache-Control": "no-store",

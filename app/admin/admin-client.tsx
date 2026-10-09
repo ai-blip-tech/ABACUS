@@ -6,7 +6,7 @@ import "../account/account.css";
 import "./admin.css";
 
 const sections = [
-  ["overview", "Обзор"], ["users", "Пользователи"], ["tokens", "Токены"],
+  ["overview", "Обзор"], ["finance", "AI финансы"], ["users", "Пользователи"], ["tokens", "Токены"],
   ["plans", "Тарифы"], ["packages", "Пакеты токенов"], ["payments", "Платежи"],
   ["tenants", "Тенанты"], ["generations", "Генерации"], ["settings", "Настройки"], ["audit", "Журнал действий"],
 ] as const;
@@ -16,6 +16,7 @@ const nf = new Intl.NumberFormat("ru-RU");
 const money = (kopecks: unknown, currency = "RUB") => new Intl.NumberFormat("ru-RU", { style: "currency", currency }).format(Number(kopecks || 0) / 100);
 const when = (value: unknown) => value ? new Date(String(value)).toLocaleString("ru-RU") : "—";
 const text = (value: unknown) => value === null || value === undefined || value === "" ? "Нет данных" : String(value);
+const usdFromMicro = (value: unknown) => new Intl.NumberFormat("ru-RU", { style: "currency", currency: "USD", minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(Number(value || 0) / 1_000_000);
 
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, init);
@@ -34,7 +35,7 @@ export default function GlobalAdminClient({ admin }: { admin: { id: string; emai
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const paths = ["overview", "users", "token-transactions", "plans", "token-packages", "payments", "tenants", "generations", "settings", "audit-log"];
+      const paths = ["overview", "ai-finance", "users", "token-transactions", "plans", "token-packages", "payments", "tenants", "generations", "settings", "audit-log"];
       const payloads = await Promise.all(paths.map((path) => api(`/api/admin/${path}`)));
       setData(Object.assign({}, ...payloads));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось загрузить админку."); }
@@ -79,6 +80,7 @@ export default function GlobalAdminClient({ admin }: { admin: { id: string; emai
       {error && <p className="admin-alert" role="alert">{error}</p>}
       {loading ? <p className="admin-empty">Загружаем реальные данные…</p> : <>
         {section === "overview" && <Overview data={data.overview}/>}
+        {section === "finance" && <AiFinance initial={data.finance} onError={setError}/>}
         {section === "users" && (selectedUser ? <UserDetail user={selectedUser} plans={data.plans || []} onBack={() => setSelectedUser(null)} onChanged={() => void openUser(selectedUser.profile.id)}/> : <Users users={data.users || []} onSearch={search} onOpen={openUser}/>)}
         {section === "tokens" && <Tokens users={data.users || []} transactions={data.transactions || []} onTransfer={transfer}/>}
         {section === "plans" && <Plans plans={data.plans || []}/>}
@@ -97,15 +99,30 @@ function Overview({ data }: { data: any }) {
   if (!data) return <Empty/>;
   const cards = [
     ["Всего пользователей", data.users?.total], ["Новые за 30 дней", data.users?.new_users], ["Активные за 30 дней", data.users?.active_users],
-    ["Проекты", data.projects?.total], ["Успешные AI operations", data.generations?.successful], ["Ошибки AI", data.generations?.failed],
+    ["Проекты", data.projects?.total], ["AI operations с учётом", data.aiFinance?.operations], ["Успешные AI operations", data.aiFinance?.succeeded],
     ["Общий token balance", data.balances?.total], ["Начислено токенов", data.ledger?.credited], ["Списано токенов", data.ledger?.debited],
   ];
-  return <><div className="admin-cards">{cards.map(([label, value]) => <article key={String(label)}><small>{label}</small><b>{value === null || value === undefined ? "Не отслеживается" : nf.format(Number(value))}</b></article>)}</div><div className="admin-grid-two"><Panel title="Платежи"><p>Записей: <b>{nf.format(Number(data.payments?.total || 0))}</b></p><p>Mock/test: <b>{nf.format(Number(data.payments?.mock_count || 0))}</b></p><p>Подтверждённая выручка real provider: <b>{Number(data.payments?.paid_real_count || 0) ? money(data.payments?.paid_real_rub_kopecks) : "Нет реальных платежей"}</b></p></Panel><Panel title="AI economics"><p>Расчётный NET: <b>${Number(data.generations?.estimated_net_usd || 0).toFixed(4)}</b></p><p className="admin-note">Это оценка по provider tokens. Фактическая стоимость провайдера исторически не сохранялась.</p></Panel></div></>;
+  return <><div className="admin-cards">{cards.map(([label, value]) => <article key={String(label)}><small>{label}</small><b>{value === null || value === undefined ? "Не отслеживается" : nf.format(Number(value))}</b></article>)}</div><div className="admin-grid-two"><Panel title="Платежи"><p>Записей: <b>{nf.format(Number(data.payments?.total || 0))}</b></p><p>Mock/test: <b>{nf.format(Number(data.payments?.mock_count || 0))}</b></p><p>Подтверждённая выручка real provider: <b>{Number(data.payments?.paid_real_count || 0) ? money(data.payments?.paid_real_rub_kopecks) : "Нет реальных платежей"}</b></p></Panel><Panel title="Фактические AI расходы"><p>NET: <b>{usdFromMicro(data.aiFinance?.net_micro_usd)}</b></p><p>GROSS: <b>{usdFromMicro(data.aiFinance?.gross_micro_usd)}</b></p><p>Точно рассчитано: <b>{nf.format(Number(data.aiFinance?.exactly_priced || 0))} из {nf.format(Number(data.aiFinance?.operations || 0))}</b></p><p className="admin-note">Исторические операции без сохранённой детализации provider usage не подменяются оценкой.</p></Panel></div></>;
+}
+
+function AiFinance({ initial, onError }: { initial: any; onError: (value: string) => void }) {
+  const [finance, setFinance] = useState(initial);
+  const [loading, setLoading] = useState(false);
+  const loadPeriod = async (period: string) => { setLoading(true); onError(""); try { setFinance((await api(`/api/admin/ai-finance?period=${period}`)).finance); } catch (reason) { onError(reason instanceof Error ? reason.message : "Финансовые данные не загружены."); } finally { setLoading(false); } };
+  if (!finance) return <Empty/>;
+  const totals = finance.totals || {};
+  return <>
+    <div className="admin-period" aria-label="Период AI-финансов">{[["today","Сегодня"],["7d","7 дней"],["30d","30 дней"],["month","Этот месяц"],["last_month","Прошлый месяц"]].map(([key,label]) => <button type="button" className={finance.period?.key === key ? "active" : ""} disabled={loading} key={key} onClick={() => void loadPeriod(key)}>{label}</button>)}</div>
+    <p className="admin-info">Фактические usage и цены сохраняются для новых операций. Период: <b>{finance.period?.label}</b>. Старые генерации без ledger не пересчитываются задним числом.</p>
+    <Panel title="Действующая тарификация" subtitle="Снимок этих ставок и коэффициента фиксируется отдельно для каждой новой AI-операции."><div className="admin-finance-strip"><span><small>Модель</small><b>{finance.model}</b></span><span><small>Text input / 1M</small><b>{finance.currentPricing ? `$${finance.currentPricing.inputTextUsd}` : "Нет точной цены"}</b></span><span><small>Image input / 1M</small><b>{finance.currentPricing ? `$${finance.currentPricing.inputImageUsd}` : "Нет точной цены"}</b></span><span><small>Image output / 1M</small><b>{finance.currentPricing ? `$${finance.currentPricing.outputImageUsd}` : "Нет точной цены"}</b></span><span><small>GROSS коэффициент</small><b>× {Number(finance.grossCoefficient || 0).toFixed(2)}</b></span></div></Panel>
+    <div className="admin-cards"><article><small>AI operations</small><b>{nf.format(Number(totals.operations || 0))}</b></article><article><small>RD tokens списано</small><b>{nf.format(Number(totals.rd_tokens_charged || 0))}</b></article><article><small>Пользователей</small><b>{nf.format(Number(totals.users || 0))}</b></article><article><small>NET</small><b>{usdFromMicro(totals.net_micro_usd)}</b></article><article><small>GROSS</small><b>{usdFromMicro(totals.gross_micro_usd)}</b></article><article><small>Точная цена</small><b>{nf.format(Number(totals.exactly_priced || 0))} / {nf.format(Number(totals.operations || 0))}</b></article></div>
+    <div className="admin-grid-two"><Panel title="По дням"><MiniRows rows={finance.days || []} render={(row) => <><span><b>{row.day}</b><small>{row.operations} операций · RD {nf.format(Number(row.rd_tokens_charged || 0))}</small></span><span><b>{usdFromMicro(row.gross_micro_usd)} GROSS</b><small>{usdFromMicro(row.net_micro_usd)} NET</small></span></>}/></Panel><Panel title="По типам операций"><MiniRows rows={finance.operations || []} render={(row) => <><span><b>{row.operation_type}</b><small>{row.operations} операций · RD {nf.format(Number(row.rd_tokens_charged || 0))}</small></span><span><b>{usdFromMicro(row.gross_micro_usd)} GROSS</b><small>{usdFromMicro(row.net_micro_usd)} NET</small></span></>}/></Panel></div>
+  </>;
 }
 
 function Users({ users, onSearch, onOpen }: { users: any[]; onSearch: (event: FormEvent<HTMLFormElement>) => void; onOpen: (id: string) => void }) {
   return <Panel title="Зарегистрированные пользователи" action={<form className="admin-search" onSubmit={onSearch}><input name="q" placeholder="Email, имя или компания"/><button>Найти</button></form>}>
-    {!users.length ? <Empty/> : <div className="admin-table"><div className="admin-row admin-table-head"><span>Пользователь</span><span>Доступ</span><span>Тариф</span><span>Токены</span><span>Проекты / AI</span></div>{users.map((user) => <button className="admin-row" key={user.id} onClick={() => onOpen(user.id)}><span><b>{[user.first_name, user.last_name].filter(Boolean).join(" ") || "Без имени"}</b><small>{user.email}<br/>{user.company_role || "Компания не указана"}</small></span><span><b>{user.global_role}</b><small>{user.memberships?.map((membership: any) => `${membership.name}: ${membership.role}`).join(" · ") || "Без tenant membership"}</small></span><span>{user.plan_name}</span><span>{nf.format(Number(user.token_balance || 0))}</span><span>{user.project_count} / {user.generation_count}</span></button>)}</div>}
+    {!users.length ? <Empty/> : <div className="admin-table"><div className="admin-row admin-table-head"><span>Пользователь</span><span>Доступ</span><span>Тариф</span><span>Токены</span><span>Проекты / AI</span><span>NET / GROSS</span></div>{users.map((user) => <button className="admin-row" key={user.id} onClick={() => onOpen(user.id)}><span><b>{[user.first_name, user.last_name].filter(Boolean).join(" ") || "Без имени"}</b><small>{user.email}<br/>{user.company_role || "Компания не указана"}</small></span><span><b>{user.global_role}</b><small>{user.memberships?.map((membership: any) => `${membership.name}: ${membership.role}`).join(" · ") || "Без tenant membership"}</small></span><span>{user.plan_name}</span><span>{nf.format(Number(user.token_balance || 0))}</span><span>{user.project_count} / {user.ai_operation_count || 0}</span><span><b>{usdFromMicro(user.ai_net_micro_usd)}</b><small>{usdFromMicro(user.ai_gross_micro_usd)} GROSS</small></span></button>)}</div>}
   </Panel>;
 }
 
@@ -115,6 +132,7 @@ function UserDetail({ user, plans, onBack, onChanged }: { user: any; plans: any[
   return <><button className="admin-back" onClick={onBack}>← Все пользователи</button><div className="admin-user-title"><div><h2>{[user.profile.first_name, user.profile.last_name].filter(Boolean).join(" ") || user.profile.email}</h2><p>{user.profile.email}</p></div><span>{user.profile.global_role}</span></div>
     <div className="admin-grid-two"><Panel title="Профиль"><Key label="Компания" value={user.profile.company_role}/><Key label="Телефон" value={user.profile.phone}/><Key label="Регистрация" value={when(user.profile.created_at)}/><Key label="Последний вход" value={when(user.profile.last_login_at)}/></Panel><Panel title="Доступ">{user.memberships.length ? user.memberships.map((item: any) => <p key={item.id}><b>{item.name}</b> · {item.role}</p>) : <p className="admin-note">Tenant memberships отсутствуют.</p>}</Panel></div>
     <div className="admin-grid-two"><Panel title="Тариф"><p>Текущий: <b>{user.plan?.name || "Free"}</b></p><form className="admin-form" onSubmit={assignPlan}><select name="planId" required defaultValue={user.plan?.plan_id || user.plan?.id}>{plans.map((plan) => <option value={plan.id} key={plan.id}>{plan.name}</option>)}</select><button>Назначить тариф</button></form></Panel><Panel title="Токены"><p>Баланс: <b>{nf.format(Number(user.account.balance || 0))}</b></p><form className="admin-form" onSubmit={adjust}><select name="direction"><option value="credit">Начислить</option><option value="debit">Списать</option></select><input name="amount" type="number" min="1" step="1" required placeholder="Количество"/><input name="reason" required maxLength={500} placeholder="Причина / комментарий"/><button>Выполнить</button></form></Panel></div>
+    <Panel title="Фактическая AI-тарификация" subtitle="Только операции, для которых уже записан финансовый ledger."><div className="admin-finance-strip"><span><small>AI operations</small><b>{nf.format(Number(user.aiFinance?.operations || 0))}</b></span><span><small>RD tokens списано</small><b>{nf.format(Number(user.aiFinance?.rd_tokens_charged || 0))}</b></span><span><small>NET</small><b>{usdFromMicro(user.aiFinance?.net_micro_usd)}</b></span><span><small>GROSS</small><b>{usdFromMicro(user.aiFinance?.gross_micro_usd)}</b></span></div></Panel>
     <Panel title={`Проекты (${user.counts.project_count || 0})`}><MiniRows rows={user.projects} render={(item) => <><span><b>{item.name}</b><small>{item.project_type}</small></span><span>{when(item.updated_at)}</span></>}/></Panel>
     <Panel title={`Генерации (${user.counts.generation_count || 0})`} subtitle="Нажмите на миниатюру, чтобы открыть исходное изображение."><GenerationGallery userId={user.profile.id} initialRows={user.generations || []} total={Number(user.counts.generation_count || 0)}/></Panel>
     <Panel title="Платежи"><MiniRows rows={user.payments} render={(item) => <><span><b>{money(item.amount, item.currency)}</b><small>{item.provider === "mock" ? "MOCK / TEST" : item.provider} · {item.status}</small></span><span>{when(item.created_at)}</span></>}/></Panel>
@@ -149,10 +167,10 @@ function GenerationGallery({ userId, initialRows, total }: { userId: string; ini
     <div className="admin-generation-grid">
       {rows.map((item) => item.image_deleted_at ? <article className="admin-generation-card is-deleted" key={item.id}>
         <span className="admin-generation-thumb admin-generation-placeholder">Изображение удалено по политике хранения</span>
-        <span className="admin-generation-meta"><b>{item.operation}</b><small>{when(item.created_at)}</small></span>
+        <span className="admin-generation-meta"><b>{item.operation}</b><small>{when(item.created_at)}</small><small>{item.cost_status ? `${usdFromMicro(item.net_micro_usd)} NET · ${usdFromMicro(item.gross_micro_usd)} GROSS` : "Историческая операция — точная цена не записана"}</small></span>
       </article> : <button className="admin-generation-card" type="button" key={item.id} onClick={() => setActive(item)} aria-label={`Открыть генерацию ${item.operation} от ${when(item.created_at)}`}>
         <span className="admin-generation-thumb"><img src={`/api/admin/generations/${item.id}?variant=thumbnail`} alt="" loading="lazy" decoding="async"/></span>
-        <span className="admin-generation-meta"><b>{item.operation}</b><small>{when(item.created_at)}</small></span>
+        <span className="admin-generation-meta"><b>{item.operation}</b><small>{when(item.created_at)}</small><small>{item.cost_status ? `${usdFromMicro(item.net_micro_usd)} NET · ${usdFromMicro(item.gross_micro_usd)} GROSS` : "Историческая операция — точная цена не записана"}</small></span>
       </button>)}
     </div>
     {loadError && <p className="admin-generation-error" role="alert">{loadError}</p>}
@@ -160,7 +178,7 @@ function GenerationGallery({ userId, initialRows, total }: { userId: string; ini
     {active && <div className="admin-generation-modal">
       <button className="admin-generation-backdrop" type="button" aria-label="Закрыть просмотр" onClick={() => setActive(null)}/>
       <div className="admin-generation-dialog" role="dialog" aria-modal="true" aria-label={`Генерация ${active.operation}`}>
-        <header><div><b>{active.operation}</b><small>{when(active.created_at)}</small></div><button type="button" aria-label="Закрыть просмотр" onClick={() => setActive(null)}>×</button></header>
+        <header><div><b>{active.operation}</b><small>{when(active.created_at)}</small><small>{active.model || "Модель не записана"} · {active.cost_status || "historical"} · {active.cost_status ? `${usdFromMicro(active.net_micro_usd)} NET / ${usdFromMicro(active.gross_micro_usd)} GROSS` : "нет точной цены"}</small></div><button type="button" aria-label="Закрыть просмотр" onClick={() => setActive(null)}>×</button></header>
         <div className="admin-generation-full"><img src={`/api/admin/generations/${active.id}`} alt={`Результат генерации ${active.operation}`}/></div>
       </div>
     </div>}

@@ -1,26 +1,27 @@
 import { creditTokens, debitTokens, ensureBillingStore, getTokenAccount, getTokenHistory } from "./billing.ts";
+import { ensureAiCostLedgerStore } from "./ai-cost-ledger.ts";
+import { userAiFinance } from "./admin-ai-finance.ts";
 import { database } from "./server-runtime.ts";
-
-const INPUT_USD_PER_MILLION = 8;
-const OUTPUT_USD_PER_MILLION = 30;
 
 export async function adminOverview() {
   await ensureBillingStore();
+  await ensureAiCostLedgerStore();
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const [users, projects, generations, balances, ledger, payments] = await database.batch([
+  const [users, projects, generations, balances, ledger, payments, aiFinance] = await database.batch([
     database.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS new_users, SUM(CASE WHEN last_login_at >= ? THEN 1 ELSE 0 END) AS active_users FROM users").bind(since, since),
     database.prepare("SELECT COUNT(*) AS total FROM projects"),
     database.prepare(`SELECT COUNT(*) AS total, SUM(COALESCE(input_tokens, 0)) AS input_tokens, SUM(COALESCE(output_tokens, 0)) AS output_tokens FROM generations`),
     database.prepare("SELECT COALESCE(SUM(balance), 0) AS total FROM token_accounts"),
     database.prepare("SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS credited, COALESCE(-SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS debited FROM token_transactions"),
     database.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN provider = 'mock' THEN 1 ELSE 0 END) AS mock_count, SUM(CASE WHEN status = 'paid' AND provider <> 'mock' THEN 1 ELSE 0 END) AS paid_real_count, COALESCE(SUM(CASE WHEN status = 'paid' AND provider <> 'mock' AND currency = 'RUB' THEN amount ELSE 0 END), 0) AS paid_real_rub_kopecks FROM payments"),
+    database.prepare("SELECT COUNT(*) AS operations, SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded, SUM(CASE WHEN status <> 'succeeded' THEN 1 ELSE 0 END) AS not_succeeded, COALESCE(SUM(rd_tokens_charged), 0) AS rd_tokens_charged, COALESCE(SUM(net_micro_usd), 0) AS net_micro_usd, COALESCE(SUM(gross_micro_usd), 0) AS gross_micro_usd, SUM(CASE WHEN net_micro_usd IS NOT NULL THEN 1 ELSE 0 END) AS exactly_priced FROM ai_cost_ledger"),
   ]);
   const generation = generations.results[0] as Record<string, number | null> | undefined;
-  const estimatedNetUsd = ((Number(generation?.input_tokens || 0) * INPUT_USD_PER_MILLION) + (Number(generation?.output_tokens || 0) * OUTPUT_USD_PER_MILLION)) / 1_000_000;
   return {
     users: users.results[0] || {},
     projects: projects.results[0] || {},
-    generations: { ...(generation || {}), successful: Number(generation?.total || 0), failed: null, estimated_net_usd: estimatedNetUsd },
+    generations: { ...(generation || {}), successful: Number(generation?.total || 0), failed: null },
+    aiFinance: aiFinance.results[0] || {},
     balances: balances.results[0] || {},
     ledger: ledger.results[0] || {},
     payments: payments.results[0] || {},
@@ -29,6 +30,7 @@ export async function adminOverview() {
 
 export async function adminUsers(search = "") {
   await ensureBillingStore();
+  await ensureAiCostLedgerStore();
   const query = `%${search.trim().toLowerCase().slice(0, 160)}%`;
   const users = await database.prepare(`
     SELECT users.id, users.email, users.global_role, users.first_name, users.last_name,
@@ -36,6 +38,10 @@ export async function adminUsers(search = "") {
       COALESCE(token_accounts.balance, 0) AS token_balance,
       (SELECT COUNT(*) FROM projects WHERE projects.user_id = users.id) AS project_count,
       (SELECT COUNT(*) FROM generations WHERE generations.user_id = users.id) AS generation_count,
+      (SELECT COUNT(*) FROM ai_cost_ledger WHERE ai_cost_ledger.user_id = users.id) AS ai_operation_count,
+      (SELECT COALESCE(SUM(rd_tokens_charged), 0) FROM ai_cost_ledger WHERE ai_cost_ledger.user_id = users.id) AS ai_rd_tokens_charged,
+      (SELECT COALESCE(SUM(net_micro_usd), 0) FROM ai_cost_ledger WHERE ai_cost_ledger.user_id = users.id) AS ai_net_micro_usd,
+      (SELECT COALESCE(SUM(gross_micro_usd), 0) FROM ai_cost_ledger WHERE ai_cost_ledger.user_id = users.id) AS ai_gross_micro_usd,
       (SELECT plans.name FROM subscriptions JOIN plans ON plans.id = subscriptions.plan_id WHERE subscriptions.user_id = users.id ORDER BY subscriptions.created_at DESC LIMIT 1) AS plan_name
     FROM users LEFT JOIN token_accounts ON token_accounts.user_id = users.id
     WHERE lower(users.email) LIKE ? OR lower(COALESCE(users.first_name, '') || ' ' || COALESCE(users.last_name, '')) LIKE ? OR lower(COALESCE(users.company_role, '')) LIKE ?
@@ -55,6 +61,7 @@ export async function adminUsers(search = "") {
 
 export async function adminUserDetail(userId: string) {
   await ensureBillingStore();
+  await ensureAiCostLedgerStore();
   const profile = await database.prepare("SELECT id, email, global_role, first_name, last_name, phone, company_role, created_at, last_login_at FROM users WHERE id = ?").bind(userId).first<Record<string, unknown>>();
   if (!profile) return null;
   const [memberships, subscription, freePlan, counts, payments, generations, projects] = await Promise.all([
@@ -63,10 +70,10 @@ export async function adminUserDetail(userId: string) {
     database.prepare("SELECT * FROM plans WHERE code = 'free' AND active = 1").first(),
     database.prepare("SELECT (SELECT COUNT(*) FROM projects WHERE user_id = ?) AS project_count, (SELECT COUNT(*) FROM generations WHERE user_id = ?) AS generation_count").bind(userId, userId).first(),
     database.prepare("SELECT * FROM payments WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").bind(userId).all(),
-    database.prepare("SELECT id, tenant_id, operation, created_at, bytes, content_type, input_tokens, output_tokens, total_tokens, token_transaction_id, token_cost, brutto_coefficient_snapshot, image_deleted_at, image_deletion_reason FROM generations WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 24").bind(userId).all(),
+    database.prepare("SELECT generations.id, generations.tenant_id, generations.operation, generations.created_at, generations.bytes, generations.content_type, generations.input_tokens, generations.output_tokens, generations.total_tokens, generations.token_transaction_id, generations.token_cost, generations.brutto_coefficient_snapshot, generations.image_deleted_at, generations.image_deletion_reason, ai_cost_ledger.model, ai_cost_ledger.endpoint, ai_cost_ledger.status AS cost_status, ai_cost_ledger.provider_request_id, ai_cost_ledger.input_text_tokens, ai_cost_ledger.input_image_tokens, ai_cost_ledger.output_image_tokens, ai_cost_ledger.rd_tokens_charged, ai_cost_ledger.net_micro_usd, ai_cost_ledger.gross_micro_usd FROM generations LEFT JOIN ai_cost_ledger ON ai_cost_ledger.generation_id = generations.id WHERE generations.user_id = ? ORDER BY generations.created_at DESC, generations.id DESC LIMIT 24").bind(userId).all(),
     database.prepare("SELECT id, tenant_id, name, project_type, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100").bind(userId).all(),
   ]);
-  const [account, tokenHistory] = await Promise.all([getTokenAccount(userId), getTokenHistory(userId)]);
+  const [account, tokenHistory, aiFinance] = await Promise.all([getTokenAccount(userId), getTokenHistory(userId), userAiFinance(userId)]);
   return {
     profile,
     memberships: memberships.results,
@@ -78,17 +85,19 @@ export async function adminUserDetail(userId: string) {
     generations: generations.results,
     payments: payments.results,
     tokenHistory,
+    aiFinance: aiFinance || {},
   };
 }
 
 export async function adminUserGenerations(userId: string, offset = 0, limit = 24) {
   await ensureBillingStore();
+  await ensureAiCostLedgerStore();
   const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.trunc(offset)) : 0;
   const safeLimit = Number.isFinite(limit) ? Math.min(24, Math.max(1, Math.trunc(limit))) : 24;
   const [user, count, generations] = await Promise.all([
     database.prepare("SELECT id FROM users WHERE id = ?").bind(userId).first(),
     database.prepare("SELECT COUNT(*) AS total FROM generations WHERE user_id = ?").bind(userId).first<{ total: number }>(),
-    database.prepare("SELECT id, tenant_id, operation, created_at, bytes, content_type, token_cost, image_deleted_at, image_deletion_reason FROM generations WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?").bind(userId, safeLimit, safeOffset).all(),
+    database.prepare("SELECT generations.id, generations.tenant_id, generations.operation, generations.created_at, generations.bytes, generations.content_type, generations.token_cost, generations.image_deleted_at, generations.image_deletion_reason, ai_cost_ledger.model, ai_cost_ledger.endpoint, ai_cost_ledger.status AS cost_status, ai_cost_ledger.input_text_tokens, ai_cost_ledger.input_image_tokens, ai_cost_ledger.output_image_tokens, ai_cost_ledger.rd_tokens_charged, ai_cost_ledger.net_micro_usd, ai_cost_ledger.gross_micro_usd FROM generations LEFT JOIN ai_cost_ledger ON ai_cost_ledger.generation_id = generations.id WHERE generations.user_id = ? ORDER BY generations.created_at DESC, generations.id DESC LIMIT ? OFFSET ?").bind(userId, safeLimit, safeOffset).all(),
   ]);
   if (!user) return null;
   const total = Number(count?.total || 0);
