@@ -22,10 +22,15 @@ jobs:
             cd ~/ABACUS
 
             rollback_sha="54e3418cb399593140b646dd6a13765cd6ff0353"
-            recovery_dir="$(ls -1dt .next.rollback-${rollback_sha}-* 2>/dev/null | head -n 1 || true)"
-            test -n "$recovery_dir"
-            test -d "$recovery_dir"
-            echo "CONFIRMED_ROLLBACK_BUILD=${recovery_dir}"
+            recovery_dir=""
+            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null; then
+              echo "EXISTING_WORKING_BUILD_REUSED=YES"
+            else
+              recovery_dir="$(ls -1dt .next.rollback-* 2>/dev/null | head -n 1 || true)"
+              test -n "$recovery_dir"
+              test -d "$recovery_dir"
+              echo "FALLBACK_ROLLBACK_BUILD=${recovery_dir}"
+            fi
 
             git status --short
             git restore --source=HEAD -- package-lock.json next-env.d.ts
@@ -37,13 +42,15 @@ jobs:
             pkill -f '[n]ext build' || true
             pm2 stop roomdesign || true
 
-            if [ -d .next ]; then
-              failed_dir=".next.failed-$(date +%Y%m%d%H%M%S)"
-              mv .next "$failed_dir"
-              echo "INTERRUPTED_BUILD_PRESERVED=${failed_dir}"
+            if [ -n "$recovery_dir" ]; then
+              if [ -d .next ]; then
+                failed_dir=".next.failed-$(date +%Y%m%d%H%M%S)"
+                mv .next "$failed_dir"
+                echo "INTERRUPTED_BUILD_PRESERVED=${failed_dir}"
+              fi
+              cp -a "$recovery_dir" .next
             fi
 
-            cp -a "$recovery_dir" .next
             pm2 restart roomdesign --update-env
 
             curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
