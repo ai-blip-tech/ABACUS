@@ -16,9 +16,19 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 20m
           script: |
             set -eu
             cd ~/ABACUS
+
+            if [ ! -d .next ]; then
+              recovery_dir="$(ls -1dt .next.rollback-* 2>/dev/null | head -n 1 || true)"
+              test -n "$recovery_dir"
+              echo "RECOVERING_INTERRUPTED_DEPLOY_FROM=${recovery_dir}"
+              mv "$recovery_dir" .next
+              pm2 restart roomdesign --update-env
+              curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
+            fi
 
             previous_sha="$(git rev-parse HEAD)"
             rollback_dir=".next.rollback-${previous_sha}-$(date +%Y%m%d%H%M%S)"
