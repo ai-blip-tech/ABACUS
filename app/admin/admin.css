@@ -11,3 +11,4 @@
 @media(max-width:900px){.admin-table .admin-row,.admin-users-table .admin-row{grid-template-columns:1fr 1fr}.admin-finance-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.admin-finance-strip,.admin-user-filters{grid-template-columns:1fr}}
 .admin-filter-status { min-height: 1.25rem; margin: .35rem 0 0; color: #66750c; font-weight: 700; }
+.admin-cost-values{display:grid;gap:3px}.admin-cost-values b{font-size:inherit}.admin-cost-exact{color:#2f7a35}.admin-cost-estimated{color:#b12f32}

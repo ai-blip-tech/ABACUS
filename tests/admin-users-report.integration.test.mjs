@@ -100,4 +100,6 @@ test("Excel export contains the same filters, rows and saved GROSS total", async
   assert.match(sheet || "", /NORR Møbler/);
   assert.match(sheet || "", /2026-10-01 — 2026-10-10/);
   assert.match(sheet || "", /<v>0\.00135<\/v>/);
+  assert.ok((sheet || "").indexOf("<autoFilter") < (sheet || "").indexOf("<mergeCells"));
+  assert.doesNotMatch(sheet || "", /Legacy/);
 });

@@ -18,6 +18,16 @@ const when = (value: unknown) => value ? new Date(String(value)).toLocaleString(
 const text = (value: unknown) => value === null || value === undefined || value === "" ? "Нет данных" : String(value);
 const usdFromMicro = (value: unknown) => new Intl.NumberFormat("ru-RU", { style: "currency", currency: "USD", minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(Number(value || 0) / 1_000_000);
 
+function CostValues({ exactCount, exactValue, estimatedCount, estimatedValue }: { exactCount: unknown; exactValue: unknown; estimatedCount: unknown; estimatedValue: unknown }) {
+  const hasExact = Number(exactCount || 0) > 0;
+  const hasEstimate = Number(estimatedCount || 0) > 0;
+  if (!hasExact && !hasEstimate) return <b>—</b>;
+  return <span className="admin-cost-values">
+    {hasExact && <b className="admin-cost-exact">{usdFromMicro(exactValue)}</b>}
+    {hasEstimate && <b className="admin-cost-estimated">{usdFromMicro(estimatedValue)}</b>}
+  </span>;
+}
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, init);
   const payload = await response.json().catch(() => ({}));
@@ -166,11 +176,11 @@ function Users({ users, totals, filter, tenants, onSearch, onOpen, loading, feed
       <span><small>Генераций за период</small><b>{nf.format(Number(totals.generation_count || 0))}</b></span>
       <span><small>AI operations за период</small><b>{nf.format(Number(totals.ai_operation_count || 0))}</b></span>
       <span><small>RD tokens списано</small><b>{nf.format(Number(totals.ai_rd_tokens_charged || 0))}</b></span>
-      <span><small>Фактический NET / GROSS</small><b>{Number(totals.ai_operation_count || 0) ? usdFromMicro(totals.ai_net_micro_usd) : "Нет точных данных"}</b><small>{Number(totals.ai_operation_count || 0) ? `${usdFromMicro(totals.ai_gross_micro_usd)} GROSS` : "Ledger за период пуст"}</small></span>
-      <span><small>Legacy — расчётная оценка</small><b>{Number(totals.legacy_estimated_count || 0) ? `${usdFromMicro(totals.legacy_net_estimate_micro_usd)} NET` : "Нет данных для оценки"}</b><small>{Number(totals.legacy_gross_estimated_count || 0) ? `${usdFromMicro(totals.legacy_gross_estimate_micro_usd)} GROSS` : "GROSS snapshot отсутствует"}</small></span>
+      <span><small>NET</small><CostValues exactCount={totals.ai_operation_count} exactValue={totals.ai_net_micro_usd} estimatedCount={totals.legacy_estimated_count} estimatedValue={totals.legacy_net_estimate_micro_usd}/></span>
+      <span><small>GROSS</small><CostValues exactCount={totals.ai_operation_count} exactValue={totals.ai_gross_micro_usd} estimatedCount={totals.legacy_gross_estimated_count} estimatedValue={totals.legacy_gross_estimate_micro_usd}/></span>
     </div>
     <Panel title="Зарегистрированные пользователи" subtitle={filter ? `Период: ${filter.fromDate} — ${filter.toDate}` : undefined}>
-      {!users.length ? <Empty/> : <div className="admin-table admin-users-table"><div className="admin-row admin-table-head"><span>Пользователь</span><span>Доступ</span><span>Тариф</span><span>Токены</span><span>Проекты / генерации</span><span>NET</span><span>GROSS</span></div>{users.map((user) => <button className="admin-row" key={user.id} onClick={() => onOpen(user.id)}><span><b>{[user.first_name, user.last_name].filter(Boolean).join(" ") || "Без имени"}</b><small>{user.email}<br/>{user.company_role || "Компания не указана"}</small></span><span><b>{user.global_role}</b><small>{user.memberships?.map((membership: any) => `${membership.name}: ${membership.role}`).join(" · ") || "Без tenant membership"}</small></span><span>{user.plan_name}</span><span>{nf.format(Number(user.token_balance || 0))}</span><span><b>{nf.format(Number(user.project_count || 0))} / {nf.format(Number(user.generation_count || 0))}</b><small>за выбранный период</small></span><span><b>{Number(user.ai_operation_count || 0) ? usdFromMicro(user.ai_net_micro_usd) : "Нет точных данных"}</b><small>{Number(user.legacy_estimated_count || 0) ? `Оценка legacy: ${usdFromMicro(user.legacy_net_estimate_micro_usd)}` : ""}</small></span><span><b>{Number(user.ai_operation_count || 0) ? usdFromMicro(user.ai_gross_micro_usd) : "Нет точных данных"}</b><small>{Number(user.legacy_gross_estimated_count || 0) ? `Оценка legacy: ${usdFromMicro(user.legacy_gross_estimate_micro_usd)}` : ""}</small></span></button>)}</div>}
+      {!users.length ? <Empty/> : <div className="admin-table admin-users-table"><div className="admin-row admin-table-head"><span>Пользователь</span><span>Доступ</span><span>Тариф</span><span>Токены</span><span>Проекты / генерации</span><span>NET</span><span>GROSS</span></div>{users.map((user) => <button className="admin-row" key={user.id} onClick={() => onOpen(user.id)}><span><b>{[user.first_name, user.last_name].filter(Boolean).join(" ") || "Без имени"}</b><small>{user.email}<br/>{user.company_role || "Компания не указана"}</small></span><span><b>{user.global_role}</b><small>{user.memberships?.map((membership: any) => `${membership.name}: ${membership.role}`).join(" · ") || "Без tenant membership"}</small></span><span>{user.plan_name}</span><span>{nf.format(Number(user.token_balance || 0))}</span><span><b>{nf.format(Number(user.project_count || 0))} / {nf.format(Number(user.generation_count || 0))}</b><small>за выбранный период</small></span><span><CostValues exactCount={user.ai_operation_count} exactValue={user.ai_net_micro_usd} estimatedCount={user.legacy_estimated_count} estimatedValue={user.legacy_net_estimate_micro_usd}/></span><span><CostValues exactCount={user.ai_operation_count} exactValue={user.ai_gross_micro_usd} estimatedCount={user.legacy_gross_estimated_count} estimatedValue={user.legacy_gross_estimate_micro_usd}/></span></button>)}</div>}
     </Panel>
   </>;
 }

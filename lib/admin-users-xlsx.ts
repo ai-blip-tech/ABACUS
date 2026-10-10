@@ -39,7 +39,7 @@ export async function createAdminUsersXlsx(report: Report, tenantName: string) {
   const headers = [
     "User", "Email", "Company", "Tenant", "Access", "Plan", "RD token balance", "Projects in period",
     "Generations in period", "Exact ledger ops in period", "RD tokens spent", "Exact NET$", "Exact GROSS$",
-    "Legacy NET estimate$", "Legacy GROSS estimate$", "Provider text input tokens",
+    "Historical NET$", "Historical GROSS$", "Provider text input tokens",
     "Provider image input tokens", "Provider image output tokens",
   ];
   const generatedAt = new Intl.DateTimeFormat("ru-RU", {
@@ -88,7 +88,7 @@ export async function createAdminUsersXlsx(report: Report, tenantName: string) {
       Number(user.input_image_tokens || 0),
       Number(user.output_image_tokens || 0),
     ];
-    rows.push(`<row r="${row}">${values.map((value, column) => cell(row, column, value, column >= 11 && column <= 14 ? 5 : 0)).join("")}</row>`);
+    rows.push(`<row r="${row}">${values.map((value, column) => cell(row, column, value, column === 11 || column === 12 ? 5 : column === 13 || column === 14 ? 6 : 0)).join("")}</row>`);
   });
   const totalRow = firstDataRow + report.users.length;
   const totalValues: unknown[] = [
@@ -105,32 +105,37 @@ export async function createAdminUsersXlsx(report: Report, tenantName: string) {
     report.totals.input_image_tokens,
     report.totals.output_image_tokens,
   ];
-  rows.push(`<row r="${totalRow}" ht="24" customHeight="1">${totalValues.map((value, column) => cell(totalRow, column, value, column >= 11 && column <= 14 ? 6 : 4)).join("")}</row>`);
+  rows.push(`<row r="${totalRow}" ht="24" customHeight="1">${totalValues.map((value, column) => cell(totalRow, column, value, column === 11 || column === 12 ? 7 : column === 13 || column === 14 ? 8 : 4)).join("")}</row>`);
 
   const widths = [24, 30, 24, 24, 32, 14, 17, 18, 20, 21, 18, 14, 14, 20, 22, 24, 25, 26];
   const worksheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:R${totalRow}"/>
   <sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane ySplit="${headerRow}" topLeftCell="A${firstDataRow}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+  <sheetFormatPr defaultRowHeight="15"/>
   <cols>${widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join("")}</cols>
   <sheetData>${rows.join("")}</sheetData>
-  <mergeCells count="1"><mergeCell ref="A1:R1"/></mergeCells>
   <autoFilter ref="A${headerRow}:R${Math.max(headerRow, totalRow - 1)}"/>
+  <mergeCells count="1"><mergeCell ref="A1:R1"/></mergeCells>
+  <pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>
 </worksheet>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <numFmts count="1"><numFmt numFmtId="164" formatCode="$#,##0.000000"/></numFmts>
-  <fonts count="4"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF20211D"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF707168"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts>
+  <fonts count="6"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF20211D"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF707168"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><sz val="10"/><color rgb="FF2F7A35"/><name val="Arial"/></font><font><sz val="10"/><color rgb="FFB12F32"/><name val="Arial"/></font></fonts>
   <fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF252620"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF0F1EA"/><bgColor indexed="64"/></patternFill></fill></fills>
   <borders count="2"><border/><border><bottom style="thin"><color rgb="FFD8D9D2"/></bottom></border></borders>
   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="7">
+  <cellXfs count="9">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
     <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
     <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
     <xf numFmtId="0" fontId="3" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
     <xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
-    <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center"/></xf>
-    <xf numFmtId="164" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="164" fontId="4" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="164" fontId="5" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="164" fontId="4" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="164" fontId="5" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center"/></xf>
   </cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
