@@ -4,6 +4,7 @@ import sharp from "sharp";
 test("template videos advance on the homepage and template catalog", async ({ page }) => {
   for (const path of ["/#templates", "/templates"]) {
     await page.goto(path);
+    await expect(page.locator(".template-status-label, .template-fixture-label, .home-template-triptych > small")).toHaveCount(0);
     for (const slug of ["design-battle", "light-scenarios"]) {
       const video = page.locator(`a[href="/templates/${slug}"] video`).first();
       await expect(video).toBeVisible();
@@ -20,10 +21,12 @@ test("template videos advance on the homepage and template catalog", async ({ pa
         if (Math.abs(beforePixels[index] - afterPixels[index]) > 8) changed += 1;
       }
       const state = await video.evaluate((element: HTMLVideoElement) => ({ duration: element.duration, paused: element.paused, autoplay: element.autoplay }));
+      const filter = await video.evaluate((element: HTMLVideoElement) => window.getComputedStyle(element).filter);
       expect(end).toBeGreaterThan(start + 0.25);
       expect(changed / beforePixels.length).toBeGreaterThan(0.01);
       expect(state.paused).toBe(false);
       expect(state.autoplay).toBe(true);
+      expect(filter).toBe("none");
     }
   }
 });

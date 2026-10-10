@@ -56,6 +56,9 @@ test("homepage and catalog share video-capable template previews", () => {
   assert.match(templatePreviewMediaSource, /playsInline/);
   assert.match(templatePreviewMediaSource, /poster=\{preview\.src\}/);
   assert.match(templatesHomeCssSource, /\.home-template-video-preview/);
+  assert.doesNotMatch(templatesHomeSource, /VIDEO PREVIEW|VIDEO ASSET SLOT/);
+  assert.doesNotMatch(templateCardSource, /status-|template-status-label|template-fixture-label|ВИДЕО СКОРО|Посмотреть preview/);
+  assert.match(templatesCssSource, /\.template-catalog-preview\{[^}]*filter:none/);
 });
 
 test("homepage hero scrubs approved media with scroll and keeps accessible fallbacks", () => {

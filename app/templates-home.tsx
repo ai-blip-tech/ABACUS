@@ -26,7 +26,6 @@ function TemplateTriptych({ template, compact = false }: { template: TemplateDef
             <span>{label}</span>{index === 1 && <i aria-hidden="true">→</i>}
           </div>
         ))}
-      <small>{showVideoPreview ? "VIDEO PREVIEW" : "VIDEO ASSET SLOT"}</small>
     </div>
   );
 }
