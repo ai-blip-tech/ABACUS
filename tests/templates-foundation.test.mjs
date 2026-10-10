@@ -13,6 +13,8 @@ const generateRouteSource = await readFile(new URL("../app/api/generate/route.ts
 const templateAssetsRouteSource = await readFile(new URL("../app/api/account/template-assets/route.ts", import.meta.url), "utf8");
 const templatesCssSource = await readFile(new URL("../app/templates-foundation.css", import.meta.url), "utf8");
 const templatesHomeSource = await readFile(new URL("../app/templates-home.tsx", import.meta.url), "utf8");
+const templateCardSource = await readFile(new URL("../app/templates/template-card.tsx", import.meta.url), "utf8");
+const templatePreviewMediaSource = await readFile(new URL("../app/template-preview-media.tsx", import.meta.url), "utf8");
 const templatesHomeCssSource = await readFile(new URL("../app/templates-home-v2.css", import.meta.url), "utf8");
 const nextConfigSource = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
 
@@ -26,8 +28,8 @@ test("registry contains exactly thirty-five unique versioned templates", () => {
   for (const template of templateRegistry) {
     assert.equal(template.version, 1);
     assert.ok(template.inputSlots.length > 0, `${template.slug} must have input slots`);
-    assert.equal(template.preview.type, "placeholder");
-    assert.match(template.preview.alt, /placeholder/i);
+    assert.ok(template.preview.type === "placeholder" || template.preview.type === "video");
+    assert.ok(template.preview.src);
     assert.notEqual(template.status, "live", `${template.slug} must not be live before its quality gate`);
   }
 });
@@ -36,15 +38,31 @@ test("foundation exposes all reviewable records and the approved featured mix", 
   assert.equal(previewTemplates.length, 35);
   assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "declutter", "moodboard-to-room", "material-preview", "next-chapter", "roast-my-room", "kitchen-cad-to-photo"]);
   assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
+  assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 0\)/);
+  assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 1\)/);
+  assert.match(templatesHomeSource, /matchMedia\("\(max-width: 760px\)"\)/);
+  assert.match(templatesHomeCssSource, /\.home-featured-column\{[^}]*flex-direction:column[^}]*gap:12px/);
 });
 
-test("homepage uses the approved Design Battle video preview", () => {
-  assert.match(templatesHomeSource, /\/media\/templates\/design-battle-preview\.mp4/);
-  assert.match(templatesHomeSource, /showVideoPreview=\{template\.slug === "design-battle"\}/);
-  assert.match(templatesHomeSource, /prefers-reduced-motion: reduce/);
-  assert.match(templatesHomeSource, /muted/);
-  assert.match(templatesHomeSource, /playsInline/);
+test("homepage and catalog share video-capable template previews", () => {
+  const battle = templateRegistry.find((template) => template.slug === "design-battle");
+  assert.equal(battle?.preview.type, "video");
+  assert.equal(battle?.preview.videoSrc, "/media/templates/design-battle-preview.mp4");
+
+  const lightScenarios = templateRegistry.find((template) => template.slug === "light-scenarios");
+  assert.equal(lightScenarios?.preview.type, "video");
+  assert.equal(lightScenarios?.preview.videoSrc, "/media/templates/light-scenarios-preview.mp4");
+  assert.match(templatesHomeSource, /TemplatePreviewMedia/);
+  assert.match(templateCardSource, /TemplatePreviewMedia/);
+  assert.match(templatePreviewMediaSource, /prefers-reduced-motion: reduce/);
+  assert.match(templatePreviewMediaSource, /IntersectionObserver/);
+  assert.match(templatePreviewMediaSource, /muted/);
+  assert.match(templatePreviewMediaSource, /playsInline/);
+  assert.match(templatePreviewMediaSource, /poster=\{preview\.src\}/);
   assert.match(templatesHomeCssSource, /\.home-template-video-preview/);
+  assert.doesNotMatch(templatesHomeSource, /VIDEO PREVIEW|VIDEO ASSET SLOT/);
+  assert.doesNotMatch(templateCardSource, /status-|template-status-label|template-fixture-label|ВИДЕО СКОРО|Посмотреть preview/);
+  assert.match(templatesCssSource, /\.template-catalog-preview\{[^}]*filter:none/);
 });
 
 test("homepage hero scrubs approved media with scroll and keeps accessible fallbacks", () => {
