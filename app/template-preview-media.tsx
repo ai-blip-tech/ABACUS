@@ -50,12 +50,14 @@ export default function TemplatePreviewMedia({ preview, className, sizes, priori
     <video
       ref={videoRef}
       className={className}
+      autoPlay
       muted
       loop
       playsInline
-      preload="metadata"
+      preload="auto"
       poster={preview.src}
       aria-label={preview.alt}
+      onCanPlay={(event) => void event.currentTarget.play().catch(() => undefined)}
       onError={() => setVideoFailed(true)}
     >
       <source src={preview.videoSrc} type={preview.videoMimeType || "video/mp4"} />
