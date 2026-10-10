@@ -124,6 +124,7 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
   }),
   definition({
     id: "15", slug: "light-scenarios", status: "coming_soon", wave: "two", category: "home", sortOrder: 15, featured: true, previewIndex: 0,
+    previewVideoSrc: "/media/templates/light-scenarios-preview.mp4",
     title: "Сценарии света", hook: "Проверь утро, вечер и мягкий свет", description: "Выберите световой сценарий или точную цветовую температуру, не меняя интерьер.", resultType: "image", inputSummary: "Комната + сценарий или Kelvin", badges: [], requiredCapabilities: ["relighting"], requireAnyOf: [["lighting", "temperature"]], exclusiveValueGroups: [["lighting", "temperature"]],
     inputSlots: [
       room(),

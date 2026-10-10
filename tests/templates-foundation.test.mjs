@@ -44,6 +44,10 @@ test("homepage and catalog share video-capable template previews", () => {
   const battle = templateRegistry.find((template) => template.slug === "design-battle");
   assert.equal(battle?.preview.type, "video");
   assert.equal(battle?.preview.videoSrc, "/media/templates/design-battle-preview.mp4");
+
+  const lightScenarios = templateRegistry.find((template) => template.slug === "light-scenarios");
+  assert.equal(lightScenarios?.preview.type, "video");
+  assert.equal(lightScenarios?.preview.videoSrc, "/media/templates/light-scenarios-preview.mp4");
   assert.match(templatesHomeSource, /TemplatePreviewMedia/);
   assert.match(templateCardSource, /TemplatePreviewMedia/);
   assert.match(templatePreviewMediaSource, /prefers-reduced-motion: reduce/);
