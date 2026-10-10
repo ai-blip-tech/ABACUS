@@ -37,17 +37,19 @@ const placeholderImages = [
   "/images/room-design/room-design-projects-dashboard-hero-reference.avif",
 ];
 
-const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "analyticsKey" | "audience"> & { previewIndex: number; audience?: TemplateAudience }): TemplateDefinition => {
-  const { previewIndex, ...template } = value;
+const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "analyticsKey" | "audience"> & { previewIndex: number; previewVideoSrc?: string; audience?: TemplateAudience }): TemplateDefinition => {
+  const { previewIndex, previewVideoSrc, ...template } = value;
   return {
     ...template,
     audience: value.audience || "both",
     version: 1,
     analyticsKey: `template_${template.id}_${template.slug}`,
     preview: {
-      type: "placeholder",
+      type: previewVideoSrc ? "video" : "placeholder",
       src: placeholderImages[previewIndex % placeholderImages.length],
-      alt: `Временный preview placeholder для шаблона «${template.title}»`,
+      alt: previewVideoSrc ? `Видео-превью шаблона «${template.title}»` : `Временный preview placeholder для шаблона «${template.title}»`,
+      videoSrc: previewVideoSrc,
+      videoMimeType: previewVideoSrc ? "video/mp4" : undefined,
     },
   };
 };
@@ -97,7 +99,7 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
     inputSlots: [room(), { id: "scenario", kind: "choice", label: "Выберите следующую главу", helper: "Сценарий задаёт контекст, а не описание личности", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], options: ["Новый дом", "Творческая студия", "Семейное пространство", "Дом у моря"] }, image({ id: "person", kind: "people_images", label: "Добавьте человека или питомца", helper: "Необязательно · подтвердите право использовать фотографию", required: false, minCount: 0, maxCount: 2, consent: "people" })],
   }),
   definition({
-    id: "10", slug: "design-battle", status: "internal", wave: "one", category: "control", sortOrder: 10, featured: true, previewIndex: 0,
+    id: "10", slug: "design-battle", status: "internal", wave: "one", category: "control", sortOrder: 10, featured: true, previewIndex: 0, previewVideoSrc: "/media/templates/design-battle-preview.mp4",
     title: "Дизайн-баттл", hook: "Два решения — одно пространство", description: "Получите два направления в одинаковом ракурсе и сравните их рядом.", resultType: "image_series", inputSummary: "Комната + 2 направления", badges: ["BETA"], requiredCapabilities: ["paired_generation", "series"],
     inputSlots: [room(), { id: "directionA", kind: "short_text", label: "Опишите направление A", helper: "Например: тёплый минимализм", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], placeholder: "Направление A" }, { id: "directionB", kind: "short_text", label: "Опишите направление B", helper: "Например: выразительный модернизм", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], placeholder: "Направление B" }],
   }),

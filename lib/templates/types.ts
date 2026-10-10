@@ -46,10 +46,12 @@ export type TemplateDefinition = {
   requireAnyOf?: string[][];
   exclusiveValueGroups?: string[][];
   preview: {
-    type: "placeholder";
+    type: "placeholder" | "video";
     src: string;
     alt: string;
     position?: string;
+    videoSrc?: string;
+    videoMimeType?: string;
   };
   badges: Array<"NEW" | "VIDEO" | "С ДРУГОМ" | "WILDCARD" | "BETA">;
   requiredCapabilities: string[];

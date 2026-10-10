@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 
+import TemplatePreviewMedia from "@/app/template-preview-media";
 import { resultLabels, statusLabels } from "@/lib/templates/registry";
 import type { TemplateDefinition } from "@/lib/templates/types";
 
@@ -9,8 +9,8 @@ export default function TemplateCard({ template }: { template: TemplateDefinitio
   return (
     <Link className={`template-catalog-card status-${template.status}`} href={`/templates/${template.slug}`}>
       <div className="template-catalog-media">
-        <Image src={template.preview.src} alt={template.preview.alt} fill sizes="(max-width: 720px) 100vw, (max-width: 1100px) 50vw, 33vw" />
-        {process.env.NODE_ENV !== "production" && <span className="template-fixture-label">DEV · PLACEHOLDER</span>}
+        <TemplatePreviewMedia className="template-catalog-preview" preview={template.preview} sizes="(max-width: 720px) 100vw, (max-width: 1100px) 50vw, 33vw" />
+        {template.preview.type === "placeholder" && <span className="template-fixture-label">ВИДЕО СКОРО</span>}
         <b className="template-card-number">{template.id}</b>
         <span className="template-status-label">{statusLabels[template.status]}</span>
       </div>
