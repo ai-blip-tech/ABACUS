@@ -26,7 +26,7 @@ const userShape = (id, email, role, tenantRole) => ({ id, email, role, tenantId:
 const globalToken = await auth.createSession(userShape("global-admin", "global-admin@example.test", "admin", null));
 const ordinaryToken = await auth.createSession(userShape("ordinary", "ordinary@example.test", "user", "member"));
 const tenantAdminToken = await auth.createSession(userShape("tenant-admin", "tenant-admin@example.test", "user", "admin"));
-const request = (token) => new Request("http://localhost/admin", token ? { headers: { cookie: `room_session=${token}` } } : undefined);
+const request = (token) => new Request("https://norr-club.testaimoblernorr.chatgpt.site/admin", token ? { headers: { cookie: `room_session=${token}` } } : undefined);
 
 after(async () => rm(root, { recursive: true, force: true }));
 
@@ -39,7 +39,7 @@ test("global admin authorization denies anonymous, ordinary and tenant admin ses
 
 test("all global admin routes use strict global authorization", async () => {
   const routes = [
-    "overview/route.ts", "users/route.ts", "users/[id]/route.ts", "users/[id]/generations/route.ts", "users/[id]/tokens/route.ts", "users/[id]/plan/route.ts",
+    "overview/route.ts", "users/route.ts", "users/[id]/route.ts", "users/[id]/generations/route.ts", "users/[id]/tokens/route.ts", "users/[id]/plan/route.ts", "users/[id]/tenant/route.ts",
     "plans/route.ts", "token-packages/route.ts", "payments/route.ts", "tenants/route.ts", "generations/route.ts",
     "generations/[id]/route.ts", "settings/route.ts", "token-transactions/route.ts", "tokens/transfer/route.ts", "audit-log/route.ts",
   ];
@@ -76,6 +76,23 @@ test("plan assignment and user detail use existing billing entities", async () =
   assert.equal(detail.account.balance, 375);
   const audit = await database.prepare("SELECT actor_user_id FROM audit_logs WHERE action = 'plan.assign' AND entity_id = 'ordinary'").first();
   assert.equal(audit.actor_user_id, "global-admin");
+});
+
+test("tenant assignment moves ordinary users, revokes sessions and keeps global admins tenantless", async () => {
+  const moved = await admin.assignUserTenant({ adminUserId: "global-admin", userId: "ordinary", tenantId: "tenant_roomdesign" });
+  assert.equal(moved.tenant.slug, "roomdesign");
+  assert.equal(moved.sessionsRevoked, true);
+  const memberships = await database.prepare("SELECT tenant_id, role FROM tenant_memberships WHERE user_id = 'ordinary'").all();
+  assert.equal(memberships.results.length, 1);
+  assert.equal(memberships.results[0].tenant_id, "tenant_roomdesign");
+  assert.equal(memberships.results[0].role, "member");
+  assert.equal((await database.prepare("SELECT COUNT(*) AS count FROM sessions WHERE user_id = 'ordinary'").first()).count, 0);
+  await assert.rejects(() => admin.assignUserTenant({ adminUserId: "global-admin", userId: "global-admin", tenantId: "tenant_norrmobler" }), /Global admin/);
+  await database.prepare("INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at) VALUES ('tenant_norrmobler', 'global-admin', 'member', ?)").bind(now).run();
+  const cleared = await admin.assignUserTenant({ adminUserId: "global-admin", userId: "global-admin", tenantId: null });
+  assert.equal(cleared.sessionsRevoked, false);
+  assert.equal((await database.prepare("SELECT COUNT(*) AS count FROM tenant_memberships WHERE user_id = 'global-admin'").first()).count, 0);
+  assert.equal((await database.prepare("SELECT COUNT(*) AS count FROM audit_logs WHERE action = 'tenant.assign' AND entity_id IN ('ordinary', 'global-admin')").first()).count, 2);
 });
 
 test("admin generation gallery pages records and creates compact thumbnails", async () => {

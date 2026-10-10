@@ -35,7 +35,7 @@ after(async () => {
   await rm(dataRoot, { recursive: true, force: true });
 });
 
-const request = (token) => new Request("http://localhost/api/auth/me", token ? { headers: { cookie: `room_session=${token}` } } : undefined);
+const request = (token) => new Request("https://norr-club.testaimoblernorr.chatgpt.site/api/auth/me", token ? { headers: { cookie: `room_session=${token}` } } : undefined);
 
 async function insertUser({ id, email, password, iterations, membership }) {
   const credential = hashPassword(password, undefined, iterations);
@@ -70,6 +70,10 @@ test("global admin without membership can login, restore a session, and pass req
   assert.equal(requiredAdmin?.email, adminEmail);
   assert.equal((await auth.requireGlobalAdmin(sessionRequest))?.id, requiredAdmin?.id);
   assert.equal(await auth.requireTenantUser(sessionRequest), null);
+  const crossTenantAdmin = await auth.currentUser(new Request("https://roomdesign.com.ru/api/auth/me", { headers: { cookie: `room_session=${token}` } }));
+  assert.equal(crossTenantAdmin?.id, admin.id);
+  assert.equal(crossTenantAdmin?.tenantSlug, "roomdesign");
+  assert.equal(crossTenantAdmin?.tenantRole, null);
 
   const membership = await database.prepare("SELECT COUNT(*) AS count FROM tenant_memberships WHERE user_id = ?")
     .bind(admin.id).first();
@@ -103,4 +107,29 @@ test("tenant admin role does not grant global admin authorization", async () => 
   const token = await auth.createSession(user);
   assert.equal((await auth.requireAdmin(request(token)))?.id, "tenant-admin");
   assert.equal(await auth.requireGlobalAdmin(request(token)), null);
+});
+
+test("direct Room Design traffic and NORR traffic resolve to separate tenants", async () => {
+  const direct = await auth.tenantForRequest(new Request("https://roomdesign.com.ru/api/auth/register"));
+  const directWww = await auth.tenantForRequest(new Request("https://www.roomdesign.com.ru/api/auth/register"));
+  const preview = await auth.tenantForRequest(new Request("http://127.0.0.1:3124/api/auth/register"));
+  const norr = await auth.tenantForRequest(new Request("https://norr-club.testaimoblernorr.chatgpt.site/api/auth/register"));
+  assert.equal(direct.slug, "roomdesign");
+  assert.equal(directWww.slug, "roomdesign");
+  assert.equal(preview.slug, "roomdesign");
+  assert.equal(norr.slug, "norrmobler");
+});
+
+test("direct Room Design registration creates a Room Design membership", async () => {
+  const email = "direct-room-design@example.test";
+  const user = await auth.register(
+    new Request("https://roomdesign.com.ru/api/auth/register"),
+    email,
+    ["test-only", "room-design", "passphrase"].join("-"),
+    { firstName: "Direct" },
+  );
+  assert.equal(user.tenantSlug, "roomdesign");
+  const membership = await database.prepare("SELECT tenant_id, role FROM tenant_memberships WHERE user_id = ?").bind(user.id).first();
+  assert.equal(membership.tenant_id, "tenant_roomdesign");
+  assert.equal(membership.role, "member");
 });

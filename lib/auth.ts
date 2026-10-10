@@ -1,9 +1,12 @@
 import { database, objectStorage } from "./server-runtime.ts";
 import { ensureBillingStore } from "./billing.ts";
 
-const DEFAULT_TENANT_ID = "tenant_norrmobler";
-const DEFAULT_TENANT_SLUG = "norrmobler";
-const PRODUCTION_HOST = "norr-club.testaimoblernorr.chatgpt.site";
+const ROOM_DESIGN_TENANT_ID = "tenant_roomdesign";
+const ROOM_DESIGN_TENANT_SLUG = "roomdesign";
+const NORR_TENANT_ID = "tenant_norrmobler";
+const NORR_TENANT_SLUG = "norrmobler";
+const NORR_PRODUCTION_HOST = "norr-club.testaimoblernorr.chatgpt.site";
+const ROOM_DESIGN_PRODUCTION_HOSTS = ["roomdesign.com.ru", "www.roomdesign.com.ru"];
 
 export type TenantContext = { id: string; slug: string; name: string };
 export type GlobalRole = "user" | "admin";
@@ -105,15 +108,19 @@ export function ensureStore() {
     for (const [name, type] of [["first_name", "TEXT"], ["last_name", "TEXT"], ["phone", "TEXT"], ["company_role", "TEXT"]] as const) await addColumnIfMissing("users", name, type);
 
     const now = new Date().toISOString();
-    await database.prepare("INSERT OR IGNORE INTO tenants (id, slug, name, status, settings_json, created_at, updated_at) VALUES (?, ?, ?, 'active', '{}', ?, ?)").bind(DEFAULT_TENANT_ID, DEFAULT_TENANT_SLUG, "NORR Møbler", now, now).run();
-    await database.prepare("INSERT OR IGNORE INTO tenant_domains (hostname, tenant_id, created_at) VALUES (?, ?, ?)").bind(PRODUCTION_HOST, DEFAULT_TENANT_ID, now).run();
+    await database.batch([
+      database.prepare("INSERT OR IGNORE INTO tenants (id, slug, name, status, settings_json, created_at, updated_at) VALUES (?, ?, ?, 'active', '{}', ?, ?)").bind(ROOM_DESIGN_TENANT_ID, ROOM_DESIGN_TENANT_SLUG, "Room Design", now, now),
+      database.prepare("INSERT OR IGNORE INTO tenants (id, slug, name, status, settings_json, created_at, updated_at) VALUES (?, ?, ?, 'active', '{}', ?, ?)").bind(NORR_TENANT_ID, NORR_TENANT_SLUG, "NORR Møbler", now, now),
+      database.prepare("INSERT INTO tenant_domains (hostname, tenant_id, created_at) VALUES (?, ?, ?) ON CONFLICT(hostname) DO UPDATE SET tenant_id = excluded.tenant_id").bind(NORR_PRODUCTION_HOST, NORR_TENANT_ID, now),
+      ...ROOM_DESIGN_PRODUCTION_HOSTS.map((hostname) => database.prepare("INSERT INTO tenant_domains (hostname, tenant_id, created_at) VALUES (?, ?, ?) ON CONFLICT(hostname) DO UPDATE SET tenant_id = excluded.tenant_id").bind(hostname, ROOM_DESIGN_TENANT_ID, now)),
+    ]);
 
     await database.batch([
-      database.prepare("DELETE FROM tenant_memberships WHERE tenant_id = ? AND role = 'tenant_admin' AND user_id IN (SELECT id FROM users WHERE global_role = 'admin')").bind(DEFAULT_TENANT_ID),
+      database.prepare("DELETE FROM tenant_memberships WHERE user_id IN (SELECT id FROM users WHERE global_role = 'admin')"),
       database.prepare("UPDATE tenant_memberships SET role = 'admin' WHERE role = 'tenant_admin'"),
-      database.prepare("UPDATE sessions SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = ''").bind(DEFAULT_TENANT_ID),
-      database.prepare("UPDATE generations SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = ''").bind(DEFAULT_TENANT_ID),
-      database.prepare("UPDATE projects SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = ''").bind(DEFAULT_TENANT_ID),
+      database.prepare("UPDATE sessions SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = ''").bind(NORR_TENANT_ID),
+      database.prepare("UPDATE generations SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = ''").bind(NORR_TENANT_ID),
+      database.prepare("UPDATE projects SET tenant_id = ? WHERE tenant_id IS NULL OR tenant_id = ''").bind(NORR_TENANT_ID),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_tenant_token ON sessions(tenant_id, token_hash)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_generations_tenant_user_created ON generations(tenant_id, user_id, created_at DESC)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_projects_tenant_user_updated ON projects(tenant_id, user_id, updated_at DESC)"),
@@ -131,7 +138,7 @@ export async function tenantForRequest(request: Request): Promise<TenantContext>
   try { hostname = new URL(request.url).hostname.toLowerCase(); } catch { /* default below */ }
   const tenant = hostname ? await d1().prepare("SELECT tenants.id, tenants.slug, tenants.name FROM tenant_domains JOIN tenants ON tenants.id = tenant_domains.tenant_id WHERE tenant_domains.hostname = ? AND tenants.status = 'active'").bind(hostname).first<TenantContext>() : null;
   if (tenant) return tenant;
-  const fallback = await d1().prepare("SELECT id, slug, name FROM tenants WHERE slug = ? AND status = 'active'").bind(DEFAULT_TENANT_SLUG).first<TenantContext>();
+  const fallback = await d1().prepare("SELECT id, slug, name FROM tenants WHERE slug = ? AND status = 'active'").bind(ROOM_DESIGN_TENANT_SLUG).first<TenantContext>();
   if (!fallback) throw new Error("Организация сайта не настроена.");
   return fallback;
 }
@@ -159,7 +166,7 @@ export async function currentUser(request: Request): Promise<AppUser | null> {
   const tenant = await tenantForRequest(request);
   const token = cookieValue(request);
   if (!token) return null;
-  const row = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, tenant_memberships.role AS tenantRole FROM sessions JOIN users ON users.id = sessions.user_id LEFT JOIN tenant_memberships ON tenant_memberships.tenant_id = sessions.tenant_id AND tenant_memberships.user_id = users.id WHERE sessions.token_hash = ? AND sessions.tenant_id = ? AND sessions.expires_at > ?").bind(await sha256(token), tenant.id, new Date().toISOString()).first<AuthIdentityRow>();
+  const row = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, tenant_memberships.role AS tenantRole FROM sessions JOIN users ON users.id = sessions.user_id LEFT JOIN tenant_memberships ON tenant_memberships.tenant_id = ? AND tenant_memberships.user_id = users.id WHERE sessions.token_hash = ? AND (sessions.tenant_id = ? OR users.global_role = 'admin') AND sessions.expires_at > ?").bind(tenant.id, await sha256(token), tenant.id, new Date().toISOString()).first<AuthIdentityRow>();
   if (!row) return null;
   return userRecord(row, tenant);
 }

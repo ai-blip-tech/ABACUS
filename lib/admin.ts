@@ -126,3 +126,28 @@ export async function assignUserPlan(input: { adminUserId: string; userId: strin
     return sqlite.prepare("SELECT * FROM subscriptions WHERE id = ?").get(id);
   });
 }
+
+export async function assignUserTenant(input: { adminUserId: string; userId: string; tenantId: string | null }) {
+  await ensureBillingStore();
+  const tenantId = input.tenantId?.trim() || null;
+  return database.transaction((sqlite) => {
+    const user = sqlite.prepare("SELECT id, global_role FROM users WHERE id = ?").get(input.userId) as { id: string; global_role: string } | undefined;
+    if (!user) throw new Error("Пользователь не найден.");
+    if (user.global_role === "admin" && tenantId) throw new Error("Global admin относится к платформе Room Design и не может состоять в tenant.");
+    if (user.global_role !== "admin" && !tenantId) throw new Error("Обычный пользователь должен относиться к tenant. Выберите Room Design или другую организацию.");
+    const tenant = tenantId ? sqlite.prepare("SELECT id, slug, name FROM tenants WHERE id = ? AND status = 'active'").get(tenantId) as { id: string; slug: string; name: string } | undefined : null;
+    if (tenantId && !tenant) throw new Error("Tenant не найден или отключён.");
+    const previous = sqlite.prepare("SELECT tenant_id, role FROM tenant_memberships WHERE user_id = ? ORDER BY tenant_id").all(input.userId) as { tenant_id: string; role: string }[];
+    const unchanged = tenantId ? previous.length === 1 && previous[0]?.tenant_id === tenantId && previous[0]?.role === "member" : previous.length === 0;
+    if (unchanged) return { changed: false, tenant, sessionsRevoked: false };
+
+    const now = new Date().toISOString();
+    sqlite.prepare("DELETE FROM tenant_memberships WHERE user_id = ?").run(input.userId);
+    if (tenant) sqlite.prepare("INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at) VALUES (?, ?, 'member', ?)").run(tenant.id, input.userId, now);
+    const sessionsRevoked = input.userId !== input.adminUserId;
+    if (sessionsRevoked) sqlite.prepare("DELETE FROM sessions WHERE user_id = ?").run(input.userId);
+    sqlite.prepare("INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, metadata_json, created_at) VALUES (?, ?, 'tenant.assign', 'user', ?, ?, ?)")
+      .run(crypto.randomUUID(), input.adminUserId, input.userId, JSON.stringify({ previousMemberships: previous, tenantId: tenant?.id || null, tenantSlug: tenant?.slug || null }), now);
+    return { changed: true, tenant, sessionsRevoked };
+  });
+}
