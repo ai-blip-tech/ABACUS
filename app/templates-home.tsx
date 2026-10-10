@@ -30,9 +30,9 @@ function TemplateTriptych({ template, compact = false }: { template: TemplateDef
   );
 }
 
-function EditorialCard({ template, compact = false }: { template: TemplateDefinition; compact?: boolean }) {
+function EditorialCard({ template, compact = false, prominent = false }: { template: TemplateDefinition; compact?: boolean; prominent?: boolean }) {
   return (
-    <Link className={`home-template-card${compact ? " is-compact" : ""}`} href={`/templates/${template.slug}`}>
+    <Link className={`home-template-card${compact ? " is-compact" : ""}${prominent ? " is-prominent" : ""}`} href={`/templates/${template.slug}`}>
       <TemplateTriptych template={template} compact={compact} />
       <div className="home-template-card-copy">
         <div><small>{template.id} / {categoryLabels[template.category]}</small><span>{template.inputSummary}</span></div>
@@ -125,6 +125,16 @@ function ScrollScrubHero({ onStartProject }: { onStartProject: () => void }) {
 
 export default function TemplatesHome({ accountControl, onStartProject }: { accountControl: ReactNode; onStartProject: () => void }) {
   const [audience, setAudience] = useState<TemplateAudience>("personal");
+  const [stackFeatured, setStackFeatured] = useState(false);
+
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 760px)");
+    const updateLayout = () => setStackFeatured(mobile.matches);
+    updateLayout();
+    mobile.addEventListener("change", updateLayout);
+    return () => mobile.removeEventListener("change", updateLayout);
+  }, []);
+
   const matchesAudience = (template: TemplateDefinition) => template.audience === "both" || template.audience === audience;
   const homepagePriority = ["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"];
   const matchedFeatured = [...featuredTemplates].sort((left, right) => {
@@ -133,6 +143,7 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
     return (leftPriority < 0 ? Number.MAX_SAFE_INTEGER : leftPriority) - (rightPriority < 0 ? Number.MAX_SAFE_INTEGER : rightPriority);
   }).filter(matchesAudience);
   const featured = [...matchedFeatured, ...templateRegistry.filter(matchesAudience)].filter((template, index, all) => all.findIndex((item) => item.slug === template.slug) === index).slice(0, 6);
+  const featuredColumns = stackFeatured ? [featured] : [featured.filter((_, index) => index % 2 === 0), featured.filter((_, index) => index % 2 === 1)];
 
   return (
     <main className="templates-home">
@@ -153,7 +164,16 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
           <div className="home-audience-switch" role="group" aria-label="Аудитория шаблонов"><button type="button" aria-pressed={audience === "personal"} onClick={() => setAudience("personal")}>Для себя</button><button type="button" aria-pressed={audience === "professional"} onClick={() => setAudience("professional")}>Для профессионалов</button></div>
           <Link href="/templates">Все шаблоны <span>→</span></Link>
         </div>
-        <div className="home-featured-grid">{featured.map((template, index) => <EditorialCard key={template.slug} template={template} compact={index > 2} />)}</div>
+        <div className={`home-featured-grid${stackFeatured ? " is-stacked" : ""}`}>
+          {featuredColumns.map((column, columnIndex) => (
+            <div className="home-featured-column" key={stackFeatured ? "stacked" : `column-${columnIndex}`}>
+              {column.map((template) => {
+                const index = featured.findIndex((item) => item.slug === template.slug);
+                return <EditorialCard key={template.slug} template={template} compact={index > 2} prominent={index === 0} />;
+              })}
+            </div>
+          ))}
+        </div>
       </section>
 
       {homeSections.map((section, sectionIndex) => {

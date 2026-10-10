@@ -38,6 +38,10 @@ test("foundation exposes all reviewable records and the approved featured mix", 
   assert.equal(previewTemplates.length, 35);
   assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "declutter", "moodboard-to-room", "material-preview", "next-chapter", "roast-my-room", "kitchen-cad-to-photo"]);
   assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
+  assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 0\)/);
+  assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 1\)/);
+  assert.match(templatesHomeSource, /matchMedia\("\(max-width: 760px\)"\)/);
+  assert.match(templatesHomeCssSource, /\.home-featured-column\{[^}]*flex-direction:column[^}]*gap:12px/);
 });
 
 test("homepage and catalog share video-capable template previews", () => {
