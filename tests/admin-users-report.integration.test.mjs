@@ -28,6 +28,16 @@ for (const [id, email, firstName] of [["user-a", "a@example.com", "User A"], ["u
   await database.prepare("INSERT INTO users (id, email, password_hash, password_salt, first_name, created_at) VALUES (?, ?, 'hash', 'salt', ?, ?)").bind(id, email, firstName, now).run();
 }
 await database.prepare("INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at) VALUES ('tenant-norr', 'user-a', 'member', ?), ('tenant-norr', 'user-b', 'member', ?), ('tenant-other', 'user-c', 'member', ?)").bind(now, now, now).run();
+await database.prepare(`INSERT INTO projects (id, user_id, tenant_id, name, created_at, updated_at) VALUES
+  ('project-a-period', 'user-a', 'tenant-norr', 'A period', '2026-10-02T10:00:00.000Z', '2026-10-02T10:00:00.000Z'),
+  ('project-a-old', 'user-a', 'tenant-norr', 'A old', '2026-08-02T10:00:00.000Z', '2026-10-02T10:00:00.000Z'),
+  ('project-b-period', 'user-b', 'tenant-norr', 'B period', '2026-10-07T10:00:00.000Z', '2026-10-07T10:00:00.000Z')`).run();
+await database.prepare(`INSERT INTO generations (
+  id, user_id, tenant_id, operation, prompt, output_key, content_type, input_tokens, output_tokens, total_tokens, brutto_coefficient_snapshot, created_at
+) VALUES
+  ('generation-a-period', 'user-a', 'tenant-norr', 'generate', '', 'a-period.webp', 'image/webp', 100, 200, 300, 2.2, '2026-10-02T10:00:00.000Z'),
+  ('generation-a-old', 'user-a', 'tenant-norr', 'generate', '', 'a-old.webp', 'image/webp', 999, 999, 1998, 2.2, '2026-08-02T10:00:00.000Z'),
+  ('generation-b-period', 'user-b', 'tenant-norr', 'generate', '', 'b-period.webp', 'image/webp', 50, 50, 100, NULL, '2026-10-07T10:00:00.000Z')`).run();
 
 async function ledger(id, userId, tenantId, createdAt, rdTokens, net, gross, coefficient = 2) {
   await database.prepare(`INSERT INTO ai_cost_ledger (
@@ -60,8 +70,18 @@ test("tenant and date filters aggregate only matching immutable ledger entries",
   const userA = report.users.find((user) => user.id === "user-a");
   const userB = report.users.find((user) => user.id === "user-b");
   assert.equal(userA?.ai_operation_count, 2);
+  assert.equal(userA?.project_count, 1);
+  assert.equal(userA?.generation_count, 1);
+  assert.equal(userA?.legacy_net_estimate_micro_usd, 6800);
+  assert.equal(userA?.legacy_gross_estimate_micro_usd, 14960);
   assert.equal(userA?.ai_rd_tokens_charged, 30);
   assert.equal(userB?.ai_operation_count, 1);
+  assert.equal(userB?.project_count, 1);
+  assert.equal(userB?.generation_count, 1);
+  assert.equal(report.totals.project_count, 2);
+  assert.equal(report.totals.generation_count, 2);
+  assert.equal(report.totals.legacy_estimated_count, 2);
+  assert.equal(report.totals.legacy_gross_estimated_count, 1);
   assert.equal(report.totals.ai_operation_count, 3);
   assert.equal(report.totals.ai_rd_tokens_charged, 60);
   assert.equal(report.totals.ai_net_micro_usd, 600);

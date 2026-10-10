@@ -50,12 +50,45 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
       FROM ai_cost_ledger
       WHERE created_at >= ? AND created_at < ? AND (? = '' OR tenant_id = ?)
       GROUP BY user_id
+    ), period_projects AS (
+      SELECT user_id, COUNT(*) AS project_count
+      FROM projects
+      WHERE created_at >= ? AND created_at < ? AND (? = '' OR tenant_id = ?)
+      GROUP BY user_id
+    ), period_generations AS (
+      SELECT generations.user_id,
+        COUNT(*) AS generation_count,
+        SUM(CASE WHEN ai_cost_ledger.id IS NULL THEN 1 ELSE 0 END) AS legacy_generation_count,
+        SUM(CASE WHEN ai_cost_ledger.id IS NULL
+          AND generations.input_tokens IS NOT NULL AND generations.output_tokens IS NOT NULL
+          THEN 1 ELSE 0 END) AS legacy_estimated_count,
+        COALESCE(SUM(CASE WHEN ai_cost_ledger.id IS NULL
+          AND generations.input_tokens IS NOT NULL AND generations.output_tokens IS NOT NULL
+          THEN generations.input_tokens * 8 + generations.output_tokens * 30 ELSE 0 END), 0) AS legacy_net_estimate_micro_usd,
+        COALESCE(SUM(CASE WHEN ai_cost_ledger.id IS NULL
+          AND generations.input_tokens IS NOT NULL AND generations.output_tokens IS NOT NULL
+          AND generations.brutto_coefficient_snapshot IS NOT NULL
+          THEN ROUND((generations.input_tokens * 8 + generations.output_tokens * 30) * generations.brutto_coefficient_snapshot) ELSE 0 END), 0) AS legacy_gross_estimate_micro_usd,
+        SUM(CASE WHEN ai_cost_ledger.id IS NULL
+          AND generations.input_tokens IS NOT NULL AND generations.output_tokens IS NOT NULL
+          AND generations.brutto_coefficient_snapshot IS NOT NULL
+          THEN 1 ELSE 0 END) AS legacy_gross_estimated_count
+      FROM generations
+      LEFT JOIN ai_cost_ledger ON ai_cost_ledger.generation_id = generations.id
+      WHERE generations.created_at >= ? AND generations.created_at < ?
+        AND (? = '' OR generations.tenant_id = ?)
+      GROUP BY generations.user_id
     )
     SELECT users.id, users.email, users.global_role, users.first_name, users.last_name,
       users.company_role, users.created_at, users.last_login_at,
       COALESCE(token_accounts.balance, 0) AS token_balance,
-      (SELECT COUNT(*) FROM projects WHERE projects.user_id = users.id) AS project_count,
-      (SELECT COUNT(*) FROM generations WHERE generations.user_id = users.id) AS generation_count,
+      COALESCE(period_projects.project_count, 0) AS project_count,
+      COALESCE(period_generations.generation_count, 0) AS generation_count,
+      COALESCE(period_generations.legacy_generation_count, 0) AS legacy_generation_count,
+      COALESCE(period_generations.legacy_estimated_count, 0) AS legacy_estimated_count,
+      COALESCE(period_generations.legacy_net_estimate_micro_usd, 0) AS legacy_net_estimate_micro_usd,
+      COALESCE(period_generations.legacy_gross_estimate_micro_usd, 0) AS legacy_gross_estimate_micro_usd,
+      COALESCE(period_generations.legacy_gross_estimated_count, 0) AS legacy_gross_estimated_count,
       COALESCE(period_ledger.ai_operation_count, 0) AS ai_operation_count,
       COALESCE(period_ledger.ai_rd_tokens_charged, 0) AS ai_rd_tokens_charged,
       COALESCE(period_ledger.input_text_tokens, 0) AS input_text_tokens,
@@ -67,10 +100,14 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
     FROM users
     LEFT JOIN token_accounts ON token_accounts.user_id = users.id
     LEFT JOIN period_ledger ON period_ledger.user_id = users.id
+    LEFT JOIN period_projects ON period_projects.user_id = users.id
+    LEFT JOIN period_generations ON period_generations.user_id = users.id
     WHERE (lower(users.email) LIKE ? OR lower(COALESCE(users.first_name, '') || ' ' || COALESCE(users.last_name, '')) LIKE ? OR lower(COALESCE(users.company_role, '')) LIKE ?)
       AND (? = '' OR EXISTS (SELECT 1 FROM tenant_memberships WHERE tenant_memberships.user_id = users.id AND tenant_memberships.tenant_id = ?))
     ORDER BY users.created_at DESC
   `).bind(
+    filter.from, filter.toExclusive, filter.tenantId, filter.tenantId,
+    filter.from, filter.toExclusive, filter.tenantId, filter.tenantId,
     filter.from, filter.toExclusive, filter.tenantId, filter.tenantId,
     query, query, query, filter.tenantId, filter.tenantId,
   ).all<Record<string, unknown>>();
@@ -86,6 +123,8 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
   }));
   const totals = rows.reduce((result, user) => ({
     users: result.users + 1,
+    project_count: result.project_count + Number(user.project_count || 0),
+    generation_count: result.generation_count + Number(user.generation_count || 0),
     ai_operation_count: result.ai_operation_count + Number(user.ai_operation_count || 0),
     ai_rd_tokens_charged: result.ai_rd_tokens_charged + Number(user.ai_rd_tokens_charged || 0),
     input_text_tokens: result.input_text_tokens + Number(user.input_text_tokens || 0),
@@ -93,10 +132,17 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
     output_image_tokens: result.output_image_tokens + Number(user.output_image_tokens || 0),
     ai_net_micro_usd: result.ai_net_micro_usd + Number(user.ai_net_micro_usd || 0),
     ai_gross_micro_usd: result.ai_gross_micro_usd + Number(user.ai_gross_micro_usd || 0),
+    legacy_generation_count: result.legacy_generation_count + Number(user.legacy_generation_count || 0),
+    legacy_estimated_count: result.legacy_estimated_count + Number(user.legacy_estimated_count || 0),
+    legacy_net_estimate_micro_usd: result.legacy_net_estimate_micro_usd + Number(user.legacy_net_estimate_micro_usd || 0),
+    legacy_gross_estimate_micro_usd: result.legacy_gross_estimate_micro_usd + Number(user.legacy_gross_estimate_micro_usd || 0),
+    legacy_gross_estimated_count: result.legacy_gross_estimated_count + Number(user.legacy_gross_estimated_count || 0),
   }), {
-    users: 0, ai_operation_count: 0, ai_rd_tokens_charged: 0,
+    users: 0, project_count: 0, generation_count: 0, ai_operation_count: 0, ai_rd_tokens_charged: 0,
     input_text_tokens: 0, input_image_tokens: 0, output_image_tokens: 0,
     ai_net_micro_usd: 0, ai_gross_micro_usd: 0,
+    legacy_generation_count: 0, legacy_estimated_count: 0,
+    legacy_net_estimate_micro_usd: 0, legacy_gross_estimate_micro_usd: 0, legacy_gross_estimated_count: 0,
   });
   const coefficient = await database.prepare(`
     SELECT COUNT(DISTINCT gross_coefficient_snapshot) AS variants,
