@@ -55,9 +55,12 @@ async function insertUser({ id, email, password, iterations, membership }) {
 }
 
 test("global admin without membership can login, restore a session, and pass requireAdmin", async () => {
+  await database.prepare("INSERT INTO projects (id, user_id, tenant_id, name, project_type, created_at, updated_at) VALUES ('admin-existing-project', (SELECT id FROM users WHERE email = ?), 'tenant_norrmobler', 'Existing project', 'Квартира', ?, ?)")
+    .bind(adminEmail, new Date().toISOString(), new Date().toISOString()).run();
   const admin = await auth.login(request(), adminEmail, adminPassword);
   assert.equal(admin.role, "admin");
   assert.equal(admin.tenantRole, null);
+  assert.equal(admin.tenantSlug, "norrmobler");
 
   const token = await auth.createSession(admin);
   const sessionRequest = request(token);
@@ -69,10 +72,10 @@ test("global admin without membership can login, restore a session, and pass req
   assert.equal(current?.tenantRole, null);
   assert.equal(requiredAdmin?.email, adminEmail);
   assert.equal((await auth.requireGlobalAdmin(sessionRequest))?.id, requiredAdmin?.id);
-  assert.equal(await auth.requireTenantUser(sessionRequest), null);
+  assert.equal((await auth.requireTenantUser(sessionRequest))?.id, admin.id);
   const crossTenantAdmin = await auth.currentUser(new Request("https://roomdesign.com.ru/api/auth/me", { headers: { cookie: `room_session=${token}` } }));
   assert.equal(crossTenantAdmin?.id, admin.id);
-  assert.equal(crossTenantAdmin?.tenantSlug, "roomdesign");
+  assert.equal(crossTenantAdmin?.tenantSlug, "norrmobler");
   assert.equal(crossTenantAdmin?.tenantRole, null);
 
   const membership = await database.prepare("SELECT COUNT(*) AS count FROM tenant_memberships WHERE user_id = ?")
