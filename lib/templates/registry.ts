@@ -37,8 +37,8 @@ const placeholderImages = [
   "/images/room-design/room-design-projects-dashboard-hero-reference.avif",
 ];
 
-const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "analyticsKey" | "audience"> & { previewIndex: number; previewVideoSrc?: string; audience?: TemplateAudience }): TemplateDefinition => {
-  const { previewIndex, previewVideoSrc, ...template } = value;
+const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "analyticsKey" | "audience"> & { previewIndex: number; previewPosterSrc?: string; previewVideoSrc?: string; audience?: TemplateAudience }): TemplateDefinition => {
+  const { previewIndex, previewPosterSrc, previewVideoSrc, ...template } = value;
   return {
     ...template,
     audience: value.audience || "both",
@@ -46,7 +46,7 @@ const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "ana
     analyticsKey: `template_${template.id}_${template.slug}`,
     preview: {
       type: previewVideoSrc ? "video" : "placeholder",
-      src: placeholderImages[previewIndex % placeholderImages.length],
+      src: previewPosterSrc || placeholderImages[previewIndex % placeholderImages.length],
       alt: previewVideoSrc ? `Видео-превью шаблона «${template.title}»` : `Временный preview placeholder для шаблона «${template.title}»`,
       videoSrc: previewVideoSrc,
       videoMimeType: previewVideoSrc ? "video/mp4" : undefined,
@@ -156,8 +156,10 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
     inputSlots: [room(), { id: "storageNeed", kind: "short_text", label: "Что нужно хранить", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], placeholder: "Например: книги, одежда и документы" }],
   }),
   definition({
-    id: "19", slug: "moodboard-to-room", status: "coming_soon", wave: "two", category: "make_yours", sortOrder: 19, featured: true, previewIndex: 4,
-    title: "Мудборд в комнате", hook: "Переведи направление в реальный интерьер", description: "Перенесите палитру, материалы и настроение мудборда в своё пространство.", resultType: "image", inputSummary: "Комната + мудборд", badges: [], requiredCapabilities: ["multi_reference", "style_transfer"],
+    id: "19", slug: "moodboard-to-room", status: "internal", wave: "two", category: "make_yours", sortOrder: 19, featured: true, previewIndex: 4,
+    previewPosterSrc: "/media/templates/moodboard-to-room-hero-poster.png",
+    previewVideoSrc: "/media/templates/moodboard-to-room-hero.mp4",
+    title: "Мудборд в комнате", hook: "Перенеси направление в интерьер — или собери мудборд", description: "Перенесите палитру и материалы в своё пространство или соберите самостоятельный material moodboard из референсов.", ctaLabel: "Открыть режимы", resultType: "image", inputSummary: "Комната + мудборд / до 16 материалов", badges: ["BETA"], requiredCapabilities: ["multi_reference", "style_transfer", "material_board"],
     inputSlots: [room(), reference("moodboard", "Добавьте мудборд", "Один цельный коллаж или до четырёх референсов", 1, 4)],
   }),
   definition({
@@ -252,7 +254,7 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
   }),
 ];
 
-const templatePriority = ["design-battle", "light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"];
+const templatePriority = ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "declutter", "furniture-casting"];
 
 export const templateRegistry: TemplateDefinition[] = [...unorderedTemplateRegistry]
   .sort((left, right) => {

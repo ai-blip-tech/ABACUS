@@ -5,7 +5,7 @@ test("template videos advance on the homepage and template catalog", async ({ pa
   for (const path of ["/#templates", "/templates"]) {
     await page.goto(path);
     await expect(page.locator(".template-status-label, .template-fixture-label, .home-template-triptych > small")).toHaveCount(0);
-    for (const slug of ["design-battle", "light-scenarios"]) {
+    for (const slug of ["design-battle", "light-scenarios", "moodboard-to-room"]) {
       const video = page.locator(`a[href="/templates/${slug}"] video`).first();
       await expect(video).toBeVisible();
       await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState)).toBeGreaterThanOrEqual(2);

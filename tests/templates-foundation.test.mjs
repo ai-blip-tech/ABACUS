@@ -24,7 +24,7 @@ test("registry contains exactly thirty-five unique versioned templates", () => {
   assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 35);
   for (const removed of ["memory-room", "home-swap", "architectural-xray", "window-portal", "inside-the-walls", "house-awake"]) assert.equal(templateRegistry.some((template) => template.slug === removed), false);
   assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 35 }, (_, index) => index + 1));
-  assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "use-what-you-have", "declutter", "moodboard-to-room"]);
+  assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "declutter", "furniture-casting"]);
   for (const template of templateRegistry) {
     assert.equal(template.version, 1);
     assert.ok(template.inputSlots.length > 0, `${template.slug} must have input slots`);
@@ -36,7 +36,7 @@ test("registry contains exactly thirty-five unique versioned templates", () => {
 
 test("foundation exposes all reviewable records and the approved featured mix", () => {
   assert.equal(previewTemplates.length, 35);
-  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "furniture-casting", "declutter", "moodboard-to-room", "material-preview", "next-chapter", "roast-my-room", "kitchen-cad-to-photo"]);
+  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "declutter", "furniture-casting", "material-preview", "next-chapter", "roast-my-room", "kitchen-cad-to-photo"]);
   assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
   assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 0\)/);
   assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 1\)/);
@@ -125,6 +125,34 @@ test("light scenarios offers an exclusive preset-or-kelvin control and preserves
   assert.match(scenarioWorkbenchSource, /exclusiveValueGroups/);
 });
 
+test("moodboard template supports room transfer and a sixteen-reference editorial composition mode", () => {
+  const template = templateRegistry.find((item) => item.slug === "moodboard-to-room");
+  assert.ok(template);
+  assert.equal(template.status, "internal");
+  assert.match(template.inputSummary, /16 материалов/);
+  assert.match(scenarioWorkbenchSource, /type MoodboardMode = "room" \| "compose"/);
+  assert.match(scenarioWorkbenchSource, /maxCount: 16/);
+  assert.match(scenarioWorkbenchSource, /Собрать мудборд/);
+  assert.match(scenarioWorkbenchSource, /moodboard-builder/);
+  assert.match(scenarioWorkbenchSource, /1024x1536/);
+  assert.match(generateRouteSource, /isMoodboardComposition/);
+  assert.match(generateRouteSource, /Images 1–\$\{templateReferenceImages\.length \+ 1\} are equal material and visual references/);
+  assert.match(generateRouteSource, /never substitute or invent a material/);
+  assert.match(generateRouteSource, /maxTemplateReferenceImages = isMoodboardComposition \? 15 : 10/);
+  assert.match(templatesCssSource, /\.editorial-mode-switch/);
+  assert.match(templatesCssSource, /\.editorial-result-stage\.is-moodboard-stage/);
+});
+
+test("moodboard uses its approved video as a catalog and homepage cover, not inside the workspace", () => {
+  const template = templateRegistry.find((item) => item.slug === "moodboard-to-room");
+  assert.equal(template?.preview.type, "video");
+  assert.equal(template?.preview.videoSrc, "/media/templates/moodboard-to-room-hero.mp4");
+  assert.equal(template?.preview.src, "/media/templates/moodboard-to-room-hero-poster.png");
+  assert.doesNotMatch(detailSource, /TemplatePreviewMedia|preview\.videoSrc/);
+  assert.match(templateCardSource, /TemplatePreviewMedia/);
+  assert.match(templatesHomeSource, /TemplatePreviewMedia/);
+});
+
 test("kitchen CAD preview enforces required materials and Geometry Lock", () => {
   const template = templateRegistry.find((item) => item.slug === "kitchen-cad-to-photo");
   assert.ok(template);
@@ -201,7 +229,7 @@ test("editorial workbench uses one point per active image and one final generati
   assert.doesNotMatch(editorialWorkbenchSource, /Предметы добавляются последовательно/);
   assert.doesNotMatch(editorialWorkbenchSource, /setProgress|\$\{progress\}%/);
   assert.match(editorialWorkbenchSource, /elapsedSeconds/);
-  assert.match(generateRouteSource, /body\.furnitureCasting \? 360_000 : 180_000/);
+  assert.match(generateRouteSource, /body\.furnitureCasting \|\| isMoodboardComposition \? 360_000 : 180_000/);
   assert.match(editorialWorkbenchSource, /Открыть готовый рендер/);
   assert.match(editorialWorkbenchSource, /title="История генераций"/);
   assert.doesNotMatch(editorialWorkbenchSource, /Provider usage|Стоимость Room Design|tokenCost|X-Room-AI/);

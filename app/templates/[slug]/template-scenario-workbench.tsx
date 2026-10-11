@@ -14,11 +14,30 @@ type LightboxState = { items: GenerationItem[]; index: number };
 type User = { id: string; email: string };
 type Phase = "idle" | "processing" | "failed";
 type SurfacePoint = { x: number; y: number; displayX: number; displayY: number };
+type MoodboardMode = "room" | "compose";
 
 const isValueSlot = (slot: TemplateInputSlot) => slot.kind === "choice" || slot.kind === "short_text" || slot.kind === "range";
 const isImage = (file: UploadedFile) => file.type.startsWith("image/");
 const surfacePointColors = ["#2f8f5b", "#2f69b0", "#c47b22", "#8b4da5"];
 const surfacePointColorNames = ["зелёные", "синие", "янтарные", "фиолетовые"];
+const moodboardMaterialSlot: TemplateInputSlot = {
+  id: "moodboardMaterials",
+  kind: "reference_image",
+  label: "Добавьте материалы и референсы",
+  helper: "От 2 до 16 изображений · паркет, обои, ткань, дерево, камень, металл и другие образцы",
+  required: true,
+  minCount: 2,
+  maxCount: 16,
+  acceptedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+  maxBytes: 15 * 1024 * 1024,
+  allowReorder: true,
+};
+const moodboardCompositionBrief = [
+  "Собрать из всех загруженных изображений один цельный профессиональный material moodboard.",
+  "Каждый исходный материал должен остаться узнаваемым по реальному цвету, рисунку, зерну, ворсу, блеску и фактуре; не подменять образцы и не придумывать отсутствующие материалы.",
+  "Композиция как в референсе: премиальный editorial flat-lay на тёплом светлом фоне, физические образцы разной формы и масштаба частично перекрывают друг друга, мягкий направленный дневной свет и естественные контактные тени.",
+  "Можно добавить только небольшие не подписанные цветовые выкрасы, извлечённые из загруженных материалов. Не создавать комнату, цифровую сетку, одинаковые карточки, технический каталог, текст, логотипы или водяные знаки.",
+].join(" ");
 const imageTypeByExtension: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const normalizedFileType = (file: Pick<File, "name" | "type">) => {
   const type = file.type.toLowerCase();
@@ -164,8 +183,18 @@ const generationCount = (template: TemplateDefinition, outputLabels: string[], u
 };
 
 export default function TemplateScenarioWorkbench({ template }: { template: TemplateDefinition }) {
-  const scenario = useMemo(() => getTemplateWorkbenchScenario(template), [template]);
-  const fileSlots = useMemo(() => template.inputSlots.filter((slot) => !isValueSlot(slot)), [template]);
+  const supportsMoodboardModes = template.slug === "moodboard-to-room";
+  const [moodboardMode, setMoodboardMode] = useState<MoodboardMode>("room");
+  const baseScenario = useMemo(() => getTemplateWorkbenchScenario(template), [template]);
+  const isMoodboardComposition = supportsMoodboardModes && moodboardMode === "compose";
+  const scenario = useMemo(() => isMoodboardComposition ? {
+    actionLabel: "Собрать мудборд",
+    resultTitle: "Готовый мудборд",
+    outputLabels: ["Материальный мудборд"],
+    generationBrief: moodboardCompositionBrief,
+  } : baseScenario, [baseScenario, isMoodboardComposition]);
+  const activeInputSlots = useMemo(() => isMoodboardComposition ? [moodboardMaterialSlot] : template.inputSlots, [isMoodboardComposition, template.inputSlots]);
+  const fileSlots = useMemo(() => activeInputSlots.filter((slot) => !isValueSlot(slot)), [activeInputSlots]);
   const primarySlot = fileSlots[0];
   const [uploads, setUploads] = useState<Record<string, UploadedFile[]>>({});
   const [values, setValues] = useState<Record<string, string>>({});
@@ -214,7 +243,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
           .map((generation: { id: string; created_at: string; prompt: string }) => ({
             id: generation.id,
             batchId: generation.prompt.match(/batch:([^;\]]+)/)?.[1]?.trim() || `legacy:${generation.created_at.slice(0, 16)}`,
-            label: generation.prompt.match(/output:([^\]]+)/)?.[1]?.trim() || scenario.resultTitle,
+            label: generation.prompt.match(/output:([^\]]+)/)?.[1]?.trim() || baseScenario.resultTitle,
             dataUrl: `/api/account/generations/${generation.id}`,
             createdAt: generation.created_at,
           }));
@@ -223,7 +252,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     };
     void load().catch(() => { if (active) setAuthChecked(true); });
     return () => { active = false; };
-  }, [scenario.resultTitle, template.slug]);
+  }, [baseScenario.resultTitle, template.slug]);
 
   useEffect(() => {
     if (phase !== "processing") return;
@@ -252,9 +281,9 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     setLightbox({ items: ordered, index: Math.max(0, ordered.findIndex((item) => item.id === id)) });
   };
 
-  const validationErrors = useMemo(() => {
+  const validationErrors = (() => {
     const issues: string[] = [];
-    for (const slot of template.inputSlots) {
+    for (const slot of activeInputSlots) {
       if (isValueSlot(slot)) {
         if (slot.required && !values[slot.id]?.trim()) issues.push(`${slot.label}: заполните поле.`);
         continue;
@@ -264,9 +293,9 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       if (count > slot.maxCount) issues.push(`${slot.label}: максимум ${slot.maxCount}.`);
       if (count && slot.consent && slot.consent !== "none" && !consents[slot.id]) issues.push(`${slot.label}: подтвердите согласие.`);
     }
-    for (const group of template.requireAnyOf || []) {
+    for (const group of isMoodboardComposition ? [] : template.requireAnyOf || []) {
       if (!group.some((id) => Boolean(values[id]?.trim()) || Boolean(uploads[id]?.length))) {
-        const labels = group.map((id) => template.inputSlots.find((slot) => slot.id === id)?.label.toLowerCase()).filter(Boolean);
+        const labels = group.map((id) => activeInputSlots.find((slot) => slot.id === id)?.label.toLowerCase()).filter(Boolean);
         issues.push(labels.length ? `${labels.join(" или ")}: выберите один вариант.` : "Добавьте хотя бы один из предложенных материалов.");
       }
     }
@@ -276,19 +305,26 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       for (const [index, material] of facadeMaterials.entries()) {
         if (!surfacePoints[material.id]?.length) issues.push(`Фактура фасадов ${index + 1}: поставьте хотя бы одну ${surfacePointColorNames[index]} точку на CAD-виде.`);
       }
-      const referenceCount = template.inputSlots.filter((slot) => !isValueSlot(slot) && slot.id !== primarySlot?.id).reduce((total, slot) => total + (uploads[slot.id]?.length || 0), 0);
+      const referenceCount = activeInputSlots.filter((slot) => !isValueSlot(slot) && slot.id !== primarySlot?.id).reduce((total, slot) => total + (uploads[slot.id]?.length || 0), 0);
       if (referenceCount > 10) issues.push("Для одной генерации можно использовать до 10 изображений материалов и техники. Уберите лишние референсы.");
     }
     if (template.safetyPolicy === "geometry-lock" && hasGeometryLockConflict(values.additionalPrompt || "")) {
       issues.push("Дополнительный prompt просит изменить геометрию кухни. В режиме Geometry Lock можно менять только окружение, свет и визуальную подачу.");
     }
     return issues;
-  }, [consents, facadeMaterials, primarySlot?.id, surfacePoints, template.inputSlots, template.requireAnyOf, template.safetyPolicy, uploads, usesFacadePointMapping, values]);
+  })();
 
   const ready = validationErrors.length === 0 && Boolean(user) && generationConfigured && phase !== "processing";
   const primaryFiles = uploads[primarySlot?.id] || [];
   const stageImage = latestResults[0]?.dataUrl || primaryFiles.find(isImage)?.dataUrl;
   const activeSurfaceMaterialIndex = facadeMaterials.findIndex((material) => material.id === activeSurfaceMaterialId);
+
+  const selectMoodboardMode = (mode: MoodboardMode) => {
+    if (phase === "processing" || mode === moodboardMode) return;
+    setMoodboardMode(mode);
+    setLatestResults([]);
+    setError("");
+  };
 
   const addSurfacePoint = (event: MouseEvent<HTMLButtonElement>) => {
     if (!usesFacadePointMapping || !activeSurfaceMaterialId || latestResults.length || phase === "processing") return;
@@ -326,7 +362,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
   const setInputValue = (slotId: string, value: string) => {
     setValues((current) => {
       const next = { ...current, [slotId]: value };
-      for (const group of template.exclusiveValueGroups || []) {
+      for (const group of isMoodboardComposition ? [] : template.exclusiveValueGroups || []) {
         if (!group.includes(slotId)) continue;
         for (const otherId of group) if (otherId !== slotId) delete next[otherId];
       }
@@ -412,9 +448,9 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     setPhase("processing");
     try {
       const primaryDataUrl = await resolveDataUrl(primary);
-      const allImages = template.inputSlots.flatMap((slot) => uploads[slot.id] || []).filter((file) => file.id !== primary.id && isImage(file));
-      const referenceImages = await Promise.all(allImages.slice(0, 10).map(resolveDataUrl));
-      const fieldBrief = template.inputSlots.map((slot) => {
+      const allImages = activeInputSlots.flatMap((slot) => uploads[slot.id] || []).filter((file) => file.id !== primary.id && isImage(file));
+      const referenceImages = await Promise.all(allImages.slice(0, isMoodboardComposition ? 15 : 10).map(resolveDataUrl));
+      const fieldBrief = activeInputSlots.map((slot) => {
         if (isValueSlot(slot)) return values[slot.id]?.trim() ? `${slot.label}: ${values[slot.id].trim()}` : "";
         const files = uploads[slot.id] || [];
         return files.length ? `${slot.label}: ${files.map((file) => file.name).join(", ")}` : "";
@@ -438,12 +474,12 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
             prompt: `${historyMarker} ${scenario.generationBrief}`,
             roomImage: primaryDataUrl,
             templateEdit: {
-              templateId: template.slug,
+              templateId: isMoodboardComposition ? "moodboard-builder" : template.slug,
               outputLabel: label,
               referenceImages,
               instructions: `${scenario.generationBrief}\n${fieldBrief}\n${surfaceAssignmentBrief}\nCreate only the result «${label}».`,
             },
-            outputSize: "1536x1024",
+            outputSize: isMoodboardComposition ? "1024x1536" : "1536x1024",
           }),
         });
         if (!response.ok) {
@@ -463,6 +499,10 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
 
   return <section className="editorial-workbench editorial-scenario-workbench" id="workspace" aria-labelledby="scenario-workbench-title">
     <h2 className="sr-only" id="scenario-workbench-title">Рабочая область {template.title}</h2>
+    {supportsMoodboardModes && <div className="editorial-mode-switch" role="group" aria-label="Режим работы с мудбордом">
+      <button type="button" className={moodboardMode === "room" ? "is-active" : ""} aria-pressed={moodboardMode === "room"} disabled={phase === "processing"} onClick={() => selectMoodboardMode("room")}><span>01</span><b>Перенести в комнату</b><small>Фото комнаты + мудборд или референсы</small></button>
+      <button type="button" className={moodboardMode === "compose" ? "is-active" : ""} aria-pressed={moodboardMode === "compose"} disabled={phase === "processing"} onClick={() => selectMoodboardMode("compose")}><span>02</span><b>Собрать мудборд</b><small>До 16 материалов в одной editorial-композиции</small></button>
+    </div>}
     <div className="editorial-workbench-grid">
       <div className="editorial-source-column">
         {template.safetyPolicy === "geometry-lock" && <aside className="editorial-geometry-lock" aria-label="Ограничения Geometry Lock">
@@ -471,7 +511,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
           <p>Фиксируем камеру, модули, фасады, столешницу, ручки и расположение техники. Меняются только материалы, свет, окружение и качество изображения.</p>
           <small>PREVIEW · назначение поверхностей подтверждается вручную</small>
         </aside>}
-        {template.inputSlots.map((slot, index) => <section className="editorial-source-panel editorial-dynamic-panel" key={slot.id}>
+        {activeInputSlots.map((slot, index) => <section className="editorial-source-panel editorial-dynamic-panel" key={slot.id}>
           <header><span>{index + 1}.</span><div><h3>{slot.label}{!isValueSlot(slot) && <b> ({uploads[slot.id]?.length || 0}/{slot.maxCount})</b>}</h3><p>{slot.helper || (slot.required ? "Обязательный материал" : "Необязательно")}</p></div></header>
           {isValueSlot(slot) ? slot.kind === "choice" ? <div className="editorial-choice-grid">{slot.options?.map((option) => <button className={values[slot.id] === option ? "is-selected" : ""} aria-pressed={values[slot.id] === option} type="button" key={option} onClick={() => setInputValue(slot.id, option)}>{option}</button>)}</div> : slot.kind === "range" ? <RangeControl slot={slot} value={values[slot.id] || ""} onChange={(value) => setInputValue(slot.id, value)} /> : <textarea className="editorial-text-input" value={values[slot.id] || ""} placeholder={slot.placeholder} onChange={(event) => setInputValue(slot.id, event.target.value)} /> : <>
             <div className={`editorial-dynamic-files${slot.id === primarySlot?.id ? " is-primary" : ""}${draggedAssetId && canAddHistoryToSlot(assetHistory.find((file) => file.id === draggedAssetId), slot) ? " is-drop-ready" : ""}${dropTargetSlotId === slot.id ? " is-drop-active" : ""}`} onDragOver={(event) => allowHistoryDrop(event, slot)} onDragLeave={() => setDropTargetSlotId("")} onDrop={(event) => dropHistoryAsset(event, slot)}>
@@ -502,9 +542,9 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
 
       <section className="editorial-result-panel" aria-label="Результат">
         <header><p>РЕЗУЛЬТАТ</p><span>GOOD ROOMS<br />BETTER LIVES</span></header>
-        <div className={`editorial-result-stage${latestResults.length ? " has-result" : ""}${usesFacadePointMapping && activeSurfaceMaterialId && !latestResults.length ? " is-surface-placing" : ""}`}>
+        <div className={`editorial-result-stage${latestResults.length ? " has-result" : ""}${isMoodboardComposition ? " is-moodboard-stage" : ""}${usesFacadePointMapping && activeSurfaceMaterialId && !latestResults.length ? " is-surface-placing" : ""}`}>
           {latestResults.length > 1 ? <div className={`editorial-result-collection count-${Math.min(latestResults.length, 4)}`}>{latestResults.map((item) => <button type="button" key={item.id} onClick={() => openLightbox(latestResults, item.id)}><img src={item.dataUrl} alt={item.label} /><span>{item.label}</span></button>)}</div> : stageImage ? <button type="button" onClick={latestResults[0] ? () => openLightbox(latestResults, latestResults[0].id) : addSurfacePoint} aria-label={latestResults[0] ? "Открыть результат" : usesFacadePointMapping && activeSurfaceMaterialId ? `Поставить ${surfacePointColorNames[activeSurfaceMaterialIndex]} точку на фасад` : "Основное изображение"}><img src={stageImage} alt={latestResults[0]?.label || "Основное изображение"} />{usesFacadePointMapping && !latestResults.length && facadeMaterials.flatMap((material, materialIndex) => (surfacePoints[material.id] || []).map((point, pointIndex) => <span className="editorial-surface-point" style={{ left: `${point.displayX}%`, top: `${point.displayY}%`, "--surface-point-color": surfacePointColors[materialIndex] } as CSSProperties} key={`${material.id}-${pointIndex}`}>{pointIndex + 1}</span>))}</button> : <div className="editorial-result-empty"><b>ROOM DESIGN</b><p>Добавьте исходные материалы — здесь появится результат сценария.</p></div>}
-          {phase === "processing" && <div className="editorial-result-progress" role="status"><i /><b>Создаём {scenario.outputLabels.length > 1 ? "варианты" : "результат"} · {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, "0")}</b><p>Все варианты создаются из одного набора исходных материалов.</p></div>}
+          {phase === "processing" && <div className="editorial-result-progress" role="status"><i /><b>{isMoodboardComposition ? "Собираем мудборд" : `Создаём ${scenario.outputLabels.length > 1 ? "варианты" : "результат"}`} · {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, "0")}</b><p>{isMoodboardComposition ? "Сохраняем реальные цвета, рисунки и фактуры всех выбранных материалов." : "Все варианты создаются из одного набора исходных материалов."}</p></div>}
           {phase === "failed" && <div className="editorial-result-error" role="alert"><b>Результат не создан</b><p>{error || "Попробуйте запустить сценарий ещё раз."}</p></div>}
         </div>
         <footer><h3>{latestResults.length ? scenario.resultTitle : primaryFiles.length ? "Исходники готовы" : "Здесь появится результат"}</h3>{latestResults.length > 1 && <span>{latestResults.length} варианта</span>}</footer>

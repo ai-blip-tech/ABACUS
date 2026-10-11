@@ -140,6 +140,57 @@ test("success sends clean plus marked images, never a segmentation mask, and cha
   }
 });
 
+test("moodboard builder accepts sixteen equal image references in one provider request", async () => {
+  const id = "success-moodboard-builder";
+  const before = await balance();
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    calls += 1;
+    assert.equal(url, "https://api.openai.com/v1/images/edits");
+    assert.equal(options.body.getAll("image[]").length, 16);
+    assert.equal(options.body.get("size"), "1024x1536");
+    const providerPrompt = String(options.body.get("prompt"));
+    assert.match(providerPrompt, /Images 1–16 are equal material and visual references/);
+    assert.match(providerPrompt, /never substitute or invent a material/);
+    assert.match(providerPrompt, /Do not create an interior room/);
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 41, output_tokens: 22, total_tokens: 63 } });
+  };
+  const response = await POST(request({
+    operation: "global_edit",
+    prompt: "[template:moodboard-to-room; output:Материальный мудборд] Собрать material moodboard",
+    roomImage: png,
+    outputSize: "1024x1536",
+    templateEdit: {
+      templateId: "moodboard-builder",
+      instructions: "Собрать все материалы в одну editorial-композицию.",
+      outputLabel: "Материальный мудборд",
+      referenceImages: Array.from({ length: 15 }, () => png),
+    },
+  }, id));
+  assert.equal(response.status, 200);
+  assert.equal(calls, 1);
+  assert.equal(await generationCount(id), 1);
+  assert.equal(await balance(), before - (await billing.quoteAiOperation("global_edit")).tokenCost);
+});
+
+test("moodboard builder rejects a seventeenth input before reserve or provider", async () => {
+  globalThis.fetch = () => { throw new Error("Provider must not be called"); };
+  const before = await balance();
+  const response = await POST(request({
+    operation: "global_edit",
+    prompt: "Слишком много материалов",
+    roomImage: png,
+    templateEdit: {
+      templateId: "moodboard-builder",
+      instructions: "Собрать мудборд.",
+      outputLabel: "Материальный мудборд",
+      referenceImages: Array.from({ length: 16 }, () => png),
+    },
+  }, "moodboard-too-many"));
+  assert.equal(response.status, 400);
+  assert.equal(await balance(), before);
+});
+
 test("furniture casting sends every item in one provider request and stores one final generation", async () => {
   const id = "success-furniture-casting";
   const before = await balance();

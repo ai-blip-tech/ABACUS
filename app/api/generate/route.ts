@@ -81,8 +81,20 @@ async function generateResponse(request: Request) {
     "Change only what the instruction requires. Preserve all unrelated architecture, furniture, materials, lighting, people, perspective, and composition.",
     "Return a photorealistic full-frame result. No text, logos, or watermark unless the user's instruction explicitly requires existing text to remain.",
   ].join("\n") : "";
-  const templateReferenceImages = (body.templateEdit?.referenceImages || []).slice(0, 10);
-  const templateEditPrompt = body.templateEdit?.instructions ? [
+  const isMoodboardComposition = body.templateEdit?.templateId === "moodboard-builder";
+  const rawTemplateReferenceImages = body.templateEdit?.referenceImages || [];
+  const maxTemplateReferenceImages = isMoodboardComposition ? 15 : 10;
+  const templateReferenceImages = rawTemplateReferenceImages.slice(0, maxTemplateReferenceImages);
+  const templateEditPrompt = body.templateEdit?.instructions ? (isMoodboardComposition ? [
+    "Create one premium vertical editorial material moodboard from all supplied source images.",
+    `Images 1–${templateReferenceImages.length + 1} are equal material and visual references. There is no primary room image and no image may be treated as an architectural scene to preserve.`,
+    "Represent every supplied reference exactly once as a recognisable physical sample. Preserve its actual dominant colours, pattern, grain, weave, pile, reflectivity and surface character; never substitute or invent a material that is not visible in the inputs.",
+    "Arrange the samples as a tactile, professionally art-directed flat-lay on a warm ivory background. Use varied sample shapes and scales, controlled overlaps, balanced asymmetry, soft directional daylight and believable contact shadows.",
+    "Optional colour swatches must be unlabelled and derived only from colours visible in the supplied references.",
+    body.templateEdit.instructions,
+    "Do not create an interior room, furniture scene, digital grid, row of identical cards, technical catalogue, text, labels, logos, hands, people or watermark.",
+    "Return exactly one coherent full-frame moodboard.",
+  ].join("\n") : [
     "Create one polished photorealistic Room Design result for the supplied Template scenario.",
     "Image 1 is the primary source and must remain the authoritative camera, architecture, proportions and spatial context.",
     templateReferenceImages.length ? `Images 2–${templateReferenceImages.length + 1} are supporting references. Use each only for the role described by the brief.` : "There are no supporting reference images.",
@@ -91,7 +103,7 @@ async function generateResponse(request: Request) {
     body.templateEdit.instructions,
     "Preserve unrelated architecture and content. Return exactly one coherent full-frame result.",
     "No people unless supplied with consent, no added text, no logos, no watermark.",
-  ].join("\n") : "";
+  ].join("\n")) : "";
   const materialPrompt = body.material ? [
     "Use image 1 as the clean completed interior.",
     "Image 2 is the same interior with a temporary crosshair marker. Identify the complete semantic object or surface containing the marker centre. The marker must not appear in the result.",
@@ -204,7 +216,7 @@ async function generateResponse(request: Request) {
       if (operation === "global_edit" && !body.globalEdit?.instruction?.trim() && !body.templateEdit?.instructions?.trim()) throw new Error("Опишите изменение изображения.");
       if (body.templateEdit) {
         if (!/^[a-z0-9-]{1,80}$/.test(body.templateEdit.templateId || "")) throw new Error("Некорректный идентификатор Template.");
-        if (templateReferenceImages.length > 10) throw new Error("Можно использовать не более десяти референсов.");
+        if (rawTemplateReferenceImages.length > maxTemplateReferenceImages) throw new Error(isMoodboardComposition ? "Для одного мудборда можно использовать не более 16 изображений." : "Можно использовать не более десяти референсов.");
         for (const [index, source] of templateReferenceImages.entries()) await validatedEditImage(source, `референс ${index + 1}`);
       }
       if (body.furnitureCasting) {
@@ -293,9 +305,9 @@ async function generateResponse(request: Request) {
       refunded = true;
     }
   };
-  const providerTimeout = ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(body.furnitureCasting ? 360_000 : 180_000) : undefined;
+  const providerTimeout = ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(body.furnitureCasting || isMoodboardComposition ? 360_000 : 180_000) : undefined;
   const providerTimedOut = (error?: unknown) => providerTimeout?.aborted || error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-  const providerTimeoutMessage = body.furnitureCasting ? "Создание единого рендера заняло больше 6 минут. Попробуйте ещё раз с фотографиями меньшего размера." : "Сервис генерации не ответил вовремя. Попробуйте ещё раз.";
+  const providerTimeoutMessage = body.furnitureCasting ? "Создание единого рендера заняло больше 6 минут. Попробуйте ещё раз с фотографиями меньшего размера." : isMoodboardComposition ? "Сборка мудборда заняла больше 6 минут. Попробуйте ещё раз с меньшим количеством или размером изображений." : "Сервис генерации не ответил вовремя. Попробуйте ещё раз.";
 
   let response: Response;
   try {
