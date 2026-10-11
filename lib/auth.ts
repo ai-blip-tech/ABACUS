@@ -27,6 +27,8 @@ type AuthIdentityRow = Omit<AppUser, "tenantId" | "tenantSlug" | "tenantRole"> &
   password_iterations?: number;
 };
 
+type ActiveMembership = TenantContext & { tenantRole: string };
+
 const encoder = new TextEncoder();
 const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 const fromB64 = (value: string) => Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), (character) => character.charCodeAt(0));
@@ -163,17 +165,32 @@ const userRecord = (row: AuthIdentityRow | null, tenant: TenantContext) => row ?
   firstName: row.firstName || "", lastName: row.lastName || "", phone: row.phone || "", companyRole: row.companyRole || "",
 } : null;
 
+async function activeMembershipForUser(userId: string, preferredTenantId = "") {
+  return d1().prepare(`
+    SELECT tenants.id, tenants.slug, tenants.name, tenant_memberships.role AS tenantRole
+    FROM tenant_memberships
+    JOIN tenants ON tenants.id = tenant_memberships.tenant_id
+    WHERE tenant_memberships.user_id = ? AND tenants.status = 'active'
+    ORDER BY CASE WHEN tenant_memberships.tenant_id = ? THEN 0 ELSE 1 END,
+      tenant_memberships.created_at DESC, tenants.id
+    LIMIT 1
+  `).bind(userId, preferredTenantId).first<ActiveMembership>();
+}
+
 export async function currentUser(request: Request): Promise<AppUser | null> {
-  const tenant = await tenantForRequest(request);
+  const requestTenant = await tenantForRequest(request);
   const token = cookieValue(request);
   if (!token) return null;
-  const row = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, tenant_memberships.role AS tenantRole, sessions.tenant_id AS sessionTenantId FROM sessions JOIN users ON users.id = sessions.user_id LEFT JOIN tenant_memberships ON tenant_memberships.tenant_id = ? AND tenant_memberships.user_id = users.id WHERE sessions.token_hash = ? AND (sessions.tenant_id = ? OR users.global_role = 'admin') AND sessions.expires_at > ?").bind(tenant.id, await sha256(token), tenant.id, new Date().toISOString()).first<AuthIdentityRow>();
+  const row = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, NULL AS tenantRole, sessions.tenant_id AS sessionTenantId FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?").bind(await sha256(token), new Date().toISOString()).first<AuthIdentityRow>();
   if (!row) return null;
-  if (row.role === "admin" && row.sessionTenantId && row.sessionTenantId !== tenant.id) {
+  if (row.role === "admin" && row.sessionTenantId) {
     const workspaceTenant = await d1().prepare("SELECT id, slug, name FROM tenants WHERE id = ? AND status = 'active'").bind(row.sessionTenantId).first<TenantContext>();
     if (workspaceTenant) return userRecord(row, workspaceTenant);
   }
-  return userRecord(row, tenant);
+  if (row.role === "admin") return userRecord(row, requestTenant);
+  const membership = await activeMembershipForUser(row.id, row.sessionTenantId || "");
+  if (!membership) return null;
+  return userRecord({ ...row, tenantRole: membership.tenantRole }, membership);
 }
 
 export async function register(request: Request, email: string, password: string, profile: RegistrationProfile) {
@@ -199,16 +216,19 @@ export async function register(request: Request, email: string, password: string
 }
 
 export async function login(request: Request, email: string, password: string) {
-  const tenant = await tenantForRequest(request);
-  const user = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, users.password_hash, users.password_salt, users.password_algorithm, users.password_iterations, tenant_memberships.role AS tenantRole FROM users JOIN auth_identities ON auth_identities.user_id = users.id AND auth_identities.provider = 'password' LEFT JOIN tenant_memberships ON tenant_memberships.user_id = users.id AND tenant_memberships.tenant_id = ? WHERE users.email = ?").bind(tenant.id, normalizeEmail(email)).first<AuthIdentityRow>();
+  const requestTenant = await tenantForRequest(request);
+  const user = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, users.password_hash, users.password_salt, users.password_algorithm, users.password_iterations, NULL AS tenantRole FROM users JOIN auth_identities ON auth_identities.user_id = users.id AND auth_identities.provider = 'password' WHERE users.email = ?").bind(normalizeEmail(email)).first<AuthIdentityRow>();
   if (!user) throw new Error("Неверный email или пароль.");
   if (!await passwordMatches(password, { hash: user.password_hash, salt: user.password_salt, algorithm: user.password_algorithm, iterations: user.password_iterations })) throw new Error("Неверный email или пароль.");
   await d1().prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
   if (user.role === "admin") {
     const workspaceTenant = await d1().prepare("SELECT tenants.id, tenants.slug, tenants.name FROM projects JOIN tenants ON tenants.id = projects.tenant_id WHERE projects.user_id = ? AND tenants.status = 'active' ORDER BY projects.updated_at DESC LIMIT 1").bind(user.id).first<TenantContext>();
     if (workspaceTenant) return userRecord(user, workspaceTenant)!;
+    return userRecord(user, requestTenant)!;
   }
-  return userRecord(user, tenant)!;
+  const membership = await activeMembershipForUser(user.id);
+  if (!membership) throw new Error("Аккаунту не назначена организация. Обратитесь к администратору Room Design.");
+  return userRecord({ ...user, tenantRole: membership.tenantRole }, membership)!;
 }
 
 export async function updateProfile(user: AppUser, profile: RegistrationProfile) {
@@ -266,9 +286,12 @@ export async function requireTenantUser(request: Request) {
 }
 
 export async function userForRequest(request: Request, userId: string) {
-  const tenant = await tenantForRequest(request);
-  const row = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, tenant_memberships.role AS tenantRole FROM users LEFT JOIN tenant_memberships ON tenant_memberships.user_id = users.id AND tenant_memberships.tenant_id = ? WHERE users.id = ?").bind(tenant.id, userId).first<AuthIdentityRow>();
-  return userRecord(row, tenant);
+  const requestTenant = await tenantForRequest(request);
+  const row = await d1().prepare("SELECT users.id, users.email, users.global_role AS role, users.first_name AS firstName, users.last_name AS lastName, users.phone, users.company_role AS companyRole, NULL AS tenantRole FROM users WHERE users.id = ?").bind(userId).first<AuthIdentityRow>();
+  if (!row) return null;
+  if (row.role === "admin") return userRecord(row, requestTenant);
+  const membership = await activeMembershipForUser(row.id);
+  return membership ? userRecord({ ...row, tenantRole: membership.tenantRole }, membership) : null;
 }
 
 export async function recordGeneration(user: AppUser, values: { id?: string; operation: string; prompt: string; outputKey: string; contentType: string; bytes: number; inputTokens?: number | null; outputTokens?: number | null; totalTokens?: number | null; tokenTransactionId?: string | null; tokenCost?: number | null; bruttoCoefficientSnapshot?: number | null }) {

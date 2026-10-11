@@ -36,7 +36,7 @@ export async function beginGoogleLogin(request: Request) {
 
 type GoogleTokenInfo = { sub?: string; email?: string; email_verified?: string; given_name?: string; family_name?: string; aud?: string; iss?: string; exp?: string; error_description?: string };
 
-export async function resolveGoogleIdentity(info: { sub: string; email: string; given_name?: string; family_name?: string }) {
+export async function resolveGoogleIdentity(info: { sub: string; email: string; given_name?: string; family_name?: string }, initialTenantId = "") {
   await ensureStore();
   const email = normalizeEmail(info.email);
   const now = new Date().toISOString();
@@ -48,6 +48,10 @@ export async function resolveGoogleIdentity(info: { sub: string; email: string; 
     const inaccessible = randomValue();
     await database.prepare("INSERT INTO users (id, email, password_hash, password_salt, password_algorithm, password_iterations, global_role, first_name, last_name, created_at) VALUES (?, ?, ?, ?, 'google-only', 600000, 'user', ?, ?, ?)")
       .bind(user.id, email, inaccessible, randomValue(), (info.given_name || "").slice(0, 80), (info.family_name || "").slice(0, 80), now).run();
+    if (initialTenantId) {
+      await database.prepare("INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at) SELECT id, ?, 'member', ? FROM tenants WHERE id = ? AND status = 'active'")
+        .bind(user.id, now, initialTenantId).run();
+    }
   }
   try {
     await database.prepare("INSERT INTO auth_identities (id, user_id, provider, provider_user_id, provider_email, created_at, updated_at) VALUES (?, ?, 'google', ?, ?, ?, ?)")
@@ -67,7 +71,7 @@ export async function finishGoogleLogin(request: Request, code: string, state: s
   if (!config.enabled) throw new Error("Google Sign-In не настроен.");
   if (!code || !state || cookieValue(request, "room_google_state") !== state) throw new Error("Некорректное состояние Google OAuth.");
   const stateHash = await sha256(state);
-  const oauthState = await database.prepare("SELECT code_verifier, redirect_uri, expires_at FROM oauth_states WHERE state_hash = ?").bind(stateHash).first<{ code_verifier: string; redirect_uri: string; expires_at: string }>();
+  const oauthState = await database.prepare("SELECT code_verifier, tenant_id, redirect_uri, expires_at FROM oauth_states WHERE state_hash = ?").bind(stateHash).first<{ code_verifier: string; tenant_id: string; redirect_uri: string; expires_at: string }>();
   if (!oauthState || oauthState.expires_at <= new Date().toISOString()) throw new Error("Google OAuth-сессия истекла.");
   await database.prepare("DELETE FROM oauth_states WHERE state_hash = ?").bind(stateHash).run();
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: oauthState.redirect_uri, grant_type: "authorization_code", code_verifier: oauthState.code_verifier }) });
@@ -76,9 +80,9 @@ export async function finishGoogleLogin(request: Request, code: string, state: s
   const infoResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(tokenPayload.id_token)}`);
   const info = await infoResponse.json() as GoogleTokenInfo;
   if (!infoResponse.ok || !info.sub || !info.email || info.email_verified !== "true" || info.aud !== config.clientId || !["accounts.google.com", "https://accounts.google.com"].includes(info.iss || "") || Number(info.exp || 0) * 1000 <= Date.now()) throw new Error(info.error_description || "Google identity не прошла проверку.");
-  const userId = await resolveGoogleIdentity({ sub: info.sub, email: info.email, given_name: info.given_name, family_name: info.family_name });
+  const userId = await resolveGoogleIdentity({ sub: info.sub, email: info.email, given_name: info.given_name, family_name: info.family_name }, oauthState.tenant_id);
   const appUser = await userForRequest(request, userId);
-  if (!appUser) throw new Error("Не удалось загрузить глобальный аккаунт.");
+  if (!appUser) throw new Error("Аккаунту не назначена организация. Обратитесь к администратору Room Design.");
   const token = await createSession(appUser);
   return { user: appUser, cookie: sessionCookie(token) };
 }

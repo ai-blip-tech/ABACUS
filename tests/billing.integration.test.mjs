@@ -74,13 +74,16 @@ test("failed AI operation refund and duplicate protection preserve balance", asy
 });
 
 test("Google identity creates once and links by verified normalized email", async () => {
-  const created = await google.resolveGoogleIdentity({ sub: "google-new", email: " New@Example.Test ", given_name: "New" });
+  const created = await google.resolveGoogleIdentity({ sub: "google-new", email: " New@Example.Test ", given_name: "New" }, "tenant_roomdesign");
   assert.equal(created, await google.resolveGoogleIdentity({ sub: "google-new", email: "new@example.test" }));
   await user("existing", "existing@example.test");
   const linked = await google.resolveGoogleIdentity({ sub: "google-existing", email: "EXISTING@example.test" });
   assert.equal(linked, "existing");
   assert.equal((await database.prepare("SELECT COUNT(*) AS count FROM users WHERE email IN ('new@example.test', 'existing@example.test')").first()).count, 2);
-  assert.equal((await database.prepare("SELECT COUNT(*) AS count FROM tenant_memberships WHERE user_id IN (?, ?)").bind(created, linked).first()).count, 0);
+  const membership = await database.prepare("SELECT tenant_id, role FROM tenant_memberships WHERE user_id = ?").bind(created).first();
+  assert.equal(membership.tenant_id, "tenant_roomdesign");
+  assert.equal(membership.role, "member");
+  assert.equal((await database.prepare("SELECT COUNT(*) AS count FROM tenant_memberships WHERE user_id = ?").bind(linked).first()).count, 0);
 });
 
 test("payment keeps rate snapshot and paid webhook credits exactly once", async () => {

@@ -139,15 +139,16 @@ export async function assignUserTenant(input: { adminUserId: string; userId: str
     if (tenantId && !tenant) throw new Error("Tenant не найден или отключён.");
     const previous = sqlite.prepare("SELECT tenant_id, role FROM tenant_memberships WHERE user_id = ? ORDER BY tenant_id").all(input.userId) as { tenant_id: string; role: string }[];
     const unchanged = tenantId ? previous.length === 1 && previous[0]?.tenant_id === tenantId && previous[0]?.role === "member" : previous.length === 0;
-    if (unchanged) return { changed: false, tenant, sessionsRevoked: false };
+    if (unchanged) return { changed: false, tenant, sessionsRevoked: false, sessionsUpdated: 0 };
 
     const now = new Date().toISOString();
     sqlite.prepare("DELETE FROM tenant_memberships WHERE user_id = ?").run(input.userId);
     if (tenant) sqlite.prepare("INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at) VALUES (?, ?, 'member', ?)").run(tenant.id, input.userId, now);
-    const sessionsRevoked = input.userId !== input.adminUserId;
-    if (sessionsRevoked) sqlite.prepare("DELETE FROM sessions WHERE user_id = ?").run(input.userId);
+    const sessionsUpdated = tenant
+      ? Number(sqlite.prepare("UPDATE sessions SET tenant_id = ? WHERE user_id = ?").run(tenant.id, input.userId).changes || 0)
+      : 0;
     sqlite.prepare("INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, metadata_json, created_at) VALUES (?, ?, 'tenant.assign', 'user', ?, ?, ?)")
-      .run(crypto.randomUUID(), input.adminUserId, input.userId, JSON.stringify({ previousMemberships: previous, tenantId: tenant?.id || null, tenantSlug: tenant?.slug || null }), now);
-    return { changed: true, tenant, sessionsRevoked };
+      .run(crypto.randomUUID(), input.adminUserId, input.userId, JSON.stringify({ previousMemberships: previous, tenantId: tenant?.id || null, tenantSlug: tenant?.slug || null, sessionsUpdated }), now);
+    return { changed: true, tenant, sessionsRevoked: false, sessionsUpdated };
   });
 }

@@ -35,7 +35,8 @@ after(async () => {
   await rm(dataRoot, { recursive: true, force: true });
 });
 
-const request = (token) => new Request("https://norr-club.testaimoblernorr.chatgpt.site/api/auth/me", token ? { headers: { cookie: `room_session=${token}` } } : undefined);
+const requestAt = (hostname, token) => new Request(`https://${hostname}/api/auth/me`, token ? { headers: { cookie: `room_session=${token}` } } : undefined);
+const request = (token) => requestAt("norr-club.testaimoblernorr.chatgpt.site", token);
 
 async function insertUser({ id, email, password, iterations, membership }) {
   const credential = hashPassword(password, undefined, iterations);
@@ -88,18 +89,23 @@ test("global admin without membership can login, restore a session, and pass req
 
 test("legacy member with 100000 PBKDF2 iterations can login", async () => {
   await insertUser({ id: "legacy-member", email: legacyEmail, password: legacyPassword, iterations: 100_000, membership: true });
-  const user = await auth.login(request(), legacyEmail, legacyPassword);
+  const user = await auth.login(requestAt("roomdesign.com.ru"), legacyEmail, legacyPassword);
   assert.equal(user.role, "user");
   assert.equal(user.tenantRole, "member");
+  assert.equal(user.tenantSlug, "norrmobler");
+  const token = await auth.createSession(user);
+  const restored = await auth.currentUser(requestAt("roomdesign.com.ru", token));
+  assert.equal(restored?.id, "legacy-member");
+  assert.equal(restored?.tenantSlug, "norrmobler");
+  assert.equal((await auth.requireTenantUser(requestAt("roomdesign.com.ru", token)))?.id, "legacy-member");
+  const oauthStyleLookup = await auth.userForRequest(requestAt("roomdesign.com.ru"), "legacy-member");
+  assert.equal(oauthStyleLookup?.tenantSlug, "norrmobler");
+  assert.equal(oauthStyleLookup?.tenantRole, "member");
 });
 
-test("ordinary global user can login globally but cannot use tenant-scoped authorization", async () => {
+test("ordinary user without tenant gets an explicit account configuration error", async () => {
   await insertUser({ id: "orphan-user", email: orphanEmail, password: legacyPassword, iterations: 100_000, membership: false });
-  const user = await auth.login(request(), orphanEmail, legacyPassword);
-  assert.equal(user.tenantRole, null);
-  const token = await auth.createSession(user);
-  assert.equal((await auth.currentUser(request(token)))?.email, orphanEmail);
-  assert.equal(await auth.requireTenantUser(request(token)), null);
+  await assert.rejects(() => auth.login(requestAt("roomdesign.com.ru"), orphanEmail, legacyPassword), /не назначена организация/);
 });
 
 test("tenant admin role does not grant global admin authorization", async () => {
