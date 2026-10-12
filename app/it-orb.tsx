@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import type { ItTurn, ItUiAction, ItVisualState, RoomDesignContext } from "@/lib/it/types";
-import type { OnoWidgetEvent } from "@/lib/it/embed-contract";
-import type { OnoStreamEvent, OnoProgressStage } from "@/lib/it/stream";
 import OnoOrb, { type OnoState } from "./ono-orb";
 
 type TranscriptItem = {
@@ -12,8 +10,6 @@ type TranscriptItem = {
   text: string;
   image?: string;
   products?: ItTurn["products"];
-  visionAnalysis?: ItTurn["visionAnalysis"];
-  sources?: ItTurn["sources"];
 };
 
 type ItOrbProps = {
@@ -21,9 +17,6 @@ type ItOrbProps = {
   onAction: (action: ItUiAction) => void;
   suggestions?: string[];
   closedLabel?: string;
-  brandLabel?: string;
-  headerTitle?: string;
-  onWidgetEvent?: (event: OnoWidgetEvent) => void;
 };
 
 const stateLabel: Record<ItVisualState, string> = {
@@ -67,7 +60,7 @@ const imageAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => 
   reader.readAsDataURL(file);
 });
 
-export default function ItOrb({ context, onAction, suggestions = defaultSuggestions, closedLabel = "Оно", brandLabel = "ROOM DESIGN", headerTitle, onWidgetEvent }: ItOrbProps) {
+export default function ItOrb({ context, onAction, suggestions = defaultSuggestions, closedLabel = "Оно" }: ItOrbProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<ItVisualState>("closed");
   const [value, setValue] = useState("");
@@ -78,9 +71,6 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
   const [orbKeyboardFocused, setOrbKeyboardFocused] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [composerError, setComposerError] = useState("");
-  const [progressLabel, setProgressLabel] = useState("");
-  const [sessionId, setSessionId] = useState("");
-  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [guideOffset, setGuideOffset] = useState<{ x: number; y: number } | null>(null);
   const [messages, setMessages] = useState<TranscriptItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -92,30 +82,13 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioFrameRef = useRef<number | null>(null);
   const guideTimerRef = useRef<number | null>(null);
-  const activeRequestRef = useRef<AbortController | null>(null);
   const openRef = useRef(open);
   const composerPlaceholder = context.template ? "Спросите об этом шаблоне" : context.page === "templates" ? "Опишите задачу — подберу шаблон" : "Спросите о проекте или интерьере";
   const contextLabel = context.template ? `Контекст: ${context.template.title}` : context.page === "templates" ? "Каталог шаблонов известен" : "Контекст страницы включён";
 
   useEffect(() => { openRef.current = open; }, [open]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setIsHistoryLoading(true);
-    fetch("/api/it", { signal: controller.signal, cache: "no-store" })
-      .then(async (response) => {
-        const payload = await response.json() as { sessionId?: string; messages?: Array<{ id: string; role: "user" | "assistant"; text: string; products?: ItTurn["products"] }>; error?: string };
-        if (!response.ok) throw new Error(payload.error || "Не удалось восстановить диалог.");
-        setSessionId(payload.sessionId || "");
-        setMessages((current) => current.length ? current : (payload.messages || []).map((message) => ({ ...message, role: message.role === "assistant" ? "it" : "user" })));
-      })
-      .catch((error) => { if (error instanceof Error && error.name !== "AbortError") setComposerError(error.message); })
-      .finally(() => setIsHistoryLoading(false));
-    return () => controller.abort();
-  }, []);
-
   useEffect(() => () => {
-    activeRequestRef.current?.abort();
     if (audioFrameRef.current) cancelAnimationFrame(audioFrameRef.current);
     void audioContextRef.current?.close().catch(() => undefined);
   }, []);
@@ -161,12 +134,11 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
       if (event.key === "Escape" && open) {
         setOpen(false);
         setState("closed");
-        onWidgetEvent?.({ type: "widget.closed" });
       }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onWidgetEvent, open]);
+  }, [open]);
 
   const ask = async (message: string, image = "") => {
     const text = message.trim() || (image ? "Проанализируй прикреплённое изображение." : "");
@@ -174,29 +146,13 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
     setValue("");
     setPendingImage("");
     setComposerError("");
-    setProgressLabel(image ? "Анализирую изображение" : "Разбираюсь в задаче");
-    onWidgetEvent?.({ type: "ono.message.sent", hasImage: Boolean(image) });
     setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", text, image: image || undefined }]);
     setState(/найди|подбери|каталог/i.test(text) ? "searching" : "thinking");
-    const assistantId = crypto.randomUUID();
-    const requestController = new AbortController();
-    activeRequestRef.current = requestController;
-    const stageState: Record<OnoProgressStage, ItVisualState> = {
-      accepted: "thinking",
-      analyzing: "thinking",
-      thinking: "thinking",
-      searching: "searching",
-      comparing: "searching",
-      finalizing: "speaking",
-    };
     try {
       const response = await fetch("/api/it", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
-        signal: requestController.signal,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requestId: crypto.randomUUID(),
-          sessionId: sessionId || undefined,
           message: text,
           image: image || undefined,
           context,
@@ -208,83 +164,18 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
           })),
         }),
       });
-      if (!response.ok || !response.body) {
-        const payload = await response.json().catch(() => ({})) as { error?: string };
-        throw new Error(payload.error || "Не удалось получить ответ.");
-      }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let hasAssistant = false;
-      let finalTurn: ItTurn | null = null;
-      const applyEvent = (event: OnoStreamEvent) => {
-        if (event.type === "progress") {
-          setProgressLabel(event.label);
-          setState(stageState[event.stage]);
-        } else if (event.type === "text_delta") {
-          if (!hasAssistant) {
-            hasAssistant = true;
-            setMessages((items) => [...items, { id: assistantId, role: "it", text: event.delta }]);
-          } else {
-            setMessages((items) => items.map((item) => item.id === assistantId ? { ...item, text: `${item.text}${event.delta}` } : item));
-          }
-        } else if (event.type === "result") {
-          finalTurn = event.turn;
-          if (event.sessionId) setSessionId(event.sessionId);
-        } else if (event.type === "error") {
-          throw new Error(event.message);
-        }
-      };
-      while (true) {
-        const { value: chunk, done } = await reader.read();
-        buffer += decoder.decode(chunk || new Uint8Array(), { stream: !done });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) if (line.trim()) applyEvent(JSON.parse(line) as OnoStreamEvent);
-        if (done) break;
-      }
-      if (buffer.trim()) applyEvent(JSON.parse(buffer) as OnoStreamEvent);
-      if (!finalTurn) throw new Error("Поток завершился без результата.");
-      const payload = finalTurn as ItTurn;
-      setMessages((items) => {
-        const complete = { id: assistantId, role: "it" as const, text: payload.text, products: payload.products, visionAnalysis: payload.visionAnalysis, sources: payload.sources };
-        return items.some((item) => item.id === assistantId) ? items.map((item) => item.id === assistantId ? complete : item) : [...items, complete];
-      });
+      const payload = await response.json() as ItTurn & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Не удалось получить ответ.");
+      setMessages((items) => [...items, { id: crypto.randomUUID(), role: "it", text: payload.text, products: payload.products }]);
       setState(payload.state);
-      if (payload.products?.length) onWidgetEvent?.({ type: "ono.catalog.results", count: payload.products.length });
-      if (payload.handoffRequested) onWidgetEvent?.({ type: "handoff.requested" });
       payload.actions?.forEach(onAction);
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        setMessages((items) => items.some((item) => item.id === assistantId) ? items : [...items, { id: assistantId, role: "it", text: "Запрос остановлен." }]);
-        setState("idle");
-        return;
-      }
       setMessages((items) => [...items, {
         id: crypto.randomUUID(),
         role: "it",
         text: error instanceof Error ? error.message : "Не удалось ответить. Попробуйте ещё раз.",
       }]);
       setState("error");
-    } finally {
-      if (activeRequestRef.current === requestController) activeRequestRef.current = null;
-      setProgressLabel("");
-    }
-  };
-
-  const newConversation = async () => {
-    if (state === "thinking" || state === "searching") return;
-    try {
-      const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
-      const response = await fetch(`/api/it${query}`, { method: "DELETE" });
-      const payload = await response.json() as { sessionId?: string; error?: string };
-      if (!response.ok) throw new Error(payload.error || "Не удалось начать новый диалог.");
-      setSessionId(payload.sessionId || "");
-      setMessages([]);
-      setComposerError("");
-      setState("idle");
-    } catch (error) {
-      setComposerError(error instanceof Error ? error.message : "Не удалось начать новый диалог.");
     }
   };
 
@@ -311,12 +202,9 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
     try {
       const form = new FormData();
       form.append("audio", blob, blob.type.includes("mp4") ? "message.m4a" : "message.webm");
-      form.append("requestId", crypto.randomUUID());
-      if (sessionId) form.append("sessionId", sessionId);
       const response = await fetch("/api/it/transcribe", { method: "POST", body: form });
-      const payload = await response.json() as { text?: string; sessionId?: string; error?: string };
+      const payload = await response.json() as { text?: string; error?: string };
       if (!response.ok || !payload.text) throw new Error(payload.error || "Не удалось распознать запись.");
-      if (payload.sessionId) setSessionId(payload.sessionId);
       setIsTranscribing(false);
       await ask(payload.text, pendingImage);
     } catch (error) {
@@ -399,7 +287,6 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
   const toggle = () => {
     setOpen((current) => {
       setState(current ? "closed" : "idle");
-      onWidgetEvent?.(current ? { type: "widget.closed" } : { type: "widget.opened", source: "orb" });
       return !current;
     });
   };
@@ -419,13 +306,10 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
         <section className={`it-surface${messages.length === 0 ? " is-empty" : ""}`} aria-label="Разговор с Оно">
           <header className="it-surface-head">
             <div>
-              <span>{headerTitle || (brandLabel ? `ОНО · ${brandLabel}` : "ОНО")}</span>
+              <span>ОНО · ROOM DESIGN</span>
               <p><i aria-hidden="true"/> {stateLabel[state]}</p>
             </div>
-            <div className="it-surface-actions">
-              <button type="button" onClick={() => void newConversation()} disabled={isHistoryLoading || !messages.length} aria-label="Начать новый диалог">Новый диалог</button>
-              <button type="button" onClick={toggle} aria-label="Закрыть Оно">×</button>
-            </div>
+            <button type="button" onClick={toggle} aria-label="Закрыть Оно">×</button>
           </header>
 
           {messages.length > 0 && <div className="it-transcript" ref={transcriptRef} aria-live="polite">
@@ -434,24 +318,10 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
                 <span>{message.role === "it" ? "ОНО" : "ВЫ"}</span>
                 {message.image && <img className="it-message-image" src={message.image} alt="Изображение, прикреплённое к сообщению"/>}
                 <p>{message.text}</p>
-                {message.visionAnalysis && (
-                  <div className="it-vision" aria-label="Наблюдения по изображению">
-                    <b>Вижу на фото</b>
-                    <div>
-                      {[...message.visionAnalysis.categories, ...message.visionAnalysis.colors, ...message.visionAnalysis.materials, ...message.visionAnalysis.styles]
-                        .slice(0, 8)
-                        .map((item) => <span key={item}>{item}</span>)}
-                    </div>
-                    <small>{message.visionAnalysis.requiresConfirmation ? "Спорные признаки уточню перед точным поиском." : `Уверенность: ${message.visionAnalysis.confidence}.`}</small>
-                  </div>
-                )}
                 {message.products && message.products.length > 0 && (
                   <div className="it-products">
                     {message.products.map((product, index) => (
-                      <a key={product.id} href={product.url || undefined} target={product.url ? "_blank" : undefined} rel="noreferrer" onClick={() => {
-                        onWidgetEvent?.({ type: "user.click_product", productId: product.id });
-                        if (product.url) onWidgetEvent?.({ type: "widget.link_opened", href: product.url });
-                      }}>
+                      <a key={product.id} href={product.url || undefined} target={product.url ? "_blank" : undefined} rel="noreferrer">
                         <span className="it-product-index">0{index + 1}</span>
                         <img src={product.image} alt=""/>
                         <div><b>{product.name}</b><small>{product.material || product.color || product.category}</small><strong>{new Intl.NumberFormat("ru-RU").format(product.price)} ₽</strong></div>
@@ -460,16 +330,10 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
                     ))}
                   </div>
                 )}
-                {message.sources && message.sources.length > 0 && (
-                  <div className="it-sources" aria-label="Источники ответа">
-                    <b>Источники</b>
-                    {message.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.title} ↗</a>)}
-                  </div>
-                )}
               </article>
             ))}
             {(state === "thinking" || state === "searching") && (
-              <div className="it-process"><span/><span/><span/><p>{progressLabel || stateLabel[state]}</p><button type="button" onClick={() => activeRequestRef.current?.abort()}>Остановить</button></div>
+              <div className="it-process"><span/><span/><span/><p>{stateLabel[state]}</p></div>
             )}
           </div>}
 
@@ -488,7 +352,7 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
             <input ref={inputRef} value={value} onChange={(event) => setValue(event.target.value)} placeholder={composerPlaceholder} aria-label="Сообщение для Оно"/>
             <button className="it-send" type="submit" disabled={(!value.trim() && !pendingImage) || state === "thinking" || state === "searching" || isRecording || isTranscribing} aria-label="Отправить">↑</button>
           </form>
-          <footer><span>{contextLabel}</span><i/><span>История хранится 30 дней</span></footer>
+          <footer><span>{contextLabel}</span><i/><span>Действия под вашим контролем</span></footer>
         </section>
       )}
 

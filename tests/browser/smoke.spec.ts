@@ -29,7 +29,7 @@ test("landing, auth, projects, account dropdown, account and Studio", async ({ p
   const password = "CrossBrowser123!";
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Пространство начинается/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Ваш интерьер/ })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await page.getByRole("button", { name: "Войти" }).click();
@@ -38,7 +38,7 @@ test("landing, auth, projects, account dropdown, account and Studio", async ({ p
   await page.getByLabel("Имя обязательно").fill("Smoke");
   await page.getByLabel("Email логин").fill(email);
   await page.getByLabel("Пароль", { exact: true }).fill(password);
-  await page.getByRole("dialog", { name: "Вход и регистрация" }).getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
 
   await expect(page.getByRole("heading", { name: /Ваши проекты, Smoke/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Продолжить работу" })).toBeVisible();

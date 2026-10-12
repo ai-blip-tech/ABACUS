@@ -28,7 +28,7 @@ test("Add, Replace and Remove use point-guided routing without segmentation", as
   await page.getByLabel("Имя обязательно").fill("Stable tools");
   await page.getByLabel("Email логин").fill(`stable-tools-${Date.now()}@example.com`);
   await page.getByLabel("Пароль", { exact: true }).fill("StableTools123!");
-  await page.getByRole("dialog", { name: "Вход и регистрация" }).getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.locator(".projects-dashboard-generation").click();
 
   const actions = page.locator(".furniture-action-bar");
@@ -98,7 +98,7 @@ test("Studio keeps history over the canvas and upscale in the first screen", asy
   await page.getByLabel("Имя обязательно").fill("Studio layout");
   await page.getByLabel("Email логин").fill(`studio-layout-${testInfo.project.name}-${Date.now()}@example.com`);
   await page.getByLabel("Пароль", { exact: true }).fill("StudioLayout123!");
-  await page.getByRole("dialog", { name: "Вход и регистрация" }).getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.locator(".projects-dashboard-generation").click();
   await page.getByRole("button", { name: "Сохранённая генерация", exact: true }).click();
 

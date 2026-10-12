@@ -100,7 +100,7 @@ test("commercial proposal saves a newly created project before opening the edito
   await page.getByLabel("Имя обязательно").fill("Proposal save");
   await page.getByLabel("Email логин").fill(email);
   await page.getByLabel("Пароль", { exact: true }).fill("ProposalSave123!");
-  await page.getByRole("dialog", { name: "Вход и регистрация" }).getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.getByRole("button", { name: "Создать проект" }).first().click();
   await page.getByLabel("НАЗВАНИЕ ПРОЕКТА").fill("Новое коммерческое предложение");
   await page.getByRole("button", { name: "Создать проект" }).click();
@@ -176,7 +176,7 @@ test("commercial proposal snapshots the history version selected in Studio", asy
   const reopenedPayload = await reopened.json() as { state: { historyVersions: Array<{ proposalItems?: Array<{ id: string }> }> } };
   expect(reopenedPayload.state.historyVersions[0].proposalItems?.map((item) => item.id)).toEqual(["render-a-sofa"]);
   expect(reopenedPayload.state.historyVersions[1].proposalItems?.map((item) => item.id)).toEqual(["render-b-table"]);
-  await context.route("**/api/catalog?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [
+  await page.route("**/api/catalog?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ products: [
     { id: "old-sofa", name: "Old Sofa", image, images: [image], price: 100000, widthMm: 1900, depthMm: 900 },
     { id: "final-table", name: "Final Table", image, images: [image], price: 70000, widthMm: 900, depthMm: 600 },
   ] }) }));

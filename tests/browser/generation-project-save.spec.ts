@@ -42,7 +42,7 @@ test("a saved generation becomes one reopenable project without duplicate creati
   await page.getByLabel("Имя обязательно").fill("Save flow");
   await page.getByLabel("Email логин").fill(`save-flow-${Date.now()}@example.com`);
   await page.getByLabel("Пароль", { exact: true }).fill("SaveFlow123!");
-  await page.getByRole("dialog", { name: "Вход и регистрация" }).getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
 
   await expect(page.locator(".projects-dashboard-generation")).toBeVisible();
   await page.locator(".projects-dashboard-generation").click();
@@ -257,7 +257,7 @@ test("an uploaded project interior survives reload before a manual save click", 
   await page.getByLabel("Имя обязательно").fill("Reload upload");
   await page.getByLabel("Email логин").fill(`reload-upload-${testInfo.project.name}-${Date.now()}@example.com`);
   await page.getByLabel("Пароль", { exact: true }).fill("ReloadUpload123!");
-  await page.getByRole("dialog", { name: "Вход и регистрация" }).getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.getByRole("button", { name: /Создать проект/ }).first().click();
   await page.getByLabel("НАЗВАНИЕ ПРОЕКТА").fill(projectName);
   await page.getByRole("button", { name: /Создать проект/ }).click();

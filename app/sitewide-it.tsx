@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import ItOrb from "./it-orb";
 import { categoryLabels, getTemplateBySlug, resultLabels, statusLabels } from "@/lib/templates/registry";
 import type { ItUiAction, RoomDesignContext } from "@/lib/it/types";
-import { onoV2Enabled } from "@/lib/it/version";
 
 const emptyWorkspace = {
   isAuthenticated: false,
@@ -125,48 +124,12 @@ function RouteAwareIt({ pathname }: { pathname: string }) {
 
   const suggestions = suggestionsFor(context);
   const closedLabel = context.page === "template" ? "Подскажу по шаблону" : context.page === "templates" ? "Помогу выбрать шаблон" : "Оно";
-  const handleAction = (action: ItUiAction) => {
-    window.dispatchEvent(new CustomEvent("roomdesign:it-action", { detail: action }));
-    if (action.type === "navigate") return;
-    const registeredSelectors: Partial<Record<ItUiAction["target"], string>> = {
-      "templates-catalog": "[data-ono-target='templates-catalog']",
-      "template-light-scenarios": "[data-ono-target='template-light-scenarios']",
-    };
-    const selector = registeredSelectors[action.target];
-    const target = selector ? document.querySelector<HTMLElement>(selector) : null;
-    if (!target) return;
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (action.type === "focus") target.focus({ preventScroll: true });
-    if (action.type === "highlight" || action.type === "guide") {
-      target.classList.add("it-guided-target");
-      window.setTimeout(() => target.classList.remove("it-guided-target"), 4_200);
-    }
-    if (action.type === "guide") {
-      const rect = target.getBoundingClientRect();
-      window.dispatchEvent(new CustomEvent("it:guide", { detail: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } }));
-    }
-  };
+  const handleAction = (action: ItUiAction) => window.dispatchEvent(new CustomEvent("roomdesign:it-action", { detail: action }));
 
   return <ItOrb context={context} onAction={handleAction} suggestions={suggestions} closedLabel={closedLabel}/>;
 }
 
 export default function SitewideIt() {
   const pathname = usePathname();
-  const [runtimeEnabled, setRuntimeEnabled] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/it/config", { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const payload = await response.json() as { enabled?: boolean };
-        setRuntimeEnabled(response.ok && payload.enabled !== false);
-      })
-      .catch((error) => { if (!(error instanceof Error) || error.name !== "AbortError") setRuntimeEnabled(false); });
-    return () => controller.abort();
-  }, []);
-
-  if (!onoV2Enabled()) return null;
-  if (runtimeEnabled !== true) return null;
-  if (pathname.startsWith("/embed/ono")) return null;
   return <RouteAwareIt key={pathname} pathname={pathname}/>;
 }

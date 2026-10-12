@@ -20,7 +20,7 @@ async function sourceFiles(directory) {
 
 test("production build is standard Next.js for Node", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-  assert.equal(packageJson.scripts.build, "next build --webpack");
+  assert.equal(packageJson.scripts.build, "next build");
   assert.equal(packageJson.scripts.start, "next start");
   assert.equal(packageJson.dependencies.next, "16.3.6");
   for (const forbidden of ["vinext", "wrangler", "@cloudflare/vite-plugin", "@openai/sites-vite-plugin"]) {

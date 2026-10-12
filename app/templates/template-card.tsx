@@ -6,7 +6,7 @@ import type { TemplateDefinition } from "@/lib/templates/types";
 
 export default function TemplateCard({ template }: { template: TemplateDefinition }) {
   return (
-    <Link className="template-catalog-card" href={`/templates/${template.slug}`} data-ono-target={template.slug === "light-scenarios" ? "template-light-scenarios" : undefined}>
+    <Link className="template-catalog-card" href={`/templates/${template.slug}`}>
       <div className="template-catalog-media">
         <TemplatePreviewMedia className="template-catalog-preview" preview={template.preview} sizes="(max-width: 720px) 100vw, (max-width: 1100px) 50vw, 33vw" />
         <b className="template-card-number">{template.id}</b>

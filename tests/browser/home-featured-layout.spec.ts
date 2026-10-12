@@ -33,8 +33,8 @@ test("featured templates use independent columns without stretching compact card
   }
 });
 
-test("featured templates preserve source order in one mobile column", async ({ page }, testInfo) => {
-  if (!testInfo.project.name.endsWith("-mobile")) await page.setViewportSize({ width: 390, height: 844 });
+test("featured templates preserve source order in one mobile column", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/#templates");
   const grid = page.locator(".home-featured-grid");
   await expect(grid.locator(".home-featured-column")).toHaveCount(1);

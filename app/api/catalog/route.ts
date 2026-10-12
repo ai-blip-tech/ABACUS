@@ -14,14 +14,12 @@ type CatalogProduct = {
   subtype: string;
   color: string;
   material: string;
-  brand: string;
   widthMm: number | null;
   depthMm: number | null;
   heightMm: number | null;
   description: string;
   parameters: Array<{ name: string; value: string }>;
   _trail?: string;
-  _updatedAt?: string;
 };
 
 type CatalogCache = { expiresAt: number; products: CatalogProduct[] };
@@ -108,7 +106,6 @@ async function loadCatalog() {
   };
 
   const products: CatalogProduct[] = [];
-  const updatedAt = new Date().toISOString();
   for (const match of xml.matchAll(/<offer\s+id="([^"]+)"\s+available="([^"]+)"[^>]*>([\s\S]*?)<\/offer>/gi)) {
     const body = match[3];
     const params: Record<string, string> = {};
@@ -136,14 +133,12 @@ async function loadCatalog() {
       subtype: params["Тип"] || categories.get(categoryId)?.name || "",
       color: params["Цвет"] || params["Цвет корпуса"] || params["Ткань Цвет"] || params["Цвет столешницы"] || "",
       material: params["Материал"] || params["Материал обивки"] || params["Материал корпуса"] || params["Материал столешницы"] || "",
-      brand: params["Бренд"] || params["Производитель"] || "",
       widthMm: centimetersToMillimeters(params["Габаритная ширина"]),
       depthMm: centimetersToMillimeters(params["Габаритная глубина"]),
       heightMm: centimetersToMillimeters(params["Габаритная высота"]),
       description: tag(body, "description"),
       parameters: Object.entries(params).map(([name, value]) => ({ name, value })),
       _trail: categoryTrail(categoryId),
-      _updatedAt: updatedAt,
     });
   }
   catalogCache = { expiresAt: Date.now() + CACHE_TTL, products };
@@ -157,17 +152,7 @@ export async function GET(request: Request) {
   const query = normalize(search.get("q") || "");
   const subtype = normalize(search.get("subtype") || "");
   const availableOnly = search.get("available") === "1";
-  const minPrice = Math.max(0, Number(search.get("minPrice")) || 0);
   const maxPrice = Math.max(0, Number(search.get("maxPrice")) || 0);
-  const color = normalize(search.get("color") || "");
-  const material = normalize(search.get("material") || "");
-  const brand = normalize(search.get("brand") || "");
-  const widthMinMm = Math.max(0, Number(search.get("widthMinMm")) || 0);
-  const widthMaxMm = Math.max(0, Number(search.get("widthMaxMm")) || 0);
-  const depthMinMm = Math.max(0, Number(search.get("depthMinMm")) || 0);
-  const depthMaxMm = Math.max(0, Number(search.get("depthMaxMm")) || 0);
-  const heightMinMm = Math.max(0, Number(search.get("heightMinMm")) || 0);
-  const heightMaxMm = Math.max(0, Number(search.get("heightMaxMm")) || 0);
   const sort = search.get("sort") || "";
   const page = Math.max(1, Number(search.get("page")) || 1);
   const limit = Math.min(30, Math.max(6, Number(search.get("limit")) || 18));
@@ -179,36 +164,22 @@ export async function GET(request: Request) {
       const trail = product._trail || "";
       if (!matchesCatalogType(product, type, trail)) return false;
       if (availableOnly && !product.available) return false;
-      if (minPrice && (!product.price || product.price < minPrice)) return false;
       if (maxPrice && (!product.price || product.price > maxPrice)) return false;
       const haystack = normalize(`${product.name} ${product.article} ${product.subtype} ${product.color} ${product.material}`);
-      if (query && !query.split(" ").every((token) => haystack.includes(token))) return false;
-      if (subtype && !normalize(product.subtype).includes(subtype)) return false;
-      if (color && !normalize(`${product.color} ${product.parameters.filter((item) => /цвет/i.test(item.name)).map((item) => item.value).join(" ")}`).includes(color)) return false;
-      if (material && !normalize(`${product.material} ${product.parameters.filter((item) => /материал|ткань/i.test(item.name)).map((item) => item.value).join(" ")}`).includes(material)) return false;
-      if (brand && !normalize(product.brand).includes(brand)) return false;
-      if (widthMinMm && (!product.widthMm || product.widthMm < widthMinMm)) return false;
-      if (widthMaxMm && (!product.widthMm || product.widthMm > widthMaxMm)) return false;
-      if (depthMinMm && (!product.depthMm || product.depthMm < depthMinMm)) return false;
-      if (depthMaxMm && (!product.depthMm || product.depthMm > depthMaxMm)) return false;
-      if (heightMinMm && (!product.heightMm || product.heightMm < heightMinMm)) return false;
-      if (heightMaxMm && (!product.heightMm || product.heightMm > heightMaxMm)) return false;
-      return true;
+      if (query && !haystack.includes(query)) return false;
+      return !subtype || normalize(product.subtype).includes(subtype);
     });
     if (sort === "price_asc") matched.sort((left, right) => (left.price || Number.POSITIVE_INFINITY) - (right.price || Number.POSITIVE_INFINITY));
-    if (sort === "price_desc") matched.sort((left, right) => (right.price || 0) - (left.price || 0));
     const subtypes = Array.from(new Set(matched.map((product) => product.subtype).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru")).slice(0, 24);
     const start = (page - 1) * limit;
     const selectedProducts = ids.size ? matched.slice(0, 100) : matched.slice(start, start + limit);
     const pageProducts = selectedProducts.map((product) => ({
       id: product.id,
-      sourceId: product.id,
       name: product.name,
       article: product.article,
       image: product.image,
       images: product.images,
       url: product.url,
-      canonicalUrl: product.url,
       price: product.price,
       oldPrice: product.oldPrice,
       available: product.available,
@@ -216,14 +187,11 @@ export async function GET(request: Request) {
       subtype: product.subtype,
       color: product.color,
       material: product.material,
-      brand: product.brand,
       widthMm: product.widthMm,
       depthMm: product.depthMm,
       heightMm: product.heightMm,
       description: product.description,
       parameters: product.parameters,
-      updatedAt: product._updatedAt,
-      provenance: "norrmobler_yml",
     }));
     return Response.json({ products: pageProducts, total: matched.length, page, limit, subtypes });
   } catch {

@@ -27,8 +27,6 @@ jobs:
 
             live_dir="$(pwd)"
             previous_sha="$(git rev-parse HEAD)"
-            env_file="$live_dir/.env"
-            env_backup=""
             echo "PRODUCTION_SHA_BEFORE=${previous_sha}"
             pm2 describe roomdesign
             curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null
@@ -61,10 +59,6 @@ jobs:
               trap - ERR INT TERM
               cleanup_candidate
               cd "$live_dir"
-              if [ -n "$env_backup" ] && [ -f "$env_backup" ]; then
-                cp "$env_backup" "$env_file"
-                echo "PRODUCTION_ENV_RESTORED=${env_backup}"
-              fi
               if [ -n "$rollback_dir" ] && [ -d "$rollback_dir" ]; then
                 if [ -d .next ]; then
                   failed_dir=".next.failed-${release_sha}-$(date +%Y%m%d%H%M%S)"
@@ -79,52 +73,10 @@ jobs:
             }
             trap rollback_release ERR INT TERM
 
-            test -f "$env_file"
-            data_dir="$live_dir/data"
-            test -d "$data_dir"
-            test -f "$data_dir/room-design.sqlite"
-            test "$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$data_dir")" = "$data_dir"
-            env_backup_root="$HOME/room-design-env-backups"
-            mkdir -p "$env_backup_root"
-            env_backup="$env_backup_root/env-pre-ono-${previous_sha}-$(date +%Y%m%d%H%M%S)"
-            cp "$env_file" "$env_backup"
-            chmod 600 "$env_backup"
-            python3 - "$env_file" "$data_dir" <<'PY'
-            from pathlib import Path
-            import sys
-
-            path = Path(sys.argv[1])
-            updates = {
-                "ROOM_DESIGN_DATA_DIR": sys.argv[2],
-                "OPENAI_TEXT_MODEL": "gpt-6.1-sol",
-                "NEXT_PUBLIC_ONO_V2_ENABLED": "true",
-                "ONO_V2_ENABLED": "false",
-            }
-            lines = path.read_text(encoding="utf-8").splitlines()
-            output = []
-            seen = set()
-            for line in lines:
-                key = line.split("=", 1)[0].strip() if "=" in line else ""
-                if key in updates:
-                    if key not in seen:
-                        output.append(f"{key}={updates[key]}")
-                        seen.add(key)
-                else:
-                    output.append(line)
-            for key, value in updates.items():
-                if key not in seen:
-                    output.append(f"{key}={value}")
-            path.write_text("\n".join(output) + "\n", encoding="utf-8")
-            PY
-            chmod 600 "$env_file"
-            grep -qx "ROOM_DESIGN_DATA_DIR=$data_dir" "$env_file"
-            grep -qx 'OPENAI_TEXT_MODEL=gpt-6.1-sol' "$env_file"
-            grep -qx 'NEXT_PUBLIC_ONO_V2_ENABLED=true' "$env_file"
-            grep -qx 'ONO_V2_ENABLED=false' "$env_file"
-            echo "ONO_RELEASE_ENVIRONMENT=prepared-disabled"
-
             git archive HEAD | tar -x -C "$release_dir"
-            cp "$env_file" "$release_dir/.env"
+            if [ -f .env ]; then
+              cp .env "$release_dir/.env"
+            fi
 
             cd "$release_dir"
             npm ci
@@ -140,9 +92,6 @@ jobs:
             curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused "http://127.0.0.1:${candidate_port}/api/health" >/dev/null
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/" >/dev/null
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/account" >/dev/null
-            test "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${candidate_port}/api/it")" = "503"
-            test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST "http://127.0.0.1:${candidate_port}/api/it/transcribe")" = "503"
-            curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/api/it/config" | grep -q '"enabled":false'
             cleanup_candidate
 
             cd "$live_dir"
@@ -158,9 +107,6 @@ jobs:
             curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
-            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/it)" = "503"
-            test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/it/transcribe)" = "503"
-            curl --fail --silent --show-error http://127.0.0.1:3000/api/it/config | grep -q '"enabled":false'
 
             production_html="$(curl --fail --silent --show-error http://127.0.0.1:3000/)"
             production_css="$(printf '%s' "$production_html" | grep -oE '/_next/static/[^\" ]+\.css' | sort -u | while IFS= read -r asset; do curl --fail --silent --show-error "http://127.0.0.1:3000${asset}"; done)"
@@ -169,7 +115,5 @@ jobs:
 
             trap - ERR INT TERM
             echo "ROLLBACK_BUILD=${rollback_dir}"
-            echo "ROLLBACK_ENV=${env_backup}"
-            echo "ONO_SERVER_STATE=disabled"
             echo "PRODUCTION_SHA_AFTER=$(git rev-parse HEAD)"
             pm2 describe roomdesign
