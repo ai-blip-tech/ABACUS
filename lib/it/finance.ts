@@ -32,6 +32,13 @@ const TEXT_PRICING: Record<string, TextPricing> = {
     cachedInputUsd: 1,
     outputUsd: 50,
   },
+  "gpt-4o-mini-transcribe": {
+    version: "openai-audio-2026-10-13",
+    source: "https://developers.openai.com/api/docs/models/gpt-4o-mini-transcribe",
+    inputUsd: 1.25,
+    cachedInputUsd: 0,
+    outputUsd: 5,
+  },
 };
 
 let setupPromise: Promise<void> | null = null;
@@ -79,7 +86,12 @@ export function ensureOnoFinanceStore() {
 
 const integer = (value: unknown) => Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
 
-export function calculateOnoTextCost(model: string, usage: OnoTextUsage, grossCoefficient: number) {
+export function calculateOnoTextCost(
+  model: string,
+  usage: OnoTextUsage,
+  grossCoefficient: number,
+  endpoint = "openai.responses",
+) {
   const pricing = TEXT_PRICING[model];
   const inputTokens = integer(usage.inputTokens);
   const cachedInputTokens = Math.min(inputTokens, integer(usage.cachedInputTokens));
@@ -89,7 +101,7 @@ export function calculateOnoTextCost(model: string, usage: OnoTextUsage, grossCo
     ? Math.round(uncachedInputTokens * pricing.inputUsd + cachedInputTokens * pricing.cachedInputUsd + outputTokens * pricing.outputUsd)
     : null;
   return {
-    pricingSnapshot: pricing ? { ...pricing, model, endpoint: "openai.responses", currency: "USD", unit: "per_million_tokens" } : null,
+    pricingSnapshot: pricing ? { ...pricing, model, endpoint, currency: "USD", unit: "per_million_tokens" } : null,
     netMicroUsd,
     grossMicroUsd: netMicroUsd === null ? null : Math.round(netMicroUsd * grossCoefficient),
   };
@@ -119,6 +131,8 @@ export async function beginOnoFinancialUsage(input: {
   tenantId: string;
   siteId: string;
   model: string;
+  operationType?: "ono_conversation" | "ono_transcription";
+  endpoint?: "openai.responses" | "openai.audio.transcriptions";
 }) {
   await ensureOnoFinanceStore();
   const settings = await getGlobalSettings();
@@ -126,10 +140,11 @@ export async function beginOnoFinancialUsage(input: {
   const result = await database.prepare(`INSERT OR IGNORE INTO ono_cost_ledger (
     id, request_id, session_id, user_id, visitor_id, tenant_id, site_id, operation_type,
     provider, model, endpoint, status, gross_coefficient_snapshot, created_at, completed_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ono_conversation', 'openai', ?, 'openai.responses', 'pending', ?, ?, ?)`)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'openai', ?, ?, 'pending', ?, ?, ?)`)
     .bind(
       crypto.randomUUID(), input.requestId, input.sessionId, input.userId, input.visitorId,
-      input.tenantId, input.siteId, input.model, settings.brutto_coefficient, now, now,
+      input.tenantId, input.siteId, input.operationType || "ono_conversation", input.model,
+      input.endpoint || "openai.responses", settings.brutto_coefficient, now, now,
     ).run();
   return Number(result.meta.changes) > 0;
 }
@@ -140,12 +155,14 @@ export async function completeOnoFinancialUsage(input: {
   status: "succeeded" | "failed";
   usage: OnoTextUsage;
   errorCode?: string | null;
+  endpoint?: "openai.responses" | "openai.audio.transcriptions";
+  usageKnown?: boolean;
 }) {
   await ensureOnoFinanceStore();
   const row = await database.prepare("SELECT gross_coefficient_snapshot FROM ono_cost_ledger WHERE request_id = ?").bind(input.requestId).first<{ gross_coefficient_snapshot: number }>();
   const grossCoefficient = Number(row?.gross_coefficient_snapshot || 1);
-  const cost = calculateOnoTextCost(input.model, input.usage, grossCoefficient);
-  const hasProviderUsage = integer(input.usage.calls) > 0;
+  const cost = calculateOnoTextCost(input.model, input.usage, grossCoefficient, input.endpoint);
+  const hasProviderUsage = input.usageKnown !== false && integer(input.usage.calls) > 0;
   const netMicroUsd = hasProviderUsage ? cost.netMicroUsd : null;
   const grossMicroUsd = hasProviderUsage ? cost.grossMicroUsd : null;
   const now = new Date().toISOString();

@@ -311,9 +311,12 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
     try {
       const form = new FormData();
       form.append("audio", blob, blob.type.includes("mp4") ? "message.m4a" : "message.webm");
+      form.append("requestId", crypto.randomUUID());
+      if (sessionId) form.append("sessionId", sessionId);
       const response = await fetch("/api/it/transcribe", { method: "POST", body: form });
-      const payload = await response.json() as { text?: string; error?: string };
+      const payload = await response.json() as { text?: string; sessionId?: string; error?: string };
       if (!response.ok || !payload.text) throw new Error(payload.error || "Не удалось распознать запись.");
+      if (payload.sessionId) setSessionId(payload.sessionId);
       setIsTranscribing(false);
       await ask(payload.text, pendingImage);
     } catch (error) {
