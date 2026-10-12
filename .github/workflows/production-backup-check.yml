@@ -1,0 +1,404 @@
+name: Verify and back up Room Design production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type BACKUP_ROOM_DESIGN_PRODUCTION to run the read-only production check and backup"
+        required: true
+        type: string
+      expected_production_sha:
+        description: "Full SHA expected to be running in production"
+        required: true
+        default: "ae1cbdc31570a7deabb67fbbd7ed17011e8a8ac9"
+        type: string
+
+permissions:
+  contents: read
+
+# A backup and a deployment must never overlap.
+concurrency:
+  group: roomdesign-production
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Verify production and create a restorable backup
+    if: ${{ inputs.confirmation == 'BACKUP_ROOM_DESIGN_PRODUCTION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production-backup
+    env:
+      BACKUP_RUN_ID: ${{ github.run_id }}
+      BACKUP_RUN_ATTEMPT: ${{ github.run_attempt }}
+      EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+    steps:
+      - name: Validate manual confirmation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirmation }}" = "BACKUP_ROOM_DESIGN_PRODUCTION"
+
+      - name: Verify and back up production over SSH
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+        env:
+          BACKUP_RUN_ID: ${{ env.BACKUP_RUN_ID }}
+          BACKUP_RUN_ATTEMPT: ${{ env.BACKUP_RUN_ATTEMPT }}
+          EXPECTED_PRODUCTION_SHA: ${{ env.EXPECTED_PRODUCTION_SHA }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 40m
+          envs: BACKUP_RUN_ID,BACKUP_RUN_ATTEMPT,EXPECTED_PRODUCTION_SHA
+          script: |
+            set -eu
+            umask 077
+
+            live_dir="$HOME/ABACUS"
+            data_dir="/var/lib/room-design"
+            database_name="room-design.sqlite"
+            backup_root="$HOME/room-design-backups"
+            backup_name="predeploy-${BACKUP_RUN_ID}-${BACKUP_RUN_ATTEMPT}"
+            backup_dir="$backup_root/$backup_name"
+            snapshot_dir="$backup_dir/snapshot"
+            restore_dir="$backup_dir/restore-check"
+            archive_path="$backup_dir/room-design-production.tar.gz"
+            checksum_path="$archive_path.sha256"
+            report_path="$backup_dir/REPORT.txt"
+            counts_path="$snapshot_dir/critical-table-counts.txt"
+            restored_counts_path="$restore_dir/critical-table-counts-restored.txt"
+            env_file="$live_dir/.env"
+            status="FAILED"
+            current_step="initialization"
+            production_sha="unknown"
+            archive_sha="not-created"
+            database_sha="not-created"
+            sqlite_integrity="not-run"
+            restore_integrity="not-run"
+            manifest_status="not-run"
+            model_status="not-run"
+            environment_status="not-run"
+            production_sha_status="not-run"
+            table_counts_status="not-run"
+            readiness_failed="0"
+            data_size="unknown"
+            archive_size="unknown"
+
+            write_report() {
+              mkdir -p "$backup_dir"
+              {
+                echo "Room Design production backup verification"
+                echo "status=$status"
+                echo "run_id=$BACKUP_RUN_ID"
+                echo "run_attempt=$BACKUP_RUN_ATTEMPT"
+                echo "created_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                echo "production_sha=$production_sha"
+                echo "expected_production_sha=$EXPECTED_PRODUCTION_SHA"
+                echo "production_sha_check=$production_sha_status"
+                echo "data_directory=$data_dir"
+                echo "backup_directory=$backup_dir"
+                echo "archive=$archive_path"
+                echo "archive_sha256=$archive_sha"
+                echo "database_sha256=$database_sha"
+                echo "source_size=$data_size"
+                echo "archive_size=$archive_size"
+                echo "sqlite_integrity=$sqlite_integrity"
+                echo "restore_integrity=$restore_integrity"
+                echo "manifest_verification=$manifest_status"
+                echo "critical_table_counts=$table_counts_status"
+                echo "environment_check=$environment_status"
+                echo "gpt_6_1_sol_availability=$model_status"
+                echo "last_step=$current_step"
+                echo "site_restarted=no"
+                echo "source_data_modified=no"
+              } > "$report_path"
+            }
+
+            finish() {
+              result=$?
+              trap - EXIT INT TERM
+              if [ "$result" -eq 0 ]; then
+                status="PASSED"
+              fi
+              write_report
+              rm -rf "$restore_dir"
+              echo "BACKUP_STATUS=$status"
+              echo "BACKUP_DIRECTORY=$backup_dir"
+              echo "BACKUP_REPORT=$report_path"
+              echo "PRODUCTION_SHA=$production_sha"
+              echo "ARCHIVE_SHA256=$archive_sha"
+              echo "SQLITE_INTEGRITY=$sqlite_integrity"
+              echo "RESTORE_INTEGRITY=$restore_integrity"
+              echo "MODEL_GPT_6_1_SOL=$model_status"
+              exit "$result"
+            }
+            trap finish EXIT INT TERM
+
+            current_step="checking prerequisites"
+            for command_name in git pm2 curl python3 rsync tar sha256sum find sort xargs cmp du df awk sed; do
+              command -v "$command_name" >/dev/null 2>&1 || {
+                echo "Required command is unavailable: $command_name" >&2
+                exit 1
+              }
+            done
+
+            test -d "$live_dir"
+            test -d "$data_dir"
+            test -r "$data_dir/$database_name"
+            test -d "$data_dir/storage"
+            test -f "$env_file"
+            test ! -e "$backup_dir"
+            mkdir -p "$snapshot_dir/data" "$restore_dir"
+
+            current_step="checking live application without changing it"
+            cd "$live_dir"
+            production_sha="$(git rev-parse HEAD)"
+            git rev-parse --verify HEAD >/dev/null
+            if [ "$production_sha" = "$EXPECTED_PRODUCTION_SHA" ]; then
+              production_sha_status="passed"
+            else
+              echo "Production SHA does not match the manually confirmed expected SHA." >&2
+              production_sha_status="mismatch"
+              readiness_failed="1"
+            fi
+            pm2 describe roomdesign >/dev/null
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+
+            env_value() {
+              key="$1"
+              sed -n "s/^${key}=//p" "$env_file" | tail -n 1 | sed "s/^['\"]//;s/['\"]$//;s/\r$//"
+            }
+
+            current_step="checking approved production data directory"
+            configured_data_dir="$(env_value ROOM_DESIGN_DATA_DIR)"
+            test "$configured_data_dir" = "$data_dir" || {
+              echo "ROOM_DESIGN_DATA_DIR does not match the approved production path." >&2
+              environment_status="data-directory-mismatch"
+              exit 1
+            }
+            current_step="checking free disk space"
+            data_kib="$(du -sk "$data_dir" | awk '{print $1}')"
+            available_kib="$(df -Pk "$backup_root" | awk 'NR==2 {print $4}')"
+            required_kib="$((data_kib * 3 + 1048576))"
+            data_size="$(du -sh "$data_dir" | awk '{print $1}')"
+            test "$available_kib" -ge "$required_kib" || {
+              echo "Not enough free disk space for snapshot plus isolated restore check." >&2
+              exit 1
+            }
+
+            current_step="copying immutable/object data without modifying source"
+            rsync -a --numeric-ids --safe-links \
+              --exclude "$database_name" \
+              --exclude "$database_name-wal" \
+              --exclude "$database_name-shm" \
+              "$data_dir/" "$snapshot_dir/data/"
+
+            current_step="creating SQLite online backup"
+            python3 - "$data_dir/$database_name" "$snapshot_dir/data/$database_name" <<'PY'
+            import sqlite3
+            import sys
+
+            source_path, destination_path = sys.argv[1:3]
+            source = sqlite3.connect(f"file:{source_path}?mode=ro", uri=True, timeout=30)
+            destination = sqlite3.connect(destination_path, timeout=30)
+            try:
+                source.backup(destination)
+                destination.commit()
+            finally:
+                destination.close()
+                source.close()
+            PY
+
+            current_step="second read-only object-data pass"
+            rsync -a --numeric-ids --safe-links \
+              --exclude "$database_name" \
+              --exclude "$database_name-wal" \
+              --exclude "$database_name-shm" \
+              "$data_dir/" "$snapshot_dir/data/"
+
+            current_step="checking SQLite snapshot integrity"
+            sqlite_integrity="$(python3 - "$snapshot_dir/data/$database_name" <<'PY'
+            import sqlite3
+            import sys
+
+            database = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+            try:
+                print(database.execute("PRAGMA integrity_check").fetchone()[0])
+            finally:
+                database.close()
+            PY
+            )"
+            test "$sqlite_integrity" = "ok"
+            database_sha="$(sha256sum "$snapshot_dir/data/$database_name" | awk '{print $1}')"
+
+            current_step="recording critical table counts"
+            python3 - "$snapshot_dir/data/$database_name" "$counts_path" <<'PY'
+            import sqlite3
+            import sys
+
+            database_path, output_path = sys.argv[1:3]
+            tables = (
+                "users", "projects", "generations", "token_accounts",
+                "token_transactions", "payments", "payment_events",
+                "ai_cost_ledger", "ono_cost_ledger",
+            )
+            database = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
+            try:
+                names = {
+                    row[0]
+                    for row in database.execute(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    )
+                }
+                with open(output_path, "w", encoding="utf-8") as output:
+                    for table in tables:
+                        if table not in names:
+                            output.write(f"{table}=not-present\n")
+                            continue
+                        count = database.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
+                        output.write(f"{table}={count}\n")
+            finally:
+                database.close()
+            PY
+
+            current_step="creating content manifest and archive"
+            (
+              cd "$snapshot_dir"
+              find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256
+            )
+            tar -C "$snapshot_dir" -czf "$archive_path" .
+            archive_sha="$(sha256sum "$archive_path" | awk '{print $1}')"
+            printf '%s  %s\n' "$archive_sha" "$(basename "$archive_path")" > "$checksum_path"
+            archive_size="$(du -sh "$archive_path" | awk '{print $1}')"
+
+            current_step="performing isolated restore rehearsal"
+            tar -xzf "$archive_path" -C "$restore_dir"
+            (
+              cd "$restore_dir"
+              sha256sum -c MANIFEST.sha256 >/dev/null
+            )
+            manifest_status="passed"
+            restore_integrity="$(python3 - "$restore_dir/data/$database_name" <<'PY'
+            import sqlite3
+            import sys
+
+            database = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+            try:
+                print(database.execute("PRAGMA integrity_check").fetchone()[0])
+            finally:
+                database.close()
+            PY
+            )"
+            test "$restore_integrity" = "ok"
+            restored_database_sha="$(sha256sum "$restore_dir/data/$database_name" | awk '{print $1}')"
+            test "$restored_database_sha" = "$database_sha"
+
+            python3 - "$restore_dir/data/$database_name" "$restored_counts_path" <<'PY'
+            import sqlite3
+            import sys
+
+            database_path, output_path = sys.argv[1:3]
+            tables = (
+                "users", "projects", "generations", "token_accounts",
+                "token_transactions", "payments", "payment_events",
+                "ai_cost_ledger", "ono_cost_ledger",
+            )
+            database = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
+            try:
+                names = {
+                    row[0]
+                    for row in database.execute(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    )
+                }
+                with open(output_path, "w", encoding="utf-8") as output:
+                    for table in tables:
+                        if table not in names:
+                            output.write(f"{table}=not-present\n")
+                            continue
+                        count = database.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
+                        output.write(f"{table}={count}\n")
+            finally:
+                database.close()
+            PY
+            cmp "$counts_path" "$restored_counts_path"
+            table_counts_status="passed"
+
+            current_step="checking release environment without printing values"
+            missing_keys=""
+            for key_name in OPENAI_API_KEY OPENAI_TEXT_MODEL ROOM_DESIGN_DATA_DIR NEXT_PUBLIC_ONO_V2_ENABLED ONO_V2_ENABLED; do
+              if ! grep -q "^${key_name}=" "$env_file"; then
+                missing_keys="$missing_keys $key_name"
+              fi
+            done
+            if [ -n "$missing_keys" ]; then
+              echo "Required environment keys are missing:$missing_keys" >&2
+              environment_status="missing-required-keys"
+              readiness_failed="1"
+            else
+              configured_text_model="$(env_value OPENAI_TEXT_MODEL)"
+              configured_public_flag="$(env_value NEXT_PUBLIC_ONO_V2_ENABLED)"
+              configured_server_flag="$(env_value ONO_V2_ENABLED)"
+              openai_key="$(env_value OPENAI_API_KEY)"
+              environment_status="passed"
+
+              if [ "$configured_text_model" != "gpt-6.1-sol" ]; then
+                environment_status="text-model-mismatch"
+                readiness_failed="1"
+              elif [ "$configured_public_flag" != "true" ]; then
+                environment_status="public-flag-not-ready"
+                readiness_failed="1"
+              elif [ "$configured_server_flag" != "true" ]; then
+                environment_status="server-flag-not-ready"
+                readiness_failed="1"
+              elif [ -z "$openai_key" ]; then
+                environment_status="openai-key-empty"
+                readiness_failed="1"
+              fi
+
+              current_step="checking GPT-6.1 Sol availability"
+              if [ -n "$openai_key" ]; then
+                model_response="$backup_dir/model-check.json"
+                model_http_status="$(curl --silent --show-error --output "$model_response" --write-out '%{http_code}' \
+                  --connect-timeout 10 --max-time 30 \
+                  --header "Authorization: Bearer $openai_key" \
+                  "https://api.openai.com/v1/models/gpt-6.1-sol")"
+                openai_key=""
+                rm -f "$model_response"
+                if [ "$model_http_status" = "200" ]; then
+                  model_status="passed"
+                else
+                  model_status="failed-http-$model_http_status"
+                  readiness_failed="1"
+                fi
+              else
+                model_status="not-run-missing-key"
+                readiness_failed="1"
+              fi
+            fi
+
+            rm -rf "$snapshot_dir" "$restore_dir"
+            current_step="completed"
+            test "$readiness_failed" = "0"
+
+      - name: Download sanitized verification report
+        if: always()
+        continue-on-error: true
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "room-design-backups/predeploy-${{ env.BACKUP_RUN_ID }}-${{ env.BACKUP_RUN_ATTEMPT }}/REPORT.txt"
+          target: backup-report
+          strip_components: 2
+
+      - name: Upload sanitized verification report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: room-design-production-backup-report-${{ env.BACKUP_RUN_ID }}-${{ env.BACKUP_RUN_ATTEMPT }}
+          path: backup-report/REPORT.txt
+          if-no-files-found: warn
+          retention-days: 30
