@@ -56,7 +56,7 @@ jobs:
             umask 077
 
             live_dir="$HOME/ABACUS"
-            data_dir="/var/lib/room-design"
+            data_dir="not-resolved"
             database_name="room-design.sqlite"
             backup_root="$HOME/room-design-backups"
             backup_name="predeploy-${BACKUP_RUN_ID}-${BACKUP_RUN_ATTEMPT}"
@@ -182,10 +182,41 @@ jobs:
             echo "PREFLIGHT_OK=required-commands"
 
             require_directory "application" "$live_dir"
+            require_file "environment" "$env_file"
+
+            env_value() {
+              key="$1"
+              sed -n "s/^${key}=//p" "$env_file" | tail -n 1 | sed "s/^['\"]//;s/['\"]$//;s/\r$//"
+            }
+
+            current_step="resolving production data directory"
+            configured_data_dir="$(env_value ROOM_DESIGN_DATA_DIR)"
+            if [ -z "$configured_data_dir" ]; then
+              configured_data_dir="$(env_value DATA_DIR)"
+            fi
+            if [ -z "$configured_data_dir" ]; then
+              configured_data_dir="$live_dir/data"
+              data_directory_source="application-default"
+            elif [ "${configured_data_dir#/}" = "$configured_data_dir" ]; then
+              configured_data_dir="$live_dir/$configured_data_dir"
+              data_directory_source="relative-environment"
+            else
+              data_directory_source="absolute-environment"
+            fi
+            data_dir="$(python3 - "$configured_data_dir" <<'PY'
+            import os
+            import sys
+
+            print(os.path.realpath(sys.argv[1]))
+            PY
+            )"
+            case "$data_dir" in
+              /|"$HOME"|"$live_dir") fail "unsafe-data-directory" ;;
+            esac
+            echo "PREFLIGHT_OK=data-directory-source-$data_directory_source"
             require_directory "persistent-data" "$data_dir"
             require_readable_file "sqlite" "$data_dir/$database_name"
             require_directory "storage" "$data_dir/storage"
-            require_file "environment" "$env_file"
             if [ -e "$backup_dir" ]; then
               fail "backup-directory-already-exists"
             fi
@@ -207,18 +238,6 @@ jobs:
             pm2 describe roomdesign >/dev/null
             curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
 
-            env_value() {
-              key="$1"
-              sed -n "s/^${key}=//p" "$env_file" | tail -n 1 | sed "s/^['\"]//;s/['\"]$//;s/\r$//"
-            }
-
-            current_step="checking approved production data directory"
-            configured_data_dir="$(env_value ROOM_DESIGN_DATA_DIR)"
-            test "$configured_data_dir" = "$data_dir" || {
-              echo "ROOM_DESIGN_DATA_DIR does not match the approved production path." >&2
-              environment_status="data-directory-mismatch"
-              fail "data-directory-mismatch"
-            }
             current_step="checking free disk space"
             data_kib="$(du -sk "$data_dir" | awk '{print $1}')"
             available_kib="$(df -Pk "$backup_root" | awk 'NR==2 {print $4}')"
