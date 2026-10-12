@@ -72,13 +72,22 @@ jobs:
             report="$report_root/ono-toggle-${TOGGLE_RUN_ID}.txt"
             changed="no"
 
+            wait_for_health() {
+              attempt=0
+              until curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null 2>&1; do
+                attempt=$((attempt + 1))
+                if [ "$attempt" -ge 30 ]; then return 1; fi
+                sleep 2
+              done
+            }
+
             finish() {
               result=$?
               trap - EXIT INT TERM
               if [ "$result" -ne 0 ] && [ "$changed" = "yes" ] && [ -f "$backup_env" ]; then
                 cp "$backup_env" "$env_file"
                 pm2 restart roomdesign --update-env || true
-                curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null || true
+                wait_for_health || true
               fi
               {
                 echo "status=$([ "$result" -eq 0 ] && echo PASSED || echo FAILED)"
@@ -91,7 +100,11 @@ jobs:
               } > "$report"
               echo "ONO_TOGGLE_REPORT=$report"
               echo "ONO_ENV_BACKUP=$backup_env"
-              echo "ONO_SERVER_STATE=$([ "$TOGGLE_ACTION" = enable ] && echo enabled || echo disabled)"
+              if [ "$result" -eq 0 ]; then
+                echo "ONO_SERVER_STATE=$([ "$TOGGLE_ACTION" = enable ] && echo enabled || echo disabled)"
+              else
+                echo "ONO_SERVER_STATE=rolled-back"
+              fi
               exit "$result"
             }
             trap finish EXIT INT TERM
@@ -135,7 +148,7 @@ jobs:
             changed=yes
 
             pm2 restart roomdesign --update-env
-            curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
+            wait_for_health
             curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
             if [ "$TOGGLE_ACTION" = "enable" ]; then
