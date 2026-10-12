@@ -15,14 +15,14 @@
 - Streaming, cancel, image attachment/Vision, memory, Room Design knowledge, templates и safe navigation.
 - Только read-only tools; ОНО не запускает генерации и не списывает пользовательские RD tokens.
 - Один финансовый ledger entry на `request_id` с NET/GROSS и usage всех model/function/vision calls.
+- Голосовая транскрипция подчиняется server kill switch и учитывается отдельной фактической строкой ledger с привязкой к пользователю и его tenant.
 - Runtime kill switch и generic SDK foundation для будущего партнёрского подключения.
 
 ## Проверки
 
 - Production build + TypeScript: успешно, 84 route/page entries.
-- Node tests: 208/208.
-- Playwright: 162 passed + 212 intentional skips; повторный Firefox Mobile test 1/1 passed.
-- Chromium/WebKit/Firefox; desktop/tablet/mobile.
+- Node tests: 212/212, 0 skipped.
+- Критический Playwright smoke ОНО после обновления `origin/main`: 6/6 (Chromium desktop + mobile). Полная кроссбраузерная матрица release candidate ранее пройдена.
 - `git diff --check`: без whitespace errors.
 - Общий ESLint сохраняет baseline 49 errors/42 warnings; новых ошибок ОНО не добавлено.
 
@@ -30,7 +30,7 @@
 
 Лениво создаются только добавочные таблицы `ono_chat_sessions`, `ono_chat_messages`, `ono_cost_ledger`, `ono_quality_events`. Существующие users/projects/generations/token ledgers не изменяются. При rollback эти таблицы не удалять.
 
-Локальная копия доступных data создана и проверена. До будущего deploy обязательна отдельная проверенная копия production VPS `/var/lib/room-design`.
+Production backup создан и проверен ручным workflow: `~/room-design-backups/predeploy-38314619992-1`, SHA-256 `ffdcd62cae4dcad2852737727f61e7644e55d0297b4ff86e55f98ae6f908cb45`. Фактический production data root — существующий `$HOME/ABACUS/data`; релиз не переносит данные и не создаёт новую БД.
 
 ## Rollback
 
@@ -41,8 +41,8 @@
 
 ## Остаточные риски
 
-- Remote VPS backup ещё не выполнен: публикация до него заблокирована.
 - Общий ESLint debt может блокировать pipeline, если lint является mandatory gate.
 - In-memory rate limiting не готов к нескольким процессам без общего storage.
+- `gpt-4o-mini-transcribe` сохранён как действующая модель голоса; до объявленной OpenAI даты прекращения поддержки потребуется отдельная плановая миграция модели.
 
-Итог: release candidate технически собран и протестирован, но остаётся локальным до отдельного разрешения и обязательного remote backup gate.
+Итог: release candidate технически собран, протестирован и остаётся локальным до отдельного разрешения на production deploy.

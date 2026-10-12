@@ -4,7 +4,7 @@
 
 ## Git
 
-- База release-ветки: `ae1cbdc31570a7deabb67fbbd7ed17011e8a8ac9` (`origin/main`).
+- База release-ветки: `0bf16ba7e176f9f2d0c79fb7918e40ba9f5bf2cb` (`origin/main` после исправлений backup-workflow).
 - Preview-коммиты целиком не переносились; собран path-filtered diff.
 - NORR demo/integration package, Telegram и несвязанные изменения шаблонов отсутствуют.
 - Push, merge и deploy не выполнялись.
@@ -14,7 +14,7 @@
 - Next.js 16.3.6 production build (`--webpack`): успешно.
 - TypeScript внутри production build: успешно.
 - Сгенерировано 84 route/page entries.
-- Node unit/integration: 208 passed, 0 failed, 0 skipped.
+- Node unit/integration: 212 passed, 0 failed, 0 skipped.
 - Playwright: 162 passed, 212 intentionally skipped by test guards; единственный Firefox Mobile infrastructure timeout исправлен в test harness и повторно прошёл 1/1.
 - Покрыты Chromium, WebKit и Firefox; 1920, 1440, 1366, tablet 1024 и mobile 390.
 - Полный ESLint: существующий baseline `49 errors / 42 warnings`; ошибки находятся в старом `app/page.tsx` и иных production-файлах и не созданы переносом ОНО. Production build/TypeScript зелёные.
@@ -29,14 +29,15 @@
 - Авторизация, проекты, Studio, каталог, шаблоны, PDF/PPT и выбор товаров строго из выбранного render snapshot.
 - Desktop/tablet/mobile и три браузерных движка.
 - NET/GROSS, Vision/Function usage и unique `request_id` ledger.
+- Server-side voice kill switch, фактический voice usage, tenant/user attribution и повторный `request_id` без второго provider call.
 
 ## Backup evidence
 
-- Локальный data snapshot: `/Users/a1/Documents/Git Hub Abacus/ABACUS/data/predeploy-backups/ono2-roomdesign-20261012-origin-ae1cbdc`.
-- SQLite integrity: `ok`.
-- SQLite SHA-256: `8eae347b9925bf5e6fa2742d8386e55618b8fb3707330793a8bd2ad7f0cd0c73`.
-- Размер snapshot: 27 MiB.
-- Это проверка доступных локальных данных, не резервная копия удалённого production VPS. Remote backup остаётся обязательным deploy gate.
+- Проверенный production backup: `~/room-design-backups/predeploy-38314619992-1`.
+- Архив SHA-256: `ffdcd62cae4dcad2852737727f61e7644e55d0297b4ff86e55f98ae6f908cb45`.
+- Production SHA на момент копии: `ae1cbdc31570a7deabb67fbbd7ed17011e8a8ac9`.
+- SQLite integrity, manifest, archive checksum и изолированное пробное восстановление: успешно.
+- Фактический каталог приложения: `$HOME/ABACUS/data`; `/var/lib/room-design` не используется и в рамках релиза не создаётся.
 
 ## Ограничения
 
