@@ -54,7 +54,7 @@ export default function TemplateCatalogClient({ templates, initialCategory, init
         </div>
       </div>
       <p className="template-catalog-count" aria-live="polite">{visible.length} {visible.length === 1 ? "сценарий" : "сценариев"}</p>
-      <div className="template-catalog-grid">
+      <div className="template-catalog-grid" data-ono-target="templates-catalog">
         {visible.map((template) => <TemplateCard key={template.slug} template={template} />)}
       </div>
     </>

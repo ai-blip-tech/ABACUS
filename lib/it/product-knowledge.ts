@@ -81,8 +81,31 @@ export const ROOM_DESIGN_PRODUCT_KNOWLEDGE = {
   assistant: {
     image: "В чат Оно можно прикрепить PNG, JPEG или WebP до 8 МБ кнопкой со скрепкой.",
     voice: "Кнопка микрофона записывает сообщение до 60 секунд; после остановки запись распознаётся и отправляется.",
-    safety: "Визуальная навигация временно отключена: Оно только текстом объясняет, какой раздел открыть, что нажать и что произойдёт. Оно не перемещается к элементам, не подсвечивает их и не переключает разделы. Нажатия, генерации, удаления, сохранение и другие изменяющие действия выполняет пользователь.",
+    safety: "ОНО объясняет, какой раздел открыть, что нажать и что произойдёт, и может прокрутить страницу и подсветить только заранее зарегистрированный безопасный элемент интерфейса. ОНО не нажимает кнопки, не переключает разделы и не выполняет генерации, удаления, сохранение или другие изменяющие действия — их всегда запускает пользователь.",
   },
 } as const;
 
 export const roomDesignProductKnowledgePrompt = JSON.stringify(ROOM_DESIGN_PRODUCT_KNOWLEDGE);
+
+export const roomDesignProductKnowledgePromptFor = (context?: { template?: { slug?: string } | null }) => {
+  const currentSlug = context?.template?.slug;
+  const definitions = templateKnowledge.map((template) => {
+    if (currentSlug && template.slug === currentSlug) return template;
+    return {
+      id: template.id,
+      slug: template.slug,
+      title: template.title,
+      status: template.status,
+      category: template.category,
+      audience: template.audience,
+      hook: template.hook,
+      description: template.description,
+      inputSummary: template.inputSummary,
+      resultType: template.resultType,
+    };
+  });
+  return JSON.stringify({
+    ...ROOM_DESIGN_PRODUCT_KNOWLEDGE,
+    templates: { ...ROOM_DESIGN_PRODUCT_KNOWLEDGE.templates, definitions },
+  });
+};

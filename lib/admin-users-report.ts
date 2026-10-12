@@ -1,6 +1,7 @@
 import { ensureStore } from "./auth.ts";
 import { ensureBillingStore } from "./billing.ts";
 import { ensureAiCostLedgerStore } from "./ai-cost-ledger.ts";
+import { ensureOnoFinanceStore } from "./it/finance.ts";
 import { BUSINESS_TIME_ZONE, dateRangeUtc, defaultMonthRange, isDateOnly } from "./business-time.ts";
 import { database } from "./server-runtime.ts";
 
@@ -36,6 +37,7 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
   await ensureStore();
   await ensureBillingStore();
   await ensureAiCostLedgerStore();
+  await ensureOnoFinanceStore();
   const query = `%${filter.search.toLowerCase()}%`;
   const users = await database.prepare(`
     WITH period_ledger AS (
@@ -47,7 +49,13 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
         COALESCE(SUM(output_image_tokens), 0) AS output_image_tokens,
         COALESCE(SUM(net_micro_usd), 0) AS ai_net_micro_usd,
         COALESCE(SUM(gross_micro_usd), 0) AS ai_gross_micro_usd
-      FROM ai_cost_ledger
+      FROM (
+        SELECT user_id, tenant_id, created_at, rd_tokens_charged, input_text_tokens, input_image_tokens,
+          output_image_tokens, net_micro_usd, gross_micro_usd FROM ai_cost_ledger
+        UNION ALL
+        SELECT user_id, tenant_id, created_at, 0, input_tokens, 0, 0, net_micro_usd, gross_micro_usd
+          FROM ono_cost_ledger WHERE user_id IS NOT NULL
+      )
       WHERE created_at >= ? AND created_at < ? AND (? = '' OR tenant_id = ?)
       GROUP BY user_id
     ), period_projects AS (
@@ -148,9 +156,13 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
     SELECT COUNT(DISTINCT gross_coefficient_snapshot) AS variants,
       MIN(gross_coefficient_snapshot) AS minimum,
       MAX(gross_coefficient_snapshot) AS maximum
-    FROM ai_cost_ledger JOIN users ON users.id = ai_cost_ledger.user_id
-    WHERE ai_cost_ledger.created_at >= ? AND ai_cost_ledger.created_at < ?
-      AND (? = '' OR ai_cost_ledger.tenant_id = ?)
+    FROM (
+      SELECT user_id, tenant_id, created_at, gross_coefficient_snapshot FROM ai_cost_ledger
+      UNION ALL
+      SELECT user_id, tenant_id, created_at, gross_coefficient_snapshot FROM ono_cost_ledger WHERE user_id IS NOT NULL
+    ) AS combined_costs JOIN users ON users.id = combined_costs.user_id
+    WHERE combined_costs.created_at >= ? AND combined_costs.created_at < ?
+      AND (? = '' OR combined_costs.tenant_id = ?)
       AND (lower(users.email) LIKE ? OR lower(COALESCE(users.first_name, '') || ' ' || COALESCE(users.last_name, '')) LIKE ? OR lower(COALESCE(users.company_role, '')) LIKE ?)
       AND (? = '' OR EXISTS (SELECT 1 FROM tenant_memberships WHERE tenant_memberships.user_id = users.id AND tenant_memberships.tenant_id = ?))
   `).bind(

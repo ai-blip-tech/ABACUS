@@ -5,7 +5,8 @@ import { readFile } from "node:fs/promises";
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 const sitewide = await readFile(new URL("../app/sitewide-it.tsx", import.meta.url), "utf8");
-const api = await readFile(new URL("../app/api/it/route.ts", import.meta.url), "utf8");
+const agent = await readFile(new URL("../lib/it/agent.ts", import.meta.url), "utf8");
+const knowledge = await readFile(new URL("../lib/it/product-knowledge.ts", import.meta.url), "utf8");
 
 test("Ono is mounted once at the app layout and excluded only from the public landing", () => {
   assert.match(layout, /<SitewideIt\/>/);
@@ -21,8 +22,9 @@ test("template catalog and template workspaces receive contextual assistant prom
   assert.match(sitewide, /Как работает шаблон/);
   assert.match(sitewide, /Какой шаблон поможет с моей задачей/);
   assert.match(sitewide, /template\.inputSlots\.map/);
-  assert.match(api, /CURRENT_ROOM_DESIGN_CONTEXT\.template/);
-  assert.match(api, /статус — «Скоро»/);
+  assert.match(agent, /CURRENT_ROOM_DESIGN_CONTEXT=/);
+  assert.match(agent, /roomDesignProductKnowledgePromptFor\(input\.context\)/);
+  assert.match(knowledge, /Статус «Скоро»/);
 });
 
 test("Ono remains available on account, admin and proposal routes", () => {

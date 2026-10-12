@@ -28,7 +28,7 @@ test("global image edit and material restyling remain composable with local tool
   await page.getByLabel("Имя обязательно").fill("Material");
   await page.getByLabel("Email логин").fill(`material-${Date.now()}@example.com`);
   await page.getByLabel("Пароль", { exact: true }).fill("Material123!");
-  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("dialog", { name: "Вход и регистрация" }).getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.locator(".projects-dashboard-generation").click();
 
   const brush = page.getByRole("button", { name: "Изменить материал выбранной поверхности" });
