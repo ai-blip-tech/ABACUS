@@ -72,6 +72,7 @@ Workflow не перезапускает PM2, не изменяет `.env`, Git 
 - `production_sha_check=passed`;
 - абсолютный `backup_directory`;
 - `archive_sha256` и `database_sha256`;
+- `archive_checksum_verification=passed`;
 - `sqlite_integrity=ok`;
 - `restore_integrity=ok`;
 - `manifest_verification=passed`;

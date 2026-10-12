@@ -74,6 +74,7 @@ jobs:
             failure_reason="none"
             production_sha="unknown"
             archive_sha="not-created"
+            archive_checksum_status="not-run"
             database_sha="not-created"
             sqlite_integrity="not-run"
             restore_integrity="not-run"
@@ -101,6 +102,7 @@ jobs:
                 echo "backup_directory=$backup_dir"
                 echo "archive=$archive_path"
                 echo "archive_sha256=$archive_sha"
+                echo "archive_checksum_verification=$archive_checksum_status"
                 echo "database_sha256=$database_sha"
                 echo "source_size=$data_size"
                 echo "archive_size=$archive_size"
@@ -331,6 +333,11 @@ jobs:
             tar -C "$snapshot_dir" -czf "$archive_path" .
             archive_sha="$(sha256sum "$archive_path" | awk '{print $1}')"
             printf '%s  %s\n' "$archive_sha" "$(basename "$archive_path")" > "$checksum_path"
+            (
+              cd "$backup_dir"
+              sha256sum -c "$(basename "$checksum_path")" >/dev/null
+            )
+            archive_checksum_status="passed"
             archive_size="$(du -sh "$archive_path" | awk '{print $1}')"
 
             current_step="performing isolated restore rehearsal"
