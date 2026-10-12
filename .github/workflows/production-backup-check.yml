@@ -399,12 +399,15 @@ jobs:
               readiness_failed="1"
               failure_reason="missing-required-environment-keys"
             else
-              configured_text_model="$(env_value OPENAI_TEXT_MODEL)"
-              configured_public_flag="$(env_value NEXT_PUBLIC_ONO_V2_ENABLED)"
-              configured_server_flag="$(env_value ONO_V2_ENABLED)"
-              openai_key="$(env_value OPENAI_API_KEY)"
               environment_status="passed"
+            fi
 
+            configured_text_model="$(env_value OPENAI_TEXT_MODEL)"
+            configured_public_flag="$(env_value NEXT_PUBLIC_ONO_V2_ENABLED)"
+            configured_server_flag="$(env_value ONO_V2_ENABLED)"
+            openai_key="$(env_value OPENAI_API_KEY)"
+
+            if [ "$environment_status" = "passed" ]; then
               if [ "$configured_text_model" != "gpt-6.1-sol" ]; then
                 environment_status="text-model-mismatch"
                 readiness_failed="1"
@@ -422,28 +425,28 @@ jobs:
                 readiness_failed="1"
                 failure_reason="openai-key-empty"
               fi
+            fi
 
-              current_step="checking GPT-6.1 Sol availability"
-              if [ -n "$openai_key" ]; then
-                model_response="$backup_dir/model-check.json"
-                model_http_status="$(curl --silent --show-error --output "$model_response" --write-out '%{http_code}' \
-                  --connect-timeout 10 --max-time 30 \
-                  --header "Authorization: Bearer $openai_key" \
-                  "https://api.openai.com/v1/models/gpt-6.1-sol")"
-                openai_key=""
-                rm -f "$model_response"
-                if [ "$model_http_status" = "200" ]; then
-                  model_status="passed"
-                else
-                  model_status="failed-http-$model_http_status"
-                  readiness_failed="1"
-                  failure_reason="model-availability-check-failed"
-                fi
+            current_step="checking GPT-6.1 Sol availability"
+            if [ -n "$openai_key" ]; then
+              model_response="$backup_dir/model-check.json"
+              model_http_status="$(curl --silent --show-error --output "$model_response" --write-out '%{http_code}' \
+                --connect-timeout 10 --max-time 30 \
+                --header "Authorization: Bearer $openai_key" \
+                "https://api.openai.com/v1/models/gpt-6.1-sol")"
+              openai_key=""
+              rm -f "$model_response"
+              if [ "$model_http_status" = "200" ]; then
+                model_status="passed"
               else
-                model_status="not-run-missing-key"
+                model_status="failed-http-$model_http_status"
                 readiness_failed="1"
-                failure_reason="model-check-missing-key"
+                failure_reason="model-availability-check-failed"
               fi
+            else
+              model_status="not-run-missing-key"
+              readiness_failed="1"
+              failure_reason="model-check-missing-key"
             fi
 
             rm -rf "$snapshot_dir" "$restore_dir"
