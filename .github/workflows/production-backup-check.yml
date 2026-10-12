@@ -71,6 +71,7 @@ jobs:
             env_file="$live_dir/.env"
             status="FAILED"
             current_step="initialization"
+            failure_reason="none"
             production_sha="unknown"
             archive_sha="not-created"
             database_sha="not-created"
@@ -110,6 +111,7 @@ jobs:
                 echo "environment_check=$environment_status"
                 echo "gpt_6_1_sol_availability=$model_status"
                 echo "last_step=$current_step"
+                echo "failure_reason=$failure_reason"
                 echo "site_restarted=no"
                 echo "source_data_modified=no"
               } > "$report_path"
@@ -131,25 +133,64 @@ jobs:
               echo "SQLITE_INTEGRITY=$sqlite_integrity"
               echo "RESTORE_INTEGRITY=$restore_integrity"
               echo "MODEL_GPT_6_1_SOL=$model_status"
+              echo "BACKUP_REPORT_CONTENT_START"
+              sed -n '1,80p' "$report_path"
+              echo "BACKUP_REPORT_CONTENT_END"
               exit "$result"
             }
             trap finish EXIT INT TERM
 
+            fail() {
+              failure_reason="$1"
+              echo "Backup preflight failed: $failure_reason" >&2
+              exit 1
+            }
+
+            require_directory() {
+              label="$1"
+              path="$2"
+              if [ ! -d "$path" ]; then
+                fail "missing-directory-$label"
+              fi
+              echo "PREFLIGHT_OK=directory-$label"
+            }
+
+            require_file() {
+              label="$1"
+              path="$2"
+              if [ ! -f "$path" ]; then
+                fail "missing-file-$label"
+              fi
+              echo "PREFLIGHT_OK=file-$label"
+            }
+
+            require_readable_file() {
+              label="$1"
+              path="$2"
+              if [ ! -r "$path" ]; then
+                fail "unreadable-file-$label"
+              fi
+              echo "PREFLIGHT_OK=readable-file-$label"
+            }
+
             current_step="checking prerequisites"
             for command_name in git pm2 curl python3 rsync tar sha256sum find sort xargs cmp du df awk sed; do
               command -v "$command_name" >/dev/null 2>&1 || {
-                echo "Required command is unavailable: $command_name" >&2
-                exit 1
+                fail "missing-command-$command_name"
               }
             done
+            echo "PREFLIGHT_OK=required-commands"
 
-            test -d "$live_dir"
-            test -d "$data_dir"
-            test -r "$data_dir/$database_name"
-            test -d "$data_dir/storage"
-            test -f "$env_file"
-            test ! -e "$backup_dir"
+            require_directory "application" "$live_dir"
+            require_directory "persistent-data" "$data_dir"
+            require_readable_file "sqlite" "$data_dir/$database_name"
+            require_directory "storage" "$data_dir/storage"
+            require_file "environment" "$env_file"
+            if [ -e "$backup_dir" ]; then
+              fail "backup-directory-already-exists"
+            fi
             mkdir -p "$snapshot_dir/data" "$restore_dir"
+            echo "PREFLIGHT_OK=backup-directory-created"
 
             current_step="checking live application without changing it"
             cd "$live_dir"
@@ -161,6 +202,7 @@ jobs:
               echo "Production SHA does not match the manually confirmed expected SHA." >&2
               production_sha_status="mismatch"
               readiness_failed="1"
+              failure_reason="production-sha-mismatch"
             fi
             pm2 describe roomdesign >/dev/null
             curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
@@ -175,7 +217,7 @@ jobs:
             test "$configured_data_dir" = "$data_dir" || {
               echo "ROOM_DESIGN_DATA_DIR does not match the approved production path." >&2
               environment_status="data-directory-mismatch"
-              exit 1
+              fail "data-directory-mismatch"
             }
             current_step="checking free disk space"
             data_kib="$(du -sk "$data_dir" | awk '{print $1}')"
@@ -184,7 +226,7 @@ jobs:
             data_size="$(du -sh "$data_dir" | awk '{print $1}')"
             test "$available_kib" -ge "$required_kib" || {
               echo "Not enough free disk space for snapshot plus isolated restore check." >&2
-              exit 1
+              fail "insufficient-disk-space"
             }
 
             current_step="copying immutable/object data without modifying source"
@@ -336,6 +378,7 @@ jobs:
               echo "Required environment keys are missing:$missing_keys" >&2
               environment_status="missing-required-keys"
               readiness_failed="1"
+              failure_reason="missing-required-environment-keys"
             else
               configured_text_model="$(env_value OPENAI_TEXT_MODEL)"
               configured_public_flag="$(env_value NEXT_PUBLIC_ONO_V2_ENABLED)"
@@ -346,15 +389,19 @@ jobs:
               if [ "$configured_text_model" != "gpt-6.1-sol" ]; then
                 environment_status="text-model-mismatch"
                 readiness_failed="1"
+                failure_reason="text-model-mismatch"
               elif [ "$configured_public_flag" != "true" ]; then
                 environment_status="public-flag-not-ready"
                 readiness_failed="1"
+                failure_reason="public-flag-not-ready"
               elif [ "$configured_server_flag" != "true" ]; then
                 environment_status="server-flag-not-ready"
                 readiness_failed="1"
+                failure_reason="server-flag-not-ready"
               elif [ -z "$openai_key" ]; then
                 environment_status="openai-key-empty"
                 readiness_failed="1"
+                failure_reason="openai-key-empty"
               fi
 
               current_step="checking GPT-6.1 Sol availability"
@@ -371,34 +418,15 @@ jobs:
                 else
                   model_status="failed-http-$model_http_status"
                   readiness_failed="1"
+                  failure_reason="model-availability-check-failed"
                 fi
               else
                 model_status="not-run-missing-key"
                 readiness_failed="1"
+                failure_reason="model-check-missing-key"
               fi
             fi
 
             rm -rf "$snapshot_dir" "$restore_dir"
             current_step="completed"
             test "$readiness_failed" = "0"
-
-      - name: Download sanitized verification report
-        if: always()
-        continue-on-error: true
-        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "room-design-backups/predeploy-${{ env.BACKUP_RUN_ID }}-${{ env.BACKUP_RUN_ATTEMPT }}/REPORT.txt"
-          target: backup-report
-          strip_components: 2
-
-      - name: Upload sanitized verification report
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: room-design-production-backup-report-${{ env.BACKUP_RUN_ID }}-${{ env.BACKUP_RUN_ATTEMPT }}
-          path: backup-report/REPORT.txt
-          if-no-files-found: warn
-          retention-days: 30
