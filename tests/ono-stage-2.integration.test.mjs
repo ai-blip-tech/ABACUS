@@ -83,6 +83,32 @@ test("every Ono turn stores exact GPT-6.1 Sol NET and GROSS", async () => {
   );
 });
 
+test("voice transcription pricing uses its own OpenAI endpoint snapshot", () => {
+  assert.deepEqual(
+    calculateOnoTextCost(
+      "gpt-4o-mini-transcribe",
+      { inputTokens: 1_000, outputTokens: 100, totalTokens: 1_100, calls: 1 },
+      2.2,
+      "openai.audio.transcriptions",
+    ),
+    {
+      pricingSnapshot: {
+        version: "openai-audio-2026-10-13",
+        source: "https://developers.openai.com/api/docs/models/gpt-4o-mini-transcribe",
+        inputUsd: 1.25,
+        cachedInputUsd: 0,
+        outputUsd: 5,
+        model: "gpt-4o-mini-transcribe",
+        endpoint: "openai.audio.transcriptions",
+        currency: "USD",
+        unit: "per_million_tokens",
+      },
+      netMicroUsd: 1_750,
+      grossMicroUsd: 3_850,
+    },
+  );
+});
+
 test("Stage 2 exposes versioned site config and navigation manifests", () => {
   const config = onoSiteConfigFor("roomdesign");
   assert.equal(config.capabilities.persistentMemory, true);
