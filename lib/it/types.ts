@@ -12,7 +12,7 @@ export type ItVisualState =
 
 export type RoomDesignContext = {
   route: string;
-  page: "landing" | "projects" | "project-setup" | "studio" | "templates" | "template" | "account" | "admin" | "proposal" | "other";
+  page: "landing" | "projects" | "project-setup" | "studio" | "templates" | "template" | "catalog" | "product" | "account" | "admin" | "proposal" | "other";
   projectId: string | null;
   projectName: string;
   section: "image-editor" | "planogram" | "templates" | "template-workspace" | "account" | "admin" | "proposal" | "project-setup" | "other";
@@ -56,21 +56,71 @@ export type RoomDesignContext = {
     resultType: string;
     inputs: Array<{ label: string; required: boolean; minCount: number; maxCount: number }>;
   } | null;
+  commerce?: {
+    product: {
+      id: string;
+      sku: string;
+      name: string;
+      category: string;
+      brand: string;
+      collection: string;
+      price: number | null;
+      currency: "RUB";
+      availability: "in_stock" | "out_of_stock" | "preorder" | "unknown";
+      canonicalUrl: string;
+      attributes: Array<{ name: string; value: string }>;
+    } | null;
+  };
   availableActions: string[];
 };
 
 export type ItCatalogProduct = {
   id: string;
+  sourceId?: string;
   name: string;
+  article?: string;
   image: string;
+  images?: string[];
   url: string;
+  canonicalUrl?: string;
   price: number;
+  oldPrice?: number;
+  available?: boolean;
   category: string;
+  subtype?: string;
   color: string;
   material: string;
+  brand?: string;
   widthMm: number | null;
   depthMm: number | null;
   heightMm: number | null;
+  description?: string;
+  parameters?: Array<{ name: string; value: string }>;
+  updatedAt?: string;
+  provenance?: "norrmobler_yml";
+};
+
+export type ItToolTrace = {
+  name: string;
+  status: "success" | "error";
+  durationMs: number;
+  resultCount: number;
+};
+
+export type ItVisionAnalysis = {
+  subject: "room" | "furniture" | "material" | "unknown";
+  categories: string[];
+  colors: string[];
+  materials: string[];
+  styles: string[];
+  confidence: "low" | "medium" | "high";
+  uncertain: string[];
+  requiresConfirmation: boolean;
+};
+
+export type ItSource = {
+  title: string;
+  url: string;
 };
 
 export type ItUiTarget =
@@ -91,7 +141,12 @@ export type ItUiTarget =
   | "planogram-floor-reference"
   | "planogram-wall-reference"
   | "planogram-save"
-  | "planogram-create-render";
+  | "planogram-create-render"
+  | "templates-catalog"
+  | "template-light-scenarios"
+  | "norr-catalog"
+  | "norr-sofas"
+  | "norr-contact";
 
 export type ItUiAction =
   | { type: "navigate"; target: "image-editor" | "planogram" }
@@ -104,6 +159,10 @@ export type ItTurn = {
   state: ItVisualState;
   products?: ItCatalogProduct[];
   actions?: ItUiAction[];
+  toolTrace?: ItToolTrace[];
+  handoffRequested?: boolean;
+  visionAnalysis?: ItVisionAnalysis;
+  sources?: ItSource[];
 };
 
 export type ItConversationMessage = {
@@ -118,4 +177,8 @@ export type ItRequest = {
   image?: string;
   context: RoomDesignContext;
   history?: ItConversationMessage[];
+  sessionId?: string;
+  requestId?: string;
+  memorySummary?: string;
+  memoryState?: Record<string, unknown>;
 };

@@ -8,17 +8,6 @@ import type {
   RoomDesignContext,
 } from "./types";
 
-export type CatalogSearchInput = {
-  query?: string;
-  category?: string;
-  maxPrice?: number;
-  dimensions?: { widthMm?: number; depthMm?: number; heightMm?: number };
-  material?: string;
-  color?: string;
-  style?: string;
-  limit?: number;
-};
-
 export type ConversationInput = {
   message: string;
   image?: string;
@@ -27,60 +16,44 @@ export type ConversationInput = {
   products: ItCatalogProduct[];
   actions: ItUiAction[];
   toolFacts: string[];
+  memorySummary?: string;
+  memoryState?: Record<string, unknown>;
 };
 
 export type ItAdapters = {
-  searchCatalog(input: CatalogSearchInput): Promise<ItCatalogProduct[]>;
-  answerConversation(input: ConversationInput): Promise<string | null>;
+  answerConversation(input: ConversationInput): Promise<string | null | {
+    text: string | null;
+    products?: ItCatalogProduct[];
+    toolTrace?: ItTurn["toolTrace"];
+    handoffRequested?: boolean;
+    visionAnalysis?: ItTurn["visionAnalysis"];
+    sources?: ItTurn["sources"];
+  }>;
 };
 
 const normalize = (value: string) => value.toLocaleLowerCase("ru-RU").replace(/ё/g, "е").trim();
-
-const priceFromMessage = (message: string) => {
-  const compact = normalize(message).replace(/\s/g, "");
-  const match = compact.match(/(?:до|не дороже)(\d+(?:[.,]\d+)?)(тыс(?:яч)?|к|млн)?/);
-  if (!match) return undefined;
-  const value = Number(match[1].replace(",", "."));
-  const multiplier = match[2]?.startsWith("млн") ? 1_000_000 : match[2] ? 1_000 : 1;
-  return Number.isFinite(value) ? Math.round(value * multiplier) : undefined;
-};
-
-const categoryFromText = (value: string) => {
-  const text = normalize(value);
-  if (/кресл/.test(text)) return "armchair";
-  if (/диван/.test(text)) return "sofa";
-  if (/стул/.test(text)) return "chair";
-  if (/стол/.test(text)) return "table";
-  if (/кроват/.test(text)) return "bed";
-  if (/ков[её]р/.test(text)) return "rug";
-  if (/ламп|торшер|светильник|люстр/.test(text)) return "light";
-  return undefined;
-};
-
-const recentProducts = (history: ItConversationMessage[]) => [...history]
-  .reverse()
-  .find((item) => item.products?.length)?.products || [];
 
 const recentConversationText = (history: ItConversationMessage[], limit = 6) => history
   .slice(-limit)
   .map((item) => item.text)
   .join(" ");
 
-const categoryFromProducts = (products: ItCatalogProduct[]) => categoryFromText(
-  products.map((product) => `${product.category} ${product.name}`).join(" "),
-);
-
-const shouldSearchCatalog = (message: string, hasPreviousProducts: boolean, hasPriorSubject: boolean) => {
-  const text = normalize(message);
-  return /найди|подбери|ищу|нужно? найти|самые дешевые|в каталоге|в наличии|покажи.{0,36}(?:вариант|подбор|товар|диван|кресл|стул|стол|кроват|ковер|светильник)/.test(text)
-    || (hasPreviousProducts && /подешевле|дешевле|бюджетнее|другие варианты/.test(text))
-    || (hasPriorSubject && /хочу другой|другой вариант|покажи другой/.test(text));
-};
-
 const productGuidance = (message: string, history: ItConversationMessage[], context: RoomDesignContext): { target: ItUiTarget; fact: string } | undefined => {
   const text = normalize(message);
   const recent = normalize(recentConversationText(history));
   const selected = context.planogram.selectedItem;
+  if (context.page === "templates" && /(?:где|найти|открыть|покажи).{0,40}(?:сценари[ий] света|свет)/.test(text)) {
+    return { target: "template-light-scenarios", fact: "Карточка «Сценарии света» находится второй в каталоге шаблонов. Нажмите её, чтобы открыть сценарий и загрузить фотографию комнаты." };
+  }
+  if (context.page === "templates" && /(?:где|покажи|как выбрать).{0,35}(?:шаблон|сценари)/.test(text)) {
+    return { target: "templates-catalog", fact: "Каталог шаблонов находится под фильтрами. Выберите карточку сценария; ОНО может объяснить входные материалы до открытия." };
+  }
+  if (context.page === "catalog" && /(?:где|найти|покажи|открыть).{0,35}диван/.test(text)) {
+    return { target: "norr-sofas", fact: "Раздел «Диваны» находится в каталоге NORR. Откройте его самостоятельно; ОНО не выполняет переход без действия пользователя." };
+  }
+  if ((context.page === "catalog" || context.page === "product") && /(?:менеджер|связаться|контакт)/.test(text)) {
+    return { target: "norr-contact", fact: "Ссылка на контакты менеджера находится в навигации NORR. ОНО может подготовить вопрос, но не отправляет обращение самостоятельно." };
+  }
   if (context.section === "planogram" && /референс.{0,24}пол|пол.{0,24}референс/.test(text)) {
     return { target: "planogram-floor-reference", fact: "Референс пола добавляется или заменяется кнопкой «Добавить референс пола» под планом." };
   }
@@ -152,67 +125,61 @@ const shouldGuideReplace = (message: string, history: ItConversationMessage[], c
 };
 
 const unavailableText = "Сейчас не могу сформировать ответ: модель временно недоступна. Попробуйте ещё раз.";
-const IT_VISUAL_GUIDANCE_ENABLED = false;
+const IT_VISUAL_GUIDANCE_ENABLED = true;
 
 export async function runItTurn(request: ItRequest, adapters: ItAdapters): Promise<ItTurn> {
-  const history = (request.history || []).slice(-12);
+  const history = (request.history || []).slice(-8);
   const message = request.message.trim();
-  const normalizedMessage = normalize(message);
-  const previousProducts = recentProducts(history);
   const actions: ItUiAction[] = [];
   const toolFacts: string[] = [];
-  let products: ItCatalogProduct[] = [];
 
   const guidance = productGuidance(message, history, request.context);
   if (guidance) {
     if (IT_VISUAL_GUIDANCE_ENABLED) {
       actions.push({ type: "focus", target: guidance.target }, { type: "highlight", target: guidance.target }, { type: "guide", target: guidance.target });
     }
-    toolFacts.push(`${guidance.fact} Объясни следующий шаг только текстом: не говори, что показываешь или подсвечиваешь элемент.`);
+    toolFacts.push(`${guidance.fact} Объясни следующий шаг текстом; интерфейс отдельно подсветит только зарегистрированный безопасный элемент.`);
   }
 
   if (!guidance && shouldGuideReplace(message, history, request.context)) {
     const hasSource = request.context.render.hasSource;
     if (IT_VISUAL_GUIDANCE_ENABLED) {
-      actions.push({ type: "navigate", target: "image-editor" });
       if (hasSource) actions.push({ type: "focus", target: "replace" }, { type: "highlight", target: "replace" });
+      else actions.push({ type: "focus", target: "image-editor" }, { type: "highlight", target: "image-editor" });
     }
     if (hasSource) {
-      toolFacts.push("Для замены предмета нужно открыть «Редактор изображений», нажать «Заменить» и поставить точку в центре предмета. Объясни это только текстом: не говори, что переходишь, показываешь или подсвечиваешь интерфейс.");
+      toolFacts.push("Для замены предмета нужно открыть «Редактор изображений», нажать «Заменить» и поставить точку в центре предмета. Объясни это текстом; интерфейс отдельно подсветит зарегистрированный элемент, но ничего не нажмёт.");
     } else {
       toolFacts.push("Интерьер ещё не загружен. Сначала нужно открыть «Редактор изображений» и загрузить изображение, затем нажать «Заменить» и поставить точку на предмете. Объясни это только текстом.");
     }
   }
 
-  const explicitCategory = categoryFromText(message);
-  const inheritedCategory = categoryFromProducts(previousProducts) || categoryFromText(recentConversationText(history));
-  const category = explicitCategory || inheritedCategory;
-  if (category && shouldSearchCatalog(message, previousProducts.length > 0, Boolean(inheritedCategory))) {
-    let maxPrice = priceFromMessage(message);
-    if (!maxPrice && previousProducts.length && /подешевле|дешевле|бюджетнее/.test(normalizedMessage)) {
-      const priced = previousProducts.map((product) => product.price).filter((price) => price > 0);
-      if (priced.length) maxPrice = Math.max(1, Math.min(...priced) - 1);
-    }
-    products = await adapters.searchCatalog({ category, maxPrice, limit: 5 });
-    toolFacts.push(products.length
-      ? `Catalog search returned the ${products.length} cheapest real available matching products, sorted by price ascending across the complete filtered catalog result. Use only the attached structured product data for names, prices and properties.`
-      : "Catalog search returned no matching products. Do not invent alternatives or prices.");
-  }
-
-  const text = await adapters.answerConversation({
+  const answer = await adapters.answerConversation({
     message,
     image: request.image,
     history,
     context: request.context,
-    products,
+    products: [],
     actions,
     toolFacts,
+    memorySummary: request.memorySummary,
+    memoryState: request.memoryState,
   }).catch(() => null);
+  const text = typeof answer === "string" ? answer : answer?.text || null;
+  const products = typeof answer === "object" && answer?.products ? answer.products : [];
+  const toolTrace = typeof answer === "object" ? answer?.toolTrace : undefined;
+  const handoffRequested = typeof answer === "object" && answer?.handoffRequested === true;
+  const visionAnalysis = typeof answer === "object" ? answer?.visionAnalysis : undefined;
+  const sources = typeof answer === "object" ? answer?.sources : undefined;
 
   return {
     text: text || unavailableText,
     state: text ? products.length ? "success" : actions.length ? "moving" : "speaking" : "error",
     ...(products.length ? { products } : {}),
     ...(actions.length ? { actions } : {}),
+    ...(toolTrace?.length ? { toolTrace } : {}),
+    ...(handoffRequested ? { handoffRequested: true } : {}),
+    ...(visionAnalysis ? { visionAnalysis } : {}),
+    ...(sources?.length ? { sources } : {}),
   };
 }

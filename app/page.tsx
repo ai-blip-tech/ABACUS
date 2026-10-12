@@ -563,7 +563,7 @@ export default function Home() {
       return;
     }
     const findTarget = (target: ItUiTarget) => {
-      const selectors: Record<ItUiTarget, string> = {
+      const selectors: Partial<Record<ItUiTarget, string>> = {
         "image-editor": "[data-it-target='image-editor']",
         "image-upload": ".furniture-choice .upload-zone",
         "editor-add": ".furniture-action-bar button:first-child",
@@ -582,8 +582,11 @@ export default function Home() {
         "planogram-wall-reference": ".plan-final-actions .plan-surface-reference:nth-child(2)",
         "planogram-save": ".plan-save",
         "planogram-create-render": ".plan-create-reference",
+        "templates-catalog": "[data-ono-target='templates-catalog']",
+        "template-light-scenarios": "[data-ono-target='template-light-scenarios']",
       };
-      return document.querySelector<HTMLElement>(selectors[target]);
+      const selector = selectors[target];
+      return selector ? document.querySelector<HTMLElement>(selector) : null;
     };
     const revealTarget = (targetName: ItUiTarget) => window.setTimeout(() => {
       const target = findTarget(targetName);

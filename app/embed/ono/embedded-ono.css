@@ -1,0 +1,3 @@
+html:has(.ono-embed-root),body:has(.ono-embed-root){background:transparent!important}
+.ono-embed-root{position:fixed;inset:0;background:transparent;overflow:hidden}
+.ono-embed-root .it-layer{right:14px;bottom:14px}
