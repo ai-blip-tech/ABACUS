@@ -13,6 +13,7 @@ export const catalogCategories = [
   "nightstand",
   "dresser",
   "cabinet",
+  "shelving",
   "tv_stand",
   "rug",
   "light",

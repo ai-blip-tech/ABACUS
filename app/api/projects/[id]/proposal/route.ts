@@ -16,6 +16,7 @@ function cleanOverride(value: unknown) {
     depth: number(source.depth, 20_000),
     height: number(source.height, 20_000),
     price: number(source.price, 1_000_000_000),
+    priceText: text(source.priceText, 120) || undefined,
     quantity: number(source.quantity, 10_000),
     article: text(source.article, 160) || undefined,
     category: text(source.category, 240) || undefined,

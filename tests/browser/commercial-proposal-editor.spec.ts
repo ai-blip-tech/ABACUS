@@ -66,7 +66,7 @@ test("commercial proposal editor supports catalog and reference products before 
   await expect(page.locator(".proposal-manager-person")).not.toContainText("ВАШ ЧЕЛОВЕК В NORR");
   await expect(page.getByLabel("Должность")).toHaveValue("Персональный менеджер");
   await page.getByLabel("Клиент").fill("Анна Петрова");
-  await page.getByLabel("Цена: NORR Sofa").fill("90000");
+  await page.getByLabel("Цена: NORR Sofa").fill("100 000 − 10% = 90 000 руб.");
   await page.getByLabel("Цена: Диван Миллер с реклайнером").fill("250000");
   await page.locator(".proposal-product-page").nth(1).getByLabel("Примечание").fill("Ткань букле, электрический реклайнер");
   await page.getByText("Показывать цены").click();
@@ -81,10 +81,12 @@ test("commercial proposal editor supports catalog and reference products before 
   expect(pdfPayloads[1].withPrices).toBe(true);
   expect(pdfPayloads[1].coverImage).toBe(selectedImage);
   expect((pdfPayloads[1].products as unknown[]).length).toBe(3);
+  expect((pdfPayloads[1].products as Array<{ price?: number; priceText?: string }>)[0]).toMatchObject({ price: 90000, priceText: "100 000 − 10% = 90 000 руб." });
   expect((pdfPayloads[1].products as Array<{ referenceImage: string }>).map((product) => product.referenceImage)).toEqual([image, selectedImage, image]);
   await page.getByRole("button", { name: "Скачать PPT" }).click();
   await expect.poll(() => pptxPayloads.length).toBe(1);
   expect((pptxPayloads[0].products as unknown[]).length).toBe(3);
+  expect(saves.some((entry) => JSON.stringify(entry).includes("100 000 − 10% = 90 000 руб."))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("250000"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Ткань букле, электрический реклайнер"))).toBe(true);
   expect(saves.some((entry) => JSON.stringify(entry).includes("Анна Петрова"))).toBe(true);

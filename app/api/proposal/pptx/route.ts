@@ -1,7 +1,7 @@
 import PptxGenJS from "pptxgenjs";
 import sharp from "sharp";
 import { requireTenantUser } from "@/lib/auth";
-import { paginateProposalSpecification } from "@/lib/commercial-proposal";
+import { paginateProposalSpecification, proposalPriceLabel } from "@/lib/commercial-proposal";
 import { normalizeProposalImage, type ProposalImageRole } from "@/lib/proposal-pdf-image";
 import { database } from "@/lib/server-runtime";
 import { isLegacyNorrBrand, PROPOSAL_BRAND, PROPOSAL_SELECTION_MODULE } from "@/lib/proposal-brand";
@@ -10,7 +10,7 @@ type ProposalProduct = {
   source?: "catalog" | "reference"; objectIds?: string[]; quantity?: number; name?: string; image?: string;
   referenceName?: string; referenceArticle?: string; referenceImage?: string; referencePrice?: number;
   referenceCategory?: string; referenceHeightMm?: number | null; width?: number; depth?: number; height?: number;
-  price?: number; notes?: string; article?: string; category?: string; brand?: string; configuration?: string;
+  price?: number; priceText?: string; notes?: string; article?: string; category?: string; brand?: string; configuration?: string;
   option?: string; subtype?: string; color?: string; characteristics?: string[];
 };
 type ProposalDocument = {
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
       slide.addShape(pptx.ShapeType.line, { x: .5, y: 5.88, w: 10.65, h: 0, line: { color: LINE, width: .7 } });
       addLabelValue(slide, "Комплектация", asText(product.configuration), .62, 6.08, 3.2, 10);
       addLabelValue(slide, "Количество", `${product.quantity || 1} шт.`, 4.17, 6.08, 2.2, 10);
-      addLabelValue(slide, "Стоимость", body.withPrices ? money(product.price ?? product.referencePrice) : "Цена по запросу", 7.6, 6.08, 3.2, 18);
+      addLabelValue(slide, "Стоимость", body.withPrices ? proposalPriceLabel(product.priceText, product.price ?? product.referencePrice) : "Цена по запросу", 7.6, 6.08, 3.2, 18);
       addText(slide, asText(product.notes, "Финальная стоимость зависит от ткани, отделки и выбранной конфигурации."), .5, 7.08, 10.65, .35, { fontSize: 7, color: MUTED });
     });
 
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
       const header = ["№", "ПОЗИЦИЯ", "АРТИКУЛ", "КОЛ-ВО", "ЦЕНА", "СУММА"].map((text) => ({ text, options: { bold: true, color: WHITE, fill: { color: INK } } }));
       const rows = pageProducts.map((product, index) => [
         String(offset + index + 1).padStart(2, "0"), asText(product.name), asText(product.article || product.referenceArticle), String(product.quantity || 1),
-        body.withPrices ? money(product.price) : "по запросу", body.withPrices && product.price ? money(product.price * (product.quantity || 1)) : "по запросу",
+        body.withPrices ? proposalPriceLabel(product.priceText, product.price) : "по запросу", body.withPrices && product.price ? money(product.price * (product.quantity || 1)) : "по запросу",
       ].map((text) => ({ text })));
       slide.addTable([header, ...rows], { x: .5, y: 1.48, w: 10.65, colW: [.42, 4.15, 1.55, .85, 1.75, 1.93], rowH: [.38, ...rows.map(() => .42)], fontFace: "Arial", fontSize: 8, color: INK, margin: .08, border: { type: "solid", color: LINE, pt: .5 }, valign: "middle" });
       offset += pageProducts.length;

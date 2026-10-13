@@ -5,7 +5,7 @@ export type ProposalDocument = {
 };
 
 export type ProposalOverride = {
-  name?: string; width?: number; depth?: number; height?: number; price?: number; quantity?: number;
+  name?: string; width?: number; depth?: number; height?: number; price?: number; priceText?: string; quantity?: number;
   article?: string; category?: string; brand?: string; configuration?: string; option?: string;
   characteristics?: string[]; notes?: string;
 };
@@ -49,7 +49,7 @@ export type ProposalCatalogProduct = {
 export type ProposalProduct = {
   key: string; source: "catalog" | "reference"; objectIds: string[]; quantity: number;
   name: string; image: string; images: string[]; article: string; url: string;
-  width?: number; depth?: number; height?: number; price?: number; oldPrice?: number;
+  width?: number; depth?: number; height?: number; price?: number; priceText?: string; oldPrice?: number;
   notes: string; category: string; brand: string; configuration: string; option: string;
   characteristics: string[]; subtype: string; color: string; material: string; description: string;
   parameters: Array<{ name: string; value: string }>;
@@ -115,6 +115,7 @@ export function buildProposalProducts(items: ProposalPlanItem[], catalog: Map<st
       depth: finite(override.depth) ?? finite(product?.depthMm) ?? finite(item.depth),
       height: finite(override.height) ?? finite(product?.heightMm) ?? finite(item.referenceHeightMm),
       price: finite(override.price) ?? finite(product?.price) ?? finite(item.referencePrice),
+      priceText: override.priceText ?? "",
       oldPrice: finite(product?.oldPrice) ?? finite(item.referenceOldPrice),
       notes: override.notes ?? "Финальная стоимость зависит от ткани, отделки и выбранной конфигурации.",
       category: override.category ?? product?.category ?? item.referenceCategory ?? "Предмет интерьера",
@@ -133,8 +134,28 @@ export const proposalTotal = (products: ProposalProduct[]) => products.reduce(
   (total, product) => total + (product.price || 0) * product.quantity, 0,
 );
 
+export function proposalPriceFromText(value: string, fallback?: number) {
+  const normalized = value.replace(/[\u00a0\s]/g, "").replace(/,/g, ".");
+  const result = normalized.includes("=") ? normalized.slice(normalized.lastIndexOf("=") + 1) : normalized;
+  const match = result.match(/-?\d+(?:\.\d+)?/);
+  if (match) {
+    const parsed = Number(match[0]);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return fallback;
+}
+
+export function proposalPriceLabel(priceText?: string, price?: number) {
+  const label = priceText?.trim();
+  if (label) {
+    const isPlainNumber = /^[\d\s\u00a0.,]+$/.test(label);
+    if (!isPlainNumber || price === undefined) return label;
+  }
+  return price === undefined ? "Цена по запросу" : `${new Intl.NumberFormat("ru-RU").format(price)} руб.`;
+}
+
 export const proposalOverrideFor = (product: ProposalProduct): ProposalOverride => ({
-  name: product.name, width: product.width, depth: product.depth, height: product.height, price: product.price,
+  name: product.name, width: product.width, depth: product.depth, height: product.height, price: product.price, priceText: product.priceText,
   quantity: product.quantity, article: product.article, category: product.category, brand: product.brand,
   configuration: product.configuration, option: product.option, characteristics: product.characteristics, notes: product.notes,
 });

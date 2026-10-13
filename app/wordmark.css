@@ -18,6 +18,14 @@
   white-space: nowrap;
 }
 
+button.room-design-wordmark {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: inherit;
+}
+
 .templates-nav,
 .template-site-header,
 .project-page-concept .project-nav,

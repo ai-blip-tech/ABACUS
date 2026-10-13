@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 
 type AccountSection = "profile" | "plan" | "purchase" | "tokens" | "renders" | "payments" | "settings" | "security";
+type AccountLink = { label: string; href: string; anchor?: AccountSection; feature?: "purchase" | "payments" };
 
 type AccountUser = {
   email: string;
@@ -12,15 +13,14 @@ type AccountUser = {
   features?: { purchase?: boolean; payments?: boolean };
 };
 
-const accountLinks: Array<{ label: string; anchor: AccountSection; feature?: "purchase" | "payments" }> = [
-  { label: "Личный кабинет", anchor: "profile" },
-  { label: "Тариф и токены", anchor: "plan" },
-  { label: "Купить токены", anchor: "purchase", feature: "purchase" },
-  { label: "История токенов", anchor: "tokens" },
-  { label: "История рендеров", anchor: "renders" },
-  { label: "Платежи", anchor: "payments", feature: "payments" },
-  { label: "Настройки", anchor: "settings" },
-  { label: "Безопасность", anchor: "security" },
+const accountLinks: AccountLink[] = [
+  { label: "Личный кабинет", href: "/account#profile", anchor: "profile" },
+  { label: "Мои проекты", href: "/#кабинет" },
+  { label: "Шаблоны", href: "/templates" },
+  { label: "История рендеров", href: "/account#renders", anchor: "renders" },
+  { label: "Платежи", href: "/account#payments", anchor: "payments", feature: "payments" },
+  { label: "Настройки", href: "/account#settings", anchor: "settings" },
+  { label: "Безопасность", href: "/account#security", anchor: "security" },
 ];
 
 const sectionFromLocation = (): AccountSection => {
@@ -119,11 +119,11 @@ export default function AccountDropdown({ user, studio = false, dashboard = fals
       </div>
       <div className="account-dropdown-divider"/>
       <nav aria-label="Разделы аккаунта">{visibleLinks.map((item, index) => <a
-        key={item.anchor}
+        key={item.href}
         ref={index === 0 ? firstLinkRef : undefined}
-        href={`/account#${item.anchor}`}
-        aria-current={active === item.anchor ? "page" : undefined}
-        onClick={() => { setActive(item.anchor); setOpen(false); }}
+        href={item.href}
+        aria-current={item.anchor && active === item.anchor ? "page" : undefined}
+        onClick={() => { if (item.anchor) setActive(item.anchor); setOpen(false); }}
       ><span>{String(accountLinks.indexOf(item) + 1).padStart(2, "0")}</span><i aria-hidden="true"/><b>{item.label}</b></a>)}</nav>
       {user.role === "admin" && <><div className="account-dropdown-divider account-dropdown-admin-divider"/><a className="account-dropdown-admin" href="/admin" onClick={() => setOpen(false)}>Админ-панель</a></>}
       <div className="account-dropdown-divider account-dropdown-logout-divider"/>
