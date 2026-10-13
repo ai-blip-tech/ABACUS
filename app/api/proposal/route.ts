@@ -1,7 +1,7 @@
 import fontkit from "@pdf-lib/fontkit";
 import { clip, endPath, PDFDocument, PDFImage, PDFFont, popGraphicsState, pushGraphicsState, rectangle, rgb } from "pdf-lib";
 import { normalizeProposalImage, type ProposalImageRole } from "@/lib/proposal-pdf-image";
-import { paginateProposalSpecification, proposalPriceLabel } from "@/lib/commercial-proposal";
+import { paginateProposalSpecification, proposalMoneyLabel, proposalPriceLabel } from "@/lib/commercial-proposal";
 import { requireTenantUser } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 import { isLegacyNorrBrand, PROPOSAL_BRAND, PROPOSAL_SELECTION_MODULE } from "@/lib/proposal-brand";
@@ -79,9 +79,7 @@ const BROWN = INK;
 const WHITE = rgb(1, 1, 1);
 
 const asText = (value: unknown) => String(value ?? "").replace(/\s+/g, " ").trim();
-const formatPrice = (value?: number) => value && Number.isFinite(value)
-  ? `${new Intl.NumberFormat("ru-RU").format(value)} руб.`
-  : "Цена по запросу";
+const formatPrice = proposalMoneyLabel;
 
 const decodeDataUrl = (source: string) => {
   const match = source.match(/^data:([^;,]+)?(?:;base64)?,([\s\S]*)$/);
@@ -294,7 +292,7 @@ export async function POST(request: Request) {
         const x = 36 + column * 257;
         page.drawText(label.toUpperCase(), { x: x + 10, y: 194, font: fontBold, size: 6.3, color: BURGUNDY });
         const valueSize = column === 2 ? Math.max(8, Math.min(15, 210 / Math.max(value.length, 1))) : 9;
-        page.drawText(value, { x: x + 10, y: 176, font: column === 2 ? serif : font, size: valueSize, color: BROWN });
+        page.drawText(value, { x: x + 10, y: 176, font, size: valueSize, color: BROWN });
         page.drawLine({ start: { x, y: 205 }, end: { x: x + 257, y: 205 }, thickness: .7, color: WARM_LINE });
       });
       drawLines(page, wrapText(textValue(product.notes || product.referenceDescription, "Финальная стоимость зависит от ткани, отделки и выбранной конфигурации."), font, 6.5, 740, 2), { x: 36, y: 150, font, size: 6.5, lineHeight: 8, color: MUTED });
@@ -326,7 +324,7 @@ export async function POST(request: Request) {
       const totalText = body.withPrices && total ? formatPrice(total) : "Цена по запросу";
       summary.drawRectangle({ x: 421, y: summaryY - 26, width: 379, height: 65, color: PALE });
       summary.drawText("ПРЕДВАРИТЕЛЬНЫЙ ИТОГ", { x: 438, y: summaryY + 18, font: fontBold, size: 7, color: BURGUNDY });
-      summary.drawText(totalText, { x: 438, y: summaryY - 10, font: serif, size: 19, color: BROWN });
+      summary.drawText(totalText, { x: 438, y: summaryY - 10, font: fontBold, size: 19, color: BROWN });
       summary.drawText("Условия предложения", { x: 42, y: 215, font: serif, size: 17, color: BROWN });
       [["СРОК ПОСТАВКИ", proposal.leadTime], ["ДОСТАВКА И СБОРКА", proposal.delivery], ["ОПЛАТА", proposal.payment]].forEach(([label, value], index) => {
         const x = 42 + index * 253; summary.drawRectangle({ x, y: 92, width: 235, height: 92, color: PALE });

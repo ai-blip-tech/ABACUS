@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { buildProposalProducts, defaultProposalDocument, mergeProposalDocument, proposalItemsForSelection, proposalOverrideFor, proposalPriceFromText, proposalPriceLabel, proposalTotal } from "../lib/commercial-proposal.ts";
+import { buildProposalProducts, defaultProposalDocument, formatProposalPriceText, mergeProposalDocument, proposalItemsForSelection, proposalOverrideFor, proposalPriceFromText, proposalPriceLabel, proposalTotal } from "../lib/commercial-proposal.ts";
 
 const catalog = new Map([["catalog-1", {
   id: "catalog-1", name: "Каталожный диван", image: "https://example.com/sofa.jpg", images: [],
@@ -44,11 +44,13 @@ test("commercial proposal total uses override price and quantity", () => {
   assert.equal(proposalTotal(products), 255000);
 });
 
-test("commercial proposal keeps a price-discount expression and uses its final value", () => {
+test("commercial proposal normalizes a price-discount expression and uses its final value", () => {
   const expression = "153 405 − 20% = 122 724 руб.";
+  const formattedExpression = "153 405 руб. − 20% = 122 724 руб.";
   assert.equal(proposalPriceFromText(expression, 153405), 122724);
-  assert.equal(proposalPriceLabel(expression, 122724), expression);
-  assert.equal(proposalPriceLabel("122724", 122724), "122 724 руб.");
+  assert.equal(formatProposalPriceText("255000 - 35% =165 750"), "255 000 руб. − 35% = 165 750 руб.");
+  assert.equal(proposalPriceLabel(expression, 122724), formattedExpression);
+  assert.equal(proposalPriceLabel("122724", 122724), "122 724 руб.");
   const [product] = buildProposalProducts([{
     id: "discounted", kind: "chair", name: "Кресло", width: 800, depth: 800, referenceImage: "image",
     proposalOverride: { price: 122724, priceText: expression },

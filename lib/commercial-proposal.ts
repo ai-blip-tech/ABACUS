@@ -145,13 +145,42 @@ export function proposalPriceFromText(value: string, fallback?: number) {
   return fallback;
 }
 
+const NON_BREAKING_SPACE = "\u00a0";
+
+const numericValue = (value: string) => {
+  const parsed = Number(value.replace(/[\s\u00a0\u202f]/g, "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const groupedNumber = (value: number) => new Intl.NumberFormat("ru-RU", {
+  maximumFractionDigits: 2,
+}).format(value).replace(/[\u202f\s]/g, NON_BREAKING_SPACE);
+
+export const proposalMoneyLabel = (value?: number) => value !== undefined && Number.isFinite(value)
+  ? `${groupedNumber(value)}${NON_BREAKING_SPACE}руб.`
+  : "Цена по запросу";
+
+export function formatProposalPriceText(value: string) {
+  const label = value.trim();
+  if (!label) return "";
+  const expression = label.match(/^([\d\s\u00a0\u202f.,]+)\s*(?:₽|руб\.?)?\s*[-−–—]\s*(\d+(?:[.,]\d+)?)\s*%\s*=\s*([\d\s\u00a0\u202f.,]+)\s*(?:₽|руб\.?)?$/iu);
+  if (expression) {
+    const original = numericValue(expression[1]);
+    const discount = numericValue(expression[2]);
+    const result = numericValue(expression[3]);
+    if (original !== undefined && discount !== undefined && result !== undefined) {
+      return `${proposalMoneyLabel(original)} − ${groupedNumber(discount)}% = ${proposalMoneyLabel(result)}`;
+    }
+  }
+  const plain = label.match(/^([\d\s\u00a0\u202f.,]+)\s*(?:₽|руб\.?)?$/iu);
+  const amount = plain ? numericValue(plain[1]) : undefined;
+  return amount === undefined ? label : proposalMoneyLabel(amount);
+}
+
 export function proposalPriceLabel(priceText?: string, price?: number) {
   const label = priceText?.trim();
-  if (label) {
-    const isPlainNumber = /^[\d\s\u00a0.,]+$/.test(label);
-    if (!isPlainNumber || price === undefined) return label;
-  }
-  return price === undefined ? "Цена по запросу" : `${new Intl.NumberFormat("ru-RU").format(price)} руб.`;
+  if (label) return formatProposalPriceText(label);
+  return proposalMoneyLabel(price);
 }
 
 export const proposalOverrideFor = (product: ProposalProduct): ProposalOverride => ({
