@@ -180,8 +180,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       id: shortText(item.id, 120) || crypto.randomUUID(),
       kind: shortText(item.kind, 40) || "decor",
       name: shortText(item.name, 240) || "Предмет",
-      x: finiteNumber(item.x, 0, 0, 100),
-      y: finiteNumber(item.y, 0, 0, 100),
+      // A rotated item's unrotated CSS box may extend outside the room even
+      // while its visible contour is exactly flush with a wall.
+      x: finiteNumber(item.x, 0, -100, 100),
+      y: finiteNumber(item.y, 0, -100, 100),
       width: finiteNumber(item.width, 500, 50, 20000),
       depth: finiteNumber(item.depth, 500, 50, 20000),
       rotation: finiteNumber(item.rotation, 0, 0, 360),

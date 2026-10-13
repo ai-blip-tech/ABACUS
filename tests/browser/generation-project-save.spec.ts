@@ -109,6 +109,65 @@ test("planogram save persists through the project API without downloading JSON",
   expect(downloads).toBe(0);
 });
 
+test("a rotated planogram item reaches the left wall and keeps its position after save", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-1440");
+  const projectId = "planogram-left-wall";
+  let savedState: { planItems?: Array<{ x?: number }> } | null = null;
+  await page.route("**/api/auth/me", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ user: { id: "user-wall", email: "wall@example.com", role: "user", firstName: "Wall", lastName: "Test" } }),
+  }));
+  await page.route(`**/api/projects/${projectId}`, async (route) => {
+    if (route.request().method() === "PUT") {
+      const body = route.request().postDataJSON() as { state?: { planItems?: Array<{ x?: number }> } };
+      savedState = body.state || null;
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        project: { id: projectId, name: "У левой стены", project_type: "Квартира" },
+        state: savedState || {
+          planItems: [{ id: "sofa-wall", kind: "sofa", name: "Диван", x: 20, y: 12, width: 2200, depth: 950, rotation: 90 }],
+          planRoom: { width: 6000, length: 4500 },
+        },
+      }),
+    });
+  });
+
+  await page.goto(`/?project=${projectId}#студия`);
+  await page.getByRole("button", { name: "Создание интерьера" }).click();
+  const toolbar = page.locator(".planogram-toolbar");
+  await toolbar.getByRole("button", { name: "−" }).click({ clickCount: 3 });
+  await expect(toolbar.locator("em")).toHaveText("70%");
+  const board = page.locator(".planogram-editor-board");
+  const sofa = page.getByRole("button", { name: /Диван: перемещать/ });
+  await page.waitForTimeout(350);
+  const boardBox = await board.boundingBox();
+  const sofaBox = await sofa.boundingBox();
+  if (!boardBox || !sofaBox) throw new Error("Планограмма не отрисовалась");
+  await page.mouse.move(sofaBox.x + sofaBox.width / 2, sofaBox.y + sofaBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(boardBox.x, sofaBox.y + sofaBox.height / 2, { steps: 8 });
+  await page.mouse.up();
+
+  const placedBox = await sofa.boundingBox();
+  const placedBoard = await board.boundingBox();
+  if (!placedBox || !placedBoard) throw new Error("Диван исчез после перемещения");
+  const wallInset = await board.evaluate((element) => Number.parseFloat(getComputedStyle(element).borderLeftWidth) || 0);
+  expect(Math.abs(placedBox.x - (placedBoard.x + wallInset * .7))).toBeLessThanOrEqual(2);
+
+  await toolbar.getByRole("button", { name: "Сохранить проект" }).click();
+  await expect.poll(() => savedState?.planItems?.[0]?.x).toBeLessThan(0);
+  await page.reload();
+  await page.getByRole("button", { name: "Создание интерьера" }).click();
+  const restoredBoard = await board.boundingBox();
+  const restoredSofa = await sofa.boundingBox();
+  if (!restoredBoard || !restoredSofa) throw new Error("Сохранённая планограмма не восстановилась");
+  expect(Math.abs(restoredSofa.x - (restoredBoard.x + wallInset))).toBeLessThanOrEqual(2);
+});
+
 test("planogram save creates a named project when no project exists", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-1440");
   const projectId = "new-planogram-project";

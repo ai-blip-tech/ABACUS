@@ -66,6 +66,12 @@ test("mouse dragging disables native drag without replacing touch, context menu 
   assert.match(globalCss, /\.planogram-furniture\{user-select:none;-webkit-user-select:none;-webkit-user-drag:none\}/);
 });
 
+test("rotated planogram items keep wall-aligned technical coordinates when saved", () => {
+  assert.match(page, /clampPlanogramItemToRoom/);
+  assert.match(projectRoute, /x: finiteNumber\(item\.x, 0, -100, 100\)/);
+  assert.match(projectRoute, /y: finiteNumber\(item\.y, 0, -100, 100\)/);
+});
+
 test("camera FOV uses the same rotation as the render brief and raster reference", () => {
   assert.match(page, /className="plan-camera-fov"/);
   assert.match(page, /rotate\(\$\{camera\.rotation\}deg\)/);
