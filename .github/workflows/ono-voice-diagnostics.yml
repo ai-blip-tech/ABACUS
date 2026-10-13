@@ -1,0 +1,60 @@
+name: Diagnose Ono production voice
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type DIAGNOSE_ONO_VOICE"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roomdesign-production-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    name: Read-only voice diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production-backup
+    steps:
+      - name: Validate manual confirmation
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: test "$CONFIRMATION" = "DIAGNOSE_ONO_VOICE"
+
+      - name: Inspect voice provider failures without changing production
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -eu
+            cd "$HOME/ABACUS"
+            test -f .env
+            test -d data
+            test -f data/room-design.sqlite
+
+            echo "PRODUCTION_SHA=$(git rev-parse HEAD)"
+            echo "SITE_HEALTH=$(curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null && echo ok)"
+            if grep -q '^OPENAI_TRANSCRIBE_MODEL=' .env; then
+              sed -n 's/^OPENAI_TRANSCRIBE_MODEL=/TRANSCRIBE_MODEL=/p' .env
+            else
+              echo "TRANSCRIBE_MODEL=gpt-4o-mini-transcribe (application default)"
+            fi
+            grep -q '^OPENAI_API_KEY=.' .env && echo "OPENAI_API_KEY_PRESENT=yes" || echo "OPENAI_API_KEY_PRESENT=no"
+
+            echo "VOICE_FAILURE_LOGS_BEGIN"
+            pm2 logs roomdesign --nostream --lines 1000 2>&1 \
+              | grep -E '\[It\] Audio transcription failed|status:|code:|type:|param:|message:' \
+              | tail -n 80 \
+              | sed -E 's/(sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]*/\1[REDACTED]/g' || true
+            echo "VOICE_FAILURE_LOGS_END"
+            echo "PRODUCTION_MODIFIED=no"
