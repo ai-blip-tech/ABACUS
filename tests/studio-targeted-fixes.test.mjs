@@ -12,6 +12,8 @@ const proposalPptxRoute = await readFile(new URL("../app/api/proposal/pptx/route
 const proposalEditor = await readFile(new URL("../app/proposal/[projectId]/proposal-editor.tsx", import.meta.url), "utf8");
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const projectRoute = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+const projectAssetRoute = await readFile(new URL("../app/api/projects/[id]/assets/[asset]/route.ts", import.meta.url), "utf8");
+const projectProposalRoute = await readFile(new URL("../app/api/projects/[id]/proposal/route.ts", import.meta.url), "utf8");
 const itOrb = await readFile(new URL("../app/it-orb.tsx", import.meta.url), "utf8");
 const itOrbCss = await readFile(new URL("../app/it-orb.css", import.meta.url), "utf8");
 
@@ -45,6 +47,12 @@ test("each render history version restores its own commercial proposal product s
   assert.match(projectRoute, /proposalItems: sanitizeItems\(item\.proposalItems, `history-\$\{index\}-proposal-item`\)/);
   assert.match(projectRoute, /historyVersions:[\s\S]*?proposalItems: \(version\.proposalItems \|\| \[\]\)/);
   assert.match(proposalEditor, /proposalItemsForSelection\(payload\.state\)/);
+});
+
+test("each commercial proposal image snapshot receives a fresh cache identity", () => {
+  assert.match(projectProposalRoute, /state\.proposalVisualizationVersion = crypto\.randomUUID\(\)/);
+  assert.match(projectRoute, /proposalVisualizationVersion \? `\?v=\$\{encodeURIComponent\(state\.proposalVisualizationVersion\)\}`/);
+  assert.match(projectAssetRoute, /asset === "proposal-visualization" \? "private, no-store"/);
 });
 
 test("remove flow sends a point-guided remove operation and restores editor controls", () => {

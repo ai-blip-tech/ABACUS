@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!object) return new Response("Изображение не найдено.", { status: 404 });
   const headers = new Headers();
   object.writeHttpMetadata(headers);
-  headers.set("Cache-Control", "private, max-age=3600");
+  headers.set("Cache-Control", asset === "proposal-visualization" ? "private, no-store" : "private, max-age=3600");
   headers.set("ETag", object.httpEtag);
   return new Response(object.body, { headers });
 }

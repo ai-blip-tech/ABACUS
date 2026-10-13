@@ -109,6 +109,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         customMetadata: { projectId: id, userId: user.id, tenantId: user.tenantId },
       });
       state.proposalVisualizationAsset = asset;
+      state.proposalVisualizationVersion = crypto.randomUUID();
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : "Не удалось сохранить выбранную визуализацию." }, { status: 500 });
     }
