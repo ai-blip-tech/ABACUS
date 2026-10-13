@@ -67,6 +67,13 @@ test("profile menu closes after selection", async ({ page }, testInfo) => {
   await page.getByRole("link", { name: "Шаблоны", exact: true }).click();
   await expect(page).toHaveURL(/\/templates$/);
   await expect(page.locator("#account-profile-menu")).toHaveCount(0);
+  await expect(page.locator(".template-site-header .account-trigger")).toBeVisible();
+  await expect(page.locator(".template-site-header").getByRole("link", { name: "Войти", exact: true })).toHaveCount(0);
+
+  await page.getByRole("link", { name: /Дизайн-баттл/ }).first().click();
+  await expect(page).toHaveURL(/\/templates\/design-battle$/);
+  await expect(page.locator(".template-site-header .account-trigger")).toBeVisible();
+  await expect(page.getByText("Для сохранения истории и генерации нужен вход.")).toHaveCount(0);
 });
 
 test("homepage masthead does not stretch the nested profile navigation", async ({ page }, testInfo) => {
