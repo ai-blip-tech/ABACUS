@@ -50,4 +50,5 @@
 
 /* Canonical Room Design masthead geometry shared with the homepage. */
 .templates-nav,.template-site-header{height:var(--rd-header-height);padding-left:var(--rd-header-gutter);padding-right:var(--rd-header-gutter)}
+.templates-nav .account-dropdown-card nav{align-items:stretch;gap:0}
 @media(max-width:680px){.templates-nav,.template-site-header{height:auto;min-height:66px;padding:12px 18px}}
