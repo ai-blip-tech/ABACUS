@@ -55,6 +55,7 @@ type SavedState = {
   planInstruction?: string;
   proposalShowPrices?: boolean;
   proposalVisualizationAsset?: string;
+  proposalVisualizationVersion?: string;
   proposalHistoryId?: string | null;
   proposalDocument?: Record<string, string>;
 };
@@ -69,7 +70,7 @@ function hydrateState(projectId: string, state: SavedState) {
     ...state,
     interiorImage: state.interiorAsset ? assetUrl(projectId, state.interiorAsset) : "",
     generatedImage: state.generatedAsset ? assetUrl(projectId, state.generatedAsset) : "",
-    proposalVisualization: state.proposalVisualizationAsset ? assetUrl(projectId, state.proposalVisualizationAsset) : "",
+    proposalVisualization: state.proposalVisualizationAsset ? `${assetUrl(projectId, state.proposalVisualizationAsset)}${state.proposalVisualizationVersion ? `?v=${encodeURIComponent(state.proposalVisualizationVersion)}` : ""}` : "",
     historyVersions: (state.historyVersions || []).map((version) => ({
       ...version,
       image: assetUrl(projectId, version.asset),
@@ -145,14 +146,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const existingProject = await database.prepare("SELECT id, state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first<{ id: string; state_json: string | null }>();
   let persistedShowPrices = true;
   let persistedProposalVisualizationAsset: string | undefined;
+  let persistedProposalVisualizationVersion: string | undefined;
   let persistedProposalHistoryId: string | null | undefined;
   let persistedProposalDocument: Record<string, string> | undefined;
   const persistedOverrides = new Map<string, unknown>();
   if (existingProject?.state_json) {
     try {
-      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalHistoryId?: string | null; proposalDocument?: Record<string, string>; planItems?: Array<{ id?: string; proposalOverride?: unknown }>; proposalItems?: Array<{ id?: string; proposalOverride?: unknown }> };
+      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalVisualizationVersion?: string; proposalHistoryId?: string | null; proposalDocument?: Record<string, string>; planItems?: Array<{ id?: string; proposalOverride?: unknown }>; proposalItems?: Array<{ id?: string; proposalOverride?: unknown }> };
       persistedShowPrices = persisted.proposalShowPrices !== false;
       persistedProposalVisualizationAsset = persisted.proposalVisualizationAsset;
+      persistedProposalVisualizationVersion = persisted.proposalVisualizationVersion;
       persistedProposalHistoryId = persisted.proposalHistoryId;
       persistedProposalDocument = persisted.proposalDocument;
       for (const item of persisted.planItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
@@ -180,8 +183,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       id: shortText(item.id, 120) || crypto.randomUUID(),
       kind: shortText(item.kind, 40) || "decor",
       name: shortText(item.name, 240) || "Предмет",
-      x: finiteNumber(item.x, 0, 0, 100),
-      y: finiteNumber(item.y, 0, 0, 100),
+      // A rotated item's unrotated CSS box may extend outside the room even
+      // while its visible contour is exactly flush with a wall.
+      x: finiteNumber(item.x, 0, -100, 100),
+      y: finiteNumber(item.y, 0, -100, 100),
       width: finiteNumber(item.width, 500, 50, 20000),
       depth: finiteNumber(item.depth, 500, 50, 20000),
       rotation: finiteNumber(item.rotation, 0, 0, 360),
@@ -282,6 +287,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     planInstruction: typeof draft.planInstruction === "string" ? draft.planInstruction.trim().slice(0, 2000) : "",
     proposalShowPrices: typeof draft.proposalShowPrices === "boolean" ? draft.proposalShowPrices : persistedShowPrices,
     proposalVisualizationAsset: persistedProposalVisualizationAsset,
+    proposalVisualizationVersion: persistedProposalVisualizationVersion,
     proposalHistoryId: persistedProposalHistoryId,
     proposalDocument: persistedProposalDocument,
   };

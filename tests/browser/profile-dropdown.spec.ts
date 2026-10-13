@@ -68,3 +68,24 @@ test("profile menu closes after selection", async ({ page }, testInfo) => {
   await expect(page).toHaveURL(/\/templates$/);
   await expect(page.locator("#account-profile-menu")).toHaveCount(0);
 });
+
+test("homepage masthead does not stretch the nested profile navigation", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-1440");
+  await page.goto("/");
+
+  const trigger = page.locator(".templates-nav-actions .account-trigger");
+  await trigger.click();
+  const menu = page.locator(".templates-nav-actions #account-profile-menu");
+  await expect(menu).toBeVisible();
+  await expect(menu.locator("nav")).toHaveCSS("gap", "0px");
+
+  const box = await menu.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.height).toBeGreaterThanOrEqual(470);
+  expect(box!.height).toBeLessThanOrEqual(520);
+  for (const row of await menu.locator("nav a").all()) {
+    const rowBox = await row.boundingBox();
+    expect(rowBox!.height).toBeGreaterThanOrEqual(46);
+    expect(rowBox!.height).toBeLessThanOrEqual(50);
+  }
+});

@@ -12,6 +12,8 @@ const proposalPptxRoute = await readFile(new URL("../app/api/proposal/pptx/route
 const proposalEditor = await readFile(new URL("../app/proposal/[projectId]/proposal-editor.tsx", import.meta.url), "utf8");
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const projectRoute = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+const projectAssetRoute = await readFile(new URL("../app/api/projects/[id]/assets/[asset]/route.ts", import.meta.url), "utf8");
+const projectProposalRoute = await readFile(new URL("../app/api/projects/[id]/proposal/route.ts", import.meta.url), "utf8");
 const itOrb = await readFile(new URL("../app/it-orb.tsx", import.meta.url), "utf8");
 const itOrbCss = await readFile(new URL("../app/it-orb.css", import.meta.url), "utf8");
 
@@ -47,6 +49,12 @@ test("each render history version restores its own commercial proposal product s
   assert.match(proposalEditor, /proposalItemsForSelection\(payload\.state\)/);
 });
 
+test("each commercial proposal image snapshot receives a fresh cache identity", () => {
+  assert.match(projectProposalRoute, /state\.proposalVisualizationVersion = crypto\.randomUUID\(\)/);
+  assert.match(projectRoute, /proposalVisualizationVersion \? `\?v=\$\{encodeURIComponent\(state\.proposalVisualizationVersion\)\}`/);
+  assert.match(projectAssetRoute, /asset === "proposal-visualization" \? "private, no-store"/);
+});
+
 test("remove flow sends a point-guided remove operation and restores editor controls", () => {
   assert.match(generateRoute, /body\.removal \? "remove"/);
   assert.match(generateRoute, /body\.roomImage && body\.pointEdit\?\.markedImage && body\.removal/);
@@ -64,6 +72,12 @@ test("mouse dragging disables native drag without replacing touch, context menu 
   assert.match(page, /onDoubleClick=\{\(event\)=>/);
   assert.match(page, /onContextMenu=\{\(event\)=>/);
   assert.match(globalCss, /\.planogram-furniture\{user-select:none;-webkit-user-select:none;-webkit-user-drag:none\}/);
+});
+
+test("rotated planogram items keep wall-aligned technical coordinates when saved", () => {
+  assert.match(page, /clampPlanogramItemToRoom/);
+  assert.match(projectRoute, /x: finiteNumber\(item\.x, 0, -100, 100\)/);
+  assert.match(projectRoute, /y: finiteNumber\(item\.y, 0, -100, 100\)/);
 });
 
 test("camera FOV uses the same rotation as the render brief and raster reference", () => {

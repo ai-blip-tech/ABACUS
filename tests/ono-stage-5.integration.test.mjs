@@ -60,6 +60,16 @@ test("public widget request source is host-bound and rejects foreign origins", (
   assert.equal(isTrustedOnoRequestSource(config, new Request("http://norr.localhost:3128/api/it", { headers: { origin: "https://attacker.example" } })), false);
 });
 
+test("Room Design trusts its approved public referer behind the production reverse proxy", () => {
+  const config = onoSiteConfigFor("roomdesign");
+  assert.equal(isTrustedOnoRequestSource(config, new Request("http://127.0.0.1:3000/api/it", {
+    headers: { referer: "https://roomdesign.com.ru/templates" },
+  })), true);
+  assert.equal(isTrustedOnoRequestSource(config, new Request("http://127.0.0.1:3000/api/it", {
+    headers: { referer: "https://attacker.example/templates" },
+  })), false);
+});
+
 const salesScenarios = [
   "диван по цвету и размерам", "мебель по бюджету", "угловой диван", "кресло к дивану", "сравнение моделей",
   "материалы обивки", "уход за мебелью", "маленькая комната", "большая гостиная", "товар по фотографии",

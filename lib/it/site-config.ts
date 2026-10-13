@@ -82,7 +82,10 @@ export function isTrustedOnoRequestSource(config: OnoSiteConfig, request: Reques
   if (origin) return origin === requestOrigin || isApprovedOnoOrigin(config, origin);
   const referer = request.headers.get("referer");
   if (referer) {
-    try { return new URL(referer).origin === requestOrigin; } catch { return false; }
+    try {
+      const refererOrigin = new URL(referer).origin;
+      return refererOrigin === requestOrigin || isApprovedOnoOrigin(config, refererOrigin);
+    } catch { return false; }
   }
   return process.env.NODE_ENV !== "production";
 }

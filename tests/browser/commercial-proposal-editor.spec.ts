@@ -196,7 +196,10 @@ test("commercial proposal snapshots the history version selected in Studio", asy
   await page.getByRole("button", { name: "Создать коммерческое предложение" }).click();
   let popup = await popupPromise;
   await popup.waitForURL(/\/proposal\//);
-  await expect(popup.locator(".proposal-selection-page img")).toBeVisible();
+  const firstProposalVisual = popup.locator(".proposal-selection-page img");
+  await expect(firstProposalVisual).toBeVisible();
+  await expect.poll(() => firstProposalVisual.evaluate((element) => ({ width: (element as HTMLImageElement).naturalWidth, height: (element as HTMLImageElement).naturalHeight }))).toEqual({ width: 1, height: 1 });
+  const firstProposalVisualUrl = await firstProposalVisual.getAttribute("src");
   await expect(popup.locator(".proposal-product-page")).toHaveCount(1);
   await expect(popup.locator(".proposal-summary-table")).toContainText("Old Sofa");
   await expect(popup.locator(".proposal-summary-table")).not.toContainText("Final Table");
@@ -210,6 +213,12 @@ test("commercial proposal snapshots the history version selected in Studio", asy
   await page.getByRole("button", { name: "Создать коммерческое предложение" }).click();
   popup = await popupPromise;
   await popup.waitForURL(/\/proposal\//);
+  const secondProposalVisual = popup.locator(".proposal-selection-page img");
+  await expect(secondProposalVisual).toBeVisible();
+  await expect.poll(() => secondProposalVisual.evaluate((element) => ({ width: (element as HTMLImageElement).naturalWidth, height: (element as HTMLImageElement).naturalHeight }))).toEqual({ width: 2, height: 3 });
+  const secondProposalVisualUrl = await secondProposalVisual.getAttribute("src");
+  expect(secondProposalVisualUrl).not.toBe(firstProposalVisualUrl);
+  expect(secondProposalVisualUrl).toContain("?v=");
   await expect(popup.locator(".proposal-product-page")).toHaveCount(1);
   await expect(popup.locator(".proposal-summary-table")).toContainText("Final Table");
   await expect(popup.locator(".proposal-summary-table")).not.toContainText("Old Sofa");
