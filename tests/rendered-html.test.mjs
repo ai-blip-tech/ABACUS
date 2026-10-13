@@ -84,15 +84,17 @@ test("planogram keeps menus readable, rugs below furniture, and supports bedside
   assert.match(pageSource, /type:\s*"nightstand"\s*,\s*name:\s*"Прикроватная тумба"/);
   assert.match(pageSource, /type:\s*"cabinet"\s*,\s*name:\s*"Шкаф"/);
   assert.match(pageSource, /type:\s*"ottoman"\s*,\s*name:\s*"Пуфы"/);
+  assert.match(pageSource, /type:\s*"shelving"\s*,\s*name:\s*"Стеллаж"/);
   assert.match(pageSource, /пуф\|банкетк\|оттоманк\|ottoman\|pouf/);
   assert.match(pageSource, /kind:\s*"stool"\s*,\s*name:\s*"Пуф"/);
   assert.match(pageSource, /kind:\s*"nightstand"\s*,\s*name:\s*"Прикроватная тумба"/);
   assert.match(catalogSource, /type\s*===\s*"nightstand"/);
   assert.match(catalogSource, /type\s*===\s*"cabinet"/);
   assert.match(catalogSource, /type\s*===\s*"ottoman"/);
+  assert.match(catalogSource, /type\s*===\s*"shelving"/);
   assert.match(controlsSource, /keepMenuHorizontal/);
   assert.match(controlsSource, /classList\.contains\("stool"\)[^\n]+\? "ottoman" : "chair"/);
-  assert.match(controlsSource, /classList\.contains\("cabinet"\)\) return "cabinet"/);
+  assert.match(controlsSource, /classList\.contains\("cabinet"\)[^\n]+\? "shelving" : "cabinet"/);
   assert.match(controlsSource, /--no-rotation/);
   assert.match(stylesSource, /\.planogram-furniture\.rug[^}]*z-index:\s*1!important/);
   assert.match(stylesSource, /\.planogram-furniture:not\(\.rug\)[^{]*\{z-index:\s*2\}/);

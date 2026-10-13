@@ -1,7 +1,7 @@
 import fontkit from "@pdf-lib/fontkit";
 import { clip, endPath, PDFDocument, PDFImage, PDFFont, popGraphicsState, pushGraphicsState, rectangle, rgb } from "pdf-lib";
 import { normalizeProposalImage, type ProposalImageRole } from "@/lib/proposal-pdf-image";
-import { paginateProposalSpecification } from "@/lib/commercial-proposal";
+import { paginateProposalSpecification, proposalPriceLabel } from "@/lib/commercial-proposal";
 import { requireTenantUser } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 import { isLegacyNorrBrand, PROPOSAL_BRAND, PROPOSAL_SELECTION_MODULE } from "@/lib/proposal-brand";
@@ -30,6 +30,7 @@ type ProposalProduct = {
   depth?: number;
   height?: number;
   price?: number;
+  priceText?: string;
   notes?: string;
   article?: string;
   category?: string;
@@ -289,10 +290,11 @@ export async function POST(request: Request) {
       page.drawText("заполняется менеджером", { x: panelX, y: 294, font: serifItalic, size: 5.4, color: MUTED });
       for (let line = 0; line < 4; line += 1) page.drawLine({ start: { x: panelX, y: 282 - line * 12 }, end: { x: 565, y: 282 - line * 12 }, thickness: .7, color: BURGUNDY });
       const unitPrice = product.price ?? product.referencePrice;
-      [["Комплектация", textValue(product.configuration)], ["Количество", `${String(product.quantity || 1)} шт.`], ["Стоимость", body.withPrices ? formatPrice(unitPrice) : "Цена по запросу"]].forEach(([label, value], column) => {
+      [["Комплектация", textValue(product.configuration)], ["Количество", `${String(product.quantity || 1)} шт.`], ["Стоимость", body.withPrices ? proposalPriceLabel(product.priceText, unitPrice) : "Цена по запросу"]].forEach(([label, value], column) => {
         const x = 36 + column * 257;
         page.drawText(label.toUpperCase(), { x: x + 10, y: 194, font: fontBold, size: 6.3, color: BURGUNDY });
-        page.drawText(value, { x: x + 10, y: 176, font: column === 2 ? serif : font, size: column === 2 ? 15 : 9, color: BROWN });
+        const valueSize = column === 2 ? Math.max(8, Math.min(15, 210 / Math.max(value.length, 1))) : 9;
+        page.drawText(value, { x: x + 10, y: 176, font: column === 2 ? serif : font, size: valueSize, color: BROWN });
         page.drawLine({ start: { x, y: 205 }, end: { x: x + 257, y: 205 }, thickness: .7, color: WARM_LINE });
       });
       drawLines(page, wrapText(textValue(product.notes || product.referenceDescription, "Финальная стоимость зависит от ткани, отделки и выбранной конфигурации."), font, 6.5, 740, 2), { x: 36, y: 150, font, size: 6.5, lineHeight: 8, color: MUTED });
@@ -311,9 +313,9 @@ export async function POST(request: Request) {
       ["№", "ПОЗИЦИЯ", "АРТИКУЛ", "КОЛ-ВО", "ЦЕНА", "СУММА"].forEach((value, index) => summary.drawText(value, { x: columns[index], y: 480, font: fontBold, size: 7, color: WHITE }));
       pageProducts.forEach((product, index) => {
         const y = 442 - index * 34;
-        const row = [String(specificationOffset + index + 1).padStart(2, "0"), textValue(product.name), textValue(product.article || product.referenceArticle), String(product.quantity || 1), body.withPrices ? formatPrice(product.price) : "по запросу", body.withPrices && product.price ? formatPrice(product.price * (product.quantity || 1)) : "по запросу"];
+        const row = [String(specificationOffset + index + 1).padStart(2, "0"), textValue(product.name), textValue(product.article || product.referenceArticle), String(product.quantity || 1), body.withPrices ? proposalPriceLabel(product.priceText, product.price) : "по запросу", body.withPrices && product.price ? formatPrice(product.price * (product.quantity || 1)) : "по запросу"];
         if (index % 2 === 1) summary.drawRectangle({ x: 36, y: y - 11, width: 764, height: 33, color: rgb(248 / 255, 246 / 255, 242 / 255) });
-        row.forEach((value, column) => summary.drawText(value.slice(0, column === 1 ? 40 : 20), { x: columns[column], y, font: column === 0 || column === 5 ? fontBold : font, size: 8, color: BROWN }));
+        row.forEach((value, column) => summary.drawText(value.slice(0, column === 1 ? 40 : column === 4 ? 32 : 20), { x: columns[column], y, font: column === 0 || column === 5 ? fontBold : font, size: column === 4 && value.length > 20 ? 6.2 : 8, color: BROWN }));
         summary.drawLine({ start: { x: 36, y: y - 10 }, end: { x: 800, y: y - 10 }, thickness: .5, color: WARM_LINE });
       });
       specificationOffset += pageProducts.length;

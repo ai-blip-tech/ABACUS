@@ -18,7 +18,8 @@ test("all product mastheads use the homepage Room Design wordmark", () => {
   }
   assert.match(studio, /project-wordmark room-design-wordmark/);
   assert.match(studio, /wordmark room-design-wordmark/);
-  assert.match(studio, /projects-dashboard-header"><strong className="room-design-wordmark"/);
+  assert.match(studio, /projects-dashboard-header"><button className="room-design-wordmark"[^>]+onClick=\{onHome\}/);
+  assert.match(studio, /aria-label="ROOM DESIGN — на главную"/);
   assert.doesNotMatch(admin, /ROOM <span>admin<\/span>/);
   assert.doesNotMatch(proposal, /ROOM<span>DESIGN<\/span>/);
 });

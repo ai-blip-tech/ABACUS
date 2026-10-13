@@ -13,7 +13,7 @@ if (typeof window !== "undefined" && !(window as Window & { __roomPlanControls?:
     if (item.classList.contains("chair")) return "armchair";
     if (item.classList.contains("stool")) return /пуф|банкет|оттоман|pouf|ottoman/.test(name) ? "ottoman" : "chair";
     if (item.classList.contains("bed")) return "bed";
-    if (item.classList.contains("cabinet")) return "cabinet";
+    if (item.classList.contains("cabinet")) return /стеллаж|этажерк|shelv|bookcase|rack/.test(name) ? "shelving" : "cabinet";
     if (item.classList.contains("nightstand")) return "nightstand";
     if (item.classList.contains("dresser")) return "dresser";
     if (item.classList.contains("tv_stand")) return "tv_stand";

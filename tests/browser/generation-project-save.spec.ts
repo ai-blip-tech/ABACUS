@@ -139,7 +139,7 @@ test("planogram save creates a named project when no project exists", async ({ p
   await expect(page).toHaveURL(new RegExp(`\\?project=${projectId}#`));
 });
 
-test("planogram pouf and cabinet open their matching catalog categories", async ({ page }, testInfo) => {
+test("planogram pouf, cabinet and shelving open their matching catalog categories", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-1440");
   const projectId = "planogram-catalog-types";
   const catalogTypes: string[] = [];
@@ -171,6 +171,12 @@ test("planogram pouf and cabinet open their matching catalog categories", async 
   await expect(cabinetCatalog).toBeVisible();
   await cabinetCatalog.click();
   await expect.poll(() => catalogTypes.at(-1)).toBe("cabinet");
+  await page.getByRole("button", { name: "Закрыть каталог" }).click();
+
+  await page.locator(".plan-template-grid").getByRole("button", { name: "Стеллаж", exact: true }).click();
+  await page.getByRole("button", { name: /Стеллаж: перемещать/ }).click({ button: "right" });
+  await page.locator(".plan-context-menu").getByRole("button", { name: "Добавить из каталога" }).click();
+  await expect.poll(() => catalogTypes.at(-1)).toBe("shelving");
 });
 
 test("planogram remembers an instruction without generating and sends it only with create render", async ({ page }, testInfo) => {

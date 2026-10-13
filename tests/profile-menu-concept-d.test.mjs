@@ -13,9 +13,14 @@ const hero = await readFile(new URL("../public/images/room-design/room-design-pr
 test("profile menu keeps dynamic identity, approved order and existing permissions", () => {
   assert.match(dropdown, /const fullName = \[user\.firstName, user\.lastName\]/);
   assert.match(dropdown, /const initials = fullName/);
-  for (const label of ["Личный кабинет", "Тариф и токены", "Купить токены", "История токенов", "История рендеров", "Платежи", "Настройки", "Безопасность", "Выйти"]) {
+  for (const label of ["Личный кабинет", "Мои проекты", "Шаблоны", "История рендеров", "Платежи", "Настройки", "Безопасность", "Выйти"]) {
     assert.ok(dropdown.includes(label), `missing item: ${label}`);
   }
+  for (const removed of ["Тариф и токены", "Купить токены", "История токенов"]) assert.doesNotMatch(dropdown, new RegExp(removed));
+  assert.ok(dropdown.indexOf("Личный кабинет") < dropdown.indexOf("Мои проекты"));
+  assert.ok(dropdown.indexOf("Мои проекты") < dropdown.indexOf("Шаблоны"));
+  assert.match(dropdown, /href: "\/#кабинет"/);
+  assert.match(dropdown, /href: "\/templates"/);
   assert.match(dropdown, /user\.features\?\.\[item\.feature\] !== false/);
   assert.match(dropdown, /user\.role === "admin"/);
   assert.doesNotMatch(dropdown, /tenant|userId|provider/i);

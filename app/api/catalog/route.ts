@@ -78,6 +78,7 @@ const matchesCatalogType = (product: CatalogProduct, type: string, categoryTrail
   if (type === "nightstand") return /прикроватн.{0,30}(?:тумб|стол)|(?:тумб|стол).{0,30}прикроватн/.test(text);
   if (type === "dresser") return /комод/.test(text);
   if (type === "cabinet") return /шкаф|гардероб|буфет|витрин/.test(text);
+  if (type === "shelving") return /стеллаж/.test(categoryText) || /стеллаж|этажерк/.test(text);
   if (type === "tv_stand") return /(?:тв|tv|телевиз)[\s-]*(?:тумб|стойк)|тумб[^/]{0,45}(?:тв|tv|телевиз)/.test(text);
   if (type === "rug") return /ковер|ковры|шкура/.test(categoryText);
   if (type === "light") return /свет|люстр|торшер|ламп/.test(text);

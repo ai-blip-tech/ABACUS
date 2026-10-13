@@ -23,9 +23,10 @@ test("one account dropdown is used by project and Studio headers", () => {
   assert.match(homeSource, /<AccountDropdown user=\{user\}\/>/);
   assert.match(homeSource, /<AccountDropdown user=\{user\} studio\/>/);
   assert.doesNotMatch(homeSource, /className="avatar"[^>]+window\.location\.assign\("\/account"\)/);
-  for (const label of ["Личный кабинет", "Тариф и токены", "Купить токены", "История токенов", "История рендеров", "Платежи", "Настройки", "Безопасность", "Выйти"]) {
+  for (const label of ["Личный кабинет", "Мои проекты", "Шаблоны", "История рендеров", "Платежи", "Настройки", "Безопасность", "Выйти"]) {
     assert.ok(dropdownSource.includes(label), `missing dropdown item: ${label}`);
   }
+  for (const removed of ["Тариф и токены", "Купить токены", "История токенов"]) assert.doesNotMatch(dropdownSource, new RegExp(removed));
   assert.match(dropdownSource, /pointerdown/);
   assert.match(dropdownSource, /event\.key === "Escape"/);
   assert.match(dropdownSource, /setOpen\(\(value\) => !value\)/);

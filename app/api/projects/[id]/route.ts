@@ -3,7 +3,7 @@ import { database } from "@/lib/server-runtime";
 
 type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string; proposalItems?: SavedPlanItem[] };
 type SavedPlanParameter = { name: string; value: string };
-type SavedProposalOverride = { name?: string; width?: number; depth?: number; height?: number; price?: number; quantity?: number; article?: string; category?: string; brand?: string; configuration?: string; option?: string; characteristics?: string[]; notes?: string };
+type SavedProposalOverride = { name?: string; width?: number; depth?: number; height?: number; price?: number; priceText?: string; quantity?: number; article?: string; category?: string; brand?: string; configuration?: string; option?: string; characteristics?: string[]; notes?: string };
 type SavedPlanItem = {
   id: string;
   kind: string;
@@ -211,6 +211,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           depth: typeof override.depth === "number" && Number.isFinite(override.depth) ? finiteNumber(override.depth, 0, 0, 20000) : undefined,
           height: typeof override.height === "number" && Number.isFinite(override.height) ? finiteNumber(override.height, 0, 0, 20000) : undefined,
           price: typeof override.price === "number" && Number.isFinite(override.price) ? finiteNumber(override.price, 0, 0, 1_000_000_000) : undefined,
+          priceText: typeof override.priceText === "string" ? override.priceText.trim().slice(0, 120) || undefined : undefined,
           quantity: typeof override.quantity === "number" && Number.isFinite(override.quantity) ? finiteNumber(override.quantity, 1, 1, 10_000) : undefined,
           article: shortText(override.article, 160) || undefined,
           category: shortText(override.category, 240) || undefined,
