@@ -115,6 +115,8 @@ test("Stage 2 exposes versioned site config and navigation manifests", () => {
   assert.equal(config.capabilities.mutatingActions, false);
   assert.equal(config.retentionDays, 30);
   assert.equal(config.navigationManifestVersion, navigationManifestFor("roomdesign").version);
+  assert.ok(config.approvedOrigins.includes("http://localhost:3129"));
+  assert.ok(config.approvedOrigins.includes("http://127.0.0.1:3129"));
   assert.ok(navigationManifestFor("norrmobler").entries.some((entry) => entry.id === "catalog"));
   assert.equal(resolveOnoTenantProfile("norr.localhost:3128").siteId, "norrmobler");
   assert.ok(onoSiteConfigFor("norrmobler").approvedOrigins.includes("http://norr.localhost:3128"));
