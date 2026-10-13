@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   buildProposalProducts, defaultProposalDocument, mergeProposalDocument, paginateProposalSpecification, proposalItemsForSelection, proposalOverrideFor, proposalTotal,
-  proposalPriceFromText, proposalPriceLabel,
+  formatProposalPriceText, proposalMoneyLabel, proposalPriceFromText, proposalPriceLabel,
   type ProposalCatalogProduct, type ProposalDocument, type ProposalPlanItem, type ProposalProduct,
 } from "@/lib/commercial-proposal";
 import { PROPOSAL_BRAND, isLegacyNorrBrand } from "@/lib/proposal-brand";
@@ -19,7 +19,7 @@ type ProjectPayload = {
   };
 };
 
-const money = (value?: number) => value === undefined ? "Цена по запросу" : `${new Intl.NumberFormat("ru-RU").format(value)} руб.`;
+const money = proposalMoneyLabel;
 const dataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader(); reader.onload = () => resolve(String(reader.result));
   reader.onerror = () => reject(new Error("Не удалось подготовить изображение для PDF.")); reader.readAsDataURL(blob);
@@ -87,7 +87,10 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
           if (catalogResponse.ok) catalog = new Map((catalogPayload.products || []).map((item) => [item.id, item]));
         }
         if (!active) return;
-        const mapped = buildProposalProducts(items, catalog);
+        const mapped = buildProposalProducts(items, catalog).map((product) => ({
+          ...product,
+          priceText: product.priceText ? formatProposalPriceText(product.priceText) : "",
+        }));
         const profile = auth.user || {};
         const defaults = defaultProposalDocument(payload.project?.name || "", mapped.length);
         defaults.managerPhone = profile.phone || "";
@@ -142,7 +145,11 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
     try {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       await save(products, showPrices, document);
-      await window.document.fonts.ready;
+      await Promise.all([
+        window.document.fonts.load('400 16px "Proposal Sans"'),
+        window.document.fonts.load('700 16px "Proposal Sans"'),
+        window.document.fonts.ready,
+      ]);
       const [coverImage, coverBrandAsset, managerBrandAsset, fontData, fontBoldData, serifFontData, serifItalicFontData, serifBoldFontData, preparedProducts] = await Promise.all([
         pdfImage(visual), pdfImage(PROPOSAL_BRAND.coverAsset), pdfImage(PROPOSAL_BRAND.circleAsset), pdfImage("/fonts/Arial.ttf"), pdfImage("/fonts/Arial-Bold.ttf"),
         pdfImage("/fonts/Georgia.ttf"), pdfImage("/fonts/Georgia-Italic.ttf"), pdfImage("/fonts/Georgia-Bold.ttf"),
@@ -209,7 +216,7 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
               : <><Field label="Конфигурация" value={product.configuration} onChange={(configuration) => updateProduct(product.key, { configuration })}/><Field label="Обивка / вариант" value={product.option} onChange={(option) => updateProduct(product.key, { option })}/></>}
           <div className="proposal-extra"><span>Дополнительные характеристики</span>{product.characteristics.map((value, characteristicIndex) => <input key={characteristicIndex} aria-label={`Характеристика ${characteristicIndex + 1}: ${product.name}`} value={value} onChange={(event) => { const characteristics = [...product.characteristics]; characteristics[characteristicIndex] = event.target.value; updateProduct(product.key, { characteristics }); }}/>)}</div>
         </aside></div>
-        <div className="proposal-product-strip"><Field label="Комплектация" value={product.configuration} onChange={(configuration) => updateProduct(product.key, { configuration })}/><label className="proposal-field"><span>Количество</span><input aria-label={`Количество: ${product.name}`} type="number" min="1" value={product.quantity} onChange={(event) => updateProduct(product.key, { quantity: Math.max(1, Number(event.target.value) || 1) })}/></label>{showPrices && <label className="proposal-field"><span>Стоимость</span><input aria-label={`Цена: ${product.name}`} type="text" inputMode="text" maxLength={120} value={product.priceText || (product.price ?? "")} placeholder="Например: 153 405 − 20% = 122 724" onChange={(event) => { const priceText = event.target.value; updateProduct(product.key, { priceText, price: proposalPriceFromText(priceText, product.price) }); }}/></label>}</div>
+        <div className="proposal-product-strip"><Field label="Комплектация" value={product.configuration} onChange={(configuration) => updateProduct(product.key, { configuration })}/><label className="proposal-field"><span>Количество</span><input aria-label={`Количество: ${product.name}`} type="number" min="1" value={product.quantity} onChange={(event) => updateProduct(product.key, { quantity: Math.max(1, Number(event.target.value) || 1) })}/></label>{showPrices && <label className="proposal-field"><span>Стоимость</span><input aria-label={`Цена: ${product.name}`} type="text" inputMode="text" maxLength={120} value={product.priceText || (product.price !== undefined ? proposalMoneyLabel(product.price) : "")} placeholder="Например: 153 405 руб. − 20% = 122 724 руб." onChange={(event) => { const priceText = event.target.value; updateProduct(product.key, { priceText, price: proposalPriceFromText(priceText, product.price) }); }} onBlur={(event) => { const priceText = formatProposalPriceText(event.target.value); updateProduct(product.key, { priceText, price: proposalPriceFromText(priceText, product.price) }); }}/></label>}</div>
         <Field label="Примечание" className="proposal-product-note" value={product.notes} onChange={(notes) => updateProduct(product.key, { notes })}/><ProposalFooter/>
       </article>;})}
 

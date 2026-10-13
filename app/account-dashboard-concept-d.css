@@ -140,19 +140,12 @@
 .projects-dashboard .dashboard-account-trigger:focus-visible{outline:0!important}
 .projects-dashboard .dashboard-account-trigger:focus-visible .account-trigger-avatar{box-shadow:0 0 0 2px var(--rd-paper,#fbfaf7),0 0 0 4px var(--rd-oxblood,#7b1020)}
 .dashboard-account-dropdown .account-dropdown-card{
-  top:calc(100% + 6px);
-  width:min(320px,calc(100vw - 32px));
-  max-height:min(430px,calc(100vh - 76px));
-  padding:9px 0 8px;
+  top:calc(100% + 10px);
+  width:min(356px,calc(100vw - 32px));
+  max-height:calc(100vh - 86px);
+  max-height:calc(100dvh - 86px);
   box-shadow:0 18px 46px rgba(54,37,28,.15);
 }
-.dashboard-account-dropdown .account-dropdown-user{padding:4px 14px 10px;gap:10px}
-.dashboard-account-dropdown .account-dropdown-user>span{width:40px;height:40px;flex-basis:40px}
-.dashboard-account-dropdown .account-dropdown-user b{font-size:12px}.dashboard-account-dropdown .account-dropdown-user small{font-size:9px}
-.dashboard-account-dropdown .account-dropdown-divider{margin-right:11px;margin-left:11px}
-.dashboard-account-dropdown .account-dropdown-card nav a,.dashboard-account-dropdown .account-dropdown-logout{min-height:36px;padding:0 14px 0 17px;grid-template-columns:27px 21px minmax(0,1fr)}
-.dashboard-account-dropdown .account-dropdown-card nav a>b,.dashboard-account-dropdown .account-dropdown-logout>b{font-size:12px}
-.dashboard-account-dropdown .account-dropdown-admin{min-height:34px;padding:0 17px;font-size:10px}
 .projects-dashboard-error{margin:0;padding:11px 36px;border-bottom:1px solid #d8b6ba;background:#f7e9e9;color:var(--rd-danger,#8b1e2d);font-size:12px}
 .projects-dashboard-ledger{
   min-height:96px;

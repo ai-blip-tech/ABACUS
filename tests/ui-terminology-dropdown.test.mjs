@@ -31,7 +31,9 @@ test("one account dropdown is used by project and Studio headers", () => {
   assert.match(dropdownSource, /event\.key === "Escape"/);
   assert.match(dropdownSource, /setOpen\(\(value\) => !value\)/);
   assert.match(dropdownCss, /z-index:150/);
-  assert.match(dropdownCss, /width:min\(344px/);
+  assert.match(dropdownCss, /width:min\(356px/);
+  assert.doesNotMatch(dropdownSource, /padStart\(2, "0"\)|<span>09<\/span>/);
+  assert.match(dropdownCss, /height:48px;min-height:48px/);
 });
 
 test("both save actions persist the project instead of downloading plan JSON", () => {

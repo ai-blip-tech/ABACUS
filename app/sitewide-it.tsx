@@ -147,7 +147,13 @@ function RouteAwareIt({ pathname }: { pathname: string }) {
     }
   };
 
-  return <ItOrb context={context} onAction={handleAction} suggestions={suggestions} closedLabel={closedLabel}/>;
+  return <ItOrb
+    context={context}
+    onAction={handleAction}
+    suggestions={suggestions}
+    closedLabel={closedLabel}
+    headerTitle="«ОНО» - Ваш ИИ-ассистент"
+  />;
 }
 
 export default function SitewideIt() {

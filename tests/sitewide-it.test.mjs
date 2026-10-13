@@ -13,6 +13,7 @@ test("Ono is mounted once at the app layout and excluded only from the public la
   assert.doesNotMatch(home, /<ItOrb\b/);
   assert.match(sitewide, /context\.page === "landing"/);
   assert.match(sitewide, /roomdesign:it-context/);
+  assert.match(sitewide, /headerTitle="«ОНО» - Ваш ИИ-ассистент"/);
   assert.match(home, /roomdesign:it-context/);
 });
 

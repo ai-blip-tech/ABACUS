@@ -20,9 +20,13 @@ export type OnoSiteConfig = {
 const roomDesignOrigins = [
   "https://roomdesign.com.ru",
   "https://www.roomdesign.com.ru",
-  "http://127.0.0.1:3128",
-  "http://localhost:3128",
-] as const;
+  ...(process.env.NODE_ENV !== "production" ? [
+    "http://127.0.0.1:3128",
+    "http://localhost:3128",
+    "http://127.0.0.1:3129",
+    "http://localhost:3129",
+  ] : []),
+] as readonly string[];
 
 const configuredNorrOrigins = (process.env.ONO_NORR_APPROVED_ORIGINS || "")
   .split(",")

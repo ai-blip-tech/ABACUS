@@ -24,6 +24,10 @@ test("profile menu keeps dynamic identity, approved order and existing permissio
   assert.match(dropdown, /user\.features\?\.\[item\.feature\] !== false/);
   assert.match(dropdown, /user\.role === "admin"/);
   assert.doesNotMatch(dropdown, /tenant|userId|provider/i);
+  assert.doesNotMatch(dropdown, /padStart\(2, "0"\)|<span>09<\/span>/);
+  assert.match(dropdownCss, /width:min\(356px,calc\(100vw - 32px\)\)/);
+  assert.match(dropdownCss, /height:48px;min-height:48px/);
+  assert.match(dropdownCss, /width:min\(360px,calc\(100vw - 24px\)\)/);
 });
 
 test("profile menu follows accessible popover behavior without an incomplete ARIA menu model", () => {
