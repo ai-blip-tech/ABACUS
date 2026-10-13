@@ -50,5 +50,9 @@
 
 /* Canonical Room Design masthead geometry shared with the homepage. */
 .templates-nav,.template-site-header{height:var(--rd-header-height);padding-left:var(--rd-header-gutter);padding-right:var(--rd-header-gutter)}
-.templates-nav .account-dropdown-card nav{align-items:stretch;gap:0}
+.templates-nav .account-dropdown-card nav,.template-site-header .account-dropdown-card nav{align-items:stretch;gap:0}
+.template-header-session-loading{display:block;width:190px;height:44px;background:linear-gradient(90deg,#eee7de 20%,#f8f4ec 50%,#eee7de 80%);background-size:200% 100%;animation:template-header-session-pulse 1.4s ease-in-out infinite}
+@keyframes template-header-session-pulse{from{background-position:100% 0}to{background-position:-100% 0}}
 @media(max-width:680px){.templates-nav,.template-site-header{height:auto;min-height:66px;padding:12px 18px}}
+@media(max-width:680px){.template-header-session-loading{width:44px}}
+@media(prefers-reduced-motion:reduce){.template-header-session-loading{animation:none}}

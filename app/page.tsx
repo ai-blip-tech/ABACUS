@@ -7,7 +7,6 @@ import type React from "react";
 import AccountDropdown from "./account-dropdown";
 import type { ItUiAction, ItUiTarget, RoomDesignContext } from "@/lib/it/types";
 import TemplatesHome from "./templates-home";
-import "./account-dropdown.css";
 import { normalizePlanReferenceImages } from "@/lib/plan-render";
 import { clonePlanogramItem, isEditablePlanogramShortcutTarget } from "@/lib/planogram-clipboard";
 import { downloadImageAsJpeg } from "@/lib/client-image-download";
