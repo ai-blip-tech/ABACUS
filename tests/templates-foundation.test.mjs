@@ -65,18 +65,18 @@ test("homepage and catalog share video-capable template previews", () => {
   assert.match(templatesCssSource, /\.template-catalog-preview\{[^}]*filter:none/);
 });
 
-test("homepage hero scrubs approved media with scroll and keeps accessible fallbacks", () => {
-  assert.match(templatesHomeSource, /room-design-hero\.mp4/);
-  assert.match(templatesHomeSource, /room-design-hero-poster\.png/);
-  assert.match(templatesHomeSource, /video\.currentTime = targetTime/);
-  assert.match(templatesHomeSource, /prefers-reduced-motion: reduce/);
-  assert.match(templatesHomeSource, /connection\?\.saveData/);
-  assert.match(templatesHomeSource, /muted/);
-  assert.match(templatesHomeSource, /playsInline/);
-  assert.match(templatesHomeSource, />Начать проект </);
+test("homepage mounts the live Ono hero and keeps one project call to action", () => {
+  assert.doesNotMatch(templatesHomeSource, /room-design-hero\.mp4|room-design-hero-poster\.png|ScrollScrubHero/);
+  assert.match(templatesHomeSource, /id="home-ono-slot"/);
+  assert.match(templatesHomeSource, /«ОНО» — ваш ИИ-ассистент/);
+  assert.match(templatesHomeSource, /С чего начнём\?/);
+  assert.match(templatesHomeSource, /ПРОЕКТНАЯ СРЕДА/);
+  assert.match(templatesHomeSource, /Не отдельный рендер/);
+  assert.equal((templatesHomeSource.match(/>Начать проект /g) || []).length, 1);
   assert.doesNotMatch(templatesHomeSource, /Смотреть шаблоны/);
   assert.doesNotMatch(templatesHomeSource, /Начать создавать|ROOM DESIGN \/ 2026|EDITORIAL AI INTERIORS/);
   assert.match(templatesHomeSource, /<i aria-hidden="true" \/> ШАБЛОНЫ/);
+  assert.doesNotMatch(templatesHomeSource, /home-audience-switch/);
   assert.doesNotMatch(templatesHomeSource, /01 \/ ROOM|02 \/ TRANSFORM|03 \/ RESULT|SCROLL TO TRANSFORM/);
   assert.match(templatesHomeSource, /Открыть все \{templateRegistry\.length\} шаблона/);
 });

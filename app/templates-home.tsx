@@ -1,11 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { categoryLabels, featuredTemplates, templateRegistry } from "@/lib/templates/registry";
-import type { TemplateAudience, TemplateCategory, TemplateDefinition } from "@/lib/templates/types";
+import type { TemplateCategory, TemplateDefinition } from "@/lib/templates/types";
 import TemplatePreviewMedia from "./template-preview-media";
 
 const homeSections: Array<{ category: TemplateCategory; title: string }> = [
@@ -44,87 +43,32 @@ function EditorialCard({ template, compact = false, prominent = false }: { templ
   );
 }
 
-function ScrollScrubHero({ onStartProject }: { onStartProject: () => void }) {
-  const sectionRef = useRef<HTMLElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const [staticMode, setStaticMode] = useState(false);
-  const [videoFailed, setVideoFailed] = useState(false);
-
-  useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
-    const updateMode = () => setStaticMode(reducedMotion.matches || Boolean(connection?.saveData));
-    updateMode();
-    reducedMotion.addEventListener("change", updateMode);
-    return () => reducedMotion.removeEventListener("change", updateMode);
-  }, []);
-
-  useEffect(() => {
-    const section = sectionRef.current;
-    const video = videoRef.current;
-    if (!section || !video || staticMode || videoFailed) return;
-
-    const syncVideoToScroll = () => {
-      animationFrameRef.current = null;
-      const travel = Math.max(section.offsetHeight - window.innerHeight, 1);
-      const progress = Math.min(Math.max(-section.getBoundingClientRect().top / travel, 0), 1);
-      if (video.readyState < HTMLMediaElement.HAVE_METADATA || !Number.isFinite(video.duration)) return;
-      const targetTime = progress * Math.max(video.duration - 0.04, 0);
-      if (Math.abs(video.currentTime - targetTime) > 0.016) video.currentTime = targetTime;
-    };
-
-    const requestSync = () => {
-      if (animationFrameRef.current === null) animationFrameRef.current = window.requestAnimationFrame(syncVideoToScroll);
-    };
-
-    video.pause();
-    window.addEventListener("scroll", requestSync, { passive: true });
-    window.addEventListener("resize", requestSync);
-    video.addEventListener("loadedmetadata", requestSync);
-    requestSync();
-    return () => {
-      window.removeEventListener("scroll", requestSync);
-      window.removeEventListener("resize", requestSync);
-      video.removeEventListener("loadedmetadata", requestSync);
-      if (animationFrameRef.current !== null) window.cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    };
-  }, [staticMode, videoFailed]);
-
+function OnoHomepageHero() {
   return (
-    <section ref={sectionRef} className="home-cinematic-hero" aria-labelledby="home-hero-title">
-      <div className="home-hero-sticky">
-        <div className="home-hero-media" role="img" aria-label="Интерьер превращается из архитектурного эскиза в готовое пространство">
-          {staticMode || videoFailed ? (
-            <Image className="home-hero-poster" src="/media/room-design-hero-poster.png" alt="" fill priority sizes="100vw" />
-          ) : (
-            <video
-              ref={videoRef}
-              className="home-hero-video"
-              src="/media/room-design-hero.mp4"
-              poster="/media/room-design-hero-poster.png"
-              preload="auto"
-              muted
-              playsInline
-              tabIndex={-1}
-              aria-hidden="true"
-              onError={() => setVideoFailed(true)}
-            />
-          )}
-        </div>
-        <div className="home-hero-overlay">
-          <h1 id="home-hero-title">Пространство начинается с возможности <em>увидеть его иначе.</em></h1>
-          <p>Персональная AI-студия для интерьера: выберите сценарий, добавьте своё пространство и получите результат, который можно продолжить.</p>
-          <div className="templates-hero-actions"><button type="button" onClick={onStartProject}>Начать проект <span>→</span></button></div>
-        </div>
+    <section className="home-ono-hero" aria-labelledby="home-hero-title">
+      <p>«ОНО» — ваш ИИ-ассистент</p>
+      <h1 id="home-hero-title">С чего начнём?</h1>
+      <div id="home-ono-slot" className="home-ono-slot" aria-live="polite" />
+    </section>
+  );
+}
+
+function ProjectEnvironment({ onStartProject }: { onStartProject: () => void }) {
+  return (
+    <section className="home-project-environment" aria-labelledby="home-project-title">
+      <div className="home-project-copy">
+        <p>ПРОЕКТНАЯ СРЕДА</p>
+        <h2 id="home-project-title">Не отдельный рендер.<br />Целый проект.</h2>
+      </div>
+      <div className="home-project-action">
+        <p>Соберите пространство в одном рабочем процессе: создавайте планограммы, редактируйте интерьер по исходному изображению, примеряйте мебель из каталога или любого референса, сравнивайте версии и возвращайтесь к истории рендеров. Проект сохраняет всё — от первой идеи до готового решения.</p>
+        <button type="button" onClick={onStartProject}>Начать проект <span>→</span></button>
       </div>
     </section>
   );
 }
 
 export default function TemplatesHome({ accountControl, onStartProject }: { accountControl: ReactNode; onStartProject: () => void }) {
-  const [audience, setAudience] = useState<TemplateAudience>("personal");
   const [stackFeatured, setStackFeatured] = useState(false);
 
   useEffect(() => {
@@ -135,14 +79,13 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
     return () => mobile.removeEventListener("change", updateLayout);
   }, []);
 
-  const matchesAudience = (template: TemplateDefinition) => template.audience === "both" || template.audience === audience;
   const homepagePriority = ["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"];
   const matchedFeatured = [...featuredTemplates].sort((left, right) => {
     const leftPriority = homepagePriority.indexOf(left.slug);
     const rightPriority = homepagePriority.indexOf(right.slug);
     return (leftPriority < 0 ? Number.MAX_SAFE_INTEGER : leftPriority) - (rightPriority < 0 ? Number.MAX_SAFE_INTEGER : rightPriority);
-  }).filter(matchesAudience);
-  const featured = [...matchedFeatured, ...templateRegistry.filter(matchesAudience)].filter((template, index, all) => all.findIndex((item) => item.slug === template.slug) === index).slice(0, 6);
+  });
+  const featured = [...matchedFeatured, ...templateRegistry].filter((template, index, all) => all.findIndex((item) => item.slug === template.slug) === index).slice(0, 6);
   const featuredColumns = stackFeatured ? [featured] : [featured.filter((_, index) => index % 2 === 0), featured.filter((_, index) => index % 2 === 1)];
 
   return (
@@ -156,12 +99,12 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
         <div className="templates-nav-actions">{accountControl}</div>
       </header>
 
-      <ScrollScrubHero onStartProject={onStartProject} />
+      <OnoHomepageHero />
+      <ProjectEnvironment onStartProject={onStartProject} />
 
       <section className="home-template-entry" id="templates" aria-labelledby="home-templates-title">
         <div className="home-template-entry-head">
           <div><p className="templates-section-kicker"><i aria-hidden="true" /> ШАБЛОНЫ</p><h2 id="home-templates-title">Выберите, что изменить</h2></div>
-          <div className="home-audience-switch" role="group" aria-label="Аудитория шаблонов"><button type="button" aria-pressed={audience === "personal"} onClick={() => setAudience("personal")}>Для себя</button><button type="button" aria-pressed={audience === "professional"} onClick={() => setAudience("professional")}>Для профессионалов</button></div>
           <Link href="/templates">Все шаблоны <span>→</span></Link>
         </div>
         <div className={`home-featured-grid${stackFeatured ? " is-stacked" : ""}`}>
@@ -177,10 +120,10 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
       </section>
 
       {homeSections.map((section, sectionIndex) => {
-        const items = templateRegistry.filter((template) => template.category === section.category && matchesAudience(template)).slice(0, 4);
+        const items = templateRegistry.filter((template) => template.category === section.category).slice(0, 4);
         if (!items.length) return null;
         return <section className={`home-editorial-section rhythm-${sectionIndex % 4}`} key={section.category}>
-          <header><p className="templates-section-kicker"><i aria-hidden="true" /> {section.title.toUpperCase()}</p><h2>{section.title}</h2><Link href={`/templates?category=${section.category}&audience=${audience}`}>Смотреть раздел <span>→</span></Link></header>
+          <header><p className="templates-section-kicker"><i aria-hidden="true" /> {section.title.toUpperCase()}</p><h2>{section.title}</h2><Link href={`/templates?category=${section.category}`}>Смотреть раздел <span>→</span></Link></header>
           <div className="home-editorial-grid">{items.map((template, index) => <EditorialCard key={template.slug} template={template} compact={sectionIndex === 3 || index > 1} />)}</div>
         </section>;
       })}

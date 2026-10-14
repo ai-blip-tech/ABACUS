@@ -26,7 +26,7 @@ test("hover, open-ready and composing are visual-only states wired to real input
   }
   assert.match(integration, /onPointerEnter/);
   assert.match(integration, /:focus-visible/);
-  assert.match(integration, /open && value\.trim\(\)/);
+  assert.match(integration, /if \(value\.trim\(\)\) return "composing"/);
 });
 
 test("ready material transitions inside the shader and reduced motion stays animated", () => {
