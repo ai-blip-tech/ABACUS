@@ -169,9 +169,17 @@ jobs:
             sudo nginx -t
             sudo systemctl reload nginx
 
-            curl --fail --silent --show-error --max-time 20 \
-              --resolve roomdesign.norrmobler.ru:443:127.0.0.1 \
-              https://roomdesign.norrmobler.ru/api/health >/dev/null
+            https_ready="0"
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if curl --fail --silent --show-error --max-time 20 \
+                --resolve roomdesign.norrmobler.ru:443:127.0.0.1 \
+                https://roomdesign.norrmobler.ru/api/health >/dev/null; then
+                https_ready="1"
+                break
+              fi
+              sleep 2
+            done
+            test "$https_ready" = "1"
             test "$(git -C "$app_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
             test -f "$app_dir/data/room-design.sqlite"
 
