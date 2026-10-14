@@ -151,8 +151,16 @@ jobs:
             printf '%s\n' "$acme_probe" | sudo tee \
               "/var/www/html/.well-known/acme-challenge/$acme_probe" >/dev/null
             sudo chmod 0644 "/var/www/html/.well-known/acme-challenge/$acme_probe"
-            test "$(curl --fail --silent --show-error --max-time 20 \
-              "http://roomdesign.norrmobler.ru/.well-known/acme-challenge/$acme_probe")" = "$acme_probe"
+            acme_ready="0"
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if [ "$(curl --silent --show-error --max-time 20 \
+                "http://roomdesign.norrmobler.ru/.well-known/acme-challenge/$acme_probe")" = "$acme_probe" ]; then
+                acme_ready="1"
+                break
+              fi
+              sleep 2
+            done
+            test "$acme_ready" = "1"
             sudo rm -f "/var/www/html/.well-known/acme-challenge/$acme_probe"
 
             if ! sudo test -f "$certificate_dir/fullchain.pem" || ! sudo test -f "$certificate_dir/privkey.pem"; then
