@@ -17,10 +17,10 @@ const homeSections: Array<{ category: TemplateCategory; title: string }> = [
 ];
 
 function TemplateTriptych({ template, compact = false }: { template: TemplateDefinition; compact?: boolean }) {
-  const showVideoPreview = template.preview.type === "video";
+  const showMediaPreview = template.preview.type === "video" || template.preview.type === "image";
   return (
-    <div className={`home-template-triptych${compact ? " is-compact" : ""}${showVideoPreview ? " has-video-preview" : ""}`} aria-label={`Превью шаблона «${template.title}»`}>
-      {showVideoPreview ? <TemplatePreviewMedia className="home-template-video-preview" preview={template.preview} sizes="(max-width: 760px) 100vw, 50vw" /> : ["Исходник", "Трансформация", "Результат"].map((label, index) => (
+    <div className={`home-template-triptych${compact ? " is-compact" : ""}${showMediaPreview ? " has-media-preview" : ""}`} aria-label={`Превью шаблона «${template.title}»`}>
+      {showMediaPreview ? <TemplatePreviewMedia className="home-template-media-preview" preview={template.preview} sizes="(max-width: 760px) 100vw, 50vw" /> : ["Исходник", "Трансформация", "Результат"].map((label, index) => (
           <div className={`home-template-stage stage-${index + 1}`} key={label}>
             <span>{label}</span>{index === 1 && <i aria-hidden="true">→</i>}
           </div>
@@ -80,7 +80,7 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
     return () => mobile.removeEventListener("change", updateLayout);
   }, []);
 
-  const homepagePriority = ["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"];
+  const homepagePriority = ["design-battle", "light-scenarios", "moodboard-to-room", "kitchen-cad-to-photo"];
   const matchedFeatured = [...featuredTemplates].sort((left, right) => {
     const leftPriority = homepagePriority.indexOf(left.slug);
     const rightPriority = homepagePriority.indexOf(right.slug);

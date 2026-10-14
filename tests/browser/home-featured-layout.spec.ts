@@ -42,7 +42,7 @@ test("featured templates preserve source order in one mobile column", async ({ p
   expect(hrefs.slice(0, 4)).toEqual([
     "/templates/design-battle",
     "/templates/light-scenarios",
-    "/templates/next-chapter",
     "/templates/moodboard-to-room",
+    "/templates/kitchen-cad-to-photo",
   ]);
 });

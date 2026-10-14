@@ -18,26 +18,26 @@ const templatePreviewMediaSource = await readFile(new URL("../app/template-previ
 const templatesHomeCssSource = await readFile(new URL("../app/templates-home-v2.css", import.meta.url), "utf8");
 const nextConfigSource = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
 
-test("registry contains exactly thirty-five unique versioned templates", () => {
-  assert.equal(templateRegistry.length, 35);
-  assert.equal(new Set(templateRegistry.map((template) => template.id)).size, 35);
-  assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 35);
-  for (const removed of ["memory-room", "home-swap", "architectural-xray", "window-portal", "inside-the-walls", "house-awake"]) assert.equal(templateRegistry.some((template) => template.slug === removed), false);
-  assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 35 }, (_, index) => index + 1));
-  assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "declutter", "furniture-casting"]);
+test("registry contains exactly thirty-three unique versioned templates", () => {
+  assert.equal(templateRegistry.length, 33);
+  assert.equal(new Set(templateRegistry.map((template) => template.id)).size, 33);
+  assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 33);
+  for (const removed of ["memory-room", "home-swap", "architectural-xray", "window-portal", "inside-the-walls", "house-awake", "declutter", "next-chapter"]) assert.equal(templateRegistry.some((template) => template.slug === removed), false);
+  assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 33 }, (_, index) => index + 1));
+  assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "furniture-casting", "material-preview"]);
   for (const template of templateRegistry) {
     assert.equal(template.version, 1);
     assert.ok(template.inputSlots.length > 0, `${template.slug} must have input slots`);
-    assert.ok(template.preview.type === "placeholder" || template.preview.type === "video");
+    assert.ok(["placeholder", "image", "video"].includes(template.preview.type));
     assert.ok(template.preview.src);
     assert.notEqual(template.status, "live", `${template.slug} must not be live before its quality gate`);
   }
 });
 
 test("foundation exposes all reviewable records and the approved featured mix", () => {
-  assert.equal(previewTemplates.length, 35);
-  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "declutter", "furniture-casting", "material-preview", "next-chapter", "roast-my-room", "kitchen-cad-to-photo"]);
-  assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "next-chapter", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
+  assert.equal(previewTemplates.length, 33);
+  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "furniture-casting", "material-preview", "roast-my-room", "kitchen-cad-to-photo"]);
+  assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
   assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 0\)/);
   assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 1\)/);
   assert.match(templatesHomeSource, /matchMedia\("\(max-width: 760px\)"\)/);
@@ -59,7 +59,7 @@ test("homepage and catalog share video-capable template previews", () => {
   assert.match(templatePreviewMediaSource, /muted/);
   assert.match(templatePreviewMediaSource, /playsInline/);
   assert.match(templatePreviewMediaSource, /poster=\{preview\.src\}/);
-  assert.match(templatesHomeCssSource, /\.home-template-video-preview/);
+  assert.match(templatesHomeCssSource, /\.home-template-media-preview/);
   assert.doesNotMatch(templatesHomeSource, /VIDEO PREVIEW|VIDEO ASSET SLOT/);
   assert.doesNotMatch(templateCardSource, /status-|template-status-label|template-fixture-label|ВИДЕО СКОРО|Посмотреть preview/);
   assert.match(templatesCssSource, /\.template-catalog-preview\{[^}]*filter:none/);
@@ -95,6 +95,8 @@ test("furniture casting has the approved room plus one-to-five product schema", 
   assert.ok(template);
   assert.equal(template.status, "internal");
   assert.equal(template.resultType, "image_series");
+  assert.equal(template.preview.type, "image");
+  assert.equal(template.preview.src, "/media/templates/furniture-casting-cover.png");
   assert.deepEqual(template.inputSlots.map((slot) => slot.kind), ["room_image", "product_images"]);
   assert.equal(template.inputSlots[1].minCount, 1);
   assert.equal(template.inputSlots[1].maxCount, 5);

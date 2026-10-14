@@ -233,7 +233,7 @@ test("the verified product knowledge covers both editors and known limitations",
 
 test("Ono knows every registered template, its availability, inputs and result", () => {
   const definitions = ROOM_DESIGN_PRODUCT_KNOWLEDGE.templates.definitions;
-  assert.equal(definitions.length, 35);
+  assert.equal(definitions.length, 33);
   assert.equal(new Set(definitions.map((template) => template.slug)).size, definitions.length);
   for (const template of definitions) {
     assert.ok(template.title);

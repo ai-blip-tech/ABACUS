@@ -45,9 +45,13 @@ const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "ana
     version: 1,
     analyticsKey: `template_${template.id}_${template.slug}`,
     preview: {
-      type: previewVideoSrc ? "video" : "placeholder",
+      type: previewVideoSrc ? "video" : previewPosterSrc ? "image" : "placeholder",
       src: previewPosterSrc || placeholderImages[previewIndex % placeholderImages.length],
-      alt: previewVideoSrc ? `Видео-превью шаблона «${template.title}»` : `Временный preview placeholder для шаблона «${template.title}»`,
+      alt: previewVideoSrc
+        ? `Видео-превью шаблона «${template.title}»`
+        : previewPosterSrc
+          ? `Обложка шаблона «${template.title}»`
+          : `Временный preview placeholder для шаблона «${template.title}»`,
       videoSrc: previewVideoSrc,
       videoMimeType: previewVideoSrc ? "video/mp4" : undefined,
     },
@@ -56,7 +60,7 @@ const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "ana
 
 const unorderedTemplateRegistry: TemplateDefinition[] = [
   definition({
-    id: "01", slug: "furniture-casting", status: "internal", wave: "foundation", category: "home", sortOrder: 1, featured: true, previewIndex: 0,
+    id: "01", slug: "furniture-casting", status: "internal", wave: "foundation", category: "home", sortOrder: 1, featured: true, previewIndex: 0, previewPosterSrc: "/media/templates/furniture-casting-cover.png",
     title: "Мебельный кастинг", hook: "Примерь все покупки до оплаты", description: "Сравните несколько предметов в одной и той же комнате и в одном ракурсе.", resultType: "image_series", inputSummary: "Комната + 1–5 товаров", badges: ["BETA"], requiredCapabilities: ["image_edit", "placement_mask", "series"],
     inputSlots: [room(), image({ id: "products", kind: "product_images", label: "Добавьте фото мебели", helper: "От 1 до 5 предметов на нейтральном фоне или из каталога", required: true, minCount: 1, maxCount: 5, allowReorder: true })],
   }),
@@ -64,10 +68,6 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
     id: "02", slug: "use-what-you-have", status: "coming_soon", wave: "experimental", category: "home", sortOrder: 2, featured: false, previewIndex: 1,
     title: "Собери из того, что есть", hook: "Новая комната без новых покупок", description: "Соберите новую композицию из мебели, которая уже есть у вас дома.", resultType: "image", inputSummary: "Комната + фото своей мебели", badges: [], requiredCapabilities: ["object_extraction", "rearrangement"],
     inputSlots: [room(), image({ id: "furniture", kind: "product_images", label: "Добавьте фото вашей мебели", helper: "Снимите каждый предмет отдельно, до 10 файлов", required: true, minCount: 1, maxCount: 10, allowReorder: true })],
-  }),
-  definition({
-    id: "03", slug: "declutter", status: "internal", wave: "one", category: "home", sortOrder: 3, featured: true, previewIndex: 1,
-    title: "Минус метр хаоса", hook: "Верни пространство, которое съел беспорядок", description: "Посмотрите на комнату без визуального шума — с правдоподобным хранением вещей.", resultType: "image", inputSummary: "1 фото комнаты", badges: ["BETA"], requiredCapabilities: ["controlled_removal", "storage_synthesis"], inputSlots: [room()],
   }),
   definition({
     id: "04", slug: "material-preview", status: "internal", wave: "one", category: "home", sortOrder: 4, featured: true, previewIndex: 2,
@@ -92,11 +92,6 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
   definition({
     id: "08", slug: "cover-home", status: "coming_soon", wave: "two", category: "make_yours", sortOrder: 8, featured: false, previewIndex: 0,
     title: "Дом с обложки", hook: "Устрой своей квартире журнальную съёмку", description: "Превратите обычные снимки комнаты в согласованную editorial-серию.", resultType: "image_series", inputSummary: "1–3 фото комнаты", badges: [], requiredCapabilities: ["editorial_rerender", "series_consistency"], inputSlots: [room("Загрузите фотографии комнаты", 3)],
-  }),
-  definition({
-    id: "09", slug: "next-chapter", status: "coming_soon", wave: "two", category: "make_yours", sortOrder: 9, featured: true, previewIndex: 1,
-    title: "Следующая глава", hook: "Покажи комнату своей будущей жизни", description: "Представьте пространство в выбранном жизненном сценарии.", resultType: "image", inputSummary: "Комната + сценарий", badges: [], requiredCapabilities: ["scenario_conditioning", "people_safety"], safetyPolicy: "people-and-likeness",
-    inputSlots: [room(), { id: "scenario", kind: "choice", label: "Выберите следующую главу", helper: "Сценарий задаёт контекст, а не описание личности", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], options: ["Новый дом", "Творческая студия", "Семейное пространство", "Дом у моря"] }, image({ id: "person", kind: "people_images", label: "Добавьте человека или питомца", helper: "Необязательно · подтвердите право использовать фотографию", required: false, minCount: 0, maxCount: 2, consent: "people" })],
   }),
   definition({
     id: "10", slug: "design-battle", status: "internal", wave: "one", category: "control", sortOrder: 10, featured: true, previewIndex: 0, previewVideoSrc: "/media/templates/design-battle-preview.mp4",
@@ -254,7 +249,7 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
   }),
 ];
 
-const templatePriority = ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "declutter", "furniture-casting"];
+const templatePriority = ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "furniture-casting"];
 
 export const templateRegistry: TemplateDefinition[] = [...unorderedTemplateRegistry]
   .sort((left, right) => {

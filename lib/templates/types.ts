@@ -46,7 +46,7 @@ export type TemplateDefinition = {
   requireAnyOf?: string[][];
   exclusiveValueGroups?: string[][];
   preview: {
-    type: "placeholder" | "video";
+    type: "placeholder" | "image" | "video";
     src: string;
     alt: string;
     position?: string;
