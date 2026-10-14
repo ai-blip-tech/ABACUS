@@ -1,10 +1,10 @@
-name: Diagnose Ono production voice
+name: Diagnose Ono production finance
 
 on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type DIAGNOSE_ONO_VOICE"
+        description: "Type DIAGNOSE_ONO_FINANCE"
         required: true
         type: string
 
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   diagnose:
-    name: Read-only voice diagnostics
+    name: Read-only Ono finance diagnostics
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: production-backup
@@ -26,9 +26,9 @@ jobs:
         shell: bash
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
-        run: test "$CONFIRMATION" = "DIAGNOSE_ONO_VOICE"
+        run: test "$CONFIRMATION" = "DIAGNOSE_ONO_FINANCE"
 
-      - name: Inspect voice provider failures without changing production
+      - name: Inspect recent Ono financial rows without changing production
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -39,22 +39,52 @@ jobs:
             set -eu
             cd "$HOME/ABACUS"
             test -f .env
-            test -d data
-            test -f data/room-design.sqlite
+            data_dir="$(sed -n 's/^ROOM_DESIGN_DATA_DIR=//p' .env | tail -n 1 | sed "s/^['\"]//;s/['\"]$//")"
+            if [ -z "$data_dir" ]; then data_dir="$HOME/ABACUS/data"; fi
+            test -d "$data_dir"
+            test -f "$data_dir/room-design.sqlite"
 
             echo "PRODUCTION_SHA=$(git rev-parse HEAD)"
             echo "SITE_HEALTH=$(curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null && echo ok)"
-            if grep -q '^OPENAI_TRANSCRIBE_MODEL=' .env; then
-              sed -n 's/^OPENAI_TRANSCRIBE_MODEL=/TRANSCRIBE_MODEL=/p' .env
-            else
-              echo "TRANSCRIBE_MODEL=gpt-4o-mini-transcribe (application default)"
-            fi
-            grep -q '^OPENAI_API_KEY=.' .env && echo "OPENAI_API_KEY_PRESENT=yes" || echo "OPENAI_API_KEY_PRESENT=no"
+            python3 - "$data_dir/room-design.sqlite" <<'PY'
+            import sqlite3
+            import sys
 
-            echo "VOICE_FAILURE_LOGS_BEGIN"
-            pm2 logs roomdesign --nostream --lines 1000 2>&1 \
-              | grep -E '\[It\] Audio transcription failed|status:|code:|type:|param:|message:' \
-              | tail -n 80 \
-              | sed -E 's/(sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]*/\1[REDACTED]/g' || true
-            echo "VOICE_FAILURE_LOGS_END"
+            database = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+            database.row_factory = sqlite3.Row
+            try:
+                rows = database.execute("""
+                  SELECT ledger.created_at, ledger.status, ledger.operation_type, ledger.model,
+                    ledger.model_calls, ledger.input_tokens, ledger.cached_input_tokens,
+                    ledger.output_tokens, ledger.total_tokens, ledger.net_micro_usd,
+                    ledger.gross_micro_usd, ledger.error_code,
+                    CASE WHEN ledger.usage_json IS NULL THEN 0 ELSE 1 END AS has_usage_json,
+                    CASE WHEN ledger.pricing_snapshot_json IS NULL THEN 0 ELSE 1 END AS has_pricing,
+                    CASE WHEN ledger.user_id IS NULL THEN 'guest' ELSE 'user' END AS identity_kind
+                  FROM ono_cost_ledger AS ledger
+                  ORDER BY ledger.created_at DESC
+                  LIMIT 30
+                """).fetchall()
+                print("RECENT_ONO_FINANCE_BEGIN")
+                for row in rows:
+                    print("|".join(f"{key}={row[key]}" for key in row.keys()))
+                print("RECENT_ONO_FINANCE_END")
+                summary = database.execute("""
+                  SELECT status,
+                    CASE WHEN user_id IS NULL THEN 'guest' ELSE 'user' END AS identity_kind,
+                    COUNT(*) AS operations,
+                    SUM(CASE WHEN net_micro_usd IS NULL THEN 1 ELSE 0 END) AS missing_cost,
+                    SUM(CASE WHEN net_micro_usd = 0 THEN 1 ELSE 0 END) AS zero_cost,
+                    SUM(CASE WHEN model_calls > 0 AND COALESCE(total_tokens, 0) = 0 THEN 1 ELSE 0 END) AS calls_without_tokens
+                  FROM ono_cost_ledger
+                  GROUP BY status, identity_kind
+                  ORDER BY status, identity_kind
+                """).fetchall()
+                print("ONO_FINANCE_SUMMARY_BEGIN")
+                for row in summary:
+                    print("|".join(f"{key}={row[key]}" for key in row.keys()))
+                print("ONO_FINANCE_SUMMARY_END")
+            finally:
+                database.close()
+            PY
             echo "PRODUCTION_MODIFIED=no"
