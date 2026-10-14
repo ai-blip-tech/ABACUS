@@ -5,7 +5,8 @@ const ROOM_DESIGN_TENANT_ID = "tenant_roomdesign";
 const ROOM_DESIGN_TENANT_SLUG = "roomdesign";
 const NORR_TENANT_ID = "tenant_norrmobler";
 const NORR_TENANT_SLUG = "norrmobler";
-const NORR_PRODUCTION_HOST = "norr-club.testaimoblernorr.chatgpt.site";
+const NORR_PRODUCTION_HOSTS = ["norr-club.testaimoblernorr.chatgpt.site", "roomdesign.norrmobler.ru"];
+const NORR_PREVIEW_HOSTS = process.env.NODE_ENV === "production" ? [] : ["norr.localhost"];
 const ROOM_DESIGN_PRODUCTION_HOSTS = ["roomdesign.com.ru", "www.roomdesign.com.ru"];
 
 export type TenantContext = { id: string; slug: string; name: string };
@@ -114,7 +115,7 @@ export function ensureStore() {
     await database.batch([
       database.prepare("INSERT OR IGNORE INTO tenants (id, slug, name, status, settings_json, created_at, updated_at) VALUES (?, ?, ?, 'active', '{}', ?, ?)").bind(ROOM_DESIGN_TENANT_ID, ROOM_DESIGN_TENANT_SLUG, "Room Design", now, now),
       database.prepare("INSERT OR IGNORE INTO tenants (id, slug, name, status, settings_json, created_at, updated_at) VALUES (?, ?, ?, 'active', '{}', ?, ?)").bind(NORR_TENANT_ID, NORR_TENANT_SLUG, "NORR Møbler", now, now),
-      database.prepare("INSERT INTO tenant_domains (hostname, tenant_id, created_at) VALUES (?, ?, ?) ON CONFLICT(hostname) DO UPDATE SET tenant_id = excluded.tenant_id").bind(NORR_PRODUCTION_HOST, NORR_TENANT_ID, now),
+      ...[...NORR_PRODUCTION_HOSTS, ...NORR_PREVIEW_HOSTS].map((hostname) => database.prepare("INSERT INTO tenant_domains (hostname, tenant_id, created_at) VALUES (?, ?, ?) ON CONFLICT(hostname) DO UPDATE SET tenant_id = excluded.tenant_id").bind(hostname, NORR_TENANT_ID, now)),
       ...ROOM_DESIGN_PRODUCTION_HOSTS.map((hostname) => database.prepare("INSERT INTO tenant_domains (hostname, tenant_id, created_at) VALUES (?, ?, ?) ON CONFLICT(hostname) DO UPDATE SET tenant_id = excluded.tenant_id").bind(hostname, ROOM_DESIGN_TENANT_ID, now)),
     ]);
 

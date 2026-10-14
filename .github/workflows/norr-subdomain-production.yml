@@ -1,0 +1,214 @@
+name: Configure NORR Room Design production subdomain
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type CONFIGURE_NORR_ROOMDESIGN_SUBDOMAIN"
+        required: true
+        type: string
+      expected_production_sha:
+        description: "Full SHA that must already be running in production"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roomdesign-production
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: Configure HTTPS and Nginx without changing application data
+    if: ${{ inputs.confirmation == 'CONFIGURE_NORR_ROOMDESIGN_SUBDOMAIN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-backup
+    env:
+      EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+    steps:
+      - name: Check out approved server configuration
+        uses: actions/checkout@v4
+
+      - name: Upload staged Nginx configurations
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "docs/roomdesign.norrmobler.ru.nginx.bootstrap.conf.example,docs/roomdesign.norrmobler.ru.nginx.conf.example"
+          target: "/tmp/roomdesign-norr-${{ github.run_id }}"
+          strip_components: 1
+
+      - name: Configure certificate and Nginx atomically
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          EXPECTED_PRODUCTION_SHA: ${{ env.EXPECTED_PRODUCTION_SHA }}
+          SERVER_SETUP_RUN_ID: ${{ github.run_id }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 15m
+          envs: EXPECTED_PRODUCTION_SHA,SERVER_SETUP_RUN_ID
+          script: |
+            set -eu
+            umask 077
+
+            app_dir="$HOME/ABACUS"
+            staging_dir="/tmp/roomdesign-norr-${SERVER_SETUP_RUN_ID}"
+            bootstrap_source="$staging_dir/roomdesign.norrmobler.ru.nginx.bootstrap.conf.example"
+            final_source="$staging_dir/roomdesign.norrmobler.ru.nginx.conf.example"
+            available_dir="/etc/nginx/sites-available"
+            enabled_dir="/etc/nginx/sites-enabled"
+            target="$available_dir/roomdesign-norr-subdomain"
+            enabled="$enabled_dir/roomdesign-norr-subdomain"
+            backup_dir="$HOME/room-design-server-backups/norr-subdomain-${SERVER_SETUP_RUN_ID}"
+            certificate_dir="/etc/letsencrypt/live/roomdesign.norrmobler.ru"
+            previous_target="absent"
+            previous_enabled="absent"
+            certbot_command=""
+            committed="0"
+
+            rollback() {
+              result=$?
+              trap - EXIT INT TERM
+              if [ "$committed" != "1" ]; then
+                if [ "$previous_target" = "present" ]; then
+                  sudo install -m 0644 "$backup_dir/roomdesign-norr-subdomain" "$target"
+                else
+                  sudo rm -f "$target"
+                fi
+                if [ "$previous_enabled" = "present" ]; then
+                  sudo ln -sfn "$(cat "$backup_dir/enabled-link-target.txt")" "$enabled"
+                else
+                  sudo rm -f "$enabled"
+                fi
+                sudo nginx -t
+                sudo systemctl reload nginx
+                echo "ROLLBACK=nginx-configuration-restored"
+              fi
+              rm -rf "$staging_dir"
+              exit "$result"
+            }
+            trap rollback EXIT INT TERM
+
+            for command_name in git curl systemctl install readlink; do
+              command -v "$command_name" >/dev/null 2>&1 || {
+                echo "Missing required command: $command_name" >&2
+                exit 1
+              }
+            done
+            sudo -n true
+            sudo nginx -v
+            if command -v certbot >/dev/null 2>&1; then
+              certbot_command="$(command -v certbot)"
+            elif [ -x /snap/bin/certbot ]; then
+              certbot_command="/snap/bin/certbot"
+            elif [ -x /usr/bin/certbot ]; then
+              certbot_command="/usr/bin/certbot"
+            else
+              echo "Certbot is not installed in the existing certificate infrastructure." >&2
+              exit 1
+            fi
+            test -d "$app_dir"
+            test -f "$app_dir/data/room-design.sqlite"
+            test -f "$bootstrap_source"
+            test -f "$final_source"
+            test -d "$available_dir"
+            test -d "$enabled_dir"
+            test "$(git -C "$app_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            curl --fail --silent --show-error --max-time 15 https://roomdesign.com.ru/api/health >/dev/null
+
+            mkdir -p "$backup_dir"
+            if sudo test -f "$target"; then
+              sudo cp "$target" "$backup_dir/roomdesign-norr-subdomain"
+              sudo chown "$(id -u):$(id -g)" "$backup_dir/roomdesign-norr-subdomain"
+              previous_target="present"
+            fi
+            if sudo test -L "$enabled"; then
+              sudo readlink "$enabled" > "$backup_dir/enabled-link-target.txt"
+              previous_enabled="present"
+            elif sudo test -e "$enabled"; then
+              echo "Refusing to replace a non-symlink Nginx enabled entry: $enabled" >&2
+              exit 1
+            fi
+
+            sudo mkdir -p /var/www/html/.well-known/acme-challenge
+            sudo install -m 0644 "$bootstrap_source" "$target"
+            sudo ln -sfn "$target" "$enabled"
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            if ! sudo test -f "$certificate_dir/fullchain.pem" || ! sudo test -f "$certificate_dir/privkey.pem"; then
+              sudo "$certbot_command" certonly --webroot \
+                --webroot-path /var/www/html \
+                --domain roomdesign.norrmobler.ru \
+                --non-interactive --agree-tos --keep-until-expiring
+            fi
+            sudo test -f "$certificate_dir/fullchain.pem"
+            sudo test -f "$certificate_dir/privkey.pem"
+
+            sudo install -m 0644 "$final_source" "$target"
+            sudo ln -sfn "$target" "$enabled"
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            curl --fail --silent --show-error --max-time 20 \
+              --resolve roomdesign.norrmobler.ru:443:127.0.0.1 \
+              https://roomdesign.norrmobler.ru/api/health >/dev/null
+            test "$(git -C "$app_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            test -f "$app_dir/data/room-design.sqlite"
+
+            committed="1"
+            trap - EXIT INT TERM
+            rm -rf "$staging_dir"
+            {
+              echo "status=PASSED"
+              echo "production_sha=$EXPECTED_PRODUCTION_SHA"
+              echo "hostname=roomdesign.norrmobler.ru"
+              echo "upstream=http://127.0.0.1:3000"
+              echo "nginx_config=$target"
+              echo "certificate=$certificate_dir/fullchain.pem"
+              echo "application_restarted=no"
+              echo "application_data_modified=no"
+            } > "$backup_dir/REPORT.txt"
+            echo "SERVER_CONFIGURATION_REPORT=$backup_dir/REPORT.txt"
+
+      - name: Verify public HTTPS and both Room Design domains
+        shell: bash
+        run: |
+          set -euo pipefail
+          for url in \
+            https://roomdesign.norrmobler.ru/ \
+            https://roomdesign.norrmobler.ru/templates \
+            https://roomdesign.norrmobler.ru/api/health \
+            https://roomdesign.norrmobler.ru/api/auth/me \
+            https://roomdesign.com.ru/ \
+            https://roomdesign.com.ru/templates \
+            https://roomdesign.com.ru/api/health; do
+            curl --fail --silent --show-error --max-time 30 "$url" >/dev/null
+          done
+
+          html="$(curl --fail --silent --show-error --max-time 30 https://roomdesign.norrmobler.ru/)"
+          asset="$(printf '%s' "$html" | grep -oE '/_next/static/[^\" ]+\.(css|js)' | head -n 1)"
+          test -n "$asset"
+          curl --fail --silent --show-error --max-time 30 "https://roomdesign.norrmobler.ru${asset}" >/dev/null
+
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 30 \
+            --request POST --header 'Content-Type: application/json' --data '{}' \
+            https://roomdesign.norrmobler.ru/api/auth/register)" = "400"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 30 \
+            --request POST --header 'Content-Type: application/json' \
+            --data '{"email":"norr-subdomain-smoke@example.invalid","password":"invalid-smoke-password"}' \
+            https://roomdesign.norrmobler.ru/api/auth/login)" = "400"
+
+          openssl s_client -connect roomdesign.norrmobler.ru:443 \
+            -servername roomdesign.norrmobler.ru -verify_hostname roomdesign.norrmobler.ru \
+            </dev/null 2>/dev/null | grep -q 'Verify return code: 0 (ok)'
+          echo "PUBLIC_HTTPS=passed"
+          echo "MAIN_DOMAIN_REGRESSION=passed"
+          echo "AUTH_ROUTE_VALIDATION=passed"

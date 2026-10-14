@@ -38,8 +38,9 @@ const configuredNorrOrigins = (process.env.ONO_NORR_APPROVED_ORIGINS || "")
 const norrOrigins: readonly string[] = [
   "https://norrmobler.ru",
   "https://www.norrmobler.ru",
+  "https://roomdesign.norrmobler.ru",
   ...configuredNorrOrigins,
-  ...(process.env.NODE_ENV !== "production" ? ["http://norr.localhost:3128"] : []),
+  ...(process.env.NODE_ENV !== "production" ? ["http://norr.localhost:3128", "http://norr.localhost:3130"] : []),
 ];
 
 export const onoSiteConfigs: Record<OnoTenantProfile["siteId"], OnoSiteConfig> = {

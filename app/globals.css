@@ -260,3 +260,17 @@ body{background:var(--paper);color:#1e1e1e;font-family:-apple-system,BlinkMacSys
 .plan-instruction-panel button.remembered{background:#b96420;border-color:#b96420}
 .plan-instruction-panel button:disabled{opacity:.55;cursor:not-allowed}
 .plan-instruction-panel p{margin:10px 4px 0;color:#948d87;font-size:11px;line-height:1.45;text-align:center}
+@media(max-width:700px){
+  .studio-shell .topbar{height:64px;padding:0 14px;gap:18px;overflow:hidden}
+  .studio-shell .topbar .crumb{min-width:0;overflow:hidden;white-space:nowrap}
+  .studio-shell .topbar .top-actions{gap:7px}
+  .studio{height:auto;min-height:calc(100vh - 64px);grid-template-columns:82px minmax(0,1fr);grid-template-rows:auto auto}
+  .studio>.tools{grid-column:1;grid-row:1 / span 2;padding:12px 6px}
+  .studio>.canvas-area{grid-column:2;grid-row:1;min-height:460px}
+  .studio>.inspector{display:block;grid-column:2;grid-row:2;min-width:0;max-height:none;border-top:1px solid var(--line);border-left:0}
+  .studio .canvas-head{padding:0 12px;overflow-x:auto}
+  .studio .canvas-actions{flex:none}
+  .studio .room-canvas{min-height:280px;margin:0 10px 10px}
+  .studio .history-strip{height:140px;padding:12px 10px;overflow:hidden}
+  .studio .panel-content,.studio .inspector-title{padding-left:16px;padding-right:16px}
+}

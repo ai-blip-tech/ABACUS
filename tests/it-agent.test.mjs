@@ -3,6 +3,7 @@ import test from "node:test";
 import { runOnoAgentConversation } from "../lib/it/agent.ts";
 import { onoTenantProfiles, resolveOnoTenantProfile } from "../lib/it/tenant-profiles.ts";
 import { approvedProductUrl, normalizeSearchCatalogArguments } from "../lib/it/tool-contracts.ts";
+import { onoSiteConfigFor } from "../lib/it/site-config.ts";
 
 const context = {
   route: "/templates",
@@ -35,6 +36,11 @@ const basel = {
 };
 
 const input = (message, history = []) => ({ message, history, context, products: [], actions: [], toolFacts: [] });
+
+test("the NORR partner Room Design origin is approved for the shared Ono core", () => {
+  assert.equal(onoSiteConfigFor("norrmobler").approvedOrigins.includes("https://roomdesign.norrmobler.ru"), true);
+  assert.equal(resolveOnoTenantProfile("roomdesign.norrmobler.ru").tenantId, "norr-mobler");
+});
 
 test("catalog selection is performed through a model function call with separate size and price fields", async () => {
   const requests = [];

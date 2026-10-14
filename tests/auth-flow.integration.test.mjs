@@ -123,10 +123,25 @@ test("direct Room Design traffic and NORR traffic resolve to separate tenants", 
   const directWww = await auth.tenantForRequest(new Request("https://www.roomdesign.com.ru/api/auth/register"));
   const preview = await auth.tenantForRequest(new Request("http://127.0.0.1:3124/api/auth/register"));
   const norr = await auth.tenantForRequest(new Request("https://norr-club.testaimoblernorr.chatgpt.site/api/auth/register"));
+  const norrPartner = await auth.tenantForRequest(new Request("https://roomdesign.norrmobler.ru/api/auth/register"));
+  const norrPreview = await auth.tenantForRequest(new Request("http://norr.localhost/api/auth/register"));
   assert.equal(direct.slug, "roomdesign");
   assert.equal(directWww.slug, "roomdesign");
   assert.equal(preview.slug, "roomdesign");
   assert.equal(norr.slug, "norrmobler");
+  assert.equal(norrPartner.slug, "norrmobler");
+  assert.equal(norrPreview.slug, "norrmobler");
+});
+
+test("an existing NORR member can sign in from either public Room Design entry point", async () => {
+  const email = "cross-domain-member@example.test";
+  await insertUser({ id: "cross-domain-member", email, password: legacyPassword, iterations: 100_000, membership: true });
+  const fromPartner = await auth.login(requestAt("roomdesign.norrmobler.ru"), email, legacyPassword);
+  const fromMain = await auth.login(requestAt("roomdesign.com.ru"), email, legacyPassword);
+  assert.equal(fromPartner.id, "cross-domain-member");
+  assert.equal(fromMain.id, "cross-domain-member");
+  assert.equal(fromPartner.tenantSlug, "norrmobler");
+  assert.equal(fromMain.tenantSlug, "norrmobler");
 });
 
 test("direct Room Design registration creates a Room Design membership", async () => {
