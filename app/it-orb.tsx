@@ -484,10 +484,21 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
         {composerError && <p className="it-composer-error" role="alert">{composerError}</p>}
         <form className={`it-composer it-hero-composer${isRecording ? " is-recording" : ""}`} onSubmit={submit}>
           <input ref={imageInputRef} className="it-file-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void attachImage(event.target.files?.[0])} />
-          <button className="it-composer-tool" type="button" onClick={() => imageInputRef.current?.click()} aria-label="Прикрепить изображение" title="Прикрепить изображение">⌕</button>
+          <button className="it-composer-tool it-hero-image-tool" type="button" onClick={() => imageInputRef.current?.click()} aria-label="Прикрепить изображение" title="Прикрепить изображение">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3.5" y="4" width="17" height="16" rx="2" />
+              <circle cx="8.3" cy="9" r="1.5" />
+              <path d="m5.5 17 4.1-4.2 3.1 3 2.1-2.1 3.7 3.3" />
+            </svg>
+          </button>
           <input ref={inputRef} value={value} onChange={(event) => setValue(event.target.value)} placeholder={composerPlaceholder} aria-label="Сообщение для ОНО" />
           <button className="it-composer-tool it-mic" type="button" onClick={() => void toggleRecording()} aria-label={isRecording ? "Остановить и отправить голосовое сообщение" : "Записать голосовое сообщение"} title={isRecording ? "Остановить запись" : "Записать голосом"}><span aria-hidden="true" /></button>
-          <button className="it-send" type="submit" disabled={(!value.trim() && !pendingImage) || state === "thinking" || state === "searching" || isRecording || isTranscribing} aria-label="Отправить">↑</button>
+          <button className="it-send" type="submit" disabled={(!value.trim() && !pendingImage) || state === "thinking" || state === "searching" || isRecording || isTranscribing} aria-label="Отправить">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m4 11.5 15.5-7-5.2 15.1-3.1-6.1L4 11.5Z" />
+              <path d="m11.2 13.5 4-4" />
+            </svg>
+          </button>
         </form>
         <div className="it-hero-suggestions" aria-label="Примеры вопросов для ОНО">
           {suggestions.map((suggestion) => <button key={suggestion} type="button" onClick={() => {
