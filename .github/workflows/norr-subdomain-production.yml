@@ -232,7 +232,7 @@ jobs:
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 30 \
             --request POST --header 'Content-Type: application/json' \
             --data '{"email":"norr-subdomain-smoke@example.invalid","password":"invalid-smoke-password"}' \
-            https://roomdesign.norrmobler.ru/api/auth/login)" = "400"
+            https://roomdesign.norrmobler.ru/api/auth/login)" = "401"
 
           openssl s_client -connect roomdesign.norrmobler.ru:443 \
             -servername roomdesign.norrmobler.ru -verify_hostname roomdesign.norrmobler.ru \
