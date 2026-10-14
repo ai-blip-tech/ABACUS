@@ -65,6 +65,7 @@
 .ono-orb-fallback{position:absolute;inset:1px;z-index:1;overflow:hidden;border:1px solid rgba(255,255,255,.72);border-radius:50%;background:radial-gradient(circle at 29% 22%,rgba(255,255,255,.95) 0 3%,rgba(255,255,255,.24) 8%,transparent 25%),radial-gradient(ellipse at 35% 76%,#090908 0 27%,#251d1a 38%,transparent 40%),radial-gradient(ellipse at 71% 60%,#171412 0 20%,transparent 22%),radial-gradient(circle at 50% 48%,rgba(230,227,216,.10),rgba(88,84,76,.13) 68%,rgba(18,17,15,.20) 100%);box-shadow:inset 8px 9px 18px rgba(255,255,255,.44),inset -8px -10px 17px rgba(24,22,19,.17),0 0 0 1px rgba(50,47,41,.22)}
 .ono-orb[data-state=hoverReady] .ono-orb-fallback,.ono-orb[data-state=openReady] .ono-orb-fallback,.ono-orb[data-state=composing] .ono-orb-fallback{background:radial-gradient(circle at 29% 22%,rgba(255,255,255,.95) 0 3%,rgba(255,255,255,.24) 8%,transparent 25%),radial-gradient(ellipse at 35% 76%,#23070d 0 25%,#56101b 36%,transparent 40%),radial-gradient(ellipse at 71% 60%,#6b1020 0 18%,transparent 23%),radial-gradient(circle at 50% 48%,rgba(230,227,216,.10),rgba(88,84,76,.13) 68%,rgba(18,17,15,.20) 100%)}
 .it-layer[data-state=success] .ono-orb{filter:none}
+.it-layer[data-state=error] .it-surface-head p i{background:#b64035;box-shadow:0 0 0 4px rgba(182,64,53,.1)}
 
 @media(max-width:700px){.it-layer.is-open .it-orb{width:92px;height:92px}}
 @media(prefers-reduced-motion:reduce){.ono-orb-shadow{transition:none}}

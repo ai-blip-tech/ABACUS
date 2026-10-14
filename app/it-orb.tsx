@@ -24,6 +24,7 @@ type ItOrbProps = {
   brandLabel?: string;
   headerTitle?: string;
   onWidgetEvent?: (event: OnoWidgetEvent) => void;
+  placement?: "floating" | "hero";
 };
 
 const stateLabel: Record<ItVisualState, string> = {
@@ -36,7 +37,7 @@ const stateLabel: Record<ItVisualState, string> = {
   moving: "Показывает",
   acting: "Готовит действие",
   success: "Нашло",
-  error: "Нужна пауза",
+  error: "ОНО отдыхает",
 };
 
 const onoState: Record<ItVisualState, OnoState> = {
@@ -67,9 +68,10 @@ const imageAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => 
   reader.readAsDataURL(file);
 });
 
-export default function ItOrb({ context, onAction, suggestions = defaultSuggestions, closedLabel = "Оно", brandLabel = "ROOM DESIGN", headerTitle, onWidgetEvent }: ItOrbProps) {
-  const [open, setOpen] = useState(false);
-  const [state, setState] = useState<ItVisualState>("closed");
+export default function ItOrb({ context, onAction, suggestions = defaultSuggestions, closedLabel = "Оно", brandLabel = "ROOM DESIGN", headerTitle, onWidgetEvent, placement = "floating" }: ItOrbProps) {
+  const isHero = placement === "hero";
+  const [open, setOpen] = useState(isHero);
+  const [state, setState] = useState<ItVisualState>(isHero ? "idle" : "closed");
   const [value, setValue] = useState("");
   const [pendingImage, setPendingImage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -94,7 +96,7 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
   const guideTimerRef = useRef<number | null>(null);
   const activeRequestRef = useRef<AbortController | null>(null);
   const openRef = useRef(open);
-  const composerPlaceholder = context.template ? "Спросите об этом шаблоне" : context.page === "templates" ? "Опишите задачу — подберу шаблон" : "Спросите о проекте или интерьере";
+  const composerPlaceholder = isHero ? "Спросите «ОНО», загрузите пространство или опишите задачу" : context.template ? "Спросите об этом шаблоне" : context.page === "templates" ? "Опишите задачу — подберу шаблон" : "Спросите о проекте или интерьере";
   const contextLabel = context.template ? `Контекст: ${context.template.title}` : context.page === "templates" ? "Каталог шаблонов известен" : "Контекст страницы включён";
 
   useEffect(() => { openRef.current = open; }, [open]);
@@ -121,11 +123,11 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || isHero) return;
     setState("idle");
     const frame = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(frame);
-  }, [open]);
+  }, [isHero, open]);
 
   useEffect(() => {
     const guide = (event: Event) => {
@@ -158,7 +160,7 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && open) {
+      if (event.key === "Escape" && open && !isHero) {
         setOpen(false);
         setState("closed");
         onWidgetEvent?.({ type: "widget.closed" });
@@ -166,7 +168,7 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onWidgetEvent, open]);
+  }, [isHero, onWidgetEvent, open]);
 
   const ask = async (message: string, image = "") => {
     const text = message.trim() || (image ? "Проанализируй прикреплённое изображение." : "");
@@ -407,11 +409,107 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
   const visualState: OnoState = (() => {
     const agentState = onoState[state];
     if (agentState !== "idle") return agentState;
-    if (open && value.trim()) return "composing";
-    if (open) return "openReady";
+    if (value.trim()) return "composing";
+    if (open && !isHero) return "openReady";
     if (orbHovered || orbKeyboardFocused) return "hoverReady";
     return "idle";
   })();
+
+  if (isHero) {
+    return (
+      <aside className="it-hero" data-state={state} aria-label="ОНО — ваш ИИ-ассистент">
+        <button
+          className="it-hero-orb"
+          type="button"
+          onPointerEnter={(event) => { if (event.pointerType !== "touch") setOrbHovered(true); }}
+          onPointerLeave={() => setOrbHovered(false)}
+          onFocus={(event) => setOrbKeyboardFocused(event.currentTarget.matches(":focus-visible"))}
+          onBlur={() => setOrbKeyboardFocused(false)}
+          onClick={() => inputRef.current?.focus()}
+          aria-label="Перейти к сообщению для ОНО"
+        >
+          <OnoOrb state={visualState} size={360} expanded={false} audioLevel={audioLevel} />
+        </button>
+
+        {messages.length > 0 && (
+          <section className="it-hero-response" aria-label="Разговор с ОНО">
+            <header>
+              <span><i aria-hidden="true" /> {stateLabel[state]}</span>
+              <button type="button" onClick={() => void newConversation()} disabled={isHistoryLoading} aria-label="Начать новый диалог">Новый диалог</button>
+            </header>
+            <div className="it-transcript" ref={transcriptRef} aria-live="polite">
+              {messages.map((message) => (
+                <article key={message.id} className={`it-message it-message-${message.role}`}>
+                  <span>{message.role === "it" ? "ОНО" : "ВЫ"}</span>
+                  {message.image && <img className="it-message-image" src={message.image} alt="Изображение, прикреплённое к сообщению" />}
+                  <p>{message.text}</p>
+                  {message.visionAnalysis && (
+                    <div className="it-vision" aria-label="Наблюдения по изображению">
+                      <b>Вижу на фото</b>
+                      <div>{[...message.visionAnalysis.categories, ...message.visionAnalysis.colors, ...message.visionAnalysis.materials, ...message.visionAnalysis.styles].slice(0, 8).map((item) => <span key={item}>{item}</span>)}</div>
+                      <small>{message.visionAnalysis.requiresConfirmation ? "Спорные признаки уточню перед точным поиском." : `Уверенность: ${message.visionAnalysis.confidence}.`}</small>
+                    </div>
+                  )}
+                  {message.products && message.products.length > 0 && (
+                    <div className="it-products">
+                      {message.products.map((product, index) => (
+                        <a key={product.id} href={product.url || undefined} target={product.url ? "_blank" : undefined} rel="noreferrer" onClick={() => {
+                          onWidgetEvent?.({ type: "user.click_product", productId: product.id });
+                          if (product.url) onWidgetEvent?.({ type: "widget.link_opened", href: product.url });
+                        }}>
+                          <span className="it-product-index">0{index + 1}</span>
+                          <img src={product.image} alt="" />
+                          <div><b>{product.name}</b><small>{product.material || product.color || product.category}</small><strong>{new Intl.NumberFormat("ru-RU").format(product.price)} ₽</strong></div>
+                          <i aria-hidden="true">↗</i>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {message.sources && message.sources.length > 0 && (
+                    <div className="it-sources" aria-label="Источники ответа">
+                      <b>Источники</b>
+                      {message.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.title} ↗</a>)}
+                    </div>
+                  )}
+                </article>
+              ))}
+              {(state === "thinking" || state === "searching") && (
+                <div className="it-process"><span /><span /><span /><p>{progressLabel || stateLabel[state]}</p><button type="button" onClick={() => activeRequestRef.current?.abort()}>Остановить</button></div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {pendingImage && <div className="it-image-draft"><img src={pendingImage} alt="Изображение перед отправкой" /><span>Изображение прикреплено</span><button type="button" onClick={() => setPendingImage("")} aria-label="Убрать изображение">×</button></div>}
+        {composerError && <p className="it-composer-error" role="alert">{composerError}</p>}
+        <form className={`it-composer it-hero-composer${isRecording ? " is-recording" : ""}`} onSubmit={submit}>
+          <input ref={imageInputRef} className="it-file-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void attachImage(event.target.files?.[0])} />
+          <button className="it-composer-tool it-hero-image-tool" type="button" onClick={() => imageInputRef.current?.click()} aria-label="Прикрепить изображение" title="Прикрепить изображение">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3.5" y="4" width="17" height="16" rx="2" />
+              <circle cx="8.3" cy="9" r="1.5" />
+              <path d="m5.5 17 4.1-4.2 3.1 3 2.1-2.1 3.7 3.3" />
+            </svg>
+          </button>
+          <input ref={inputRef} value={value} onChange={(event) => setValue(event.target.value)} placeholder={composerPlaceholder} aria-label="Сообщение для ОНО" />
+          <button className="it-composer-tool it-mic" type="button" onClick={() => void toggleRecording()} aria-label={isRecording ? "Остановить и отправить голосовое сообщение" : "Записать голосовое сообщение"} title={isRecording ? "Остановить запись" : "Записать голосом"}><span aria-hidden="true" /></button>
+          <button className="it-send" type="submit" disabled={(!value.trim() && !pendingImage) || state === "thinking" || state === "searching" || isRecording || isTranscribing} aria-label="Отправить">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m4 11.5 15.5-7-5.2 15.1-3.1-6.1L4 11.5Z" />
+              <path d="m11.2 13.5 4-4" />
+            </svg>
+          </button>
+        </form>
+        <div className="it-hero-suggestions" aria-label="Примеры вопросов для ОНО">
+          {suggestions.map((suggestion) => <button key={suggestion} type="button" onClick={() => {
+            setValue(suggestion);
+            onWidgetEvent?.({ type: "widget.opened", source: "hero_suggestion" });
+            requestAnimationFrame(() => inputRef.current?.focus());
+          }}>{suggestion}</button>)}
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className={`it-layer ${open ? "is-open" : "is-closed"}${guideOffset ? " is-guiding" : ""}`} style={guideOffset ? { "--it-guide-x": `${guideOffset.x}px`, "--it-guide-y": `${guideOffset.y}px` } as CSSProperties : undefined} data-state={state} aria-label="Оно — интеллект Room Design">
