@@ -60,6 +60,7 @@ function ProjectEnvironment({ onStartProject }: { onStartProject: () => void }) 
         <p>ПРОЕКТНАЯ СРЕДА</p>
         <h2 id="home-project-title">Не отдельный рендер.<br />Целый проект.</h2>
       </div>
+      <span className="home-project-divider" aria-hidden="true" />
       <div className="home-project-action">
         <p>Соберите пространство в одном рабочем процессе: создавайте планограммы, редактируйте интерьер по исходному изображению, примеряйте мебель из каталога или любого референса, сравнивайте версии и возвращайтесь к истории рендеров. Проект сохраняет всё — от первой идеи до готового решения.</p>
         <button type="button" onClick={onStartProject}>Начать проект <span>→</span></button>

@@ -51,6 +51,45 @@ test("homepage hero stays inside the viewport at the five acceptance sizes", asy
   }
 });
 
+test("homepage uses the approved neutral background and responsive project dividers", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const desktopStyles = await page.evaluate(() => {
+    const project = document.querySelector(".home-project-environment");
+    const divider = document.querySelector(".home-project-divider");
+    if (!(project instanceof HTMLElement) || !(divider instanceof HTMLElement)) throw new Error("Project environment is missing");
+    return {
+      body: getComputedStyle(document.body).backgroundColor,
+      hero: getComputedStyle(document.querySelector(".home-ono-hero")!).backgroundColor,
+      project: getComputedStyle(project).backgroundColor,
+      templates: getComputedStyle(document.querySelector(".home-template-entry")!).backgroundColor,
+      topHeight: getComputedStyle(project, "::before").height,
+      topColor: getComputedStyle(project, "::before").backgroundColor,
+      bottomHeight: getComputedStyle(project, "::after").height,
+      bottomColor: getComputedStyle(project, "::after").backgroundColor,
+      dividerDisplay: getComputedStyle(divider).display,
+      dividerWidth: getComputedStyle(divider).width,
+      dividerColor: getComputedStyle(divider).backgroundColor,
+    };
+  });
+  expect(desktopStyles).toEqual({
+    body: "rgb(252, 252, 251)",
+    hero: "rgb(252, 252, 251)",
+    project: "rgb(252, 252, 251)",
+    templates: "rgb(252, 252, 251)",
+    topHeight: "1px",
+    topColor: "rgb(218, 219, 224)",
+    bottomHeight: "1px",
+    bottomColor: "rgb(225, 225, 227)",
+    dividerDisplay: "block",
+    dividerWidth: "1px",
+    dividerColor: "rgb(212, 214, 218)",
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".home-project-divider")).toBeHidden();
+});
+
 test("Ono 2.0 keeps the approved UI and accepts a local image without generating", async ({ page }) => {
   await page.goto("/templates/design-battle");
   await page.getByRole("button", { name: /Открыть Оно/ }).click();
