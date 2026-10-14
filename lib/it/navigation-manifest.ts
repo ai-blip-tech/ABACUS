@@ -1,3 +1,5 @@
+import { templateRegistry } from "../templates/registry.ts";
+
 export type OnoNavigationEntry = {
   id: string;
   label: string;
@@ -13,11 +15,14 @@ export type OnoNavigationManifest = {
 };
 
 export const roomDesignNavigationManifest: OnoNavigationManifest = {
-  version: "2026-10-11.2",
+  version: "2026-10-14.1",
   siteId: "roomdesign",
   entries: [
+    { id: "home", label: "Главная", path: "/", pageType: "help", allowedActions: ["open_link"] },
     { id: "templates", label: "Шаблоны", path: "/templates", pageType: "templates", allowedActions: ["open_link", "search_catalog"] },
-    { id: "projects", label: "Проекты", path: "/account", pageType: "project", allowedActions: ["open_link"] },
+    { id: "projects", label: "Мои проекты", path: "/#кабинет", pageType: "project", allowedActions: ["open_link"] },
+    { id: "account", label: "Личный кабинет", path: "/account#profile", pageType: "project", allowedActions: ["open_link"] },
+    { id: "renders", label: "История рендеров", path: "/account#renders", pageType: "project", allowedActions: ["open_link"] },
     { id: "studio", label: "Студия", path: "/#студия", pageType: "project", allowedActions: ["open_link", "search_catalog"] },
     { id: "help", label: "Помощь", path: "/templates", pageType: "help", allowedActions: ["open_link"] },
     ...templateRegistry.map((template) => ({
@@ -43,4 +48,3 @@ export const norrNavigationManifest: OnoNavigationManifest = {
 export const navigationManifestFor = (siteId: OnoNavigationManifest["siteId"]) => siteId === "norrmobler"
   ? norrNavigationManifest
   : roomDesignNavigationManifest;
-import { templateRegistry } from "../templates/registry.ts";

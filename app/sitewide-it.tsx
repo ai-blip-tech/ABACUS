@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 
 import ItOrb from "./it-orb";
-import { categoryLabels, getTemplateBySlug, resultLabels, statusLabels } from "@/lib/templates/registry";
+import { categoryLabels, getTemplateBySlug, resultLabels, templateAvailabilityLabel } from "@/lib/templates/registry";
 import type { ItUiAction, RoomDesignContext } from "@/lib/it/types";
 import { onoV2Enabled } from "@/lib/it/version";
 
@@ -68,7 +68,7 @@ const contextForPath = (pathname: string): RoomDesignContext => {
     template: template ? {
       slug: template.slug,
       title: template.title,
-      status: statusLabels[template.status],
+      status: templateAvailabilityLabel(template),
       category: categoryLabels[template.category],
       audience: template.audience,
       description: template.description,

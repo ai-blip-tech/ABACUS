@@ -181,6 +181,7 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
     setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", text, image: image || undefined }]);
     setState(/найди|подбери|каталог/i.test(text) ? "searching" : "thinking");
     const assistantId = crypto.randomUUID();
+    const requestId = crypto.randomUUID();
     const requestController = new AbortController();
     activeRequestRef.current = requestController;
     const stageState: Record<OnoProgressStage, ItVisualState> = {
@@ -191,32 +192,20 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
       comparing: "searching",
       finalizing: "speaking",
     };
+    const requestBody = JSON.stringify({
+      requestId,
+      sessionId: sessionId || undefined,
+      message: text,
+      image: image || undefined,
+      context,
+      history: messages.slice(-12).map((item) => ({
+        role: item.role === "it" ? "assistant" : "user",
+        text: item.text,
+        image: item.image,
+        products: item.products,
+      })),
+    });
     try {
-      const response = await fetch("/api/it", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
-        signal: requestController.signal,
-        body: JSON.stringify({
-          requestId: crypto.randomUUID(),
-          sessionId: sessionId || undefined,
-          message: text,
-          image: image || undefined,
-          context,
-          history: messages.slice(-12).map((item) => ({
-            role: item.role === "it" ? "assistant" : "user",
-            text: item.text,
-            image: item.image,
-            products: item.products,
-          })),
-        }),
-      });
-      if (!response.ok || !response.body) {
-        const payload = await response.json().catch(() => ({})) as { error?: string };
-        throw new Error(payload.error || "Не удалось получить ответ.");
-      }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
       let hasAssistant = false;
       let finalTurn: ItTurn | null = null;
       const applyEvent = (event: OnoStreamEvent) => {
@@ -237,15 +226,42 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
           throw new Error(event.message);
         }
       };
-      while (true) {
-        const { value: chunk, done } = await reader.read();
-        buffer += decoder.decode(chunk || new Uint8Array(), { stream: !done });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) if (line.trim()) applyEvent(JSON.parse(line) as OnoStreamEvent);
-        if (done) break;
+      const receiveTurn = async () => {
+        const response = await fetch("/api/it", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+          signal: requestController.signal,
+          body: requestBody,
+        });
+        if (!response.ok || !response.body) {
+          const payload = await response.json().catch(() => ({})) as { error?: string };
+          throw new Error(payload.error || "Не удалось получить ответ.");
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { value: chunk, done } = await reader.read();
+          buffer += decoder.decode(chunk || new Uint8Array(), { stream: !done });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) if (line.trim()) applyEvent(JSON.parse(line) as OnoStreamEvent);
+          if (done) break;
+        }
+        if (buffer.trim()) applyEvent(JSON.parse(buffer) as OnoStreamEvent);
+      };
+      for (let attempt = 0; attempt < 3 && !finalTurn; attempt += 1) {
+        try {
+          await receiveTurn();
+        } catch (error) {
+          if (error instanceof Error && error.name === "AbortError") throw error;
+          const message = error instanceof Error ? error.message : "";
+          const retryable = /load failed|failed to fetch|network(?:error| request failed)|этот запрос уже выполняется/i.test(message);
+          if (!retryable || hasAssistant || attempt === 2) throw error;
+          setProgressLabel("Восстанавливаю соединение");
+          await new Promise((resolve) => window.setTimeout(resolve, attempt === 0 ? 700 : 1400));
+        }
       }
-      if (buffer.trim()) applyEvent(JSON.parse(buffer) as OnoStreamEvent);
       if (!finalTurn) throw new Error("Поток завершился без результата.");
       const payload = finalTurn as ItTurn;
       setMessages((items) => {
@@ -265,7 +281,9 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
       setMessages((items) => [...items, {
         id: crypto.randomUUID(),
         role: "it",
-        text: error instanceof Error ? error.message : "Не удалось ответить. Попробуйте ещё раз.",
+        text: error instanceof Error && /load failed|failed to fetch|network(?:error| request failed)/i.test(error.message)
+          ? "Связь прервалась. Попробуйте отправить запрос ещё раз."
+          : error instanceof Error ? error.message : "Не удалось ответить. Попробуйте ещё раз.",
       }]);
       setState("error");
     } finally {

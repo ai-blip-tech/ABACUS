@@ -226,6 +226,9 @@ test("the verified product knowledge covers both editors and known limitations",
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.imageEditor.material, /Каталог материалов пока не готов/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /зарегистрированный безопасный элемент/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.safety, /не нажимает кнопки/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.navigation.projects, /\/#кабинет/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.planogram.addItems, /стеллаж/iu);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.assistant.image, /кнопкой прикрепления изображения/iu);
 });
 
 test("Ono knows every registered template, its availability, inputs and result", () => {
@@ -239,7 +242,11 @@ test("Ono knows every registered template, its availability, inputs and result",
     assert.ok(template.resultType);
     assert.ok(template.inputs.length > 0);
     assert.ok(template.inputs.every((input) => input.label && typeof input.required === "boolean"));
+    assert.equal(template.status, "Доступен");
   }
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.navigation.templates, /35 работающих сценариев/);
+  assert.doesNotMatch(ROOM_DESIGN_PRODUCT_KNOWLEDGE.templates.statuses, /Preview|Beta|Скоро/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.templates.statuses, /главнее старых ответов ассистента/iu);
   assert.equal(definitions.find((template) => template.slug === "design-battle")?.title, "Дизайн-баттл");
   assert.match(definitions.find((template) => template.slug === "light-scenarios")?.inputSummary || "", /сценарий|Kelvin/i);
   assert.match(definitions.find((template) => template.slug === "kitchen-cad-to-photo")?.safetyPolicy || "", /geometry-lock/);

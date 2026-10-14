@@ -156,4 +156,4 @@ export function onoKnowledgeHealth(profile: OnoTenantProfile) {
   };
 }
 
-export const onoKnowledgeVersion = "2026-10-12.1";
+export const onoKnowledgeVersion = "2026-10-14.1";

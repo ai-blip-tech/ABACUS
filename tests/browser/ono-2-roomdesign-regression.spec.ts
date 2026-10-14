@@ -48,6 +48,31 @@ test("homepage shows a clear rest state when Ono is unavailable", async ({ page 
   expect(await statusDot.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(182, 64, 53)");
 });
 
+test("homepage retries one interrupted Ono request without duplicating the message", async ({ page }) => {
+  let postAttempts = 0;
+  await page.route("**/api/it", async (route) => {
+    if (route.request().method() === "GET") {
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ sessionId: "11111111-1111-4111-8111-111111111111", messages: [] }) });
+    }
+    if (route.request().method() !== "POST") return route.continue();
+    postAttempts += 1;
+    if (postAttempts === 1) return route.abort("failed");
+    const turn = { text: "Соединение восстановлено.", state: "speaking" };
+    return route.fulfill({
+      status: 200,
+      contentType: "application/x-ndjson",
+      body: `${JSON.stringify({ type: "result", turn, sessionId: "11111111-1111-4111-8111-111111111111", requestId: "22222222-2222-4222-8222-222222222222", timing: { firstEventMs: 1, totalMs: 2 } })}\n`,
+    });
+  });
+  await page.goto("/");
+  await page.getByLabel("Сообщение для ОНО").fill("Найди похожее кресло");
+  await page.getByRole("button", { name: "Отправить" }).click();
+  await expect(page.getByText("Соединение восстановлено.")).toBeVisible();
+  await expect(page.locator(".it-message-user")).toHaveCount(1);
+  await expect(page.locator(".it-message-it")).toHaveCount(1);
+  expect(postAttempts).toBe(2);
+});
+
 test("homepage keeps one compact project action and no audience switch on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

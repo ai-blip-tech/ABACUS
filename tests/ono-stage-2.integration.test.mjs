@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { templateRegistry } from "../lib/templates/registry.ts";
 
 const dataDir = mkdtempSync(join(tmpdir(), "room-design-ono-stage-2-"));
 process.env.ROOM_DESIGN_DATA_DIR = dataDir;
@@ -111,12 +112,20 @@ test("voice transcription pricing uses its own OpenAI endpoint snapshot", () => 
 
 test("Stage 2 exposes versioned site config and navigation manifests", () => {
   const config = onoSiteConfigFor("roomdesign");
+  const roomDesignManifest = navigationManifestFor("roomdesign");
   assert.equal(config.capabilities.persistentMemory, true);
   assert.equal(config.capabilities.mutatingActions, false);
   assert.equal(config.retentionDays, 30);
-  assert.equal(config.navigationManifestVersion, navigationManifestFor("roomdesign").version);
+  assert.equal(config.navigationManifestVersion, roomDesignManifest.version);
   assert.ok(config.approvedOrigins.includes("http://localhost:3129"));
   assert.ok(config.approvedOrigins.includes("http://127.0.0.1:3129"));
+  assert.deepEqual(
+    roomDesignManifest.entries.find((entry) => entry.id === "projects"),
+    { id: "projects", label: "Мои проекты", path: "/#кабинет", pageType: "project", allowedActions: ["open_link"] },
+  );
+  assert.equal(roomDesignManifest.entries.find((entry) => entry.id === "account")?.path, "/account#profile");
+  assert.equal(roomDesignManifest.entries.find((entry) => entry.id === "renders")?.path, "/account#renders");
+  assert.equal(roomDesignManifest.entries.filter((entry) => entry.id.startsWith("template-")).length, templateRegistry.length);
   assert.ok(navigationManifestFor("norrmobler").entries.some((entry) => entry.id === "catalog"));
   assert.equal(resolveOnoTenantProfile("norr.localhost:3128").siteId, "norrmobler");
   assert.ok(onoSiteConfigFor("norrmobler").approvedOrigins.includes("http://norr.localhost:3128"));

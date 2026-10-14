@@ -290,12 +290,18 @@ export const statusLabels: Record<TemplateStatus, string> = {
   archived: "В архиве",
 };
 
+// Release lifecycle labels are internal metadata. Every template exposed by the
+// public catalog has a working route and runtime, so Ono must describe public
+// availability from the same predicate that builds that catalog.
+export const isTemplatePubliclyAvailable = (template: TemplateDefinition) => !["draft", "paused", "archived"].includes(template.status);
+export const templateAvailabilityLabel = (template: TemplateDefinition) => isTemplatePubliclyAvailable(template) ? "Доступен" : "Недоступен";
+
 export const resultLabels: Record<TemplateResultType, string> = {
   image: "Изображение",
   image_series: "Серия",
   video: "Видео",
 };
 
-export const previewTemplates = templateRegistry.filter((template) => !["draft", "archived"].includes(template.status));
+export const previewTemplates = templateRegistry.filter(isTemplatePubliclyAvailable);
 export const featuredTemplates = templateRegistry.filter((template) => template.featured);
 export const getTemplateBySlug = (slug: string) => templateRegistry.find((template) => template.slug === slug);
