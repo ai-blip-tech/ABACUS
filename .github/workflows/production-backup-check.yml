@@ -12,6 +12,10 @@ on:
         required: true
         default: "ae1cbdc31570a7deabb67fbbd7ed17011e8a8ac9"
         type: string
+      retention_confirmation:
+        description: "Type PRUNE_PRODUCTION_BACKUPS_KEEP_10 to retain only the 10 newest predeploy backups"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -32,6 +36,7 @@ jobs:
       BACKUP_RUN_ID: ${{ github.run_id }}
       BACKUP_RUN_ATTEMPT: ${{ github.run_attempt }}
       EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+      RETENTION_CONFIRMATION: ${{ inputs.retention_confirmation }}
     steps:
       - name: Validate manual confirmation
         shell: bash
@@ -45,12 +50,13 @@ jobs:
           BACKUP_RUN_ID: ${{ env.BACKUP_RUN_ID }}
           BACKUP_RUN_ATTEMPT: ${{ env.BACKUP_RUN_ATTEMPT }}
           EXPECTED_PRODUCTION_SHA: ${{ env.EXPECTED_PRODUCTION_SHA }}
+          RETENTION_CONFIRMATION: ${{ env.RETENTION_CONFIRMATION }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           command_timeout: 40m
-          envs: BACKUP_RUN_ID,BACKUP_RUN_ATTEMPT,EXPECTED_PRODUCTION_SHA
+          envs: BACKUP_RUN_ID,BACKUP_RUN_ATTEMPT,EXPECTED_PRODUCTION_SHA,RETENTION_CONFIRMATION
           script: |
             set -eu
             umask 077
@@ -148,6 +154,39 @@ jobs:
               exit 1
             }
 
+            prune_old_backups() {
+              keep_count="$1"
+              excluded_dir="${2:-}"
+              test "$RETENTION_CONFIRMATION" = "PRUNE_PRODUCTION_BACKUPS_KEEP_10" || fail "backup-retention-not-confirmed"
+              resolved_backup_root="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$backup_root")"
+              expected_backup_root="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$HOME/room-design-backups")"
+              test "$resolved_backup_root" = "$expected_backup_root" || fail "unsafe-backup-retention-root"
+              retention_list="$(mktemp)"
+              find "$resolved_backup_root" -mindepth 1 -maxdepth 1 -type d -name 'predeploy-*' \
+                -printf '%T@ %p\n' | sort -nr > "$retention_list"
+              retained=0
+              deleted=0
+              while IFS=' ' read -r modified candidate; do
+                test -n "${candidate:-}" || continue
+                if [ -n "$excluded_dir" ] && [ "$candidate" = "$excluded_dir" ]; then
+                  continue
+                fi
+                case "$candidate" in
+                  "$resolved_backup_root"/predeploy-*) ;;
+                  *) rm -f "$retention_list"; fail "unsafe-backup-retention-candidate" ;;
+                esac
+                retained=$((retained + 1))
+                if [ "$retained" -le "$keep_count" ]; then
+                  continue
+                fi
+                find "$candidate" -depth -delete
+                deleted=$((deleted + 1))
+              done < "$retention_list"
+              rm -f "$retention_list"
+              echo "BACKUP_RETENTION_KEEP=$keep_count"
+              echo "BACKUP_RETENTION_DELETED=$deleted"
+            }
+
             require_directory() {
               label="$1"
               path="$2"
@@ -219,6 +258,7 @@ jobs:
             require_directory "persistent-data" "$data_dir"
             require_readable_file "sqlite" "$data_dir/$database_name"
             require_directory "storage" "$data_dir/storage"
+            prune_old_backups 10
             if [ -e "$backup_dir" ]; then
               fail "backup-directory-already-exists"
             fi
@@ -459,3 +499,4 @@ jobs:
             rm -rf "$snapshot_dir" "$restore_dir"
             current_step="completed"
             test "$readiness_failed" = "0"
+            prune_old_backups 9 "$backup_dir"
