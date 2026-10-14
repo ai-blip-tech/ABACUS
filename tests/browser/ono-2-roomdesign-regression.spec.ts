@@ -34,6 +34,20 @@ test("homepage signup action uses the same pill shape as the project action", as
   expect(await project.evaluate((element) => getComputedStyle(element).borderRadius)).toBe("999px");
 });
 
+test("homepage shows a clear rest state when Ono is unavailable", async ({ page }) => {
+  await page.route("**/api/it", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Модель временно недоступна." }) });
+  });
+  await page.goto("/");
+  await page.getByLabel("Сообщение для ОНО").fill("Тестовый вопрос");
+  await page.getByRole("button", { name: "Отправить" }).click();
+  const response = page.getByRole("region", { name: "Разговор с ОНО" });
+  await expect(response.getByText("ОНО отдыхает")).toBeVisible();
+  const statusDot = response.locator("header i");
+  expect(await statusDot.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(182, 64, 53)");
+});
+
 test("homepage keeps one compact project action and no audience switch on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

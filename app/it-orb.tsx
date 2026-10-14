@@ -37,7 +37,7 @@ const stateLabel: Record<ItVisualState, string> = {
   moving: "Показывает",
   acting: "Готовит действие",
   success: "Нашло",
-  error: "Нужна пауза",
+  error: "ОНО отдыхает",
 };
 
 const onoState: Record<ItVisualState, OnoState> = {
