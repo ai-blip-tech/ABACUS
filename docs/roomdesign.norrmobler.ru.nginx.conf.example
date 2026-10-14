@@ -3,8 +3,10 @@ server {
     listen [::]:80;
     server_name roomdesign.norrmobler.ru;
 
-    location /.well-known/acme-challenge/ {
+    location ^~ /.well-known/acme-challenge/ {
         root /var/www/html;
+        default_type text/plain;
+        try_files $uri =404;
     }
 
     location / {

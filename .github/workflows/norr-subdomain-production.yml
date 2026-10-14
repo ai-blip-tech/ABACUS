@@ -137,11 +137,23 @@ jobs:
               exit 1
             fi
 
-            sudo mkdir -p /var/www/html/.well-known/acme-challenge
+            # `umask 077` protects the rest of this workflow, but the ACME
+            # webroot must remain traversable/readable by the Nginx worker.
+            sudo install -d -m 0755 /var/www/html
+            sudo install -d -m 0755 /var/www/html/.well-known
+            sudo install -d -m 0755 /var/www/html/.well-known/acme-challenge
             sudo install -m 0644 "$bootstrap_source" "$target"
             sudo ln -sfn "$target" "$enabled"
             sudo nginx -t
             sudo systemctl reload nginx
+
+            acme_probe="codex-acme-probe-${SERVER_SETUP_RUN_ID}"
+            printf '%s\n' "$acme_probe" | sudo tee \
+              "/var/www/html/.well-known/acme-challenge/$acme_probe" >/dev/null
+            sudo chmod 0644 "/var/www/html/.well-known/acme-challenge/$acme_probe"
+            test "$(curl --fail --silent --show-error --max-time 20 \
+              "http://roomdesign.norrmobler.ru/.well-known/acme-challenge/$acme_probe")" = "$acme_probe"
+            sudo rm -f "/var/www/html/.well-known/acme-challenge/$acme_probe"
 
             if ! sudo test -f "$certificate_dir/fullchain.pem" || ! sudo test -f "$certificate_dir/privkey.pem"; then
               sudo "$certbot_command" certonly --webroot \
