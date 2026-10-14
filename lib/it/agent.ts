@@ -49,7 +49,7 @@ export type OnoAgentResult = {
   toolTrace: ItToolTrace[];
   visionAnalysis?: ItVisionAnalysis;
   sources?: ItSource[];
-  modelUsage: { inputTokens: number; cachedInputTokens: number; outputTokens: number; totalTokens: number; calls: number };
+  modelUsage: { inputTokens: number; cachedInputTokens: number; outputTokens: number; totalTokens: number; calls: number; usageReports: number };
   modelDurationMs: number;
 };
 
@@ -208,7 +208,7 @@ export async function runOnoAgentConversation(input: ConversationInput, profile:
   const products = new Map<string, ItCatalogProduct>();
   const lastToolProducts: string[] = [];
   const toolTrace: ItToolTrace[] = [];
-  const modelUsage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 0 };
+  const modelUsage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 0, usageReports: 0 };
   let modelDurationMs = 0;
   let toolCalls = 0;
 
@@ -228,6 +228,7 @@ export async function runOnoAgentConversation(input: ConversationInput, profile:
     });
     modelDurationMs += Date.now() - modelStartedAt;
     modelUsage.calls += 1;
+    if (response.usage) modelUsage.usageReports += 1;
     modelUsage.inputTokens += Number(response.usage?.input_tokens || 0);
     modelUsage.cachedInputTokens += Number(response.usage?.input_tokens_details?.cached_tokens || 0);
     modelUsage.outputTokens += Number(response.usage?.output_tokens || 0);

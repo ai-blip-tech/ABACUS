@@ -7,6 +7,7 @@ export type OnoTextUsage = {
   totalTokens: number;
   cachedInputTokens?: number;
   calls: number;
+  usageReports?: number;
 };
 
 type TextPricing = {

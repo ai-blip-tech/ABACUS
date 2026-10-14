@@ -62,6 +62,26 @@ test("Stage 4 sends an image to Vision and returns explicit uncertainty", async 
   assert.equal(result.visionAnalysis?.subject, "furniture");
   assert.equal(result.visionAnalysis?.requiresConfirmation, true);
   assert.equal(result.modelUsage.totalTokens, 50);
+  assert.equal(result.modelUsage.usageReports, 1);
+});
+
+test("model calls without provider usage are not treated as confirmed zero cost", async () => {
+  const profile = { ...onoTenantProfiles.roomdesign, capabilities: { ...onoTenantProfiles.roomdesign.capabilities, webSearch: false } };
+  const result = await runOnoAgentConversation(
+    { message: "Как открыть шаблоны?", history: [], context, products: [], actions: [], toolFacts: [] },
+    profile,
+    {
+      callModel: async () => ({
+        output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+          message: "Откройте раздел «Шаблоны».", selectedProductIds: [], handoffRequested: false, visionAnalysis: null, sources: [],
+        }) }] }],
+      }),
+      executeTool: async () => { throw new Error("not called"); },
+    },
+  );
+  assert.equal(result.modelUsage.calls, 1);
+  assert.equal(result.modelUsage.usageReports, 0);
+  assert.equal(result.modelUsage.totalTokens, 0);
 });
 
 test("Web Search is capability-gated and custom read-only tools stay available", () => {

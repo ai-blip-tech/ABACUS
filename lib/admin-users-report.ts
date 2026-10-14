@@ -45,10 +45,18 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
         COUNT(*) AS ai_operation_count,
         COALESCE(SUM(rd_tokens_charged), 0) AS ai_rd_tokens_charged,
         COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN 1 ELSE 0 END), 0) AS generation_operation_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'generation' AND status = 'succeeded' THEN 1 ELSE 0 END), 0) AS generation_succeeded_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'generation' AND status <> 'succeeded' THEN 1 ELSE 0 END), 0) AS generation_failed_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'generation' AND net_micro_usd IS NOT NULL AND gross_micro_usd IS NOT NULL THEN 1 ELSE 0 END), 0) AS generation_exact_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'generation' AND net_micro_usd IS NULL AND spend_evidence = 1 THEN 1 ELSE 0 END), 0) AS generation_unpriced_count,
         COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN rd_tokens_charged ELSE 0 END), 0) AS generation_rd_tokens_charged,
         COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN net_micro_usd ELSE 0 END), 0) AS generation_net_micro_usd,
         COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN gross_micro_usd ELSE 0 END), 0) AS generation_gross_micro_usd,
         COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN 1 ELSE 0 END), 0) AS ono_operation_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'ono' AND status = 'succeeded' THEN 1 ELSE 0 END), 0) AS ono_succeeded_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'ono' AND status <> 'succeeded' THEN 1 ELSE 0 END), 0) AS ono_failed_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'ono' AND net_micro_usd IS NOT NULL AND gross_micro_usd IS NOT NULL THEN 1 ELSE 0 END), 0) AS ono_exact_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'ono' AND net_micro_usd IS NULL AND spend_evidence = 1 THEN 1 ELSE 0 END), 0) AS ono_unpriced_count,
         COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN rd_tokens_charged ELSE 0 END), 0) AS ono_rd_tokens_charged,
         COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN net_micro_usd ELSE 0 END), 0) AS ono_net_micro_usd,
         COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN gross_micro_usd ELSE 0 END), 0) AS ono_gross_micro_usd,
@@ -58,10 +66,13 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
         COALESCE(SUM(net_micro_usd), 0) AS ai_net_micro_usd,
         COALESCE(SUM(gross_micro_usd), 0) AS ai_gross_micro_usd
       FROM (
-        SELECT 'generation' AS ledger_kind, user_id, tenant_id, created_at, rd_tokens_charged, input_text_tokens, input_image_tokens,
-          output_image_tokens, net_micro_usd, gross_micro_usd FROM ai_cost_ledger
+        SELECT 'generation' AS ledger_kind, user_id, tenant_id, created_at, status, rd_tokens_charged, input_text_tokens, input_image_tokens,
+          output_image_tokens, net_micro_usd, gross_micro_usd,
+          CASE WHEN provider_request_id IS NOT NULL OR usage_json IS NOT NULL OR COALESCE(total_tokens, 0) > 0 THEN 1 ELSE 0 END AS spend_evidence
+          FROM ai_cost_ledger
         UNION ALL
-        SELECT 'ono' AS ledger_kind, user_id, tenant_id, created_at, rd_tokens_charged, input_tokens, 0, 0, net_micro_usd, gross_micro_usd
+        SELECT 'ono' AS ledger_kind, user_id, tenant_id, created_at, status, rd_tokens_charged, input_tokens, 0, 0, net_micro_usd, gross_micro_usd,
+          CASE WHEN model_calls > 0 THEN 1 ELSE 0 END AS spend_evidence
           FROM ono_cost_ledger WHERE user_id IS NOT NULL
       )
       WHERE created_at >= ? AND created_at < ? AND (? = '' OR tenant_id = ?)
@@ -108,10 +119,18 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
       COALESCE(period_ledger.ai_operation_count, 0) AS ai_operation_count,
       COALESCE(period_ledger.ai_rd_tokens_charged, 0) AS ai_rd_tokens_charged,
       COALESCE(period_ledger.generation_operation_count, 0) AS generation_operation_count,
+      COALESCE(period_ledger.generation_succeeded_count, 0) AS generation_succeeded_count,
+      COALESCE(period_ledger.generation_failed_count, 0) AS generation_failed_count,
+      COALESCE(period_ledger.generation_exact_count, 0) AS generation_exact_count,
+      COALESCE(period_ledger.generation_unpriced_count, 0) AS generation_unpriced_count,
       COALESCE(period_ledger.generation_rd_tokens_charged, 0) AS generation_rd_tokens_charged,
       COALESCE(period_ledger.generation_net_micro_usd, 0) AS generation_net_micro_usd,
       COALESCE(period_ledger.generation_gross_micro_usd, 0) AS generation_gross_micro_usd,
       COALESCE(period_ledger.ono_operation_count, 0) AS ono_operation_count,
+      COALESCE(period_ledger.ono_succeeded_count, 0) AS ono_succeeded_count,
+      COALESCE(period_ledger.ono_failed_count, 0) AS ono_failed_count,
+      COALESCE(period_ledger.ono_exact_count, 0) AS ono_exact_count,
+      COALESCE(period_ledger.ono_unpriced_count, 0) AS ono_unpriced_count,
       COALESCE(period_ledger.ono_rd_tokens_charged, 0) AS ono_rd_tokens_charged,
       COALESCE(period_ledger.ono_net_micro_usd, 0) AS ono_net_micro_usd,
       COALESCE(period_ledger.ono_gross_micro_usd, 0) AS ono_gross_micro_usd,
@@ -152,10 +171,18 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
     ai_operation_count: result.ai_operation_count + Number(user.ai_operation_count || 0),
     ai_rd_tokens_charged: result.ai_rd_tokens_charged + Number(user.ai_rd_tokens_charged || 0),
     generation_operation_count: result.generation_operation_count + Number(user.generation_operation_count || 0),
+    generation_succeeded_count: result.generation_succeeded_count + Number(user.generation_succeeded_count || 0),
+    generation_failed_count: result.generation_failed_count + Number(user.generation_failed_count || 0),
+    generation_exact_count: result.generation_exact_count + Number(user.generation_exact_count || 0),
+    generation_unpriced_count: result.generation_unpriced_count + Number(user.generation_unpriced_count || 0),
     generation_rd_tokens_charged: result.generation_rd_tokens_charged + Number(user.generation_rd_tokens_charged || 0),
     generation_net_micro_usd: result.generation_net_micro_usd + Number(user.generation_net_micro_usd || 0),
     generation_gross_micro_usd: result.generation_gross_micro_usd + Number(user.generation_gross_micro_usd || 0),
     ono_operation_count: result.ono_operation_count + Number(user.ono_operation_count || 0),
+    ono_succeeded_count: result.ono_succeeded_count + Number(user.ono_succeeded_count || 0),
+    ono_failed_count: result.ono_failed_count + Number(user.ono_failed_count || 0),
+    ono_exact_count: result.ono_exact_count + Number(user.ono_exact_count || 0),
+    ono_unpriced_count: result.ono_unpriced_count + Number(user.ono_unpriced_count || 0),
     ono_rd_tokens_charged: result.ono_rd_tokens_charged + Number(user.ono_rd_tokens_charged || 0),
     ono_net_micro_usd: result.ono_net_micro_usd + Number(user.ono_net_micro_usd || 0),
     ono_gross_micro_usd: result.ono_gross_micro_usd + Number(user.ono_gross_micro_usd || 0),
@@ -171,8 +198,10 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
     legacy_gross_estimated_count: result.legacy_gross_estimated_count + Number(user.legacy_gross_estimated_count || 0),
   }), {
     users: 0, project_count: 0, generation_count: 0, ai_operation_count: 0, ai_rd_tokens_charged: 0,
-    generation_operation_count: 0, generation_rd_tokens_charged: 0, generation_net_micro_usd: 0, generation_gross_micro_usd: 0,
-    ono_operation_count: 0, ono_rd_tokens_charged: 0, ono_net_micro_usd: 0, ono_gross_micro_usd: 0,
+    generation_operation_count: 0, generation_succeeded_count: 0, generation_failed_count: 0, generation_exact_count: 0, generation_unpriced_count: 0,
+    generation_rd_tokens_charged: 0, generation_net_micro_usd: 0, generation_gross_micro_usd: 0,
+    ono_operation_count: 0, ono_succeeded_count: 0, ono_failed_count: 0, ono_exact_count: 0, ono_unpriced_count: 0,
+    ono_rd_tokens_charged: 0, ono_net_micro_usd: 0, ono_gross_micro_usd: 0,
     input_text_tokens: 0, input_image_tokens: 0, output_image_tokens: 0,
     ai_net_micro_usd: 0, ai_gross_micro_usd: 0,
     legacy_generation_count: 0, legacy_estimated_count: 0,

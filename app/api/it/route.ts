@@ -212,7 +212,7 @@ export async function POST(request: Request) {
   if (!onoServerEnabled()) return Response.json({ error: "ОНО временно отключено." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   let requestId = crypto.randomUUID();
   let financeStarted = false;
-  let usage: OnoTextUsage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 0 };
+  let usage: OnoTextUsage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 0, usageReports: 0 };
   const requestStartedAt = Date.now();
   let firstResponseMs: number | null = null;
   let activeRequestKey = "";
@@ -255,6 +255,7 @@ export async function POST(request: Request) {
     }
     financeStarted = true;
     let activeState = memory.state;
+    const usageIsProviderConfirmed = () => usage.calls > 0 && Number(usage.usageReports || 0) === usage.calls;
     const executeTurn = async (onProgress?: (stage: OnoProgressStage) => void, signal?: AbortSignal) => {
       const turn = await runItTurn(body, {
         answerConversation: (input) => answerConversation(input, profile, requestId, (observedUsage, observedState) => {
@@ -263,7 +264,7 @@ export async function POST(request: Request) {
         }, onProgress, signal),
       });
       const succeeded = turn.state !== "error";
-      await completeOnoFinancialUsage({ requestId, model: modelName(), status: succeeded ? "succeeded" : "failed", usage, errorCode: succeeded ? null : "model_unavailable" });
+      await completeOnoFinancialUsage({ requestId, model: modelName(), status: succeeded ? "succeeded" : "failed", usage, usageKnown: usageIsProviderConfirmed(), errorCode: succeeded ? null : "model_unavailable" });
       await saveOnoTurn({ session, requestId, userText: body.message.trim(), imagePresent: Boolean(body.image), assistantText: turn.text, products: turn.products, state: activeState });
       await recordOnoQualityEvent({
         requestId,
@@ -320,7 +321,7 @@ export async function POST(request: Request) {
             emit({ type: "error", message, requestId });
             controller.close();
           }
-          if (financeStarted) await completeOnoFinancialUsage({ requestId, model: modelName(), status: "failed", usage, errorCode: abortController.signal.aborted ? "request_cancelled" : "request_failed" }).catch(() => undefined);
+          if (financeStarted) await completeOnoFinancialUsage({ requestId, model: modelName(), status: "failed", usage, usageKnown: usageIsProviderConfirmed(), errorCode: abortController.signal.aborted ? "request_cancelled" : "request_failed" }).catch(() => undefined);
         } finally {
           activeRequestIds.delete(activeRequestKey);
         }
@@ -337,7 +338,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (activeRequestKey) activeRequestIds.delete(activeRequestKey);
     const message = error instanceof Error ? error.message : "Не удалось ответить.";
-    if (financeStarted) await completeOnoFinancialUsage({ requestId, model: modelName(), status: "failed", usage, errorCode: "request_failed" }).catch(() => undefined);
+    if (financeStarted) await completeOnoFinancialUsage({ requestId, model: modelName(), status: "failed", usage, usageKnown: usage.calls > 0 && Number(usage.usageReports || 0) === usage.calls, errorCode: "request_failed" }).catch(() => undefined);
     console.error("[Ono] request failed", { requestId, message });
     return Response.json({ error: message }, { status: 500, headers: { "X-Ono-Request-Id": requestId } });
   }

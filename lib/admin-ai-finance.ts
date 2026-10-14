@@ -91,17 +91,28 @@ export async function userAiFinance(userId: string, period?: FinancePeriod) {
     COALESCE(SUM(net_micro_usd), 0) AS net_micro_usd,
     COALESCE(SUM(gross_micro_usd), 0) AS gross_micro_usd,
     COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN 1 ELSE 0 END), 0) AS generation_operations,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'generation' AND status = 'succeeded' THEN 1 ELSE 0 END), 0) AS generation_succeeded,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'generation' AND status <> 'succeeded' THEN 1 ELSE 0 END), 0) AS generation_failed,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'generation' AND net_micro_usd IS NOT NULL AND gross_micro_usd IS NOT NULL THEN 1 ELSE 0 END), 0) AS generation_exact,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'generation' AND net_micro_usd IS NULL AND spend_evidence = 1 THEN 1 ELSE 0 END), 0) AS generation_unpriced,
     COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN rd_tokens_charged ELSE 0 END), 0) AS generation_rd_tokens_charged,
     COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN net_micro_usd ELSE 0 END), 0) AS generation_net_micro_usd,
     COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN gross_micro_usd ELSE 0 END), 0) AS generation_gross_micro_usd,
     COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN 1 ELSE 0 END), 0) AS ono_operations,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'ono' AND status = 'succeeded' THEN 1 ELSE 0 END), 0) AS ono_succeeded,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'ono' AND status <> 'succeeded' THEN 1 ELSE 0 END), 0) AS ono_failed,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'ono' AND net_micro_usd IS NOT NULL AND gross_micro_usd IS NOT NULL THEN 1 ELSE 0 END), 0) AS ono_exact,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'ono' AND net_micro_usd IS NULL AND spend_evidence = 1 THEN 1 ELSE 0 END), 0) AS ono_unpriced,
     COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN rd_tokens_charged ELSE 0 END), 0) AS ono_rd_tokens_charged,
     COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN net_micro_usd ELSE 0 END), 0) AS ono_net_micro_usd,
     COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN gross_micro_usd ELSE 0 END), 0) AS ono_gross_micro_usd,
     SUM(CASE WHEN net_micro_usd IS NOT NULL THEN 1 ELSE 0 END) AS exactly_priced
-  FROM (SELECT 'generation' AS ledger_kind, user_id, created_at, rd_tokens_charged, rd_tokens_quoted, input_text_tokens, input_image_tokens,
-      output_image_tokens, net_micro_usd, gross_micro_usd FROM ai_cost_ledger
+  FROM (SELECT 'generation' AS ledger_kind, user_id, created_at, status, rd_tokens_charged, rd_tokens_quoted, input_text_tokens, input_image_tokens,
+      output_image_tokens, net_micro_usd, gross_micro_usd,
+      CASE WHEN provider_request_id IS NOT NULL OR usage_json IS NOT NULL OR COALESCE(total_tokens, 0) > 0 THEN 1 ELSE 0 END AS spend_evidence
+      FROM ai_cost_ledger
     UNION ALL
-    SELECT 'ono' AS ledger_kind, user_id, created_at, rd_tokens_charged, rd_tokens_quoted, input_tokens, 0, 0, net_micro_usd, gross_micro_usd FROM ono_cost_ledger)
+    SELECT 'ono' AS ledger_kind, user_id, created_at, status, rd_tokens_charged, rd_tokens_quoted, input_tokens, 0, 0, net_micro_usd, gross_micro_usd,
+      CASE WHEN model_calls > 0 THEN 1 ELSE 0 END AS spend_evidence FROM ono_cost_ledger)
   WHERE user_id = ? ${filter}`).bind(...values).first<Record<string, unknown>>();
 }

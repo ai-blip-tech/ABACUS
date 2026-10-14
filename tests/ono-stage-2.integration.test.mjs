@@ -84,6 +84,25 @@ test("every Ono turn stores exact GPT-6.1 Sol NET and GROSS", async () => {
   );
 });
 
+test("missing provider usage stays unpriced instead of becoming a confirmed zero", async () => {
+  const request = new Request("http://127.0.0.1:3128/api/it");
+  const conversation = await resolveOnoConversation({ request, tenantId: "tenant_roomdesign", siteId: "roomdesign", user: null });
+  const requestId = "20000000-0000-4000-8000-000000000003";
+  await beginOnoFinancialUsage({ requestId, sessionId: conversation.session.id, userId: null, visitorId: conversation.visitorId, tenantId: "tenant_roomdesign", siteId: "roomdesign", model: "gpt-6.1-sol" });
+  await completeOnoFinancialUsage({
+    requestId,
+    model: "gpt-6.1-sol",
+    status: "succeeded",
+    usage: { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 1, usageReports: 0 },
+    usageKnown: false,
+  });
+  const row = await database.prepare("SELECT status, model_calls, net_micro_usd, gross_micro_usd FROM ono_cost_ledger WHERE request_id = ?").bind(requestId).first();
+  assert.equal(row.status, "succeeded");
+  assert.equal(row.model_calls, 1);
+  assert.equal(row.net_micro_usd, null);
+  assert.equal(row.gross_micro_usd, null);
+});
+
 test("voice transcription pricing uses its own OpenAI endpoint snapshot", () => {
   assert.deepEqual(
     calculateOnoTextCost(

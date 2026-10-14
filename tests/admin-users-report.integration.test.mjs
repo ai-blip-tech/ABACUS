@@ -66,6 +66,20 @@ await database.prepare(`INSERT INTO ono_cost_ledger (
 ) VALUES ('ono-a', 'ono-request-a', 'ono-session-a', 'user-a', 'visitor-user-a-1234', 'tenant-norr', 'roomdesign',
   'ono_conversation', 'openai', 'gpt-6.1-sol', 'openai.responses', 'succeeded', 1, 10, 5, 15, 50, 3, 150, 5, 5,
   '2026-10-03T10:00:00.000Z', '2026-10-03T10:00:00.000Z')`).run();
+await database.prepare(`INSERT INTO ono_cost_ledger (
+  id, request_id, session_id, user_id, visitor_id, tenant_id, site_id, operation_type, provider, model, endpoint,
+  status, model_calls, input_tokens, output_tokens, total_tokens, net_micro_usd, gross_coefficient_snapshot,
+  gross_micro_usd, rd_tokens_charged, rd_tokens_quoted, error_code, created_at, completed_at
+) VALUES ('ono-a-failed', 'ono-request-a-failed', 'ono-session-a', 'user-a', 'visitor-user-a-1234', 'tenant-norr', 'roomdesign',
+  'ono_conversation', 'openai', 'gpt-6.1-sol', 'openai.responses', 'failed', 0, 0, 0, 0, NULL, 3, NULL, 0, 0,
+  'model_unavailable', '2026-10-04T10:00:00.000Z', '2026-10-04T10:00:00.000Z')`).run();
+await database.prepare(`INSERT INTO ono_cost_ledger (
+  id, request_id, session_id, user_id, visitor_id, tenant_id, site_id, operation_type, provider, model, endpoint,
+  status, model_calls, input_tokens, output_tokens, total_tokens, usage_json, net_micro_usd, gross_coefficient_snapshot,
+  gross_micro_usd, rd_tokens_charged, rd_tokens_quoted, created_at, completed_at
+) VALUES ('ono-a-unpriced', 'ono-request-a-unpriced', 'ono-session-a', 'user-a', 'visitor-user-a-1234', 'tenant-norr', 'roomdesign',
+  'ono_conversation', 'openai', 'gpt-6.1-sol', 'openai.responses', 'succeeded', 1, 0, 0, 0, '{"calls":1}', NULL, 3, NULL, 0, 0,
+  '2026-10-05T10:00:00.000Z', '2026-10-05T10:00:00.000Z')`).run();
 
 test.after(() => rmSync(dataDir, { recursive: true, force: true }));
 
@@ -82,9 +96,17 @@ test("tenant and date filters aggregate only matching immutable ledger entries",
   assert.deepEqual(report.users.map((user) => user.id).sort(), ["user-a", "user-b"]);
   const userA = report.users.find((user) => user.id === "user-a");
   const userB = report.users.find((user) => user.id === "user-b");
-  assert.equal(userA?.ai_operation_count, 3);
+  assert.equal(userA?.ai_operation_count, 5);
   assert.equal(userA?.generation_operation_count, 2);
-  assert.equal(userA?.ono_operation_count, 1);
+  assert.equal(userA?.generation_succeeded_count, 2);
+  assert.equal(userA?.generation_failed_count, 0);
+  assert.equal(userA?.generation_exact_count, 2);
+  assert.equal(userA?.generation_unpriced_count, 0);
+  assert.equal(userA?.ono_operation_count, 3);
+  assert.equal(userA?.ono_succeeded_count, 2);
+  assert.equal(userA?.ono_failed_count, 1);
+  assert.equal(userA?.ono_exact_count, 1);
+  assert.equal(userA?.ono_unpriced_count, 1);
   assert.equal(userA?.generation_net_micro_usd, 300);
   assert.equal(userA?.generation_gross_micro_usd, 900);
   assert.equal(userA?.ono_net_micro_usd, 50);
@@ -101,12 +123,16 @@ test("tenant and date filters aggregate only matching immutable ledger entries",
   assert.equal(report.totals.generation_count, 2);
   assert.equal(report.totals.legacy_estimated_count, 2);
   assert.equal(report.totals.legacy_gross_estimated_count, 1);
-  assert.equal(report.totals.ai_operation_count, 4);
+  assert.equal(report.totals.ai_operation_count, 6);
   assert.equal(report.totals.ai_rd_tokens_charged, 65);
   assert.equal(report.totals.generation_net_micro_usd, 600);
   assert.equal(report.totals.generation_gross_micro_usd, 1800);
   assert.equal(report.totals.ono_net_micro_usd, 50);
   assert.equal(report.totals.ono_gross_micro_usd, 150);
+  assert.equal(report.totals.ono_succeeded_count, 2);
+  assert.equal(report.totals.ono_failed_count, 1);
+  assert.equal(report.totals.ono_exact_count, 1);
+  assert.equal(report.totals.ono_unpriced_count, 1);
   assert.equal(report.grossCoefficient.variants, 1);
 });
 
