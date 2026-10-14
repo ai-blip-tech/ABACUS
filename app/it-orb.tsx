@@ -507,7 +507,6 @@ export default function ItOrb({ context, onAction, suggestions = defaultSuggesti
             requestAnimationFrame(() => inputRef.current?.focus());
           }}>{suggestion}</button>)}
         </div>
-        <footer><span>{contextLabel}</span><i /><span>История хранится 30 дней</span></footer>
       </aside>
     );
   }
