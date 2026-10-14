@@ -24,6 +24,16 @@ test("homepage suggestion fills the shared composer without sending a request", 
   await expect(page.locator(".it-message")).toHaveCount(0);
 });
 
+test("homepage signup action uses the same pill shape as the project action", async ({ page }) => {
+  await page.goto("/");
+  const signup = page.getByRole("button", { name: "Зарегистрироваться" });
+  const project = page.getByRole("button", { name: "Начать проект →" });
+  await expect(signup).toBeVisible();
+  await expect(project).toBeVisible();
+  expect(await signup.evaluate((element) => getComputedStyle(element).borderRadius)).toBe("999px");
+  expect(await project.evaluate((element) => getComputedStyle(element).borderRadius)).toBe("999px");
+});
+
 test("homepage keeps one compact project action and no audience switch on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

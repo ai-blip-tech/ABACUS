@@ -20,6 +20,7 @@ html:has(.templates-home),body:has(.templates-home){background:var(--rd-page-bac
 .home-hero-overlay>p{width:min(480px,78%);margin:24px 0 22px;font-size:13px;line-height:1.6;color:#efe7dd}
 .home-hero-overlay .templates-hero-actions>button{background:var(--th-wine);color:#fff}.home-hero-overlay .templates-hero-actions>a{color:#fff}
 .templates-home .templates-nav-actions>button:last-child,.home-hero-overlay .templates-hero-actions>button{transition:transform .2s ease,box-shadow .2s ease,background-color .2s ease}
+.templates-home .templates-nav-actions>button:last-child{border-radius:999px}
 .templates-home .templates-nav-actions>button:first-child:not(:last-child):hover,.templates-home .templates-nav-actions>button:first-child:not(:last-child):focus-visible{text-decoration:underline;text-underline-offset:5px}
 .templates-home .templates-nav-actions>button:last-child:hover,.templates-home .templates-nav-actions>button:last-child:focus-visible,.home-hero-overlay .templates-hero-actions>button:hover,.home-hero-overlay .templates-hero-actions>button:focus-visible{transform:translateY(-3px);background:#681020;box-shadow:0 9px 22px rgba(43,29,20,.25)}
 .templates-home .templates-nav-actions>button:last-child:focus-visible,.home-hero-overlay .templates-hero-actions>button:focus-visible{outline:2px solid #fff;outline-offset:3px}
