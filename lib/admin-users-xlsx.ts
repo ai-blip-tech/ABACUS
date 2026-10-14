@@ -38,7 +38,8 @@ function coefficientLabel(value: Report["grossCoefficient"]) {
 export async function createAdminUsersXlsx(report: Report, tenantName: string) {
   const headers = [
     "User", "Email", "Company", "Tenant", "Access", "Plan", "RD token balance", "Projects in period",
-    "Generations in period", "Exact ledger ops in period", "RD tokens spent", "Exact NET$", "Exact GROSS$",
+    "Generations in period", "Generation ledger ops", "Generation RD tokens", "Generation NET$", "Generation GROSS$",
+    "Ono calls", "Ono RD tokens", "Ono NET$", "Ono GROSS$",
     "Historical NET$", "Historical GROSS$", "Provider text input tokens",
     "Provider image input tokens", "Provider image output tokens",
   ];
@@ -78,45 +79,53 @@ export async function createAdminUsersXlsx(report: Report, tenantName: string) {
       Number(user.token_balance || 0),
       Number(user.project_count || 0),
       Number(user.generation_count || 0),
-      Number(user.ai_operation_count || 0),
-      Number(user.ai_rd_tokens_charged || 0),
-      Number(user.ai_net_micro_usd || 0) / 1_000_000,
-      Number(user.ai_gross_micro_usd || 0) / 1_000_000,
+      Number(user.generation_operation_count || 0),
+      Number(user.generation_rd_tokens_charged || 0),
+      Number(user.generation_net_micro_usd || 0) / 1_000_000,
+      Number(user.generation_gross_micro_usd || 0) / 1_000_000,
+      Number(user.ono_operation_count || 0),
+      Number(user.ono_rd_tokens_charged || 0),
+      Number(user.ono_net_micro_usd || 0) / 1_000_000,
+      Number(user.ono_gross_micro_usd || 0) / 1_000_000,
       Number(user.legacy_net_estimate_micro_usd || 0) / 1_000_000,
       Number(user.legacy_gross_estimate_micro_usd || 0) / 1_000_000,
       Number(user.input_text_tokens || 0),
       Number(user.input_image_tokens || 0),
       Number(user.output_image_tokens || 0),
     ];
-    rows.push(`<row r="${row}">${values.map((value, column) => cell(row, column, value, column === 11 || column === 12 ? 5 : column === 13 || column === 14 ? 6 : 0)).join("")}</row>`);
+    rows.push(`<row r="${row}">${values.map((value, column) => cell(row, column, value, column === 11 || column === 12 || column === 15 || column === 16 ? 5 : column === 17 || column === 18 ? 6 : 0)).join("")}</row>`);
   });
   const totalRow = firstDataRow + report.users.length;
   const totalValues: unknown[] = [
     "ИТОГО", "", "", "", "", "", "",
     report.totals.project_count,
     report.totals.generation_count,
-    report.totals.ai_operation_count,
-    report.totals.ai_rd_tokens_charged,
-    report.totals.ai_net_micro_usd / 1_000_000,
-    report.totals.ai_gross_micro_usd / 1_000_000,
+    report.totals.generation_operation_count,
+    report.totals.generation_rd_tokens_charged,
+    report.totals.generation_net_micro_usd / 1_000_000,
+    report.totals.generation_gross_micro_usd / 1_000_000,
+    report.totals.ono_operation_count,
+    report.totals.ono_rd_tokens_charged,
+    report.totals.ono_net_micro_usd / 1_000_000,
+    report.totals.ono_gross_micro_usd / 1_000_000,
     report.totals.legacy_net_estimate_micro_usd / 1_000_000,
     report.totals.legacy_gross_estimate_micro_usd / 1_000_000,
     report.totals.input_text_tokens,
     report.totals.input_image_tokens,
     report.totals.output_image_tokens,
   ];
-  rows.push(`<row r="${totalRow}" ht="24" customHeight="1">${totalValues.map((value, column) => cell(totalRow, column, value, column === 11 || column === 12 ? 7 : column === 13 || column === 14 ? 8 : 4)).join("")}</row>`);
+  rows.push(`<row r="${totalRow}" ht="24" customHeight="1">${totalValues.map((value, column) => cell(totalRow, column, value, column === 11 || column === 12 || column === 15 || column === 16 ? 7 : column === 17 || column === 18 ? 8 : 4)).join("")}</row>`);
 
-  const widths = [24, 30, 24, 24, 32, 14, 17, 18, 20, 21, 18, 14, 14, 20, 22, 24, 25, 26];
+  const widths = [24, 30, 24, 24, 32, 14, 17, 18, 20, 14, 17, 14, 14, 21, 18, 14, 14, 20, 22, 24, 25, 26];
   const worksheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <dimension ref="A1:R${totalRow}"/>
+  <dimension ref="A1:V${totalRow}"/>
   <sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane ySplit="${headerRow}" topLeftCell="A${firstDataRow}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
   <sheetFormatPr defaultRowHeight="15"/>
   <cols>${widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join("")}</cols>
   <sheetData>${rows.join("")}</sheetData>
-  <autoFilter ref="A${headerRow}:R${Math.max(headerRow, totalRow - 1)}"/>
-  <mergeCells count="1"><mergeCell ref="A1:R1"/></mergeCells>
+  <autoFilter ref="A${headerRow}:V${Math.max(headerRow, totalRow - 1)}"/>
+  <mergeCells count="1"><mergeCell ref="A1:V1"/></mergeCells>
   <pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>
 </worksheet>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

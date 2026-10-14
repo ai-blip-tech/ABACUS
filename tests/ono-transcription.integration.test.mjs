@@ -108,7 +108,7 @@ test("enabled voice attributes cost to the signed-in user's tenant regardless of
   assert.equal(row.output_tokens, 100);
   assert.equal(row.total_tokens, 1_100);
   assert.equal(row.net_micro_usd, 1_750);
-  assert.equal(row.gross_micro_usd, Math.round(1_750 * 2.2));
+  assert.equal(row.gross_micro_usd, Math.round(1_750 * 3));
 
   const replay = await POST(transcriptionRequest(requestId));
   assert.equal(replay.status, 409);

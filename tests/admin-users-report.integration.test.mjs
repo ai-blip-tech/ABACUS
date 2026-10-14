@@ -11,6 +11,8 @@ process.env.ROOM_DESIGN_BUSINESS_TIMEZONE = "Europe/Moscow";
 const { ensureStore } = await import("../lib/auth.ts");
 const { ensureBillingStore } = await import("../lib/billing.ts");
 const { ensureAiCostLedgerStore } = await import("../lib/ai-cost-ledger.ts");
+const { ensureOnoMemoryStore } = await import("../lib/it/memory.ts");
+const { ensureOnoFinanceStore } = await import("../lib/it/finance.ts");
 const { resolveAdminUsersFilter, adminUsersReport } = await import("../lib/admin-users-report.ts");
 const { createAdminUsersXlsx } = await import("../lib/admin-users-xlsx.ts");
 const { dateRangeUtc } = await import("../lib/business-time.ts");
@@ -35,24 +37,35 @@ await database.prepare(`INSERT INTO projects (id, user_id, tenant_id, name, crea
 await database.prepare(`INSERT INTO generations (
   id, user_id, tenant_id, operation, prompt, output_key, content_type, input_tokens, output_tokens, total_tokens, brutto_coefficient_snapshot, created_at
 ) VALUES
-  ('generation-a-period', 'user-a', 'tenant-norr', 'generate', '', 'a-period.webp', 'image/webp', 100, 200, 300, 2.2, '2026-10-02T10:00:00.000Z'),
-  ('generation-a-old', 'user-a', 'tenant-norr', 'generate', '', 'a-old.webp', 'image/webp', 999, 999, 1998, 2.2, '2026-08-02T10:00:00.000Z'),
+  ('generation-a-period', 'user-a', 'tenant-norr', 'generate', '', 'a-period.webp', 'image/webp', 100, 200, 300, 3, '2026-10-02T10:00:00.000Z'),
+  ('generation-a-old', 'user-a', 'tenant-norr', 'generate', '', 'a-old.webp', 'image/webp', 999, 999, 1998, 3, '2026-08-02T10:00:00.000Z'),
   ('generation-b-period', 'user-b', 'tenant-norr', 'generate', '', 'b-period.webp', 'image/webp', 50, 50, 100, NULL, '2026-10-07T10:00:00.000Z')`).run();
 
-async function ledger(id, userId, tenantId, createdAt, rdTokens, net, gross, coefficient = 2) {
+async function ledger(id, userId, tenantId, createdAt, rdTokens, net) {
   await database.prepare(`INSERT INTO ai_cost_ledger (
     id, request_id, user_id, tenant_id, operation_type, provider, model, endpoint, status,
     rd_tokens_charged, rd_tokens_quoted, input_text_tokens, input_image_tokens, output_image_tokens,
     net_micro_usd, gross_coefficient_snapshot, gross_micro_usd, created_at, updated_at
   ) VALUES (?, ?, ?, ?, 'render', 'openai', 'model', 'endpoint', 'succeeded', ?, ?, 1, 2, 3, ?, ?, ?, ?, ?)`)
-    .bind(id, `request-${id}`, userId, tenantId, rdTokens, rdTokens, net, coefficient, gross, createdAt, createdAt).run();
+    .bind(id, `request-${id}`, userId, tenantId, rdTokens, rdTokens, net, 3, net * 3, createdAt, createdAt).run();
 }
 
-await ledger("a-1", "user-a", "tenant-norr", "2026-10-01T10:00:00.000Z", 10, 100, 200);
-await ledger("a-5", "user-a", "tenant-norr", "2026-10-05T10:00:00.000Z", 20, 200, 400);
-await ledger("a-12", "user-a", "tenant-norr", "2026-10-12T10:00:00.000Z", 40, 400, 800);
-await ledger("b-7", "user-b", "tenant-norr", "2026-10-07T10:00:00.000Z", 30, 300, 750, 2.5);
-await ledger("c-6", "user-c", "tenant-other", "2026-10-06T10:00:00.000Z", 50, 500, 1000);
+await ledger("a-1", "user-a", "tenant-norr", "2026-10-01T10:00:00.000Z", 10, 100);
+await ledger("a-5", "user-a", "tenant-norr", "2026-10-05T10:00:00.000Z", 20, 200);
+await ledger("a-12", "user-a", "tenant-norr", "2026-10-12T10:00:00.000Z", 40, 400);
+await ledger("b-7", "user-b", "tenant-norr", "2026-10-07T10:00:00.000Z", 30, 300);
+await ledger("c-6", "user-c", "tenant-other", "2026-10-06T10:00:00.000Z", 50, 500);
+
+await ensureOnoMemoryStore();
+await ensureOnoFinanceStore();
+await database.prepare("INSERT INTO ono_chat_sessions (id, tenant_id, site_id, user_id, visitor_id, consent_version, created_at, updated_at, expires_at) VALUES ('ono-session-a', 'tenant-norr', 'roomdesign', 'user-a', 'visitor-user-a-1234', 'v1', ?, ?, '2027-01-01T00:00:00.000Z')").bind(now, now).run();
+await database.prepare(`INSERT INTO ono_cost_ledger (
+  id, request_id, session_id, user_id, visitor_id, tenant_id, site_id, operation_type, provider, model, endpoint,
+  status, model_calls, input_tokens, output_tokens, total_tokens, net_micro_usd, gross_coefficient_snapshot,
+  gross_micro_usd, rd_tokens_charged, rd_tokens_quoted, created_at, completed_at
+) VALUES ('ono-a', 'ono-request-a', 'ono-session-a', 'user-a', 'visitor-user-a-1234', 'tenant-norr', 'roomdesign',
+  'ono_conversation', 'openai', 'gpt-6.1-sol', 'openai.responses', 'succeeded', 1, 10, 5, 15, 50, 3, 150, 5, 5,
+  '2026-10-03T10:00:00.000Z', '2026-10-03T10:00:00.000Z')`).run();
 
 test.after(() => rmSync(dataDir, { recursive: true, force: true }));
 
@@ -69,12 +82,18 @@ test("tenant and date filters aggregate only matching immutable ledger entries",
   assert.deepEqual(report.users.map((user) => user.id).sort(), ["user-a", "user-b"]);
   const userA = report.users.find((user) => user.id === "user-a");
   const userB = report.users.find((user) => user.id === "user-b");
-  assert.equal(userA?.ai_operation_count, 2);
+  assert.equal(userA?.ai_operation_count, 3);
+  assert.equal(userA?.generation_operation_count, 2);
+  assert.equal(userA?.ono_operation_count, 1);
+  assert.equal(userA?.generation_net_micro_usd, 300);
+  assert.equal(userA?.generation_gross_micro_usd, 900);
+  assert.equal(userA?.ono_net_micro_usd, 50);
+  assert.equal(userA?.ono_gross_micro_usd, 150);
   assert.equal(userA?.project_count, 1);
   assert.equal(userA?.generation_count, 1);
   assert.equal(userA?.legacy_net_estimate_micro_usd, 6800);
-  assert.equal(userA?.legacy_gross_estimate_micro_usd, 14960);
-  assert.equal(userA?.ai_rd_tokens_charged, 30);
+  assert.equal(userA?.legacy_gross_estimate_micro_usd, 20400);
+  assert.equal(userA?.ai_rd_tokens_charged, 35);
   assert.equal(userB?.ai_operation_count, 1);
   assert.equal(userB?.project_count, 1);
   assert.equal(userB?.generation_count, 1);
@@ -82,11 +101,13 @@ test("tenant and date filters aggregate only matching immutable ledger entries",
   assert.equal(report.totals.generation_count, 2);
   assert.equal(report.totals.legacy_estimated_count, 2);
   assert.equal(report.totals.legacy_gross_estimated_count, 1);
-  assert.equal(report.totals.ai_operation_count, 3);
-  assert.equal(report.totals.ai_rd_tokens_charged, 60);
-  assert.equal(report.totals.ai_net_micro_usd, 600);
-  assert.equal(report.totals.ai_gross_micro_usd, 1350);
-  assert.equal(report.grossCoefficient.variants, 2);
+  assert.equal(report.totals.ai_operation_count, 4);
+  assert.equal(report.totals.ai_rd_tokens_charged, 65);
+  assert.equal(report.totals.generation_net_micro_usd, 600);
+  assert.equal(report.totals.generation_gross_micro_usd, 1800);
+  assert.equal(report.totals.ono_net_micro_usd, 50);
+  assert.equal(report.totals.ono_gross_micro_usd, 150);
+  assert.equal(report.grossCoefficient.variants, 1);
 });
 
 test("Excel export contains the same filters, rows and saved GROSS total", async () => {
@@ -99,7 +120,8 @@ test("Excel export contains the same filters, rows and saved GROSS total", async
   const sheet = await archive.file("xl/worksheets/sheet1.xml")?.async("string");
   assert.match(sheet || "", /NORR Møbler/);
   assert.match(sheet || "", /2026-10-01 — 2026-10-10/);
-  assert.match(sheet || "", /<v>0\.00135<\/v>/);
+  assert.match(sheet || "", /<v>0\.0018<\/v>/);
+  assert.match(sheet || "", /<v>0\.00015<\/v>/);
   assert.ok((sheet || "").indexOf("<autoFilter") < (sheet || "").indexOf("<mergeCells"));
   assert.doesNotMatch(sheet || "", /Legacy/);
 });

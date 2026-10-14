@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { database } from "./server-runtime.ts";
 
-export type TokenTransactionType = "purchase" | "generation" | "refund" | "transfer_in" | "transfer_out" | "subscription_credit" | "correction";
+export type TokenTransactionType = "purchase" | "generation" | "assistant" | "refund" | "transfer_in" | "transfer_out" | "subscription_credit" | "correction";
 export type GlobalSettings = {
   token_exchange_rate: number;
   brutto_coefficient: number;
@@ -13,7 +13,7 @@ export type GlobalSettings = {
 
 const settingDefaults: GlobalSettings = {
   token_exchange_rate: 401,
-  brutto_coefficient: 2.2,
+  brutto_coefficient: 3,
   usd_to_rub_rate: 100,
   token_charging_enabled: false,
   custom_token_purchase_enabled: true,
@@ -54,6 +54,8 @@ export function ensureBillingStore() {
       database.prepare("INSERT OR IGNORE INTO ai_operation_prices (operation, estimated_netto_usd, created_at, updated_at) VALUES ('generate', 0.04, ?, ?)").bind(now, now),
       database.prepare("INSERT OR IGNORE INTO auth_identities (id, user_id, provider, provider_user_id, provider_email, created_at, updated_at) SELECT 'identity_password_' || id, id, 'password', id, email, created_at, COALESCE(last_login_at, created_at) FROM users WHERE password_algorithm = 'pbkdf2-sha256'"),
     ]);
+    await database.prepare("UPDATE global_settings SET value_json = '3', updated_at = ? WHERE key = 'brutto_coefficient' AND CAST(value_json AS REAL) <> 3").bind(now).run();
+    await database.prepare("UPDATE generations SET brutto_coefficient_snapshot = 3 WHERE brutto_coefficient_snapshot IS NULL OR brutto_coefficient_snapshot <> 3").run();
   })();
   return billingSetup;
 }
@@ -75,6 +77,7 @@ export async function updateGlobalSettings(adminUserId: string, patch: Partial<G
     const expected = settingDefaults[key as keyof GlobalSettings];
     if (typeof value !== typeof expected) throw new Error(`Некорректный тип ${key}.`);
     if (typeof value === "number" && (!Number.isFinite(value) || value <= 0)) throw new Error(`Некорректное значение ${key}.`);
+    if (key === "brutto_coefficient" && value !== 3) throw new Error("GROSS коэффициент зафиксирован на уровне ×3.");
     if (key === "token_exchange_rate" && !Number.isSafeInteger(value)) throw new Error("Курс токенов должен быть целым числом.");
     const current = await database.prepare("SELECT value_json FROM global_settings WHERE key = ?").bind(key).first<{ value_json: string }>();
     const next = JSON.stringify(value);
@@ -85,6 +88,33 @@ export async function updateGlobalSettings(adminUserId: string, patch: Partial<G
     ]);
   }
   return getGlobalSettings();
+}
+
+export async function chargeActualAiTokens(input: {
+  userId: string;
+  operation: string;
+  referenceId: string;
+  grossMicroUsd: number | null;
+  idempotencyKey: string;
+}) {
+  await ensureBillingStore();
+  const settings = await getGlobalSettings();
+  const grossMicroUsd = Math.max(0, Math.round(Number(input.grossMicroUsd || 0)));
+  const tokenCost = Math.max(0, Math.ceil((grossMicroUsd / 1_000_000) * settings.usd_to_rub_rate * settings.token_exchange_rate));
+  const activePlan = await database.prepare("SELECT plans.code FROM subscriptions JOIN plans ON plans.id = subscriptions.plan_id WHERE subscriptions.user_id = ? AND subscriptions.status = 'active' ORDER BY subscriptions.created_at DESC LIMIT 1").bind(input.userId).first<{ code: string }>();
+  const chargingEnabled = settings.token_charging_enabled && Boolean(activePlan && activePlan.code !== "free");
+  if (!chargingEnabled || tokenCost === 0) return { tokenCost, transaction: null, chargingEnabled };
+  const transaction = await debitTokens({
+    userId: input.userId,
+    type: "assistant",
+    amount: tokenCost,
+    referenceType: "ono_operation",
+    referenceId: input.referenceId,
+    description: `Списание токенов: ${input.operation}`,
+    metadata: { grossMicroUsd, grossCoefficient: settings.brutto_coefficient },
+    idempotencyKey: input.idempotencyKey,
+  });
+  return { tokenCost, transaction, chargingEnabled };
 }
 
 type Mutation = { userId: string; type: TokenTransactionType; amount: number; referenceType?: string; referenceId?: string; sourceUserId?: string; targetUserId?: string; initiatedByAdminId?: string; description?: string; metadata?: Record<string, unknown>; idempotencyKey: string; auditAction?: string };

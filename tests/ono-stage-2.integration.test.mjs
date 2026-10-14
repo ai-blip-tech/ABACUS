@@ -62,7 +62,7 @@ test("every Ono turn stores exact GPT-6.1 Sol NET and GROSS", async () => {
   assert.equal(row.status, "succeeded");
   assert.equal(row.model_calls, 2);
   assert.equal(row.net_micro_usd, 29_774);
-  assert.equal(row.gross_micro_usd, Math.round(29_774 * 2.2));
+  assert.equal(row.gross_micro_usd, Math.round(29_774 * 3));
   assert.equal(calculateOnoTextCost("unknown", { inputTokens: 1, outputTokens: 1, totalTokens: 2, calls: 1 }, 2.2).netMicroUsd, null);
   assert.deepEqual(
     calculateOnoTextCost("gpt-6-astra", { inputTokens: 1_000_000, cachedInputTokens: 0, outputTokens: 1_000_000, totalTokens: 2_000_000, calls: 1 }, 2),

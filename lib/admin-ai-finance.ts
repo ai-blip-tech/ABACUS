@@ -42,7 +42,7 @@ export async function adminAiFinance(period: FinancePeriod) {
     input_text_tokens, input_image_tokens, output_image_tokens, net_micro_usd, gross_micro_usd, created_at
     FROM ai_cost_ledger
     UNION ALL
-    SELECT user_id, tenant_id, operation_type, status, 0 AS rd_tokens_charged, 0 AS rd_tokens_quoted,
+    SELECT user_id, tenant_id, operation_type, status, rd_tokens_charged, rd_tokens_quoted,
       input_tokens AS input_text_tokens, 0 AS input_image_tokens, 0 AS output_image_tokens,
       net_micro_usd, gross_micro_usd, created_at FROM ono_cost_ledger)`;
   const [totals, days, operations] = await Promise.all([
@@ -90,10 +90,18 @@ export async function userAiFinance(userId: string, period?: FinancePeriod) {
     COALESCE(SUM(output_image_tokens), 0) AS output_image_tokens,
     COALESCE(SUM(net_micro_usd), 0) AS net_micro_usd,
     COALESCE(SUM(gross_micro_usd), 0) AS gross_micro_usd,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN 1 ELSE 0 END), 0) AS generation_operations,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN rd_tokens_charged ELSE 0 END), 0) AS generation_rd_tokens_charged,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN net_micro_usd ELSE 0 END), 0) AS generation_net_micro_usd,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN gross_micro_usd ELSE 0 END), 0) AS generation_gross_micro_usd,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN 1 ELSE 0 END), 0) AS ono_operations,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN rd_tokens_charged ELSE 0 END), 0) AS ono_rd_tokens_charged,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN net_micro_usd ELSE 0 END), 0) AS ono_net_micro_usd,
+    COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN gross_micro_usd ELSE 0 END), 0) AS ono_gross_micro_usd,
     SUM(CASE WHEN net_micro_usd IS NOT NULL THEN 1 ELSE 0 END) AS exactly_priced
-  FROM (SELECT user_id, created_at, rd_tokens_charged, rd_tokens_quoted, input_text_tokens, input_image_tokens,
+  FROM (SELECT 'generation' AS ledger_kind, user_id, created_at, rd_tokens_charged, rd_tokens_quoted, input_text_tokens, input_image_tokens,
       output_image_tokens, net_micro_usd, gross_micro_usd FROM ai_cost_ledger
     UNION ALL
-    SELECT user_id, created_at, 0, 0, input_tokens, 0, 0, net_micro_usd, gross_micro_usd FROM ono_cost_ledger)
+    SELECT 'ono' AS ledger_kind, user_id, created_at, rd_tokens_charged, rd_tokens_quoted, input_tokens, 0, 0, net_micro_usd, gross_micro_usd FROM ono_cost_ledger)
   WHERE user_id = ? ${filter}`).bind(...values).first<Record<string, unknown>>();
 }

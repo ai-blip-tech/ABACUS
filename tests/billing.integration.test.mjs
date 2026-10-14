@@ -45,15 +45,16 @@ test("transfer is atomic, audited and idempotent", async () => {
   assert.equal((await billing.getTokenAccount("target")).balance, 50_000);
 });
 
-test("exchange rate and brutto changes affect new quotes while snapshots remain historical", async () => {
+test("exchange rate changes affect new quotes while GROSS stays fixed at three", async () => {
   assert.equal((await billing.quoteTokenPurchase(1000)).tokenAmount, 401_000);
   const oldAi = await billing.quoteAiOperation("generate");
   await billing.updateGlobalSettings("source", { token_exchange_rate: 420, brutto_coefficient: 3 });
   assert.equal((await billing.quoteTokenPurchase(1000)).tokenAmount, 420_000);
   const newAi = await billing.quoteAiOperation("generate");
   assert.ok(newAi.tokenCost > oldAi.tokenCost);
-  assert.equal(oldAi.bruttoCoefficient, 2.2);
+  assert.equal(oldAi.bruttoCoefficient, 3);
   assert.equal(newAi.bruttoCoefficient, 3);
+  await assert.rejects(billing.updateGlobalSettings("source", { brutto_coefficient: 2.2 }), /зафиксирован/);
 });
 
 test("failed AI operation refund and duplicate protection preserve balance", async () => {
@@ -66,11 +67,16 @@ test("failed AI operation refund and duplicate protection preserve balance", asy
   await database.prepare("INSERT INTO plans (id, code, name, price, currency, billing_period, included_tokens, limits_json, active, sort_order, created_at, updated_at) VALUES ('plan_paid_test', 'paid-test', 'Paid test', 100, 'RUB', 'month', 0, '{}', 1, 10, ?, ?)").bind(now, now).run();
   await database.prepare("INSERT INTO subscriptions (id, user_id, plan_id, status, started_at, created_at, updated_at) VALUES ('subscription_paid_test', 'target', 'plan_paid_test', 'active', ?, ?, ?)").bind(now, now, now).run();
   const before = (await billing.getTokenAccount("target")).balance;
+  const onoCharge = await billing.chargeActualAiTokens({ userId: "target", operation: "ono_conversation", referenceId: "ono-paid-op", grossMicroUsd: 10_000, idempotencyKey: "ono-charge-target" });
+  const onoChargeRetry = await billing.chargeActualAiTokens({ userId: "target", operation: "ono_conversation", referenceId: "ono-paid-op", grossMicroUsd: 10_000, idempotencyKey: "ono-charge-target" });
+  assert.ok(onoCharge.transaction);
+  assert.equal(onoChargeRetry.transaction.id, onoCharge.transaction.id);
+  assert.equal((await billing.getTokenAccount("target")).balance, before - onoCharge.tokenCost);
   const reserved = await billing.reserveAiTokens("target", "generate", "failed-op", "reserve-failed-op");
   assert.ok(reserved.transaction);
   await billing.refundAiTokens("target", "failed-op", reserved.quote.tokenCost, "technical failure");
   await billing.refundAiTokens("target", "failed-op", reserved.quote.tokenCost, "duplicate retry");
-  assert.equal((await billing.getTokenAccount("target")).balance, before);
+  assert.equal((await billing.getTokenAccount("target")).balance, before - onoCharge.tokenCost);
 });
 
 test("Google identity creates once and links by verified normalized email", async () => {

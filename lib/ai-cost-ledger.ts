@@ -94,6 +94,7 @@ export function ensureAiCostLedgerStore() {
       database.prepare("CREATE INDEX IF NOT EXISTS idx_ai_cost_ledger_tenant_created ON ai_cost_ledger(tenant_id, created_at)"),
       database.prepare("CREATE INDEX IF NOT EXISTS idx_ai_cost_ledger_project ON ai_cost_ledger(project_id)"),
     ]);
+    await database.prepare("UPDATE ai_cost_ledger SET gross_coefficient_snapshot = 3, gross_micro_usd = CASE WHEN net_micro_usd IS NULL THEN NULL ELSE ROUND(net_micro_usd * 3) END WHERE gross_coefficient_snapshot <> 3 OR (net_micro_usd IS NOT NULL AND (gross_micro_usd IS NULL OR gross_micro_usd <> ROUND(net_micro_usd * 3)))").run();
   });
   return setupPromise;
 }

@@ -1,5 +1,6 @@
 import { creditTokens, debitTokens, ensureBillingStore, getTokenAccount, getTokenHistory } from "./billing.ts";
 import { ensureAiCostLedgerStore } from "./ai-cost-ledger.ts";
+import { ensureOnoFinanceStore } from "./it/finance.ts";
 import { userAiFinance } from "./admin-ai-finance.ts";
 import { adminUsersReport, type AdminUsersFilter } from "./admin-users-report.ts";
 import { database } from "./server-runtime.ts";
@@ -7,6 +8,7 @@ import { database } from "./server-runtime.ts";
 export async function adminOverview() {
   await ensureBillingStore();
   await ensureAiCostLedgerStore();
+  await ensureOnoFinanceStore();
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const [users, projects, generations, balances, ledger, payments, aiFinance] = await database.batch([
     database.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS new_users, SUM(CASE WHEN last_login_at >= ? THEN 1 ELSE 0 END) AS active_users FROM users").bind(since, since),
@@ -15,7 +17,7 @@ export async function adminOverview() {
     database.prepare("SELECT COALESCE(SUM(balance), 0) AS total FROM token_accounts"),
     database.prepare("SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS credited, COALESCE(-SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS debited FROM token_transactions"),
     database.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN provider = 'mock' THEN 1 ELSE 0 END) AS mock_count, SUM(CASE WHEN status = 'paid' AND provider <> 'mock' THEN 1 ELSE 0 END) AS paid_real_count, COALESCE(SUM(CASE WHEN status = 'paid' AND provider <> 'mock' AND currency = 'RUB' THEN amount ELSE 0 END), 0) AS paid_real_rub_kopecks FROM payments"),
-    database.prepare("SELECT COUNT(*) AS operations, SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded, SUM(CASE WHEN status <> 'succeeded' THEN 1 ELSE 0 END) AS not_succeeded, COALESCE(SUM(rd_tokens_charged), 0) AS rd_tokens_charged, COALESCE(SUM(net_micro_usd), 0) AS net_micro_usd, COALESCE(SUM(gross_micro_usd), 0) AS gross_micro_usd, SUM(CASE WHEN net_micro_usd IS NOT NULL THEN 1 ELSE 0 END) AS exactly_priced FROM ai_cost_ledger"),
+    database.prepare("SELECT COUNT(*) AS operations, SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded, SUM(CASE WHEN status <> 'succeeded' THEN 1 ELSE 0 END) AS not_succeeded, COALESCE(SUM(rd_tokens_charged), 0) AS rd_tokens_charged, COALESCE(SUM(net_micro_usd), 0) AS net_micro_usd, COALESCE(SUM(gross_micro_usd), 0) AS gross_micro_usd, SUM(CASE WHEN net_micro_usd IS NOT NULL THEN 1 ELSE 0 END) AS exactly_priced FROM (SELECT status, rd_tokens_charged, net_micro_usd, gross_micro_usd FROM ai_cost_ledger UNION ALL SELECT status, rd_tokens_charged, net_micro_usd, gross_micro_usd FROM ono_cost_ledger)"),
   ]);
   const generation = generations.results[0] as Record<string, number | null> | undefined;
   return {

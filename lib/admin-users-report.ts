@@ -44,16 +44,24 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
       SELECT user_id,
         COUNT(*) AS ai_operation_count,
         COALESCE(SUM(rd_tokens_charged), 0) AS ai_rd_tokens_charged,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN 1 ELSE 0 END), 0) AS generation_operation_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN rd_tokens_charged ELSE 0 END), 0) AS generation_rd_tokens_charged,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN net_micro_usd ELSE 0 END), 0) AS generation_net_micro_usd,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'generation' THEN gross_micro_usd ELSE 0 END), 0) AS generation_gross_micro_usd,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN 1 ELSE 0 END), 0) AS ono_operation_count,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN rd_tokens_charged ELSE 0 END), 0) AS ono_rd_tokens_charged,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN net_micro_usd ELSE 0 END), 0) AS ono_net_micro_usd,
+        COALESCE(SUM(CASE WHEN ledger_kind = 'ono' THEN gross_micro_usd ELSE 0 END), 0) AS ono_gross_micro_usd,
         COALESCE(SUM(input_text_tokens), 0) AS input_text_tokens,
         COALESCE(SUM(input_image_tokens), 0) AS input_image_tokens,
         COALESCE(SUM(output_image_tokens), 0) AS output_image_tokens,
         COALESCE(SUM(net_micro_usd), 0) AS ai_net_micro_usd,
         COALESCE(SUM(gross_micro_usd), 0) AS ai_gross_micro_usd
       FROM (
-        SELECT user_id, tenant_id, created_at, rd_tokens_charged, input_text_tokens, input_image_tokens,
+        SELECT 'generation' AS ledger_kind, user_id, tenant_id, created_at, rd_tokens_charged, input_text_tokens, input_image_tokens,
           output_image_tokens, net_micro_usd, gross_micro_usd FROM ai_cost_ledger
         UNION ALL
-        SELECT user_id, tenant_id, created_at, 0, input_tokens, 0, 0, net_micro_usd, gross_micro_usd
+        SELECT 'ono' AS ledger_kind, user_id, tenant_id, created_at, rd_tokens_charged, input_tokens, 0, 0, net_micro_usd, gross_micro_usd
           FROM ono_cost_ledger WHERE user_id IS NOT NULL
       )
       WHERE created_at >= ? AND created_at < ? AND (? = '' OR tenant_id = ?)
@@ -99,6 +107,14 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
       COALESCE(period_generations.legacy_gross_estimated_count, 0) AS legacy_gross_estimated_count,
       COALESCE(period_ledger.ai_operation_count, 0) AS ai_operation_count,
       COALESCE(period_ledger.ai_rd_tokens_charged, 0) AS ai_rd_tokens_charged,
+      COALESCE(period_ledger.generation_operation_count, 0) AS generation_operation_count,
+      COALESCE(period_ledger.generation_rd_tokens_charged, 0) AS generation_rd_tokens_charged,
+      COALESCE(period_ledger.generation_net_micro_usd, 0) AS generation_net_micro_usd,
+      COALESCE(period_ledger.generation_gross_micro_usd, 0) AS generation_gross_micro_usd,
+      COALESCE(period_ledger.ono_operation_count, 0) AS ono_operation_count,
+      COALESCE(period_ledger.ono_rd_tokens_charged, 0) AS ono_rd_tokens_charged,
+      COALESCE(period_ledger.ono_net_micro_usd, 0) AS ono_net_micro_usd,
+      COALESCE(period_ledger.ono_gross_micro_usd, 0) AS ono_gross_micro_usd,
       COALESCE(period_ledger.input_text_tokens, 0) AS input_text_tokens,
       COALESCE(period_ledger.input_image_tokens, 0) AS input_image_tokens,
       COALESCE(period_ledger.output_image_tokens, 0) AS output_image_tokens,
@@ -135,6 +151,14 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
     generation_count: result.generation_count + Number(user.generation_count || 0),
     ai_operation_count: result.ai_operation_count + Number(user.ai_operation_count || 0),
     ai_rd_tokens_charged: result.ai_rd_tokens_charged + Number(user.ai_rd_tokens_charged || 0),
+    generation_operation_count: result.generation_operation_count + Number(user.generation_operation_count || 0),
+    generation_rd_tokens_charged: result.generation_rd_tokens_charged + Number(user.generation_rd_tokens_charged || 0),
+    generation_net_micro_usd: result.generation_net_micro_usd + Number(user.generation_net_micro_usd || 0),
+    generation_gross_micro_usd: result.generation_gross_micro_usd + Number(user.generation_gross_micro_usd || 0),
+    ono_operation_count: result.ono_operation_count + Number(user.ono_operation_count || 0),
+    ono_rd_tokens_charged: result.ono_rd_tokens_charged + Number(user.ono_rd_tokens_charged || 0),
+    ono_net_micro_usd: result.ono_net_micro_usd + Number(user.ono_net_micro_usd || 0),
+    ono_gross_micro_usd: result.ono_gross_micro_usd + Number(user.ono_gross_micro_usd || 0),
     input_text_tokens: result.input_text_tokens + Number(user.input_text_tokens || 0),
     input_image_tokens: result.input_image_tokens + Number(user.input_image_tokens || 0),
     output_image_tokens: result.output_image_tokens + Number(user.output_image_tokens || 0),
@@ -147,6 +171,8 @@ export async function adminUsersReport(filter: AdminUsersFilter) {
     legacy_gross_estimated_count: result.legacy_gross_estimated_count + Number(user.legacy_gross_estimated_count || 0),
   }), {
     users: 0, project_count: 0, generation_count: 0, ai_operation_count: 0, ai_rd_tokens_charged: 0,
+    generation_operation_count: 0, generation_rd_tokens_charged: 0, generation_net_micro_usd: 0, generation_gross_micro_usd: 0,
+    ono_operation_count: 0, ono_rd_tokens_charged: 0, ono_net_micro_usd: 0, ono_gross_micro_usd: 0,
     input_text_tokens: 0, input_image_tokens: 0, output_image_tokens: 0,
     ai_net_micro_usd: 0, ai_gross_micro_usd: 0,
     legacy_generation_count: 0, legacy_estimated_count: 0,
