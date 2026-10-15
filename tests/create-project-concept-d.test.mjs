@@ -9,9 +9,11 @@ const tokens = readFileSync(new URL("../app/concept-d.css", import.meta.url), "u
 test("Concept D create-project page preserves the existing project handoff", () => {
   assert.match(page, /fetch\("\/api\/projects", \{ method:"POST"/);
   assert.match(page, /body:JSON\.stringify\(\{name,projectType,description:projectDescription\}\)/);
-  assert.match(page, /setProjectId\(String\(payload\.project\.id\)\)/);
+  assert.match(page, /const newProjectId = String\(payload\.project\.id\)/);
+  assert.match(page, /skipNextProjectLoadRef\.current = newProjectId/);
+  assert.match(page, /setProjectId\(newProjectId\)/);
   assert.match(page, /setProjectSaved\(false\)/);
-  assert.match(page, /navigate\("studio", String\(payload\.project\.id\)\)/);
+  assert.match(page, /navigate\("studio", newProjectId\)/);
   assert.match(page, /<option>Квартира<\/option><option>Дом<\/option><option>Офис<\/option><option>Гостеприимство<\/option><option>Другое<\/option>/);
 });
 

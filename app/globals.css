@@ -82,6 +82,24 @@ body{background:var(--paper);color:#1e1e1e;font-family:-apple-system,BlinkMacSys
   .canvas-note strong{overflow-wrap:anywhere}
 }
 
+/* Project canvas: distinct states for loading an existing project and starting a new one. */
+.project-loading-screen,.project-empty-screen{position:absolute;inset:0;z-index:12;display:grid;place-items:center;padding:clamp(18px,4vw,48px);background:rgba(252,250,246,.08)}
+.room-canvas:has(.project-loading-screen) .canvas-shade,.room-canvas:has(.project-loading-screen) .canvas-note,.room-canvas:has(.project-empty-screen) .canvas-shade,.room-canvas:has(.project-empty-screen) .canvas-note{display:none}
+.canvas-area:has(.project-loading-screen) .history-strip,.canvas-area:has(.project-empty-screen) .history-strip{visibility:hidden}
+.project-loading-card,.project-empty-card{display:flex;width:min(560px,78%);min-height:250px;flex-direction:column;align-items:center;justify-content:center;padding:clamp(28px,4vw,48px);border:1px solid rgba(136,119,101,.18);background:rgba(255,255,255,.9);box-shadow:0 16px 44px rgba(77,59,43,.12);backdrop-filter:blur(3px);color:#251d18;text-align:center}
+.project-loading-card>b{font-family:Georgia,"Times New Roman",serif;font-size:clamp(32px,4vw,58px);font-weight:500;line-height:1;letter-spacing:-.035em}
+.project-loading-card>i{width:112px;height:2px;margin:25px 0 23px;background:#9d0a28}
+.project-loading-card>strong,.project-empty-card>strong{font-family:Georgia,"Times New Roman",serif;font-size:clamp(25px,2.7vw,40px);font-weight:400;line-height:1.1}
+.project-loading-card>span,.project-empty-card>p{max-width:430px;margin:14px 0 0;color:#746d67;font-size:clamp(12px,1.25vw,17px);line-height:1.45}
+.project-loading-progress{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:18px}
+.project-loading-progress em{width:8px;height:8px;border-radius:50%;background:#9d0a28;opacity:.28;animation:project-loading-pulse 1.25s ease-in-out infinite}
+.project-loading-progress em:nth-child(2){animation-delay:.18s}.project-loading-progress em:nth-child(3){animation-delay:.36s}
+.project-empty-upload{display:grid;grid-template-columns:34px auto;align-items:center;gap:0 12px;margin-top:24px;padding:13px 20px;border-radius:999px;background:#8f0824;color:#fff;box-shadow:0 8px 22px rgba(143,8,36,.2);cursor:pointer;text-align:left}
+.project-empty-upload:hover{background:#75101f}.project-empty-upload input{display:none}.project-empty-upload>span{grid-row:1 / span 2;font-size:24px;line-height:1}.project-empty-upload>b{font-size:14px;line-height:1.25}.project-empty-upload>small{color:rgba(255,255,255,.72);font-size:9px;letter-spacing:.08em}
+@keyframes project-loading-pulse{0%,70%,100%{opacity:.28;transform:scale(.88)}35%{opacity:1;transform:scale(1.12)}}
+@media(max-width:700px){.project-loading-card,.project-empty-card{width:min(94%,480px);min-height:190px;padding:24px 18px}.project-loading-card>i{width:78px;margin:18px 0}.project-loading-card>span,.project-empty-card>p{max-width:280px}.project-empty-upload{padding:12px 17px}}
+@media(prefers-reduced-motion:reduce){.project-loading-progress em{animation:none}.project-loading-progress em:nth-child(2){opacity:.55}.project-loading-progress em:nth-child(3){opacity:.9}}
+
 /* Planogram symbols: the top edge is always the back/orientation side. */
 .planogram-furniture.sofa,.planogram-furniture.chair,.planogram-furniture.stool,.planogram-furniture.bed,.planogram-furniture.cabinet,.planogram-furniture.dresser,.planogram-furniture.nightstand,.planogram-furniture.tv_stand,.planogram-furniture.lamp{overflow:visible}
 .planogram-furniture.sofa i,.planogram-furniture.chair i,.planogram-furniture.stool i,.planogram-furniture.bed i,.planogram-furniture.cabinet i,.planogram-furniture.dresser i,.planogram-furniture.nightstand i,.planogram-furniture.tv_stand i,.planogram-furniture.lamp i{position:absolute;box-sizing:border-box;opacity:.7}

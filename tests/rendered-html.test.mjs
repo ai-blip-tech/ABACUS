@@ -79,6 +79,7 @@ test("planogram keeps menus readable, rugs below furniture, and supports bedside
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const controlsSource = await readFile(new URL("../app/planogram-controls.ts", import.meta.url), "utf8");
   const catalogSource = await readFile(new URL("../app/api/catalog/route.ts", import.meta.url), "utf8");
+  const catalogFilterSource = await readFile(new URL("../lib/catalog-filter.ts", import.meta.url), "utf8");
   const stylesSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
   assert.match(pageSource, /type:\s*"nightstand"\s*,\s*name:\s*"Прикроватная тумба"/);
@@ -88,10 +89,11 @@ test("planogram keeps menus readable, rugs below furniture, and supports bedside
   assert.match(pageSource, /пуф\|банкетк\|оттоманк\|ottoman\|pouf/);
   assert.match(pageSource, /kind:\s*"stool"\s*,\s*name:\s*"Пуф"/);
   assert.match(pageSource, /kind:\s*"nightstand"\s*,\s*name:\s*"Прикроватная тумба"/);
-  assert.match(catalogSource, /type\s*===\s*"nightstand"/);
-  assert.match(catalogSource, /type\s*===\s*"cabinet"/);
-  assert.match(catalogSource, /type\s*===\s*"ottoman"/);
-  assert.match(catalogSource, /type\s*===\s*"shelving"/);
+  assert.match(catalogSource, /matchesCatalogType/);
+  assert.match(catalogFilterSource, /type\s*===\s*"nightstand"/);
+  assert.match(catalogFilterSource, /type\s*===\s*"cabinet"/);
+  assert.match(catalogFilterSource, /type\s*===\s*"ottoman"/);
+  assert.match(catalogFilterSource, /type\s*===\s*"shelving"/);
   assert.match(controlsSource, /keepMenuHorizontal/);
   assert.match(controlsSource, /classList\.contains\("stool"\)[^\n]+\? "ottoman" : "chair"/);
   assert.match(controlsSource, /classList\.contains\("cabinet"\)[^\n]+\? "shelving" : "cabinet"/);
@@ -113,4 +115,17 @@ test("planogram keeps a remembered render instruction separate from immediate im
   assert.match(pageSource, /referenceImages,instruction:planInstruction,outputSize/);
   assert.match(generateSource, /explicit additional instruction is mandatory/);
   assert.match(projectSource, /planInstruction:\s*typeof draft\.planInstruction/);
+});
+
+test("studio distinguishes an existing-project loader from a new-project upload prompt", async () => {
+  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const stylesSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(pageSource, /project-loading-blueprint\.png/);
+  assert.match(pageSource, /Готовим ваш проект/);
+  assert.match(pageSource, /Загрузить фото интерьера/);
+  assert.match(pageSource, /skipNextProjectLoadRef/);
+  assert.match(pageSource, /project-empty-upload/);
+  assert.match(stylesSource, /\.project-loading-screen,\.project-empty-screen/);
+  assert.match(stylesSource, /@media\(prefers-reduced-motion:reduce\)/);
 });
