@@ -89,12 +89,26 @@ test("camera FOV uses the same rotation as the render brief and raster reference
 });
 
 test("an unowned generation can be named once, created, persisted and saved again without duplication", () => {
-  assert.match(page, /setProjectId\(""\);setProjectName\(""\)/);
+  assert.match(page, /resetProjectWorkspace\(true\);setInteriorImage\(image\)/);
   assert.match(page, /if \(!projectId\) \{ setSaveProjectName/);
   assert.match(page, /fetch\("\/api\/projects",\{method:"POST"/);
   assert.match(page, /setProjectId\(targetId\)/);
   assert.match(page, /await persistProject\(targetId,name\)/);
   assert.match(page, /role="dialog"[^>]*aria-labelledby="save-project-title"/);
+});
+
+test("creating or opening a project clears the previous workspace before the next project is shown", () => {
+  assert.match(page, /const resetProjectWorkspace = \(clearDetails = false\) =>/);
+  for (const reset of [
+    /setInteriorImage\(""\)/,
+    /setGeneratedImage\(null\)/,
+    /setHistoryVersions\(\[\]\)/,
+    /setPlanItems\(\[\]\)/,
+    /setProposalItems\(\[\]\)/,
+  ]) assert.match(page, reset);
+  assert.match(page, /onCreate=\{\(\)=>\{resetProjectWorkspace\(true\);navigate\("newProject",""\);\}\}/);
+  assert.match(page, /onOpenProject=\{\(project\)=>\{resetProjectWorkspace\(false\);setProjectName\(project\.name\);navigate\("studio",project\.id\)\}\}/);
+  assert.match(page, /const newProjectId = String\(payload\.project\.id\);\s*resetProjectWorkspace\(false\);\s*skipNextProjectLoadRef\.current = newProjectId/);
 });
 
 test("latest generations expose a restrained hover only for precise hover pointers", () => {

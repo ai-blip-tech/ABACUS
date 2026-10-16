@@ -5,6 +5,7 @@ import test from "node:test";
 const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8");
 const overviewRoute = await readFile(new URL("../app/api/account/overview/route.ts", import.meta.url), "utf8");
+const projectRoute = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
 const start = source.indexOf("function AccountDashboardWithProfile");
 const end = source.indexOf("function ProfileModal", start);
 const dashboard = source.slice(start, end);
@@ -45,8 +46,8 @@ test("dashboard CSS implements split hero, ledger, editorial states and responsi
 test("dashboard dropdown is compact and explicitly scoped to this page", () => {
   assert.match(dashboard, /<AccountDropdown user=\{user\} dashboard\/>/);
   assert.match(css, /dashboard-account-dropdown \.account-dropdown-card/);
-  assert.match(css, /width:min\(320px/);
-  assert.match(css, /max-height:min\(430px/);
+  assert.match(css, /width:min\(356px/);
+  assert.match(css, /max-height:calc\(100dvh - 86px\)/);
 });
 
 test("the complete project card opens the project with keyboard support", () => {
@@ -56,6 +57,20 @@ test("the complete project card opens the project with keyboard support", () => 
   assert.doesNotMatch(dashboard, /<button type="button" onClick=\{\(\)=>onOpenProject\(project\)\}>Открыть/);
   assert.match(css, /\.projects-dashboard-project\{[^}]*cursor:pointer/);
   assert.match(css, /\.projects-dashboard-project:focus-visible/);
+});
+
+test("project cards expose an owned, confirmed delete action without opening the card", () => {
+  assert.match(dashboard, /className="projects-dashboard-project-delete"/);
+  assert.match(dashboard, /title="Удалить проект"/);
+  assert.match(dashboard, /window\.confirm\(`Удалить проект/);
+  assert.match(dashboard, /event\.preventDefault\(\);event\.stopPropagation\(\)/);
+  assert.match(dashboard, /method:"DELETE"/);
+  assert.match(dashboard, /current\.projects\.filter\(\(item\)=>item\.id!==project\.id\)/);
+  assert.match(css, /\.projects-dashboard-project-delete\{[^}]*opacity:0/);
+  assert.match(css, /\.projects-dashboard-project:hover \.projects-dashboard-project-delete/);
+  assert.match(projectRoute, /export async function DELETE/);
+  assert.match(projectRoute, /WHERE id = \? AND tenant_id = \? AND user_id = \?/);
+  assert.match(projectRoute, /collectProjectAssets/);
 });
 
 test("project cards render the latest persisted project image", () => {

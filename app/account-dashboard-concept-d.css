@@ -169,9 +169,16 @@
 .projects-dashboard-section>header>h2{margin:0 0 0 15px;font:500 22px/1 var(--rd-display,"Cormorant Garamond",serif);letter-spacing:-.025em}
 .projects-dashboard-section>header>a{margin-left:auto;color:var(--rd-oxblood,#7b1020);text-decoration:none;font:500 13px/1 var(--rd-display,"Cormorant Garamond",serif)}
 .projects-dashboard-project-grid{margin-top:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.projects-dashboard-project{min-width:0;min-height:188px;border:1px solid var(--rd-line,#d8cfc4);border-radius:3px;display:grid;grid-template-columns:48% 52%;overflow:hidden;background:var(--rd-white,#fffdf9);cursor:pointer;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+.projects-dashboard-project{position:relative;min-width:0;min-height:188px;border:1px solid var(--rd-line,#d8cfc4);border-radius:3px;display:grid;grid-template-columns:48% 52%;overflow:hidden;background:var(--rd-white,#fffdf9);cursor:pointer;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}
 .projects-dashboard-project:hover{border-color:rgba(123,16,32,.42);box-shadow:0 9px 24px rgba(53,35,27,.1);transform:translateY(-1px)}
 .projects-dashboard-project:focus-visible{outline:2px solid var(--rd-oxblood,#7b1020);outline-offset:3px}
+.projects-dashboard-project-delete{width:30px;height:30px;padding:0;position:absolute;z-index:5;top:9px;right:9px;border:1px solid rgba(123,16,32,.25);border-radius:50%;background:rgba(255,253,249,.94);box-shadow:0 3px 12px rgba(32,24,19,.12);color:var(--rd-oxblood,#7b1020);display:grid;place-items:center;cursor:pointer;opacity:0;transform:scale(.88);transition:opacity .16s ease,transform .16s ease,background .16s ease,color .16s ease}
+.projects-dashboard-project-delete>span{font:400 23px/1 var(--rd-ui,Manrope,sans-serif);transform:translateY(-1px)}
+.projects-dashboard-project-delete>em{width:max-content;padding:6px 8px;position:absolute;top:35px;right:0;border-radius:3px;background:var(--rd-charcoal,#201813);color:var(--rd-white,#fffdf9);font:500 10px/1 var(--rd-ui,Manrope,sans-serif);font-style:normal;pointer-events:none;opacity:0;transform:translateY(-3px);transition:opacity .14s ease,transform .14s ease}
+.projects-dashboard-project:hover .projects-dashboard-project-delete,.projects-dashboard-project:focus-within .projects-dashboard-project-delete,.projects-dashboard-project-delete:focus-visible{opacity:1;transform:scale(1)}
+.projects-dashboard-project-delete:hover,.projects-dashboard-project-delete:focus-visible{outline:none;background:var(--rd-oxblood,#7b1020);color:var(--rd-white,#fffdf9)}
+.projects-dashboard-project-delete:hover>em,.projects-dashboard-project-delete:focus-visible>em{opacity:1;transform:translateY(0)}
+.projects-dashboard-project-delete:disabled{cursor:wait;opacity:.55}
 .projects-dashboard-project-mark{position:relative;min-height:186px;overflow:hidden;background:linear-gradient(135deg,#d8cbbb,#ede5db)}
 .projects-dashboard-project-mark img{width:100%;height:100%;position:absolute;inset:0;display:block;object-fit:cover}
 .projects-dashboard-project-mark::before,.projects-dashboard-project-mark::after{content:"";position:absolute;border:1px solid rgba(123,16,32,.16)}
@@ -226,6 +233,7 @@
   .projects-dashboard-section{padding:21px 20px 0}.projects-dashboard-section>header{align-items:center}.projects-dashboard-section>header>h2{margin-left:7px;font-size:21px}.projects-dashboard-section>header>a{font-size:11px}
   .projects-dashboard-project-grid,.projects-dashboard-generation-grid{grid-template-columns:1fr}
   .projects-dashboard-project{grid-template-columns:40% 60%}.projects-dashboard-project-mark{min-height:188px}
+  .projects-dashboard-project-delete{opacity:1;transform:none}
   .projects-dashboard-empty{min-height:108px;padding:22px 20px;align-items:flex-start;flex-direction:column}.projects-dashboard-empty b{font-size:19px}.projects-dashboard-empty>button{min-height:44px}
   .projects-dashboard-footer{margin-top:24px;padding:15px 20px;align-items:flex-start;gap:12px;flex-direction:column}.projects-dashboard-footer>span:last-child{align-self:flex-end;text-align:right}
   .dashboard-account-dropdown .account-dropdown-card{position:fixed;top:68px;right:12px;width:min(360px,calc(100vw - 24px));max-height:calc(100vh - 80px);max-height:calc(100dvh - 80px)}

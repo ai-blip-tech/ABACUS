@@ -36,6 +36,7 @@ const placeholderImages = [
   "/generated-bleed-runner.png",
   "/images/room-design/room-design-projects-dashboard-hero-reference.avif",
 ];
+const templatePlaceholderSrc = "/project-loading-blueprint.png";
 
 const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "analyticsKey" | "audience"> & { previewIndex: number; previewPosterSrc?: string; previewVideoSrc?: string; audience?: TemplateAudience }): TemplateDefinition => {
   const { previewIndex, previewPosterSrc, previewVideoSrc, ...template } = value;
@@ -46,12 +47,12 @@ const definition = (value: Omit<TemplateDefinition, "version" | "preview" | "ana
     analyticsKey: `template_${template.id}_${template.slug}`,
     preview: {
       type: previewVideoSrc ? "video" : previewPosterSrc ? "image" : "placeholder",
-      src: previewPosterSrc || placeholderImages[previewIndex % placeholderImages.length],
+      src: previewPosterSrc || (previewVideoSrc ? placeholderImages[previewIndex % placeholderImages.length] : templatePlaceholderSrc),
       alt: previewVideoSrc
         ? `Видео-превью шаблона «${template.title}»`
         : previewPosterSrc
           ? `Обложка шаблона «${template.title}»`
-          : `Временный preview placeholder для шаблона «${template.title}»`,
+          : `Эскиз интерьера для шаблона «${template.title}»`,
       videoSrc: previewVideoSrc,
       videoMimeType: previewVideoSrc ? "video/mp4" : undefined,
     },

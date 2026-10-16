@@ -65,6 +65,22 @@ test("homepage and catalog share video-capable template previews", () => {
   assert.match(templatesCssSource, /\.template-catalog-preview\{[^}]*filter:none/);
 });
 
+test("all templates without approved video or furniture-casting cover share the blueprint placeholder", () => {
+  const excludedSlugs = new Set(["design-battle", "light-scenarios", "moodboard-to-room", "furniture-casting"]);
+  const placeholderTemplates = templateRegistry.filter((template) => !excludedSlugs.has(template.slug));
+
+  assert.equal(placeholderTemplates.length, 29);
+  for (const template of placeholderTemplates) {
+    assert.equal(template.preview.type, "placeholder", template.slug);
+    assert.equal(template.preview.src, "/project-loading-blueprint.png", template.slug);
+  }
+
+  for (const slug of ["design-battle", "light-scenarios", "moodboard-to-room"]) {
+    assert.equal(templateRegistry.find((template) => template.slug === slug)?.preview.type, "video", slug);
+  }
+  assert.equal(templateRegistry.find((template) => template.slug === "furniture-casting")?.preview.src, "/media/templates/furniture-casting-cover.png");
+});
+
 test("homepage mounts the live Ono hero and keeps one project call to action", () => {
   assert.doesNotMatch(templatesHomeSource, /room-design-hero\.mp4|room-design-hero-poster\.png|ScrollScrubHero/);
   assert.match(templatesHomeSource, /id="home-ono-slot"/);

@@ -98,6 +98,24 @@ function hydrateState(projectId: string, state: SavedState) {
   };
 }
 
+function collectProjectAssets(value: unknown, assets = new Set<string>(), key = "", depth = 0) {
+  if (depth > 12 || value == null) return assets;
+  if (typeof value === "string") {
+    if ((key === "asset" || key.endsWith("Asset")) && validAsset(value)) assets.add(value);
+    return assets;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) collectProjectAssets(entry, assets, key, depth + 1);
+    return assets;
+  }
+  if (typeof value === "object") {
+    for (const [entryKey, entryValue] of Object.entries(value as Record<string, unknown>)) {
+      collectProjectAssets(entryValue, assets, entryKey, depth + 1);
+    }
+  }
+  return assets;
+}
+
 function dataUrlToBytes(value: string) {
   const match = value.match(/^data:([^;,]+);base64,([a-zA-Z0-9+/=]+)$/);
   if (!match) throw new Error("Не удалось сохранить изображение проекта.");
@@ -129,6 +147,28 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   } catch {
     return Response.json({ error: "Не удалось прочитать сохранённый проект." }, { status: 500 });
   }
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireTenantUser(request);
+  if (!user) return Response.json({ error: "Требуется вход." }, { status: 401 });
+  await ensureStore();
+  const { id } = await params;
+  if (!validProjectId(id)) return Response.json({ error: "Некорректный проект." }, { status: 400 });
+  const project = await database.prepare("SELECT state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).first<{ state_json: string | null }>();
+  if (!project) return Response.json({ error: "Проект не найден." }, { status: 404 });
+
+  let assets = new Set<string>();
+  if (project.state_json) {
+    try { assets = collectProjectAssets(JSON.parse(project.state_json)); } catch { /* the project row can still be deleted */ }
+  }
+  await database.prepare("DELETE FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).run();
+  const tenantPrefix = tenantStoragePrefix(user);
+  await Promise.allSettled([...assets].flatMap((asset) => [
+    storage().delete(assetKey(tenantPrefix, id, asset)),
+    storage().delete(`projects/${user.id}/${id}/${asset}`),
+  ]));
+  return Response.json({ ok: true, projectId: id });
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {

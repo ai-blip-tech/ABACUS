@@ -97,6 +97,9 @@ const applyProposalEdits = (items: PlanItem[], edits: FurnitureEdit[]) => edits.
   return [...base, proposalItemForEdit(edit)];
 }, items);
 
+const DEFAULT_PROJECT_PROMPT = "Создайте тёплую скандинавскую гостиную с натуральным дубом, нейтральным текстилем и мягким освещением.";
+const DEFAULT_PRESERVED_PARTS = ["Архитектуру", "Окна", "Пол", "Потолок"];
+
 export default function Home() {
   const [view, setView] = useState<"home" | "account" | "newProject" | "studio">("home");
   const [user, setUser] = useState<SignedInUser | null>(null);
@@ -122,8 +125,8 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false); const [generated, setGenerated] = useState(false); const [favorite, setFavorite] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState("");
-  const [prompt, setPrompt] = useState("Создайте тёплую скандинавскую гостиную с натуральным дубом, нейтральным текстилем и мягким освещением.");
-  const [preserved, setPreserved] = useState(["Архитектуру", "Окна", "Пол", "Потолок"]);
+  const [prompt, setPrompt] = useState(DEFAULT_PROJECT_PROMPT);
+  const [preserved, setPreserved] = useState(DEFAULT_PRESERVED_PARTS);
   const [creativity, setCreativity] = useState("Средняя");
   const [furnitureMode, setFurnitureMode] = useState<"choice" | "reference">("choice");
   const [furnitureAction, setFurnitureAction] = useState<"add" | "replace" | "remove">("add");
@@ -173,6 +176,22 @@ export default function Home() {
   const [isPlanRendering, setIsPlanRendering] = useState(false);
   const [proposalMenuOpen, setProposalMenuOpen] = useState(false);
   const [proposalError, setProposalError] = useState("");
+  const resetProjectWorkspace = (clearDetails = false) => {
+    setProjectId("");
+    if (clearDetails) { setProjectName(""); setProjectType("Квартира"); setProjectDescription(""); }
+    setProjectError(""); setProjectSaved(false); setIsLoadingProject(false); setIsSavingProject(false);
+    setSaveProjectDialogOpen(false); setSaveProjectName(""); setSaveProjectError("");
+    setActiveTool("Добавить мебель"); setSelected("Модульный диван Осло"); setGenerated(false); setFavorite(false);
+    setGeneratedImage(null); setGenerationError(""); setPrompt(DEFAULT_PROJECT_PROMPT); setPreserved(DEFAULT_PRESERVED_PARTS); setCreativity("Средняя");
+    setFurnitureMode("choice"); setFurnitureAction("add"); setReferenceName(""); setReferenceImage(""); setLinkedCatalogProduct(null);
+    setDetectedObjects([]); setExactMasks({}); setExactPolygons({}); setSelectedObject(null); setIsDetecting(false); setDetectionError("");
+    setInteriorImage(""); setInteriorName(""); setCanvasRatio(16 / 9); setHoveredObject(null); setHistoryVersions([]); setActiveHistoryId(null); setUpscaleVersion(null);
+    setReplacementTarget(null); setReplacementMask(""); setLayerBackground(""); setLayerImages({}); setHiddenLayerIds([]); setLayerPoints([]); setLayerStrokes([]); setLayerDrawing(null);
+    setPlacementPoint(null); setFurnitureEdits([]); setPlacementPrompt(""); setMaterialMenuOpen(false); setMaterialSelection(null); setLayerDrag(null); setLayerEdit(null); setIsBuildingLayers(false);
+    setPlanItems([]); setProposalItems([]); setPlanSelectedId(null); setPlanRoom({ width: 6000, length: 4500 }); setPlanFloorReference(null); setPlanWallReference(null); setPlanCamera(null);
+    setPlanInstructionDraft(""); setPlanInstruction(""); setIsPlanRendering(false); setProposalMenuOpen(false); setProposalError("");
+    skipNextProjectLoadRef.current = "";
+  };
   const setRatioFromImage = (source: string) => { const preview = new Image(); preview.onload = () => setCanvasRatio(preview.naturalWidth / preview.naturalHeight); preview.src = source; };
   const addHistoryVersion = (image: string, name: string, isGenerated = true, nextProposalItems = proposalItems) => { const version: HistoryItem = { id: `${Date.now()}-${Math.random()}`, name, image, generated: isGenerated, proposalItems: nextProposalItems }; setHistoryVersions((items) => [...items, version].slice(-8)); setActiveHistoryId(version.id); setUpscaleVersion(version); setProjectSaved(false); };
   const blobAsDataUrl = async (url: string) => {
@@ -669,7 +688,7 @@ export default function Home() {
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
   </>;
   if (view === "account") return <>
-    <AccountDashboardWithProfile user={user} onUserUpdated={setUser} onHome={()=>navigate("home")} onCreate={()=>navigate("newProject")} onOpenProject={(project)=>{setProjectName(project.name);navigate("studio",project.id)}} onOpenGeneration={async(generation)=>{try{const image=await blobAsDataUrl(`/api/account/generations/${generation.id}`);setProjectId("");setProjectName("");setProjectType("Квартира");setProjectDescription("");setProjectSaved(false);setPlanItems([]);setProposalItems([]);setPlanFloorReference(null);setPlanWallReference(null);setPlanCamera(null);setPlanInstruction("");setPlanInstructionDraft("");setInteriorImage(image);setGeneratedImage(image);setInteriorName("Сохранённая генерация");setGenerated(true);setRatioFromImage(image);setHistoryVersions([{id:generation.id,name:"Сохранённая генерация",image,generated:true}]);setActiveHistoryId(generation.id);navigate("studio","");}catch{setGenerationError("Не удалось открыть сохранённую генерацию.");}}} onLogin={()=>openAuth("login")}/>
+    <AccountDashboardWithProfile user={user} onUserUpdated={setUser} onHome={()=>navigate("home")} onCreate={()=>{resetProjectWorkspace(true);navigate("newProject","");}} onOpenProject={(project)=>{resetProjectWorkspace(false);setProjectName(project.name);navigate("studio",project.id)}} onOpenGeneration={async(generation)=>{try{const image=await blobAsDataUrl(`/api/account/generations/${generation.id}`);resetProjectWorkspace(true);setInteriorImage(image);setGeneratedImage(image);setInteriorName("Сохранённая генерация");setGenerated(true);setRatioFromImage(image);setHistoryVersions([{id:generation.id,name:"Сохранённая генерация",image,generated:true}]);setActiveHistoryId(generation.id);navigate("studio","");}catch{setGenerationError("Не удалось открыть сохранённую генерацию.");}}} onLogin={()=>openAuth("login")}/>
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);}}/>}
   </>;
   if (view === "newProject") return <main className="project-page project-page-concept">
@@ -704,6 +723,7 @@ export default function Home() {
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload.project?.id) throw new Error(payload.error || "Не удалось создать проект.");
             const newProjectId = String(payload.project.id);
+            resetProjectWorkspace(false);
             skipNextProjectLoadRef.current = newProjectId;
             setProjectName(name); setProjectId(newProjectId); setProjectSaved(false); navigate("studio", newProjectId);
           } catch (error) {
@@ -755,6 +775,7 @@ function AccountDashboardWithProfile({user,onUserUpdated,onHome,onCreate,onOpenP
   const [data,setData]=useState<AccountOverview|null>(null);
   const [error,setError]=useState("");
   const [profileOpen,setProfileOpen]=useState(false);
+  const [deletingProjectId,setDeletingProjectId]=useState("");
   useEffect(()=>{if(!user)return;void fetch("/api/account/overview").then(async(response)=>{const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||"Не удалось загрузить кабинет.");return payload;}).then(setData).catch(()=>setError("Не удалось загрузить данные кабинета. Попробуйте обновить страницу."));},[user?.id]);
   if(!user)return <main className="account-page"><header className="account-nav"><button onClick={onHome}>← На главную</button><button className="home-wordmark room-design-wordmark" type="button" onClick={onHome} aria-label="ROOM DESIGN — на главную">ROOM DESIGN</button><button onClick={onLogin}>Войти</button></header><section className="account-empty"><span>ROOM DESIGN</span><h1>Войдите, чтобы открыть кабинет</h1><p>Здесь хранятся проекты, сохранённые визуализации и история использования токенов.</p><button onClick={onLogin}>Войти или зарегистрироваться</button></section></main>;
   const summary=data?.summary||{};
@@ -763,6 +784,18 @@ function AccountDashboardWithProfile({user,onUserUpdated,onHome,onCreate,onOpenP
   const isLoading=!data&&!error;
   const projects=data?.projects||[];
   const generations=data?.generations||[];
+  const deleteProject=async(event:React.MouseEvent,project:AccountProject)=>{
+    event.preventDefault();event.stopPropagation();
+    if(deletingProjectId||!window.confirm(`Удалить проект «${project.name}»? Это действие нельзя отменить.`))return;
+    setDeletingProjectId(project.id);setError("");
+    try{
+      const response=await fetch(`/api/projects/${encodeURIComponent(project.id)}`,{method:"DELETE"});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||"Не удалось удалить проект.");
+      setData((current)=>current?{...current,projects:current.projects.filter((item)=>item.id!==project.id)}:current);
+    }catch(reason){setError(reason instanceof Error?reason.message:"Не удалось удалить проект.");}
+    finally{setDeletingProjectId("");}
+  };
   return <main className="projects-dashboard">
     <section className="projects-dashboard-top">
       <div className="projects-dashboard-paper">
@@ -781,7 +814,7 @@ function AccountDashboardWithProfile({user,onUserUpdated,onHome,onCreate,onOpenP
     </section>
     <section className="projects-dashboard-section projects-dashboard-projects" aria-labelledby="projects-dashboard-projects-title">
       <header><span>04</span><i/><h2 id="projects-dashboard-projects-title">Продолжить работу</h2></header>
-      {isLoading?<div className="projects-dashboard-skeleton"><i/><i/><i/></div>:projects.length?<div className="projects-dashboard-project-grid">{projects.map((project)=><div key={project.id} className="projects-dashboard-project" role="link" tabIndex={0} aria-label={`Открыть проект «${project.name}»`} onClick={()=>onOpenProject(project)} onKeyDown={(event)=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onOpenProject(project);}}}><div className="projects-dashboard-project-mark">{project.preview_image?<img src={project.preview_image} alt={`Последнее изображение проекта «${project.name}»`} loading="lazy"/>:<span aria-hidden="true">{project.project_type.slice(0,1)}</span>}</div><div><small>{project.project_type}</small><h3>{project.name}</h3><p>{project.description||"Описание проекта пока не добавлено."}</p><time>Обновлено {formatDate(project.updated_at)}</time><span className="projects-dashboard-project-open">Открыть <b>→</b></span></div></div>)}</div>:<div className="projects-dashboard-empty"><div><b>Здесь появятся ваши проекты.</b><span>Создайте первый проект, чтобы начать работать с интерьером.</span></div><button type="button" onClick={onCreate}>Создать первый проект →</button></div>}
+      {isLoading?<div className="projects-dashboard-skeleton"><i/><i/><i/></div>:projects.length?<div className="projects-dashboard-project-grid">{projects.map((project)=><div key={project.id} className="projects-dashboard-project" role="link" tabIndex={0} aria-label={`Открыть проект «${project.name}»`} onClick={()=>onOpenProject(project)} onKeyDown={(event)=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onOpenProject(project);}}}><button className="projects-dashboard-project-delete" type="button" aria-label={`Удалить проект «${project.name}»`} title="Удалить проект" disabled={deletingProjectId===project.id} onClick={(event)=>void deleteProject(event,project)}><span aria-hidden="true">×</span><em role="tooltip">Удалить проект</em></button><div className="projects-dashboard-project-mark">{project.preview_image?<img src={project.preview_image} alt={`Последнее изображение проекта «${project.name}»`} loading="lazy"/>:<span aria-hidden="true">{project.project_type.slice(0,1)}</span>}</div><div><small>{project.project_type}</small><h3>{project.name}</h3><p>{project.description||"Описание проекта пока не добавлено."}</p><time>Обновлено {formatDate(project.updated_at)}</time><span className="projects-dashboard-project-open">Открыть <b>→</b></span></div></div>)}</div>:<div className="projects-dashboard-empty"><div><b>Здесь появятся ваши проекты.</b><span>Создайте первый проект, чтобы начать работать с интерьером.</span></div><button type="button" onClick={onCreate}>Создать первый проект →</button></div>}
     </section>
     <section className="projects-dashboard-section projects-dashboard-generations" aria-labelledby="projects-dashboard-generations-title">
       <header><span>05</span><i/><h2 id="projects-dashboard-generations-title">Последние генерации</h2>{generations.length>0&&<a href="/account#renders">Все генерации&nbsp;&nbsp;→</a>}</header>
