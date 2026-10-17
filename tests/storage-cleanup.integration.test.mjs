@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 
 const dataRoot = mkdtempSync(join(tmpdir(), "room-design-storage-cleanup-"));
 process.env.ROOM_DESIGN_DATA_DIR = dataRoot;
@@ -91,4 +93,41 @@ test("storage cleanup deletes every canonical generated image after 30 days and 
   assert.equal(runs.results.length, 2);
   assert.equal(runs.results.some((run) => Number(run.dry_run) === 1 && Number(run.deleted) === 0), true);
   assert.equal(runs.results.some((run) => Number(run.dry_run) === 0 && Number(run.deleted) === 2 && Number(run.freed_bytes) === bytes.byteLength * 2), true);
+});
+
+test("standalone cleanup runner works without Node.js TypeScript support", () => {
+  const runnerRoot = mkdtempSync(join(tmpdir(), "room-design-storage-runner-"));
+  try {
+    const database = new DatabaseSync(join(runnerRoot, "room-design.sqlite"));
+    database.exec(`
+      CREATE TABLE generations (
+        id TEXT PRIMARY KEY,
+        output_key TEXT NOT NULL,
+        content_type TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+    const generationId = "19424042-07aa-4f6f-8fc5-66186c8e6e08";
+    const outputKey = `tenants/roomdesign/users/runner/generations/2020-01-01/${generationId}.webp`;
+    const outputPath = join(runnerRoot, "storage", ...outputKey.split("/"));
+    mkdirSync(join(outputPath, ".."), { recursive: true });
+    writeFileSync(outputPath, "expired image");
+    writeFileSync(`${outputPath}.metadata.json`, "{}");
+    database.prepare("INSERT INTO generations (id, output_key, content_type, created_at) VALUES (?, ?, 'image/webp', '2020-01-01T00:00:00.000Z')")
+      .run(generationId, outputKey);
+    database.close();
+
+    const run = spawnSync(process.execPath, ["scripts/storage-cleanup.mjs", "--execute"], {
+      cwd: new URL("..", import.meta.url),
+      env: { ...process.env, ROOM_DESIGN_DATA_DIR: runnerRoot, DATA_DIR: "" },
+      encoding: "utf8",
+    });
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    const result = JSON.parse(run.stdout);
+    assert.equal(result.deleted, 1);
+    assert.equal(result.failed, 0);
+    assert.equal(existsSync(outputPath), false);
+  } finally {
+    rmSync(runnerRoot, { recursive: true, force: true });
+  }
 });
