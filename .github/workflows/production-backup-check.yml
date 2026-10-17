@@ -59,6 +59,13 @@ jobs:
             data_dir="not-resolved"
             database_name="room-design.sqlite"
             backup_root="$HOME/room-design-backups"
+            canceled_backup_dir="$backup_root/predeploy-39053333262-1"
+            if [ -d "$canceled_backup_dir" ]; then
+              test -f "$canceled_backup_dir/REPORT.txt"
+              grep -qx 'status=FAILED' "$canceled_backup_dir/REPORT.txt"
+              rm -rf "$canceled_backup_dir"
+              echo "REMOVED_CANCELED_BACKUP=$canceled_backup_dir"
+            fi
             backup_name="predeploy-${BACKUP_RUN_ID}-${BACKUP_RUN_ATTEMPT}"
             backup_dir="$backup_root/$backup_name"
             snapshot_dir="$backup_dir/snapshot"
@@ -328,7 +335,7 @@ jobs:
             PY
 
             current_step="creating compact archive"
-            tar -C "$data_dir" -czf "$archive_path" storage -C "$snapshot_dir" data/room-design.sqlite MANIFEST.sha256 --transform='s,^storage,data/storage,'
+            tar --transform='s,^storage,data/storage,' -C "$snapshot_dir" -czf "$archive_path" MANIFEST.sha256 data/room-design.sqlite -C "$data_dir" storage
             archive_sha="$(sha256sum "$archive_path" | awk '{print $1}')"
             printf '%s  %s\n' "$archive_sha" "$(basename "$archive_path")" > "$checksum_path"
             (cd "$backup_dir" && sha256sum -c "$(basename "$checksum_path")" >/dev/null)
@@ -341,8 +348,10 @@ jobs:
             import tarfile
             import sys
 
-            with tarfile.open(sys.argv[1], "r:gz") as archive:
-                manifest_member = archive.getmember("MANIFEST.sha256")
+            with tarfile.open(sys.argv[1], "r|gz") as archive:
+                manifest_member = archive.next()
+                if manifest_member is None or manifest_member.name != "MANIFEST.sha256":
+                    raise SystemExit("manifest must be the first archive member")
                 manifest_source = archive.extractfile(manifest_member)
                 if manifest_source is None:
                     raise SystemExit("missing manifest")
@@ -350,15 +359,22 @@ jobs:
                 for line in manifest_source.read().decode("utf-8").splitlines():
                     digest, name = line.split("  ", 1)
                     expected[name] = digest
-                for name, expected_digest in expected.items():
-                    source = archive.extractfile(archive.getmember(name))
+                seen = set()
+                for member in archive:
+                    if not member.isfile() or member.name not in expected:
+                        continue
+                    source = archive.extractfile(member)
                     if source is None:
-                        raise SystemExit(f"missing archived file: {name}")
+                        raise SystemExit(f"unreadable archived file: {member.name}")
                     value = hashlib.sha256()
                     for chunk in iter(lambda: source.read(1024 * 1024), b""):
                         value.update(chunk)
-                    if value.hexdigest() != expected_digest:
-                        raise SystemExit(f"archive digest mismatch: {name}")
+                    if value.hexdigest() != expected[member.name]:
+                        raise SystemExit(f"archive digest mismatch: {member.name}")
+                    seen.add(member.name)
+                missing = sorted(set(expected) - seen)
+                if missing:
+                    raise SystemExit(f"archive files missing from verification: {missing[:3]}")
             PY
             manifest_status="passed"
 
