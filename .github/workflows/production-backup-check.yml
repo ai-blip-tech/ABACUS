@@ -255,6 +255,14 @@ jobs:
             available_kib="$(df -Pk "$backup_root" | awk 'NR==2 {print $4}')"
             required_kib="$((data_kib + 524288))"
             data_size="$(du -sh "$data_dir" | awk '{print $1}')"
+            echo "DATA_KIB=$data_kib"
+            echo "AVAILABLE_KIB=$available_kib"
+            echo "COMPACT_BACKUP_REQUIRED_KIB=$required_kib"
+            echo "FILESYSTEM_USAGE_START"
+            df -h "$backup_root"
+            echo "BACKUP_USAGE_START"
+            du -sh "$backup_root"/* 2>/dev/null || true
+            echo "BACKUP_USAGE_END"
             test "$available_kib" -ge "$required_kib" || {
               echo "Not enough free disk space for the compact verified archive." >&2
               fail "insufficient-disk-space"
