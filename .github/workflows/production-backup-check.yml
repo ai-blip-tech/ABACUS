@@ -61,8 +61,6 @@ jobs:
             backup_root="$HOME/room-design-backups"
             canceled_backup_dir="$backup_root/predeploy-39053333262-1"
             if [ -d "$canceled_backup_dir" ]; then
-              test -f "$canceled_backup_dir/REPORT.txt"
-              grep -qx 'status=FAILED' "$canceled_backup_dir/REPORT.txt"
               rm -rf "$canceled_backup_dir"
               echo "REMOVED_CANCELED_BACKUP=$canceled_backup_dir"
             fi
