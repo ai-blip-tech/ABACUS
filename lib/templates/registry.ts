@@ -249,8 +249,8 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
     ],
   }),
   definition({
-    id: "36", slug: "planogram-3d", status: "internal", wave: "experimental", category: "visualization", sortOrder: 36, featured: false, previewIndex: 1, audience: "both",
-    title: "Планограмма 3D", hook: "Превратите планировку в фотореалистичный 3D-план", description: "Загрузите план БТИ, архитектурный чертёж или эскиз. AI сохранит помещения, стены, окна и двери и создаст реалистичный меблированный вид строго сверху.", ctaLabel: "Создать 3D-план", resultType: "image", inputSummary: "Планировка + до 10 референсов", badges: ["BETA"], safetyPolicy: "floor-plan-lock",
+    id: "36", slug: "planogram-3d", status: "internal", wave: "experimental", category: "visualization", sortOrder: 36, featured: true, previewIndex: 1, previewPosterSrc: "/media/templates/planogram-3d-cover.png", audience: "both",
+    title: "Планограмма 3D", hook: "Превратите планировку в фотореалистичный 3D-план", description: "Загрузите план БТИ, архитектурный чертёж или эскиз. AI сохранит помещения, стены, окна и двери и создаст реалистичный меблированный вид строго сверху.", ctaLabel: "Создать 3D-план", resultType: "image", inputSummary: "Планировка + до 10 референсов", badges: ["НОВИНКА"], safetyPolicy: "floor-plan-lock",
     requiredCapabilities: ["image_to_image", "floor_plan_understanding", "geometry_lock", "multi_reference", "top_down_render"],
     inputSlots: [
       image({ id: "floorPlan", kind: "floor_plan", label: "Загрузите план", helper: "План БТИ, архитектурный чертёж или эскиз · JPG, PNG или WEBP · до 15 МБ", required: true, minCount: 1, maxCount: 1 }),
@@ -272,7 +272,7 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
   }),
 ];
 
-const templatePriority = ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "furniture-casting"];
+const templatePriority = ["planogram-3d", "design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "furniture-casting"];
 
 export const templateRegistry: TemplateDefinition[] = [...unorderedTemplateRegistry]
   .sort((left, right) => {

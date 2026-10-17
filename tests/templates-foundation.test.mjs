@@ -24,7 +24,7 @@ test("registry contains exactly thirty-four unique versioned templates", () => {
   assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 34);
   for (const removed of ["memory-room", "home-swap", "architectural-xray", "window-portal", "inside-the-walls", "house-awake", "declutter", "next-chapter"]) assert.equal(templateRegistry.some((template) => template.slug === removed), false);
   assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 34 }, (_, index) => index + 1));
-  assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "furniture-casting", "material-preview"]);
+  assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["planogram-3d", "design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "furniture-casting"]);
   for (const template of templateRegistry) {
     assert.equal(template.version, 1);
     assert.ok(template.inputSlots.length > 0, `${template.slug} must have input slots`);
@@ -36,8 +36,8 @@ test("registry contains exactly thirty-four unique versioned templates", () => {
 
 test("foundation exposes all reviewable records and the approved featured mix", () => {
   assert.equal(previewTemplates.length, 34);
-  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "furniture-casting", "material-preview", "roast-my-room", "kitchen-cad-to-photo"]);
-  assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
+  assert.deepEqual(featuredTemplates.map((template) => template.slug), ["planogram-3d", "design-battle", "light-scenarios", "moodboard-to-room", "furniture-casting", "material-preview", "roast-my-room", "kitchen-cad-to-photo"]);
+  assert.match(templatesHomeSource, /\["planogram-3d", "design-battle", "light-scenarios", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
   assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 0\)/);
   assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 1\)/);
   assert.match(templatesHomeSource, /matchMedia\("\(max-width: 760px\)"\)/);
@@ -65,11 +65,11 @@ test("homepage and catalog share video-capable template previews", () => {
   assert.match(templatesCssSource, /\.template-catalog-preview\{[^}]*filter:none/);
 });
 
-test("all templates without approved video or furniture-casting cover share the blueprint placeholder", () => {
-  const excludedSlugs = new Set(["design-battle", "light-scenarios", "moodboard-to-room", "furniture-casting"]);
+test("all templates without approved video or custom cover share the blueprint placeholder", () => {
+  const excludedSlugs = new Set(["design-battle", "light-scenarios", "moodboard-to-room", "furniture-casting", "planogram-3d"]);
   const placeholderTemplates = templateRegistry.filter((template) => !excludedSlugs.has(template.slug));
 
-  assert.equal(placeholderTemplates.length, 30);
+  assert.equal(placeholderTemplates.length, 29);
   for (const template of placeholderTemplates) {
     assert.equal(template.preview.type, "placeholder", template.slug);
     assert.equal(template.preview.src, "/project-loading-blueprint.png", template.slug);
@@ -131,6 +131,15 @@ test("all templates use an editorial workbench and every scenario is configured"
 test("planogram 3D has a real floor-plan generation flow with immutable architecture", () => {
   const template = templateRegistry.find((item) => item.slug === "planogram-3d");
   assert.ok(template);
+  assert.equal(templateRegistry[0].slug, "planogram-3d");
+  assert.equal(template.sortOrder, 1);
+  assert.equal(template.featured, true);
+  assert.equal(template.preview.type, "image");
+  assert.equal(template.preview.src, "/media/templates/planogram-3d-cover.png");
+  assert.deepEqual(template.badges, ["НОВИНКА"]);
+  assert.match(templateCardSource, /template-new-badge/);
+  assert.match(templatesHomeSource, /template-new-badge/);
+  assert.match(templatesCssSource, /\.template-new-badge/);
   assert.equal(template.title, "Планограмма 3D");
   assert.equal(template.status, "internal");
   assert.equal(template.safetyPolicy, "floor-plan-lock");
@@ -146,6 +155,14 @@ test("planogram 3D has a real floor-plan generation flow with immutable architec
   assert.match(scenarioWorkbenchSource, /isPlanogram3D/);
   assert.match(scenarioWorkbenchSource, /slot\.defaultValue/);
   assert.match(scenarioWorkbenchSource, /planogramOutputSize/);
+  assert.match(scenarioWorkbenchSource, /MANDATORY STYLE/);
+  assert.match(scenarioWorkbenchSource, /values\.furnishing/);
+  assert.match(scenarioWorkbenchSource, /values\.existingFurniture/);
+  assert.match(scenarioWorkbenchSource, /values\.lighting/);
+  assert.match(scenarioWorkbenchSource, /values\.atmosphere/);
+  assert.match(scenarioWorkbenchSource, /values\.peopleCount/);
+  assert.match(scenarioWorkbenchSource, /values\.peopleBehavior/);
+  assert.match(scenarioWorkbenchSource, /Do not omit them/);
   assert.match(scenarioWorkbenchSource, /planogram-3d-comparison/);
   assert.match(scenarioWorkbenchSource, /Этот шаблон сохраняет исходную планировку/);
   assert.match(generateRouteSource, /isPlanogram3D/);
@@ -153,6 +170,8 @@ test("planogram 3D has a real floor-plan generation flow with immutable architec
   assert.match(generateRouteSource, /strict 90-degree bird's-eye top-down view/);
   assert.match(generateRouteSource, /MANDATORY ARCHITECTURAL DOOR-SYMBOL PARSING/);
   assert.match(generateRouteSource, /render ALL door leaves CLOSED and FLUSH/);
+  assert.match(generateRouteSource, /Every structured control in the user brief is mandatory/);
+  assert.match(generateRouteSource, /Otherwise render the requested number or range of people/);
   assert.match(generateRouteSource, /FINAL DOOR QA IS NON-NEGOTIABLE/);
   assert.doesNotMatch(scenarioWorkbenchSource, /isPlanogram3D \? "FLOOR PLAN LOCK/);
   assert.match(templatesCssSource, /\.planogram-3d-comparison/);

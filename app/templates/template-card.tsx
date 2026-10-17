@@ -9,6 +9,7 @@ export default function TemplateCard({ template }: { template: TemplateDefinitio
     <Link className="template-catalog-card" href={`/templates/${template.slug}`} data-ono-target={template.slug === "light-scenarios" ? "template-light-scenarios" : undefined}>
       <div className="template-catalog-media">
         <TemplatePreviewMedia className="template-catalog-preview" preview={template.preview} sizes="(max-width: 720px) 100vw, (max-width: 1100px) 50vw, 33vw" />
+        {template.badges.includes("НОВИНКА") && <span className="template-new-badge">Новинка</span>}
         <b className="template-card-number">{template.id}</b>
       </div>
       <div className="template-catalog-copy">

@@ -20,6 +20,7 @@ function TemplateTriptych({ template, compact = false }: { template: TemplateDef
   const showMediaPreview = template.preview.type === "video" || template.preview.type === "image";
   return (
     <div className={`home-template-triptych${compact ? " is-compact" : ""}${showMediaPreview ? " has-media-preview" : ""}`} aria-label={`Превью шаблона «${template.title}»`}>
+      {template.badges.includes("НОВИНКА") && <span className="template-new-badge">Новинка</span>}
       {showMediaPreview ? <TemplatePreviewMedia className="home-template-media-preview" preview={template.preview} sizes="(max-width: 760px) 100vw, 50vw" /> : ["Исходник", "Трансформация", "Результат"].map((label, index) => (
           <div className={`home-template-stage stage-${index + 1}`} key={label}>
             <span>{label}</span>{index === 1 && <i aria-hidden="true">→</i>}
@@ -80,7 +81,7 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
     return () => mobile.removeEventListener("change", updateLayout);
   }, []);
 
-  const homepagePriority = ["design-battle", "light-scenarios", "moodboard-to-room", "kitchen-cad-to-photo"];
+  const homepagePriority = ["planogram-3d", "design-battle", "light-scenarios", "moodboard-to-room", "kitchen-cad-to-photo"];
   const matchedFeatured = [...featuredTemplates].sort((left, right) => {
     const leftPriority = homepagePriority.indexOf(left.slug);
     const rightPriority = homepagePriority.indexOf(right.slug);

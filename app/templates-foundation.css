@@ -14,6 +14,7 @@
 @media(prefers-reduced-motion:reduce){.template-catalog-card,.template-processing>i,.template-route-loading>i{transition:none;animation:none}}
 
 .template-catalog-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;filter:none}
+.template-new-badge{position:absolute;z-index:4;left:10px;top:10px;padding:6px 10px;border:1px solid rgba(255,255,255,.72);border-radius:999px;background:#467448;color:#fff;font:700 8px/1 var(--font-manrope),Arial,sans-serif;letter-spacing:.7px;text-transform:uppercase;box-shadow:0 4px 14px rgba(24,55,26,.18)}
 .template-catalog-card:nth-child(5n+2) .template-catalog-preview{object-position:center 70%}
 .template-card-footer{justify-content:flex-end}
 .furniture-stage-progress{overflow:hidden}.furniture-stage-progress i{left:-35%;width:35%;transition:none;animation:furniture-progress 1.8s ease-in-out infinite}@keyframes furniture-progress{0%{left:-35%}60%,100%{left:100%}}

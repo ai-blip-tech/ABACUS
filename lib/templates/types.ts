@@ -54,7 +54,7 @@ export type TemplateDefinition = {
     videoSrc?: string;
     videoMimeType?: string;
   };
-  badges: Array<"NEW" | "VIDEO" | "С ДРУГОМ" | "WILDCARD" | "BETA">;
+  badges: Array<"NEW" | "НОВИНКА" | "VIDEO" | "С ДРУГОМ" | "WILDCARD" | "BETA">;
   requiredCapabilities: string[];
   safetyPolicy?: string;
   analyticsKey: string;

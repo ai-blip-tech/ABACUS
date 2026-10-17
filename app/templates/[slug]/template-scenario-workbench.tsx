@@ -481,6 +481,18 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
         const files = uploads[slot.id] || [];
         return files.length ? `${slot.label}: ${files.map((file) => file.name).join(", ")}` : "";
       }).filter(Boolean).join("\n");
+      const planogramControlBrief = isPlanogram3D ? [
+        `MANDATORY STYLE: ${values.style || "Современный"}.`,
+        `MANDATORY FURNISHING DENSITY: ${values.furnishing || "Умеренно"}.`,
+        `MANDATORY EXISTING-FURNITURE POLICY: ${values.existingFurniture || "Использовать как подсказку"}.`,
+        `MANDATORY LIGHTING: ${values.lighting || "Смешанное"}; atmosphere: ${values.atmosphere || "Мягкий дневной свет"}.`,
+        values.peopleCount === "Без людей"
+          ? "MANDATORY PEOPLE: render no people."
+          : `MANDATORY PEOPLE: render ${values.peopleCount || "the requested number of people"}; behaviour: ${values.peopleBehavior || "Автоматически"}. Do not omit them.`,
+        `MANDATORY DETAIL: ${values.detail || "Высокая"}.`,
+        `MANDATORY WALL MODE: ${values.wallMode || "Определить автоматически"}${values.wallDimensions ? `; dimensions: ${values.wallDimensions}` : ""}.`,
+        `MANDATORY ENVIRONMENT: ${values.environment || "Нейтральный фон"}.`,
+      ].join("\n") : "";
       const surfaceAssignmentBrief = usesFacadePointMapping ? facadeMaterials.map((material, index) => {
         const referenceIndex = allImages.findIndex((file) => file.id === material.id);
         const points = surfacePoints[material.id] || [];
@@ -503,7 +515,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
               templateId: isMoodboardComposition ? "moodboard-builder" : template.slug,
               outputLabel: label,
               referenceImages,
-              instructions: `${scenario.generationBrief}\n${fieldBrief}\n${surfaceAssignmentBrief}\nCreate only the result «${label}».`,
+              instructions: `${scenario.generationBrief}\n${fieldBrief}\n${planogramControlBrief}\n${surfaceAssignmentBrief}\nCreate only the result «${label}».`,
             },
             outputSize: planogramOutputSize,
           }),
