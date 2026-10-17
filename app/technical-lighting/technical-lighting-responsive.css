@@ -1,0 +1,117 @@
+.folio-right .folio-selection-card {
+  position: static;
+  width: auto;
+  margin-bottom: 22px;
+  box-shadow: none;
+}
+
+.folio-light-settings { display: grid; gap: 12px; }
+.folio-light-settings > label { display: grid; gap: 6px; color: var(--folio-muted); font-size: 8px; text-transform: uppercase; }
+.folio-light-settings select { width: 100%; height: 35px; padding: 0 8px; border: 1px solid var(--folio-line); background: #fff; color: var(--folio-ink); font: 9px var(--font-manrope), Arial; }
+.folio-time-switch { display: grid; grid-template-columns: 1fr 1fr; padding: 2px; overflow: hidden; border: 1px solid var(--folio-line); border-radius: 999px; background: #f6f3ef; }
+.folio-time-switch button { height: 30px; border: 0; border-radius: 999px; background: transparent; color: var(--folio-ink); font-size: 9px; cursor: pointer; }
+.folio-time-switch button.active { background: var(--folio-wine); color: #fff; }
+.folio-correction textarea { min-height: 96px; }
+.folio-brand-select { position: relative; flex: 0 0 150px; z-index: 12; }
+.folio-brand-trigger { width: 100%; height: 34px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 12px 14px; column-gap: 7px; align-items: center; padding: 3px 12px; border: 1px solid var(--folio-line); border-radius: 999px; background: #fff; color: var(--folio-ink); text-align: left; cursor: pointer; }
+.folio-brand-trigger > span { grid-column: 1; color: var(--folio-muted); font-size: 6px; letter-spacing: .08em; text-transform: uppercase; }
+.folio-brand-trigger > b { grid-column: 1; font: 600 9px var(--font-manrope), Arial; }
+.folio-brand-trigger > i { grid-column: 2; grid-row: 1 / 3; color: var(--folio-wine); font-size: 14px; font-style: normal; }
+.folio-brand-menu { position: absolute; left: 0; top: calc(100% + 5px); width: 190px; max-height: 230px; overflow: auto; padding: 5px; border: 1px solid var(--folio-line); border-radius: 4px; background: #fff; box-shadow: 0 12px 30px #39291f2b; }
+.folio-brand-menu > button { width: 100%; min-height: 32px; display: grid; grid-template-columns: 20px 1fr; align-items: center; padding: 0 8px; border: 0; background: #fff; color: var(--folio-ink); font: 500 9px var(--font-manrope), Arial; text-align: left; cursor: pointer; }
+.folio-brand-menu > button:hover,.folio-brand-menu > button[aria-checked="true"] { background: #f8f0f1; }
+.folio-brand-menu > button span { color: var(--folio-wine); font-weight: 800; }
+.folio-catalog nav { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.folio-catalog nav button { flex: 0 0 auto; border-radius: 999px; white-space: nowrap; }
+.folio-workspace-footer button,.folio-selection-card button { border-radius: 999px; }
+.folio-scene-list button,.folio-history button,.folio-products > button { overflow: hidden; border-radius: 10px; }
+.folio-reference-specs { display: grid; gap: 8px; margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--folio-line); }
+.folio-reference-specs h3 { margin: 0; font: 600 9px var(--font-manrope), Arial; text-transform: uppercase; letter-spacing: .08em; }
+.folio-reference-specs article { display: grid; grid-template-columns: 42px 1fr; gap: 7px; padding: 7px; border: 1px solid var(--folio-line); background: #faf8f5; }
+.folio-reference-specs article > img { grid-row: 1; width: 42px; height: 42px; object-fit: contain; background: #fff; }
+.folio-reference-specs article > div { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.folio-reference-specs article b { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.folio-reference-specs article small { color: var(--folio-muted); font-size: 7px; }
+.folio-reference-specs article label { grid-column: 1 / 3; display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; color: var(--folio-muted); font-size: 7px; text-transform: uppercase; }
+.folio-reference-specs article input { width: 100%; height: 29px; padding: 0 7px; border: 1px solid var(--folio-line); background: #fff; color: var(--folio-ink); font: 9px var(--font-manrope), Arial; }
+.folio-reference-specs article input:invalid { border-color: #a13939; }
+.folio-products > button.folio-reference-upload { border: 1px dashed var(--folio-wine); background: #fbf5f5; }
+.folio-products > button.folio-reference-upload > span { border: 1px dashed #c49ca3; background: #fff; color: var(--folio-wine); }
+.folio-products > button.folio-reference-upload strong { font: 300 32px/1 Georgia, serif; }
+.folio-products > button.folio-reference-upload b { padding-right: 30px; }
+.folio-products > button.folio-reference-upload em { padding: 2px 4px; border-radius: 2px; background: var(--folio-wine); color: #fff; font-size: 6px; letter-spacing: .08em; }
+.folio-products > button.reference em { padding: 2px 4px; background: var(--folio-wine); color: #fff; font-size: 6px; letter-spacing: .08em; }
+.folio-products > button.used { border-color: #557a5c; background: #f1f7f2; box-shadow: inset 0 0 0 1px #557a5c; }
+.folio-products > button.used b { padding-top: 15px; }
+.folio-products > button em.used { max-width: 88px; padding: 3px 5px; border-radius: 2px; background: #557a5c; color: #fff; font: 700 5.5px/1.15 var(--font-manrope), Arial; letter-spacing: .04em; text-align: center; }
+.folio-plan g.editing .folio-track { stroke: var(--folio-wine); stroke-width: 2; stroke-dasharray: 5 2; }
+.folio-room-resize { position: absolute; z-index: 9; width: 18px; height: 18px; padding: 0; border: 3px solid #fff; border-radius: 50%; background: var(--folio-wine); box-shadow: 0 0 0 1px var(--folio-ink), 0 2px 7px #2b201d33; touch-action: none; }
+.folio-room-resize.left { left: -10px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.folio-room-resize.right { right: -10px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.folio-room-resize.top { left: 50%; top: -10px; transform: translateX(-50%); cursor: ns-resize; }
+.folio-room-resize.bottom { left: 50%; bottom: -10px; transform: translateX(-50%); cursor: ns-resize; }
+.folio-room-resize:hover { background: #a92a3d; }
+.folio-room-measure { position: absolute; z-index: 8; display: grid; place-items: center; padding: 4px 8px; border-radius: 999px; background: var(--folio-ink); color: #fff; font: 700 8px/1 var(--font-manrope), Arial; white-space: nowrap; pointer-events: none; }
+.folio-room-measure.width { left: 50%; top: -33px; transform: translateX(-50%); }
+.folio-room-measure.length { right: -50px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+.folio-track-rotate-handle { cursor: grab; }
+.folio-track-rotate-handle:active { cursor: grabbing; }
+.folio-track-rotate-handle > line { stroke: var(--folio-wine); stroke-width: .45; stroke-dasharray: 1 1; vector-effect: non-scaling-stroke; }
+.folio-track-rotate-handle > circle { fill: var(--folio-wine); stroke: #fff; stroke-width: .55; vector-effect: non-scaling-stroke; filter: drop-shadow(0 2px 2px #2b201d55); }
+.folio-track-rotate-handle > text { fill: #fff; font: 700 2.2px Arial; text-anchor: middle; pointer-events: none; }
+.folio-measurements { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.folio-measurements > i { position: absolute; display: block; border-color: var(--folio-wine); opacity: .65; }
+.folio-measurements > i.left,.folio-measurements > i.right { height: 0; border-top: 1px dashed var(--folio-wine); }
+.folio-measurements > i.top,.folio-measurements > i.bottom { width: 0; border-left: 1px dashed var(--folio-wine); }
+.folio-measurements > span { position: absolute; padding: 3px 5px; border: 1px solid #d6b4b9; border-radius: 3px; background: #fffdf9ee; color: var(--folio-wine); font: 700 7px/1 var(--font-manrope), Arial; white-space: nowrap; box-shadow: 0 2px 5px #2b201d1a; }
+.folio-measurements > span.left,.folio-measurements > span.right { transform: translate(-50%,-50%); }
+.folio-measurements > span.top,.folio-measurements > span.bottom { transform: translate(-50%,-50%); }
+.folio-relative-measure { pointer-events: none; }
+.folio-relative-measure line { stroke: #47744f; stroke-width: .55; stroke-dasharray: 1.5 1; vector-effect: non-scaling-stroke; }
+.folio-relative-measure.fixture line { stroke: #315f83; }
+.folio-relative-measure circle { fill: #fff; stroke: #47744f; stroke-width: .55; vector-effect: non-scaling-stroke; }
+.folio-relative-measure.fixture circle { stroke: #315f83; }
+.folio-relative-measure text { fill: #27452d; stroke: #fffdf9; stroke-width: .65; paint-order: stroke; font: 700 1.45px/1 Arial; text-anchor: middle; }
+.folio-relative-measure.fixture text { fill: #244b69; }
+.folio-rotation-control { display: grid; gap: 7px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--folio-line); }
+.folio-rotation-control label { display: grid; grid-template-columns: 1fr 62px; align-items: center; color: var(--folio-muted); font-size: 7px; letter-spacing: .06em; text-transform: uppercase; }
+.folio-rotation-control label input { width: 62px; height: 28px; padding: 0 6px; border: 1px solid var(--folio-line); background: #fff; color: var(--folio-ink); font: 9px var(--font-manrope), Arial; }
+.folio-rotation-control > input[type="range"] { width: 100%; accent-color: var(--folio-wine); }
+.folio-rotation-control small { color: var(--folio-muted); font-size: 7px; line-height: 1.4; }
+.folio-edit-point circle { fill: #fff8; stroke: var(--folio-wine); stroke-width: .7; vector-effect: non-scaling-stroke; }
+.folio-edit-point line { stroke: var(--folio-wine); stroke-width: .7; vector-effect: non-scaling-stroke; }
+.folio-edit-point.remove circle, .folio-edit-point.remove line { stroke: #b02121; }
+
+.folio-photo.viewing { cursor: zoom-in; }
+.folio-photo.editing { cursor: crosshair; }
+.folio-photo:focus-visible { outline: 3px solid color-mix(in srgb, var(--folio-wine) 55%, white); outline-offset: 4px; }
+
+.folio-image-actions { display: grid; grid-template-columns: 1fr; gap: 7px; }
+.folio-image-actions h2 { margin-bottom: 7px; }
+.folio-image-actions > button { min-height: 36px; padding: 7px 13px; border: 1px solid var(--folio-line); border-radius: 999px; background: #fff; color: var(--folio-ink); font: 600 8px/1.25 var(--font-manrope), Arial; text-align: center; cursor: pointer; }
+.folio-image-actions > button:hover { border-color: var(--folio-wine); }
+.folio-image-actions > button.upscale { border-color: var(--folio-wine); background: var(--folio-wine); color: #fff; }
+.folio-image-actions > button:disabled { cursor: wait; opacity: .6; }
+.folio-image-actions > p { margin: 1px 0 0; color: var(--folio-muted); font-size: 7px; line-height: 1.45; }
+.folio-apply-wrap { display: grid; gap: 7px; margin-top: auto; padding-top: 17px; border-top: 1px solid var(--folio-line); }
+.folio-apply { width: 100%; min-height: 42px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--folio-wine); color: #fff; font: 600 11px var(--font-manrope), Arial; cursor: pointer; }
+.folio-apply:disabled { cursor: wait; opacity: .55; }
+.folio-apply-wrap > p { margin: 0; color: #a13939; font-size: 8px; line-height: 1.4; }
+.folio-generate { border-radius: 999px; }
+
+.folio-lightbox { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 68px 28px 28px; background: rgba(16, 12, 11, .94); cursor: zoom-out; }
+.folio-lightbox > img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 24px 80px #0008; cursor: default; }
+.folio-lightbox-toolbar { position: fixed; top: 16px; right: 20px; z-index: 1; display: flex; gap: 8px; }
+.folio-lightbox-toolbar button { min-width: 42px; height: 38px; padding: 0 14px; border: 1px solid #ffffff55; border-radius: 999px; background: #fff; color: #2b201d; font: 700 10px var(--font-manrope), Arial; cursor: pointer; }
+.folio-lightbox-toolbar button:last-child { padding: 0; font-size: 22px; }
+
+@media (max-width: 820px) {
+  .folio-header { height: 64px; gap: 8px; padding: 0 10px; }
+  .folio-brand { font-size: 20px; white-space: nowrap; }
+  .folio-header-actions > a { display: none; }
+  .folio-mode { width: 220px; }
+  .folio-mode button { height: 38px; padding: 0 6px; font-size: 8px; line-height: 1.15; }
+  .folio-brand-select { flex-basis: 142px; }
+  .folio-lightbox { padding: 64px 10px 10px; }
+  .folio-lightbox-toolbar { top: 12px; right: 10px; }
+}

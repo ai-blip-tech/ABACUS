@@ -1,0 +1,42 @@
+.lighting-api-status {
+  padding: 5px 8px;
+  border-radius: 99px;
+  font-size: 8px !important;
+  letter-spacing: 0.08em !important;
+}
+
+.lighting-api-status.ready {
+  background: #e8f4e9;
+  color: #397545;
+}
+
+.lighting-api-status.offline {
+  background: #f9e9e5;
+  color: #9b453a;
+}
+
+.lighting-auth {
+  max-width: 150px;
+  height: 31px;
+  padding: 0 11px;
+  overflow: hidden;
+  border: 1px solid var(--light-line);
+  border-radius: 99px;
+  background: #fff;
+  color: var(--light-ink);
+  font: 700 9px var(--font-manrope), Arial, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lighting-auth:hover {
+  border-color: var(--light-accent);
+  color: var(--light-accent);
+}
+
+@media (max-width: 820px) {
+  .lighting-api-status {
+    display: none;
+  }
+}
