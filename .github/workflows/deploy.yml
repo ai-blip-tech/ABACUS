@@ -98,7 +98,7 @@ jobs:
                 "ROOM_DESIGN_DATA_DIR": sys.argv[2],
                 "OPENAI_TEXT_MODEL": "gpt-6.1-sol",
                 "NEXT_PUBLIC_ONO_V2_ENABLED": "true",
-                "ONO_V2_ENABLED": "false",
+                "ONO_V2_ENABLED": "true",
             }
             lines = path.read_text(encoding="utf-8").splitlines()
             output = []
@@ -120,8 +120,8 @@ jobs:
             grep -qx "ROOM_DESIGN_DATA_DIR=$data_dir" "$env_file"
             grep -qx 'OPENAI_TEXT_MODEL=gpt-6.1-sol' "$env_file"
             grep -qx 'NEXT_PUBLIC_ONO_V2_ENABLED=true' "$env_file"
-            grep -qx 'ONO_V2_ENABLED=false' "$env_file"
-            echo "ONO_RELEASE_ENVIRONMENT=prepared-disabled"
+            grep -qx 'ONO_V2_ENABLED=true' "$env_file"
+            echo "ONO_RELEASE_ENVIRONMENT=prepared-enabled"
 
             git archive HEAD | tar -x -C "$release_dir"
             cp "$env_file" "$release_dir/.env"
@@ -140,9 +140,7 @@ jobs:
             curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused "http://127.0.0.1:${candidate_port}/api/health" >/dev/null
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/" >/dev/null
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/account" >/dev/null
-            test "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${candidate_port}/api/it")" = "503"
-            test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST "http://127.0.0.1:${candidate_port}/api/it/transcribe")" = "503"
-            curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/api/it/config" | grep -q '"enabled":false'
+            curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/api/it/config" | grep -q '"enabled":true'
             cleanup_candidate
 
             cd "$live_dir"
@@ -158,9 +156,7 @@ jobs:
             curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
-            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/it)" = "503"
-            test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/it/transcribe)" = "503"
-            curl --fail --silent --show-error http://127.0.0.1:3000/api/it/config | grep -q '"enabled":false'
+            curl --fail --silent --show-error http://127.0.0.1:3000/api/it/config | grep -q '"enabled":true'
 
             production_html="$(curl --fail --silent --show-error http://127.0.0.1:3000/)"
             production_css="$(printf '%s' "$production_html" | grep -oE '/_next/static/[^\" ]+\.css' | sort -u | while IFS= read -r asset; do curl --fail --silent --show-error "http://127.0.0.1:3000${asset}"; done)"
@@ -170,6 +166,6 @@ jobs:
             trap - ERR INT TERM
             echo "ROLLBACK_BUILD=${rollback_dir}"
             echo "ROLLBACK_ENV=${env_backup}"
-            echo "ONO_SERVER_STATE=disabled"
+            echo "ONO_SERVER_STATE=enabled"
             echo "PRODUCTION_SHA_AFTER=$(git rev-parse HEAD)"
             pm2 describe roomdesign
