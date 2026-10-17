@@ -12,8 +12,10 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string } };
-  const idea = body.prompt?.trim();
+  const body = await request.json() as { projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string }; lightingPlan?: { planImage?: string; room?: { width?: number; length?: number }; referenceImages?: string[]; products?: Array<{ name?: string; article?: string; type?: string; widthMm?: number|null; lengthMm?: number|null; source?: string }>; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" }; lightingEdit?: { overlayImage?: string; referenceImages?: string[]; products?: Array<{ name?: string; article?: string; type?: string; widthMm?: number|null; lengthMm?: number|null; source?: string }>; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" } };
+  const idea = body.prompt?.trim()
+    || (body.lightingPlan ? "Create a calm photorealistic contemporary residential interior with neutral natural materials, a clearly visible ceiling, and the exact technical-lighting layout supplied in the plan." : "")
+    || (body.lightingEdit ? "Integrate the marked technical lighting into the current interior." : "");
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
   // client versions created arbitrary values such as 1536x864, which makes the
@@ -147,6 +149,30 @@ async function generateResponse(request: Request) {
     body.planRender?.referenceImages?.length ? "The following images are mandatory visual references named in the brief. They may include floor and wall finishes as well as real furniture; follow the brief to apply each reference only to its specified element." : "Use furniture that matches the plan dimensions and categories.",
     `Keep the room dimensions and all objects proportional. Do not add extra furniture${planInstruction ? " unless the explicit additional instruction requires it" : ""}. ${planInstruction ? "Do not add people unless explicitly requested in the additional instruction." : "No people."} No text, logos, or watermark.`,
   ].join("\n");
+  const lightingProducts = [...(body.lightingPlan?.products || []), ...(body.lightingEdit?.products || [])]
+    .slice(0, 16)
+    .map((item) => `${item.name || "Светильник"}${item.article ? `, артикул ${item.article}` : ""}${item.type ? `, тип ${item.type}` : ""}${item.widthMm && item.lengthMm ? `, габариты ${Math.round(item.widthMm)} × ${Math.round(item.lengthMm)} мм` : ""}${item.source === "reference" ? ", пользовательский референс" : ""}`)
+    .join("; ");
+  const lightingPlanPrompt = [
+    "Use image 1 as an authoritative top-down technical ceiling lighting plan.",
+    `The room is ${Math.round(body.lightingPlan?.room?.width || 6000)} × ${Math.round(body.lightingPlan?.room?.length || 4500)} mm. The plan contains ${Math.round(body.lightingPlan?.trackCount || 0)} track lines and ${Math.round(body.lightingPlan?.fixtureCount || 0)} luminaires.`,
+    "Create one photorealistic premium residential interior view in which the ceiling is clearly visible. Reproduce every dark track line from the plan as a ceiling track, preserve its topology and relative position, and place one luminaire for every numbered circular marker.",
+    lightingProducts ? `The selected catalog products are: ${lightingProducts}. Subsequent images are product references; reproduce their shape, colour, proportions and mounting type.` : "Use restrained contemporary architectural lighting.",
+    `Set the emitted light colour temperature to ${Math.round(body.lightingPlan?.cctK || 3000)} K.`,
+    body.lightingPlan?.timeOfDay === "night" ? "Render a true night scene: the exterior through every window is dark, there is no daylight or sunlight, and the specified luminaires are the only active light sources." : "Render a daytime scene with natural daylight visible outside while preserving the requested artificial-light colour temperature.",
+    body.prompt?.trim() || "Create a calm contemporary interior with neutral materials.",
+    "Do not add extra tracks or luminaires. Keep all tracks on the ceiling. No people, text, labels, logos or watermark.",
+  ].join("\n");
+  const lightingEditPrompt = [
+    "Use image 1 as the clean completed interior and preserve its camera, architecture, walls, floor, furniture, materials and décor.",
+    "Image 2 is the same interior with a temporary technical-lighting overlay. Dark orange lines mark exact ceiling-track routes. Numbered orange circles mark exact luminaire positions. The overlay graphics and numbers must not appear in the result.",
+    `Install ${Math.round(body.lightingEdit?.trackCount || 0)} marked track routes and ${Math.round(body.lightingEdit?.fixtureCount || 0)} marked luminaires on the ceiling, matching the perspective and the existing light and shadows.`,
+    lightingProducts ? `The selected catalog products are: ${lightingProducts}. Subsequent images are mandatory product references; reproduce their shape, colour, proportions and mounting type.` : "Use restrained contemporary architectural lighting.",
+    `Set the emitted light colour temperature to ${Math.round(body.lightingEdit?.cctK || 3000)} K.`,
+    body.lightingEdit?.timeOfDay === "night" ? "Convert the scene to a true night view: the exterior is dark, remove daylight and sunlight, and illuminate the interior only with the specified luminaires." : "Keep or create a daytime exterior with natural daylight while preserving the requested artificial-light colour temperature.",
+    body.prompt?.trim() || "Integrate the selected technical lighting naturally.",
+    "Do not change anything outside the ceiling-lighting installation. Do not add unmarked tracks or luminaires. No people, text, labels, logos or watermark.",
+  ].join("\n");
   const replacementPrompt = body.replacement?.name ? [
     "Use image 1 as the clean finished interior to preserve.",
     "Image 2 is the same interior with a temporary crosshair marker. Identify the complete semantic object containing the marker centre; the marker must not appear in the result.",
@@ -192,6 +218,7 @@ async function generateResponse(request: Request) {
     if (dimensions && (!dimensions.width || !dimensions.height)) throw new Error(`Некорректное изображение: ${label}.`);
     return dimensions;
   };
+  const supportedCatalogHost = (hostname: string) => /(^|\.)norrmobler\.ru$/i.test(hostname) || /(^|\.)gomoon\.ru$/i.test(hostname);
   const imageSourceToBlob = async (source: string, signal?: AbortSignal) => {
     if (source.startsWith("data:")) return dataUrlToBlob(source);
     let imageUrl: URL;
@@ -200,7 +227,7 @@ async function generateResponse(request: Request) {
     } catch {
       throw new Error("Некорректная ссылка на изображение товара.");
     }
-    if (imageUrl.protocol !== "https:" || !/(^|\.)norrmobler\.ru$/i.test(imageUrl.hostname)) {
+    if (imageUrl.protocol !== "https:" || !supportedCatalogHost(imageUrl.hostname)) {
       throw new Error("Источник изображения товара не поддерживается.");
     }
     const imageResponse = await fetch(imageUrl, { headers: { Accept: "image/*", "User-Agent": "ROOM-design-catalog/1.0" }, signal });
@@ -217,7 +244,7 @@ async function generateResponse(request: Request) {
     return new Blob([await sample.arrayBuffer()], { type: sample.headers.get("content-type") || "image/jpeg" });
   };
 
-  const inferredOperation = body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.templateEdit || body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.furnitureCasting || body.placement ? "place" : body.adjustment ? "adjust" : "generate";
+  const inferredOperation = body.lightingPlan ? "plan_render" : body.lightingEdit ? "place" : body.planRender ? "plan_render" : body.upscale ? "upscale" : body.material ? "material" : body.templateEdit || body.globalEdit ? "global_edit" : body.removal ? "remove" : body.replacement ? "replace" : body.furnitureCasting || body.placement ? "place" : body.adjustment ? "adjust" : "generate";
   const requestedOperation = body.operation?.trim();
   const supportedOperations = new Set(["plan_render", "upscale", "material", "global_edit", "remove", "replace", "place", "adjust", "generate"]);
   if (requestedOperation && (!supportedOperations.has(requestedOperation) || requestedOperation !== inferredOperation)) {
@@ -227,7 +254,24 @@ async function generateResponse(request: Request) {
   if (operation === "material" && (body.placement || body.replacement || body.removal || body.adjustment || body.globalEdit || body.planRender || body.upscale || body.product)) {
     return Response.json({ error: "Material operation не может выполнять добавление, замену или удаление объекта." }, { status: 400 });
   }
-  if (["global_edit", "material", "remove", "replace", "place"].includes(operation)) {
+  if (body.lightingPlan) {
+    try {
+      await validatedEditImage(body.lightingPlan.planImage, "план технического света");
+      if (!(body.lightingPlan.trackCount || body.lightingPlan.fixtureCount)) throw new Error("Добавьте трек или светильник на план.");
+      if (body.lightingPlan.products?.some((product) => product.source === "reference" && (!product.widthMm || !product.lengthMm))) throw new Error("Укажите ширину и длину для каждого пользовательского референса.");
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Некорректные данные плана." }, { status: 400 });
+    }
+  } else if (body.lightingEdit) {
+    try {
+      await validatedEditImage(body.roomImage, "текущее изображение");
+      await validatedEditImage(body.lightingEdit.overlayImage, "изображение с разметкой света");
+      if (!(body.lightingEdit.trackCount || body.lightingEdit.fixtureCount)) throw new Error("Добавьте трек или светильник на изображение.");
+      if (body.lightingEdit.products?.some((product) => product.source === "reference" && (!product.widthMm || !product.lengthMm))) throw new Error("Укажите ширину и длину для каждого пользовательского референса.");
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Некорректные данные изображения." }, { status: 400 });
+    }
+  } else if (["global_edit", "material", "remove", "replace", "place"].includes(operation)) {
     try {
       await validatedEditImage(body.roomImage, "текущее изображение");
       if (operation === "global_edit" && !body.globalEdit?.instruction?.trim() && !body.templateEdit?.instructions?.trim()) throw new Error("Опишите изменение изображения.");
@@ -254,7 +298,7 @@ async function generateResponse(request: Request) {
         if (body.referenceImage.startsWith("data:")) await validatedEditImage(body.referenceImage, operation === "material" ? "референс материала" : "референс предмета");
         else {
           const url = new URL(body.referenceImage);
-          if (url.protocol !== "https:" || !/(^|\.)norrmobler\.ru$/i.test(url.hostname)) throw new Error("Источник референса материала не поддерживается.");
+          if (url.protocol !== "https:" || !supportedCatalogHost(url.hostname)) throw new Error("Источник референса материала не поддерживается.");
         }
       }
     } catch (error) {
@@ -262,7 +306,9 @@ async function generateResponse(request: Request) {
     }
   }
   const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
-  const diagnosticBranch = body.roomImage && body.furnitureCasting?.markedImage && furnitureCastingItems.length ? "furniture_casting"
+  const diagnosticBranch = body.lightingPlan ? "lighting_plan"
+    : body.lightingEdit ? "lighting_edit"
+    : body.roomImage && body.furnitureCasting?.markedImage && furnitureCastingItems.length ? "furniture_casting"
     : body.roomImage && body.templateEdit?.instructions ? "template_edit"
     : body.roomImage && body.referenceImage && body.material && body.pointEdit?.markedImage ? "material"
     : body.roomImage && body.globalEdit?.instruction ? "global_edit"
@@ -271,17 +317,19 @@ async function generateResponse(request: Request) {
     : body.roomImage && body.placement && body.pointEdit?.markedImage && (body.referenceImage || body.product) ? "add"
     : "other";
   const diagnosticMaskPresent = Boolean(body.adjustment?.mask);
-  const diagnosticProviderInputImages = diagnosticBranch === "furniture_casting" ? 2 + furnitureCastingItems.length
+  const diagnosticProviderInputImages = diagnosticBranch === "lighting_plan" ? 1 + Math.min(8, body.lightingPlan?.referenceImages?.length || 0)
+    : diagnosticBranch === "lighting_edit" ? 2 + Math.min(6, body.lightingEdit?.referenceImages?.length || 0)
+    : diagnosticBranch === "furniture_casting" ? 2 + furnitureCastingItems.length
     : diagnosticBranch === "template_edit" ? 1 + templateReferenceImages.length
     : diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 3
     : diagnosticBranch === "remove" || diagnosticBranch === "add" || Boolean(body.roomImage) && Boolean(body.pointEdit?.markedImage) ? 2
     : diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
     : 0;
-  const diagnosticProviderEndpoint = body.roomImage || body.planRender?.planImage ? "openai.images.edits" : "openai.images.generations";
+  const diagnosticProviderEndpoint = body.roomImage || body.planRender?.planImage || body.lightingPlan?.planImage ? "openai.images.edits" : "openai.images.generations";
   if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first() || await aiCostLedgerHasRequest(operationId)) {
     return Response.json({ error: "Эта AI-операция уже выполнена." }, { status: 409 });
   }
-  if (["material", "global_edit", "remove", "replace", "place"].includes(operation) && await database.prepare("SELECT id FROM token_transactions WHERE user_id = ? AND idempotency_key = ?").bind(user.id, `ai-refund:${operationId}`).first()) {
+  if (await database.prepare("SELECT id FROM token_transactions WHERE user_id = ? AND idempotency_key = ?").bind(user.id, `ai-refund:${operationId}`).first()) {
     return Response.json({ error: "Эта AI-операция уже завершилась ошибкой. Повторите попытку как новую операцию." }, { status: 409 });
   }
   let reservation: Awaited<ReturnType<typeof reserveAiTokens>>;
@@ -322,13 +370,38 @@ async function generateResponse(request: Request) {
       refunded = true;
     }
   };
-  const providerTimeout = ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(body.furnitureCasting || isMoodboardComposition ? 360_000 : 180_000) : undefined;
+  const providerTimeout = body.lightingPlan || body.lightingEdit || ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(body.furnitureCasting || isMoodboardComposition ? 360_000 : 180_000) : undefined;
   const providerTimedOut = (error?: unknown) => providerTimeout?.aborted || error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
   const providerTimeoutMessage = body.furnitureCasting ? "Создание единого рендера заняло больше 6 минут. Попробуйте ещё раз с фотографиями меньшего размера." : isMoodboardComposition ? "Сборка мудборда заняла больше 6 минут. Попробуйте ещё раз с меньшим количеством или размером изображений." : "Сервис генерации не ответил вовремя. Попробуйте ещё раз.";
 
   let response: Response;
   try {
-    if (body.planRender?.planImage) {
+    if (body.lightingPlan?.planImage) {
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", lightingPlanPrompt);
+      form.append("image[]", dataUrlToBlob(body.lightingPlan.planImage), "ceiling-lighting-plan.png");
+      const references = (body.lightingPlan.referenceImages || []).slice(0, 8);
+      const blobs = await Promise.all(references.map((source) => imageSourceToBlob(source, providerTimeout)));
+      blobs.forEach((image, index) => form.append("image[]", image, `lighting-reference-${index + 1}.${image.type.split("/")[1] || "jpg"}`));
+      form.append("size", outputSize);
+      form.append("quality", "medium");
+      form.append("output_format", "webp");
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.roomImage && body.lightingEdit?.overlayImage) {
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", lightingEditPrompt);
+      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
+      form.append("image[]", dataUrlToBlob(body.lightingEdit.overlayImage), "lighting-overlay.png");
+      const references = (body.lightingEdit.referenceImages || []).slice(0, 6);
+      const blobs = await Promise.all(references.map((source) => imageSourceToBlob(source, providerTimeout)));
+      blobs.forEach((image, index) => form.append("image[]", image, `lighting-reference-${index + 1}.${image.type.split("/")[1] || "jpg"}`));
+      form.append("size", outputSize);
+      form.append("quality", "medium");
+      form.append("output_format", "webp");
+      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    } else if (body.planRender?.planImage) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", planRenderPrompt);

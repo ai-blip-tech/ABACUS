@@ -223,3 +223,88 @@ test("furniture casting sends every item in one provider request and stores one 
   assert.deepEqual(await transactions(id), ["generation"]);
   assert.equal(await balance(), before - (await billing.quoteAiOperation("place")).tokenCost);
 });
+
+test("technical-lighting plan uses its default idea and sends the plan plus product references", async () => {
+  const id = "success-lighting-plan";
+  const before = await balance();
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    calls += 1;
+    assert.equal(url, "https://api.openai.com/v1/images/edits");
+    assert.ok(options.signal);
+    assert.equal(options.body.getAll("image[]").length, 2);
+    const providerPrompt = String(options.body.get("prompt"));
+    assert.match(providerPrompt, /authoritative top-down technical ceiling lighting plan/);
+    assert.match(providerPrompt, /3000 K/);
+    assert.match(providerPrompt, /true night scene/);
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 31, output_tokens: 22, total_tokens: 53 } });
+  };
+  const response = await POST(request({
+    operation: "plan_render",
+    lightingPlan: {
+      planImage: png,
+      room: { width: 6000, length: 4500 },
+      referenceImages: [png],
+      products: [{ name: "Трек 2 м", type: "track", widthMm: 35, lengthMm: 2000, source: "catalog" }],
+      trackCount: 1,
+      fixtureCount: 2,
+      cctK: 3000,
+      timeOfDay: "night",
+    },
+  }, id));
+  assert.equal(response.status, 200);
+  assert.equal(calls, 1);
+  assert.equal(await generationCount(id), 1);
+  assert.deepEqual(await transactions(id), ["generation"]);
+  assert.equal(await balance(), before - (await billing.quoteAiOperation("plan_render")).tokenCost);
+});
+
+test("technical-lighting image correction uses the current image, overlay and generic default idea", async () => {
+  const id = "success-lighting-edit";
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    calls += 1;
+    assert.equal(url, "https://api.openai.com/v1/images/edits");
+    assert.ok(options.signal);
+    assert.equal(options.body.getAll("image[]").length, 2);
+    const providerPrompt = String(options.body.get("prompt"));
+    assert.match(providerPrompt, /temporary technical-lighting overlay/);
+    assert.match(providerPrompt, /daytime exterior/);
+    assert.doesNotMatch(providerPrompt, /GoMoon/i);
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 27, output_tokens: 22, total_tokens: 49 } });
+  };
+  const response = await POST(request({
+    operation: "place",
+    roomImage: png,
+    lightingEdit: {
+      overlayImage: png,
+      referenceImages: [],
+      products: [{ name: "Точечный светильник", type: "fixture", widthMm: 80, lengthMm: 80, source: "catalog" }],
+      trackCount: 0,
+      fixtureCount: 1,
+      cctK: 4000,
+      timeOfDay: "day",
+    },
+  }, id));
+  assert.equal(response.status, 200);
+  assert.equal(calls, 1);
+  assert.equal(await generationCount(id), 1);
+});
+
+test("technical-lighting references require dimensions before token reservation", async () => {
+  globalThis.fetch = () => { throw new Error("Provider must not be called"); };
+  const before = await balance();
+  const response = await POST(request({
+    operation: "plan_render",
+    lightingPlan: {
+      planImage: png,
+      products: [{ name: "Референс трека", type: "track", source: "reference" }],
+      trackCount: 1,
+      fixtureCount: 0,
+      cctK: 3000,
+      timeOfDay: "day",
+    },
+  }, "lighting-reference-without-dimensions"));
+  assert.equal(response.status, 400);
+  assert.equal(await balance(), before);
+});

@@ -293,3 +293,4 @@ body{background:var(--paper);color:#1e1e1e;font-family:-apple-system,BlinkMacSys
   .studio .history-strip{height:140px;padding:12px 10px;overflow:hidden}
   .studio .panel-content,.studio .inspector-title{padding-left:16px;padding-right:16px}
 }
+.technical-lighting-beta-tool{text-decoration:none;text-align:center}.technical-lighting-beta-tool em{font-size:21px;line-height:1}.technical-lighting-beta-tool span{font-size:10px;line-height:1.15}.technical-lighting-beta-tool small{display:inline-block;margin-left:2px;padding:1px 4px;border-radius:999px;background:#b96420;color:#fff;font-size:7px;font-weight:800;letter-spacing:.3px;text-transform:uppercase}.technical-lighting-beta-tool:hover small{background:#8b3e13}
