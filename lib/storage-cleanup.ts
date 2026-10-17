@@ -24,13 +24,6 @@ export type StorageCleanupResult = {
   errors: Array<{ generationId: string; error: string }>;
 };
 
-async function projectReferencesGeneration(row: GenerationCandidate) {
-  const projects = await database.prepare("SELECT state_json FROM projects WHERE state_json IS NOT NULL AND (state_json LIKE ? OR state_json LIKE ?)")
-    .bind(`%${row.id}%`, `%${row.output_key}%`)
-    .all<{ state_json: string }>();
-  return projects.results.some(({ state_json }) => state_json.includes(row.id) || state_json.includes(row.output_key));
-}
-
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
 }
@@ -53,10 +46,6 @@ export async function runStorageCleanup(options: { now?: Date; dryRun?: boolean 
   for (const candidate of candidates.results) {
     if (!isEligibleGenerationOutput(candidate)) {
       run.skippedIneligible += 1;
-      continue;
-    }
-    if (await projectReferencesGeneration(candidate)) {
-      run.skippedProtected += 1;
       continue;
     }
     run.eligible += 1;

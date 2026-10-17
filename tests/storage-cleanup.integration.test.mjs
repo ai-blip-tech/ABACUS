@@ -14,7 +14,7 @@ const { isEligibleGenerationOutput } = await import("../lib/storage-policy.ts");
 
 after(() => rmSync(dataRoot, { recursive: true, force: true }));
 
-test("storage cleanup deletes only canonical expired generated images and preserves accounting", async () => {
+test("storage cleanup deletes every canonical generated image after 30 days and preserves accounting", async () => {
   await ensureStore();
   const userId = "retention-test-user";
   const tenantId = "tenant_norrmobler";
@@ -64,18 +64,18 @@ test("storage cleanup deletes only canonical expired generated images and preser
   assert.equal(isEligibleGenerationOutput({ output_key: keys.eligible, content_type: "image/png" }), false);
 
   const dryRun = await runStorageCleanup({ now, dryRun: true });
-  assert.deepEqual({ scanned: dryRun.scanned, eligible: dryRun.eligible, deleted: dryRun.deleted, protected: dryRun.skippedProtected, ineligible: dryRun.skippedIneligible }, { scanned: 5, eligible: 1, deleted: 0, protected: 1, ineligible: 3 });
+  assert.deepEqual({ scanned: dryRun.scanned, eligible: dryRun.eligible, deleted: dryRun.deleted, protected: dryRun.skippedProtected, ineligible: dryRun.skippedIneligible }, { scanned: 5, eligible: 2, deleted: 0, protected: 0, ineligible: 3 });
   assert.ok(await storage().get(keys.eligible), "dry run must not delete the eligible image");
 
   const executed = await runStorageCleanup({ now, dryRun: false });
-  assert.deepEqual({ scanned: executed.scanned, eligible: executed.eligible, deleted: executed.deleted, missing: executed.missing, failed: executed.failed, protected: executed.skippedProtected, ineligible: executed.skippedIneligible }, { scanned: 5, eligible: 1, deleted: 1, missing: 0, failed: 0, protected: 1, ineligible: 3 });
-  assert.equal(executed.freedBytes, bytes.byteLength);
+  assert.deepEqual({ scanned: executed.scanned, eligible: executed.eligible, deleted: executed.deleted, missing: executed.missing, failed: executed.failed, protected: executed.skippedProtected, ineligible: executed.skippedIneligible }, { scanned: 5, eligible: 2, deleted: 2, missing: 0, failed: 0, protected: 0, ineligible: 3 });
+  assert.equal(executed.freedBytes, bytes.byteLength * 2);
   assert.equal(await storage().get(keys.eligible), null, "expired generated image must be physically deleted");
   assert.ok(await storage().get(keys.recent), "recent generated image must remain");
   assert.ok(await storage().get(keys.projectPath), "project image must remain");
   assert.ok(await storage().get(keys.referencePath), "reference image must remain");
   assert.ok(await storage().get(keys.legacyPath), "unclassified legacy path must remain");
-  assert.ok(await storage().get(keys.protected), "project source must remain");
+  assert.equal(await storage().get(keys.protected), null, "expired generation output must be deleted even when a legacy project references it");
 
   const preserved = await database.prepare("SELECT input_tokens, output_tokens, total_tokens, token_cost, brutto_coefficient_snapshot, image_deleted_at, image_deletion_reason FROM generations WHERE id = ?")
     .bind(ids.eligible).first();
@@ -90,5 +90,5 @@ test("storage cleanup deletes only canonical expired generated images and preser
   const runs = await database.prepare("SELECT dry_run, scanned, eligible, deleted, failed, freed_bytes FROM storage_cleanup_runs ORDER BY started_at, dry_run DESC").all();
   assert.equal(runs.results.length, 2);
   assert.equal(runs.results.some((run) => Number(run.dry_run) === 1 && Number(run.deleted) === 0), true);
-  assert.equal(runs.results.some((run) => Number(run.dry_run) === 0 && Number(run.deleted) === 1 && Number(run.freed_bytes) === bytes.byteLength), true);
+  assert.equal(runs.results.some((run) => Number(run.dry_run) === 0 && Number(run.deleted) === 2 && Number(run.freed_bytes) === bytes.byteLength * 2), true);
 });

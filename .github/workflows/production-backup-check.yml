@@ -59,11 +59,32 @@ jobs:
             data_dir="not-resolved"
             database_name="room-design.sqlite"
             backup_root="$HOME/room-design-backups"
-            canceled_backup_dir="$backup_root/predeploy-39053333262-1"
-            if [ -d "$canceled_backup_dir" ]; then
-              rm -rf "$canceled_backup_dir"
-              echo "REMOVED_CANCELED_BACKUP=$canceled_backup_dir"
-            fi
+            mkdir -p "$backup_root"
+            python3 - "$backup_root" <<'PY'
+            import pathlib
+            import shutil
+            import sys
+
+            root = pathlib.Path(sys.argv[1]).resolve()
+            candidates = sorted((path for path in root.glob("predeploy-*") if path.is_dir()), key=lambda path: path.stat().st_mtime, reverse=True)
+            verified = []
+            incomplete = []
+            for path in candidates:
+                report = path / "REPORT.txt"
+                archive = path / "room-design-production.tar.gz"
+                checksum = path / "room-design-production.tar.gz.sha256"
+                status = report.read_text(encoding="utf-8", errors="replace") if report.is_file() else ""
+                if "status=PASSED\n" in status and archive.is_file() and checksum.is_file():
+                    verified.append(path)
+                elif not archive.is_file() or "status=FAILED\n" in status:
+                    incomplete.append(path)
+            for path in verified[2:] + incomplete:
+                if path.parent != root or not path.name.startswith("predeploy-"):
+                    raise SystemExit(f"unsafe backup rotation target: {path}")
+                shutil.rmtree(path)
+                print(f"ROTATED_BACKUP={path}")
+            print(f"VERIFIED_BACKUPS_RETAINED_BEFORE_CREATE={min(len(verified), 2)}")
+            PY
             backup_name="predeploy-${BACKUP_RUN_ID}-${BACKUP_RUN_ATTEMPT}"
             backup_dir="$backup_root/$backup_name"
             snapshot_dir="$backup_dir/snapshot"
