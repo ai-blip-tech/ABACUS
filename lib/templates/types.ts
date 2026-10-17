@@ -17,6 +17,7 @@ export type TemplateInputSlot = {
   allowReorder?: boolean;
   consent?: "none" | "people" | "audio" | "collaborator";
   options?: string[];
+  defaultValue?: string;
   placeholder?: string;
   range?: {
     min: number;

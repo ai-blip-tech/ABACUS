@@ -8,7 +8,7 @@ import { downloadImageAsJpeg } from "@/lib/client-image-download";
 import { getTemplateWorkbenchScenario } from "@/lib/templates/workbench";
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
 
-type UploadedFile = { id: string; name: string; type: string; size: number; dataUrl: string; sourceUrl?: string; createdAt: string };
+type UploadedFile = { id: string; name: string; type: string; size: number; dataUrl: string; sourceUrl?: string; createdAt: string; width?: number; height?: number };
 type GenerationItem = { id: string; batchId: string; label: string; dataUrl: string; createdAt: string };
 type LightboxState = { items: GenerationItem[]; index: number };
 type User = { id: string; email: string };
@@ -81,7 +81,7 @@ const readFile = (file: File, maxDimension = 1800) => new Promise<UploadedFile>(
     image.onload = () => {
       const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
       if (scale === 1) {
-        resolve({ id: crypto.randomUUID(), name: file.name, type: fileType, size: file.size, dataUrl, createdAt: new Date().toISOString() });
+        resolve({ id: crypto.randomUUID(), name: file.name, type: fileType, size: file.size, dataUrl, createdAt: new Date().toISOString(), width: image.naturalWidth, height: image.naturalHeight });
         return;
       }
       const canvas = document.createElement("canvas");
@@ -91,7 +91,7 @@ const readFile = (file: File, maxDimension = 1800) => new Promise<UploadedFile>(
       if (!context) return reject(new Error("Не удалось подготовить изображение."));
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       const compressed = canvas.toDataURL("image/webp", 0.9);
-      resolve({ id: crypto.randomUUID(), name: file.name, type: "image/webp", size: Math.round(compressed.length * 0.75), dataUrl: compressed, createdAt: new Date().toISOString() });
+      resolve({ id: crypto.randomUUID(), name: file.name, type: "image/webp", size: Math.round(compressed.length * 0.75), dataUrl: compressed, createdAt: new Date().toISOString(), width: canvas.width, height: canvas.height });
     };
     image.onerror = () => reject(new Error(`${file.name}: не удалось прочитать изображение.`));
     image.src = dataUrl;
@@ -184,6 +184,7 @@ const generationCount = (template: TemplateDefinition, outputLabels: string[], u
 
 export default function TemplateScenarioWorkbench({ template }: { template: TemplateDefinition }) {
   const supportsMoodboardModes = template.slug === "moodboard-to-room";
+  const isPlanogram3D = template.slug === "planogram-3d";
   const [moodboardMode, setMoodboardMode] = useState<MoodboardMode>("room");
   const baseScenario = useMemo(() => getTemplateWorkbenchScenario(template), [template]);
   const isMoodboardComposition = supportsMoodboardModes && moodboardMode === "compose";
@@ -193,11 +194,19 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     outputLabels: ["Материальный мудборд"],
     generationBrief: moodboardCompositionBrief,
   } : baseScenario, [baseScenario, isMoodboardComposition]);
-  const activeInputSlots = useMemo(() => isMoodboardComposition ? [moodboardMaterialSlot] : template.inputSlots, [isMoodboardComposition, template.inputSlots]);
+  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(template.inputSlots.filter((slot) => slot.defaultValue).map((slot) => [slot.id, slot.defaultValue!])));
+  const activeInputSlots = useMemo(() => {
+    if (isMoodboardComposition) return [moodboardMaterialSlot];
+    if (!isPlanogram3D) return template.inputSlots;
+    return template.inputSlots.filter((slot) => {
+      if (slot.id === "peopleBehavior") return values.peopleCount !== "Без людей";
+      if (slot.id === "wallDimensions") return values.wallMode === "Указать вручную";
+      return true;
+    });
+  }, [isMoodboardComposition, isPlanogram3D, template.inputSlots, values.peopleCount, values.wallMode]);
   const fileSlots = useMemo(() => activeInputSlots.filter((slot) => !isValueSlot(slot)), [activeInputSlots]);
   const primarySlot = fileSlots[0];
   const [uploads, setUploads] = useState<Record<string, UploadedFile[]>>({});
-  const [values, setValues] = useState<Record<string, string>>({});
   const [consents, setConsents] = useState<Record<string, boolean>>({});
   const [assetHistory, setAssetHistory] = useState<UploadedFile[]>([]);
   const [generationHistory, setGenerationHistory] = useState<GenerationItem[]>([]);
@@ -213,6 +222,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
   const [dropTargetSlotId, setDropTargetSlotId] = useState("");
   const [surfacePoints, setSurfacePoints] = useState<Record<string, SurfacePoint[]>>({});
   const [activeSurfaceMaterialId, setActiveSurfaceMaterialId] = useState("");
+  const [comparisonPosition, setComparisonPosition] = useState(50);
 
   const usesFacadePointMapping = template.slug === "kitchen-cad-to-photo";
   const facadeMaterials = uploads.facadeMaterials || [];
@@ -311,6 +321,9 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
     if (template.safetyPolicy === "geometry-lock" && hasGeometryLockConflict(values.additionalPrompt || "")) {
       issues.push("Дополнительный prompt просит изменить геометрию кухни. В режиме Geometry Lock можно менять только окружение, свет и визуальную подачу.");
     }
+    if (template.safetyPolicy === "floor-plan-lock" && hasGeometryLockConflict(values.designBrief || "")) {
+      issues.push("Этот шаблон сохраняет исходную планировку. Для изменения стен, окон или дверей используйте отдельный инструмент редактирования плана.");
+    }
     return issues;
   })();
 
@@ -318,6 +331,19 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
   const primaryFiles = uploads[primarySlot?.id] || [];
   const stageImage = latestResults[0]?.dataUrl || primaryFiles.find(isImage)?.dataUrl;
   const activeSurfaceMaterialIndex = facadeMaterials.findIndex((material) => material.id === activeSurfaceMaterialId);
+  const planogramOutputSize = (() => {
+    if (!isPlanogram3D) return isMoodboardComposition ? "1024x1536" : "1536x1024";
+    if (values.resultFormat === "Квадратный") return "1024x1024";
+    if (values.resultFormat === "Вертикальный") return "1024x1536";
+    if (values.resultFormat === "Горизонтальный") return "1536x1024";
+    const primary = primaryFiles.find(isImage);
+    if (primary?.width && primary?.height) {
+      const ratio = primary.width / primary.height;
+      if (ratio < 0.87) return "1024x1536";
+      if (ratio <= 1.15) return "1024x1024";
+    }
+    return "1536x1024";
+  })();
 
   const selectMoodboardMode = (mode: MoodboardMode) => {
     if (phase === "processing" || mode === moodboardMode) return;
@@ -479,7 +505,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
               referenceImages,
               instructions: `${scenario.generationBrief}\n${fieldBrief}\n${surfaceAssignmentBrief}\nCreate only the result «${label}».`,
             },
-            outputSize: isMoodboardComposition ? "1024x1536" : "1536x1024",
+            outputSize: planogramOutputSize,
           }),
         });
         if (!response.ok) {
@@ -543,8 +569,15 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       <section className="editorial-result-panel" aria-label="Результат">
         <header><p>РЕЗУЛЬТАТ</p><span>GOOD ROOMS<br />BETTER LIVES</span></header>
         <div className={`editorial-result-stage${latestResults.length ? " has-result" : ""}${isMoodboardComposition ? " is-moodboard-stage" : ""}${usesFacadePointMapping && activeSurfaceMaterialId && !latestResults.length ? " is-surface-placing" : ""}`}>
-          {latestResults.length > 1 ? <div className={`editorial-result-collection count-${Math.min(latestResults.length, 4)}`}>{latestResults.map((item) => <button type="button" key={item.id} onClick={() => openLightbox(latestResults, item.id)}><img src={item.dataUrl} alt={item.label} /><span>{item.label}</span></button>)}</div> : stageImage ? <button type="button" onClick={latestResults[0] ? () => openLightbox(latestResults, latestResults[0].id) : addSurfacePoint} aria-label={latestResults[0] ? "Открыть результат" : usesFacadePointMapping && activeSurfaceMaterialId ? `Поставить ${surfacePointColorNames[activeSurfaceMaterialIndex]} точку на фасад` : "Основное изображение"}><img src={stageImage} alt={latestResults[0]?.label || "Основное изображение"} />{usesFacadePointMapping && !latestResults.length && facadeMaterials.flatMap((material, materialIndex) => (surfacePoints[material.id] || []).map((point, pointIndex) => <span className="editorial-surface-point" style={{ left: `${point.displayX}%`, top: `${point.displayY}%`, "--surface-point-color": surfacePointColors[materialIndex] } as CSSProperties} key={`${material.id}-${pointIndex}`}>{pointIndex + 1}</span>))}</button> : <div className="editorial-result-empty"><b>ROOM DESIGN</b><p>Добавьте исходные материалы — здесь появится результат сценария.</p></div>}
-          {phase === "processing" && <div className="editorial-result-progress" role="status"><i /><b>{isMoodboardComposition ? "Собираем мудборд" : `Создаём ${scenario.outputLabels.length > 1 ? "варианты" : "результат"}`} · {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, "0")}</b><p>{isMoodboardComposition ? "Сохраняем реальные цвета, рисунки и фактуры всех выбранных материалов." : "Все варианты создаются из одного набора исходных материалов."}</p></div>}
+          {isPlanogram3D && latestResults[0] && primaryFiles.find(isImage) ? <div className="planogram-3d-comparison">
+            <img src={latestResults[0].dataUrl} alt="Готовая планограмма 3D" />
+            <div className="planogram-3d-comparison-source" style={{ clipPath: `inset(0 ${100 - comparisonPosition}% 0 0)` }}><img src={primaryFiles.find(isImage)!.dataUrl} alt="Исходный план" /></div>
+            <span className="planogram-3d-comparison-divider" style={{ left: `${comparisonPosition}%` }} aria-hidden="true" />
+            <b className="is-before">Исходный план</b><b className="is-after">Планограмма 3D</b>
+            <input type="range" min="0" max="100" value={comparisonPosition} aria-label="Сравнить исходный план и результат" onChange={(event) => setComparisonPosition(Number(event.target.value))} />
+            <button type="button" onClick={() => openLightbox(latestResults, latestResults[0].id)}>Открыть результат ↗</button>
+          </div> : latestResults.length > 1 ? <div className={`editorial-result-collection count-${Math.min(latestResults.length, 4)}`}>{latestResults.map((item) => <button type="button" key={item.id} onClick={() => openLightbox(latestResults, item.id)}><img src={item.dataUrl} alt={item.label} /><span>{item.label}</span></button>)}</div> : stageImage ? <button type="button" onClick={latestResults[0] ? () => openLightbox(latestResults, latestResults[0].id) : addSurfacePoint} aria-label={latestResults[0] ? "Открыть результат" : usesFacadePointMapping && activeSurfaceMaterialId ? `Поставить ${surfacePointColorNames[activeSurfaceMaterialIndex]} точку на фасад` : "Основное изображение"}><img src={stageImage} alt={latestResults[0]?.label || "Основное изображение"} />{usesFacadePointMapping && !latestResults.length && facadeMaterials.flatMap((material, materialIndex) => (surfacePoints[material.id] || []).map((point, pointIndex) => <span className="editorial-surface-point" style={{ left: `${point.displayX}%`, top: `${point.displayY}%`, "--surface-point-color": surfacePointColors[materialIndex] } as CSSProperties} key={`${material.id}-${pointIndex}`}>{pointIndex + 1}</span>))}</button> : <div className="editorial-result-empty"><b>ROOM DESIGN</b><p>Добавьте исходные материалы — здесь появится результат сценария.</p></div>}
+          {phase === "processing" && <div className="editorial-result-progress" role="status"><i /><b>{isPlanogram3D ? "Строим планограмму 3D" : isMoodboardComposition ? "Собираем мудборд" : `Создаём ${scenario.outputLabels.length > 1 ? "варианты" : "результат"}`} · {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, "0")}</b><p>{isPlanogram3D ? "Сверяем контур, комнаты, стены, окна и двери с исходным планом." : isMoodboardComposition ? "Сохраняем реальные цвета, рисунки и фактуры всех выбранных материалов." : "Все варианты создаются из одного набора исходных материалов."}</p></div>}
           {phase === "failed" && <div className="editorial-result-error" role="alert"><b>Результат не создан</b><p>{error || "Попробуйте запустить сценарий ещё раз."}</p></div>}
         </div>
         <footer><h3>{latestResults.length ? scenario.resultTitle : primaryFiles.length ? "Исходники готовы" : "Здесь появится результат"}</h3>{latestResults.length > 1 && <span>{latestResults.length} варианта</span>}</footer>

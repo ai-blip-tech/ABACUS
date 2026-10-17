@@ -82,6 +82,7 @@ async function generateResponse(request: Request) {
     "Return a photorealistic full-frame result. No text, logos, or watermark unless the user's instruction explicitly requires existing text to remain.",
   ].join("\n") : "";
   const isMoodboardComposition = body.templateEdit?.templateId === "moodboard-builder";
+  const isPlanogram3D = body.templateEdit?.templateId === "planogram-3d";
   const rawTemplateReferenceImages = body.templateEdit?.referenceImages || [];
   const maxTemplateReferenceImages = isMoodboardComposition ? 15 : 10;
   const templateReferenceImages = rawTemplateReferenceImages.slice(0, maxTemplateReferenceImages);
@@ -94,6 +95,20 @@ async function generateResponse(request: Request) {
     body.templateEdit.instructions,
     "Do not create an interior room, furniture scene, digital grid, row of identical cards, technical catalogue, text, labels, logos, hands, people or watermark.",
     "Return exactly one coherent full-frame moodboard.",
+  ].join("\n") : isPlanogram3D ? [
+    "Create exactly one photorealistic three-dimensional floor plan from Image 1.",
+    "IMAGE 1 IS THE AUTHORITATIVE FLOOR PLAN. Preserve its outer contour, room count, room shapes, wall positions and thicknesses, windows, doors and swing directions, openings, stairs, balconies, entrances, plumbing zones, orientation and relative proportions. Dimension annotations in Image 1 have priority over visual estimation.",
+    "MANDATORY ARCHITECTURAL DOOR-SYMBOL PARSING — DO THIS BEFORE RENDERING: mentally erase every thin curved quarter-circle swing arc from Image 1. An erased arc is metadata only. It indicates the opening direction of exactly ONE hinged door and contributes ZERO physical geometry.",
+    "For each swing arc, identify its centre/hinge and the ONE straight radial line running from that hinge to the arc endpoint. That straight radial line is the only door leaf. Door count must equal doorway count, never the number of radial boundaries visible around an arc.",
+    "FORBIDDEN: any leaf shown at the arc endpoint; any open, angled, V-shaped or chevron arrangement; a second mirrored leaf in an ordinary doorway; a curved door; an extruded swing arc; a quarter-circle wall; any object following the arc path.",
+    "OUTPUT CONVENTION: render ALL door leaves CLOSED and FLUSH inside their wall openings, regardless of the open position drawn in Image 1. For a single doorway, use exactly ONE thin straight rectangular leaf spanning that opening. For a genuine double doorway, use two closed leaves aligned as one straight line across the opening. Use arcs only to infer hinge sides and opening direction, then discard them completely from visible output.",
+    "The camera must be perfectly orthographic and directly overhead: strict 90-degree bird's-eye top-down view, open ceiling, no perspective tilt, no isometric angle and no visible exterior wall faces.",
+    templateReferenceImages.length ? `Images 2–${templateReferenceImages.length + 1} are style, material and furniture references only. Never copy their architecture or layout.` : "There are no supporting references.",
+    "Furniture, finishes, lighting, environment and people may follow the user brief, but they must fit inside the unchanged source geometry. Ignore any instruction that asks to move, add or remove structural walls, doors, windows or rooms.",
+    `Result: ${body.templateEdit.outputLabel || "Планограмма 3D"}.`,
+    body.templateEdit.instructions,
+    "FINAL DOOR QA IS NON-NEGOTIABLE: re-count the source door openings and the rendered physical leaves. Every ordinary opening has exactly one closed straight leaf. Every genuine double opening has two closed collinear leaves. Remove every open or angled leaf, duplicate, V-shaped pair, curved element and all swing-arc geometry before returning the image.",
+    "Show the complete uncropped plan once. No split screen, diagrams, labels, dimensions, text, logos, borders or watermark.",
   ].join("\n") : [
     "Create one polished photorealistic Room Design result for the supplied Template scenario.",
     "Image 1 is the primary source and must remain the authoritative camera, architecture, proportions and spatial context.",

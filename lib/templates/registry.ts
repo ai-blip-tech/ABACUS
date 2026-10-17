@@ -248,6 +248,28 @@ const unorderedTemplateRegistry: TemplateDefinition[] = [
       { id: "additionalPrompt", kind: "short_text", label: "Дополнительный prompt", helper: "Управляйте светом, стенами, полом, декором и атмосферой — геометрия кухни останется заблокированной", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], placeholder: "Например: свет из большого окна слева, тёплый дубовый пол, минимальный декор" },
     ],
   }),
+  definition({
+    id: "36", slug: "planogram-3d", status: "internal", wave: "experimental", category: "visualization", sortOrder: 36, featured: false, previewIndex: 1, audience: "both",
+    title: "Планограмма 3D", hook: "Превратите планировку в фотореалистичный 3D-план", description: "Загрузите план БТИ, архитектурный чертёж или эскиз. AI сохранит помещения, стены, окна и двери и создаст реалистичный меблированный вид строго сверху.", ctaLabel: "Создать 3D-план", resultType: "image", inputSummary: "Планировка + до 10 референсов", badges: ["BETA"], safetyPolicy: "floor-plan-lock",
+    requiredCapabilities: ["image_to_image", "floor_plan_understanding", "geometry_lock", "multi_reference", "top_down_render"],
+    inputSlots: [
+      image({ id: "floorPlan", kind: "floor_plan", label: "Загрузите план", helper: "План БТИ, архитектурный чертёж или эскиз · JPG, PNG или WEBP · до 15 МБ", required: true, minCount: 1, maxCount: 1 }),
+      reference("references", "Добавьте референсы", "Необязательно · интерьер, мудборд, мебель или материалы · до 10 файлов", 0, 10, false),
+      { id: "designBrief", kind: "short_text", label: "Опишите будущий интерьер", helper: "Необязательно · стиль, материалы, мебель, свет и действия людей. Архитектура плана останется неизменной.", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], placeholder: "Например: современный интерьер в спокойной тёплой гамме, светлый дубовый пол, молочные стены…" },
+      { id: "style", kind: "choice", label: "Стиль", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Современный", options: ["Современный", "Минимализм", "Скандинавский", "Джапанди", "Неоклассика", "Современная классика", "Лофт", "Индустриальный", "Ар-деко", "Mid-century modern", "Эко", "Средиземноморский", "Прованс", "Премиальный", "Использовать стиль референсов"] },
+      { id: "furnishing", kind: "choice", label: "Количество мебели", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Умеренно", options: ["Минимально", "Умеренно", "Подробно"] },
+      { id: "existingFurniture", kind: "choice", label: "Существующая мебель на плане", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Использовать как подсказку", options: ["Сохранить расположение", "Использовать как подсказку", "Заменить новой мебелью"] },
+      { id: "lighting", kind: "choice", label: "Тип освещения", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Смешанное", options: ["Естественное", "Искусственное", "Смешанное"] },
+      { id: "atmosphere", kind: "choice", label: "Время и атмосфера", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Мягкий дневной свет", options: ["Яркий день", "Мягкий дневной свет", "Золотой час", "Вечер", "Ночь"] },
+      { id: "peopleCount", kind: "choice", label: "Количество людей", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Без людей", options: ["Без людей", "Один человек", "2–3 человека", "4–6 человек", "Много людей", "Указать в запросе"] },
+      { id: "peopleBehavior", kind: "choice", label: "Поведение людей", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Автоматически", options: ["Автоматически", "Стоят", "Сидят", "Отдыхают", "Общаются", "Работают", "Принимают пищу", "Смешанные действия", "Описать в запросе"] },
+      { id: "detail", kind: "choice", label: "Детализация", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Высокая", options: ["Стандартная", "Высокая", "Максимальная"] },
+      { id: "wallMode", kind: "choice", label: "Толщина и высота стен", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Определить автоматически", options: ["Определить автоматически", "Использовать размеры чертежа", "Указать вручную"] },
+      { id: "wallDimensions", kind: "short_text", label: "Размеры стен", helper: "Высота стен, толщина внешних стен и перегородок", required: false, minCount: 0, maxCount: 1, acceptedMimeTypes: [], placeholder: "Например: высота 2,8 м; внешние стены 300 мм; перегородки 120 мм" },
+      { id: "environment", kind: "choice", label: "Окружение", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Нейтральный фон", options: ["Без окружения", "Нейтральный фон", "Ландшафт", "Городское окружение"] },
+      { id: "resultFormat", kind: "choice", label: "Формат результата", required: true, minCount: 1, maxCount: 1, acceptedMimeTypes: [], defaultValue: "Как исходник", options: ["Как исходник", "Квадратный", "Горизонтальный", "Вертикальный"] },
+    ],
+  }),
 ];
 
 const templatePriority = ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "furniture-casting"];

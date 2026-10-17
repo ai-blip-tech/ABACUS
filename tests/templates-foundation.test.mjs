@@ -18,12 +18,12 @@ const templatePreviewMediaSource = await readFile(new URL("../app/template-previ
 const templatesHomeCssSource = await readFile(new URL("../app/templates-home-v2.css", import.meta.url), "utf8");
 const nextConfigSource = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
 
-test("registry contains exactly thirty-three unique versioned templates", () => {
-  assert.equal(templateRegistry.length, 33);
-  assert.equal(new Set(templateRegistry.map((template) => template.id)).size, 33);
-  assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 33);
+test("registry contains exactly thirty-four unique versioned templates", () => {
+  assert.equal(templateRegistry.length, 34);
+  assert.equal(new Set(templateRegistry.map((template) => template.id)).size, 34);
+  assert.equal(new Set(templateRegistry.map((template) => template.slug)).size, 34);
   for (const removed of ["memory-room", "home-swap", "architectural-xray", "window-portal", "inside-the-walls", "house-awake", "declutter", "next-chapter"]) assert.equal(templateRegistry.some((template) => template.slug === removed), false);
-  assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 33 }, (_, index) => index + 1));
+  assert.deepEqual(templateRegistry.map((template) => template.sortOrder), Array.from({ length: 34 }, (_, index) => index + 1));
   assert.deepEqual(templateRegistry.slice(0, 6).map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "use-what-you-have", "furniture-casting", "material-preview"]);
   for (const template of templateRegistry) {
     assert.equal(template.version, 1);
@@ -35,7 +35,7 @@ test("registry contains exactly thirty-three unique versioned templates", () => 
 });
 
 test("foundation exposes all reviewable records and the approved featured mix", () => {
-  assert.equal(previewTemplates.length, 33);
+  assert.equal(previewTemplates.length, 34);
   assert.deepEqual(featuredTemplates.map((template) => template.slug), ["design-battle", "light-scenarios", "moodboard-to-room", "furniture-casting", "material-preview", "roast-my-room", "kitchen-cad-to-photo"]);
   assert.match(templatesHomeSource, /\["design-battle", "light-scenarios", "moodboard-to-room", "kitchen-cad-to-photo"\]/);
   assert.match(templatesHomeSource, /featured\.filter\(\(_, index\) => index % 2 === 0\)/);
@@ -69,7 +69,7 @@ test("all templates without approved video or furniture-casting cover share the 
   const excludedSlugs = new Set(["design-battle", "light-scenarios", "moodboard-to-room", "furniture-casting"]);
   const placeholderTemplates = templateRegistry.filter((template) => !excludedSlugs.has(template.slug));
 
-  assert.equal(placeholderTemplates.length, 29);
+  assert.equal(placeholderTemplates.length, 30);
   for (const template of placeholderTemplates) {
     assert.equal(template.preview.type, "placeholder", template.slug);
     assert.equal(template.preview.src, "/project-loading-blueprint.png", template.slug);
@@ -126,6 +126,36 @@ test("all templates use an editorial workbench and every scenario is configured"
   const battle = templateWorkbenchScenarios["design-battle"];
   assert.deepEqual(battle.outputLabels, ["Решение A", "Решение B"]);
   assert.match(battle.generationBrief, /два самостоятельных интерьерных решения/i);
+});
+
+test("planogram 3D has a real floor-plan generation flow with immutable architecture", () => {
+  const template = templateRegistry.find((item) => item.slug === "planogram-3d");
+  assert.ok(template);
+  assert.equal(template.title, "Планограмма 3D");
+  assert.equal(template.status, "internal");
+  assert.equal(template.safetyPolicy, "floor-plan-lock");
+  assert.equal(template.inputSlots[0].kind, "floor_plan");
+  assert.equal(template.inputSlots[0].required, true);
+  assert.equal(template.inputSlots.find((slot) => slot.id === "references")?.maxCount, 10);
+  assert.equal(template.inputSlots.find((slot) => slot.id === "style")?.defaultValue, "Современный");
+  assert.equal(template.inputSlots.find((slot) => slot.id === "resultFormat")?.defaultValue, "Как исходник");
+  assert.match(templateWorkbenchScenarios["planogram-3d"].generationBrief, /FLOOR PLAN LOCK/);
+  assert.match(templateWorkbenchScenarios["planogram-3d"].generationBrief, /строго сверху/i);
+  assert.match(templateWorkbenchScenarios["planogram-3d"].generationBrief, /мысленно удалить все тонкие дуги/);
+  assert.match(templateWorkbenchScenarios["planogram-3d"].generationBrief, /все двери показывать закрытыми/);
+  assert.match(scenarioWorkbenchSource, /isPlanogram3D/);
+  assert.match(scenarioWorkbenchSource, /slot\.defaultValue/);
+  assert.match(scenarioWorkbenchSource, /planogramOutputSize/);
+  assert.match(scenarioWorkbenchSource, /planogram-3d-comparison/);
+  assert.match(scenarioWorkbenchSource, /Этот шаблон сохраняет исходную планировку/);
+  assert.match(generateRouteSource, /isPlanogram3D/);
+  assert.match(generateRouteSource, /IMAGE 1 IS THE AUTHORITATIVE FLOOR PLAN/);
+  assert.match(generateRouteSource, /strict 90-degree bird's-eye top-down view/);
+  assert.match(generateRouteSource, /MANDATORY ARCHITECTURAL DOOR-SYMBOL PARSING/);
+  assert.match(generateRouteSource, /render ALL door leaves CLOSED and FLUSH/);
+  assert.match(generateRouteSource, /FINAL DOOR QA IS NON-NEGOTIABLE/);
+  assert.doesNotMatch(scenarioWorkbenchSource, /isPlanogram3D \? "FLOOR PLAN LOCK/);
+  assert.match(templatesCssSource, /\.planogram-3d-comparison/);
 });
 
 test("light scenarios offers an exclusive preset-or-kelvin control and preserves the interior", () => {
