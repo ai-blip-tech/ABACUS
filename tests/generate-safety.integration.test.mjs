@@ -43,10 +43,15 @@ const operations = [
   { name: "template_edit", body: templateEdit, images: 3 },
 ];
 let nextId = 0;
-const request = (body, id = `safety-${++nextId}`) => new Request("https://norr-club.testaimoblernorr.chatgpt.site/api/generate", { method: "POST", headers: { Cookie: `room_session=${session}`, "Content-Type": "application/json", "Idempotency-Key": id }, body: JSON.stringify(body) });
+const request = (body, id = `safety-${++nextId}`, headers = {}) => new Request("https://norr-club.testaimoblernorr.chatgpt.site/api/generate", { method: "POST", headers: { Cookie: `room_session=${session}`, "Content-Type": "application/json", "Idempotency-Key": id, ...headers }, body: JSON.stringify(body) });
 const balance = async () => (await billing.getTokenAccount(user.id)).balance;
 const transactions = async (id) => (await database.prepare("SELECT type FROM token_transactions WHERE reference_id = ? ORDER BY type").bind(id).all()).results.map((row) => row.type);
 const generationCount = async (id) => Number((await database.prepare("SELECT COUNT(*) AS count FROM generations WHERE id = ?").bind(id).first()).count);
+const lightingSet = (count, mode = "plan") => {
+  const products = Array.from({ length: count }, (_, index) => ({ assetId: `asset-${mode}-${index + 1}`, productId: `product-${index + 1}`, name: `Product ${index + 1}`, article: `A-${index + 1}`, type: index ? "Светильник" : "Трек", quantity: 1 }));
+  const referenceManifest = products.map((product) => ({ assetId: product.assetId, productId: product.productId, article: product.article, sourceKind: "user", source: png }));
+  return { products, referenceManifest };
+};
 
 test("point-guided operations reject invalid images and points before reserve or provider", async () => {
   globalThis.fetch = () => { throw new Error("Provider must not be called"); };
@@ -268,20 +273,21 @@ test("technical-lighting plan uses its default idea and sends the plan plus prod
   assert.equal(await balance(), before - (await billing.quoteAiOperation("plan_render")).tokenCost);
 });
 
-test("technical-lighting retries a transient provider file-load failure", async () => {
+test("technical-lighting retries one explicit provider 5xx", async () => {
   const id = "retry-lighting-file-load";
   const before = await balance();
   let calls = 0;
   globalThis.fetch = async (url) => {
     calls += 1;
     assert.equal(url, "https://api.openai.com/v1/images/edits");
-    if (calls === 1) return Response.json({ error: { message: "load failed" } }, { status: 400 });
+    if (calls === 1) return Response.json({ error: { message: "temporary provider failure" } }, { status: 503 });
     return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 31, output_tokens: 22, total_tokens: 53 } });
   };
   const response = await POST(request({
     operation: "plan_render",
     lightingPlan: {
       planImage: png,
+      referenceImages: [png],
       products: [{ name: "Трек", type: "track", widthMm: 35, lengthMm: 2000, source: "catalog" }],
       trackCount: 1,
       fixtureCount: 0,
@@ -302,7 +308,7 @@ test("technical-lighting image correction uses the current image, overlay and ge
     calls += 1;
     assert.equal(url, "https://api.openai.com/v1/images/edits");
     assert.ok(options.signal);
-    assert.equal(options.body.getAll("image[]").length, 2);
+    assert.equal(options.body.getAll("image[]").length, 3);
     const providerPrompt = String(options.body.get("prompt"));
     assert.match(providerPrompt, /temporary technical-lighting overlay/);
     assert.match(providerPrompt, /daytime exterior/);
@@ -314,7 +320,7 @@ test("technical-lighting image correction uses the current image, overlay and ge
     roomImage: png,
     lightingEdit: {
       overlayImage: png,
-      referenceImages: [],
+      referenceImages: [png],
       products: [{ name: "Точечный светильник", type: "fixture", widthMm: 80, lengthMm: 80, source: "catalog" }],
       trackCount: 0,
       fixtureCount: 1,
@@ -343,4 +349,99 @@ test("technical-lighting references require dimensions before token reservation"
   }, "lighting-reference-without-dimensions"));
   assert.equal(response.status, 400);
   assert.equal(await balance(), before);
+});
+
+test("mixed technical-lighting and furniture payload is rejected before provider while furniture remains unchanged", async () => {
+  let calls = 0;
+  const before = await balance();
+  globalThis.fetch = async () => { calls += 1; return Response.json({ data: [{ b64_json: png.split(",")[1] }] }); };
+  const mixed = await POST(request({ ...operations[0].body, technicalLighting: true }, "mixed-lighting-furniture"));
+  assert.equal(mixed.status, 400);
+  assert.match((await mixed.json()).error, /Нельзя объединять/);
+  assert.equal(calls, 0);
+  assert.equal(await balance(), before);
+  assert.equal((await POST(request(operations[0].body, "ordinary-furniture-after-mixed"))).status, 200);
+  assert.equal(calls, 1);
+});
+
+test("Sharp loading is isolated to technical lighting", async () => {
+  process.env.ROOM_DESIGN_TECHNICAL_SHARP_DISABLED = "1";
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return Response.json({ data: [{ b64_json: png.split(",")[1] }] }); };
+  try {
+    assert.equal((await POST(request(globalEdit, "furniture-without-sharp"))).status, 200);
+    const set = lightingSet(1, "sharp");
+    const lighting = await POST(request({ technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, ...set, trackCount: 1, fixtureCount: 0 } }, "lighting-without-sharp"));
+    assert.equal(lighting.status, 400);
+    assert.match((await lighting.json()).error, /технического света временно недоступен/);
+    assert.equal(calls, 1);
+  } finally { delete process.env.ROOM_DESIGN_TECHNICAL_SHARP_DISABLED; }
+});
+
+test("technical-lighting sends all 10 references and prompt indices match multipart order", async () => {
+  for (const mode of ["plan", "edit"]) {
+    const set = lightingSet(10, mode);
+    const body = mode === "plan"
+      ? { technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, room: { width: 6000, length: 4500 }, ...set, trackCount: 1, fixtureCount: 9 } }
+      : { technicalLighting: true, operation: "place", roomImage: png, lightingEdit: { overlayImage: png, ...set, trackCount: 1, fixtureCount: 9 } };
+    globalThis.fetch = async (_url, options) => {
+      assert.equal(options.body.getAll("image[]").length, mode === "plan" ? 11 : 12);
+      const prompt = String(options.body.get("prompt"));
+      const firstIndex = mode === "plan" ? 2 : 3;
+      for (let index = 0; index < 10; index += 1) assert.match(prompt, new RegExp(`asset-${mode}-${index + 1}[^;]+изображение ${firstIndex + index}`));
+      return Response.json({ data: [{ b64_json: png.split(",")[1] }] });
+    };
+    assert.equal((await POST(request(body, `ten-refs-${mode}`))).status, 200);
+  }
+});
+
+test("technical-lighting accepts exactly 16 total images and rejects 17 before charge", async () => {
+  const accepted = lightingSet(15, "limit");
+  globalThis.fetch = async (_url, options) => { assert.equal(options.body.getAll("image[]").length, 16); return Response.json({ data: [{ b64_json: png.split(",")[1] }] }); };
+  assert.equal((await POST(request({ technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, ...accepted, trackCount: 1, fixtureCount: 14 } }, "limit-16"))).status, 200);
+  const before = await balance();
+  const rejected = lightingSet(16, "over-limit");
+  globalThis.fetch = () => { throw new Error("Provider must not be called"); };
+  const response = await POST(request({ technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, ...rejected, trackCount: 1, fixtureCount: 15 } }, "limit-17"));
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /не более 15 референсов/);
+  assert.equal(await balance(), before);
+});
+
+test("technical-lighting resolves a reopened tenant project asset", async () => {
+  const projectId = "project-saved-123";
+  const asset = "technical-reference-0";
+  const bytes = Uint8Array.from(atob(png.split(",")[1]), (character) => character.charCodeAt(0));
+  await auth.storage().put(`${auth.tenantStoragePrefix(user)}/projects/${projectId}/${asset}`, bytes, { httpMetadata: { contentType: "image/png" } });
+  const set = { products: [{ assetId: "saved-asset", productId: "saved", name: "Saved", article: "S-1", type: "Светильник" }], referenceManifest: [{ assetId: "saved-asset", productId: "saved", article: "S-1", sourceKind: "project", source: `/api/projects/${projectId}/assets/${asset}` }] };
+  globalThis.fetch = async (_url, options) => { assert.equal(options.body.getAll("image[]").length, 2); return Response.json({ data: [{ b64_json: png.split(",")[1] }] }); };
+  assert.equal((await POST(request({ technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, ...set, trackCount: 0, fixtureCount: 1 } }, "saved-project-asset"))).status, 200);
+});
+
+test("technical-lighting replays a completed result before reloading unavailable inputs", async () => {
+  const id = "lighting-replay-before-inputs";
+  const set = lightingSet(1, "replay");
+  const body = { technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, ...set, trackCount: 1, fixtureCount: 0 } };
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return Response.json({ data: [{ b64_json: png.split(",")[1] }] }); };
+  assert.equal((await POST(request(body, id))).status, 200);
+  const replay = await POST(request({ ...body, lightingPlan: { ...body.lightingPlan, planImage: "/api/projects/missing/assets/missing" } }, id));
+  assert.equal(replay.status, 200);
+  assert.equal(replay.headers.get("x-generation-replayed"), "1");
+  assert.equal(calls, 1);
+});
+
+test("technical-lighting control request disables retry and unknown outcomes never retry", async () => {
+  const set = lightingSet(1, "no-retry");
+  const body = { technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, ...set, trackCount: 1, fixtureCount: 0 } };
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return Response.json({ error: { message: "temporary" } }, { status: 503 }); };
+  assert.equal((await POST(request(body, "lighting-control-no-retry", { "X-Disable-Generation-Retry": "1" }))).status, 503);
+  assert.equal(calls, 1);
+  calls = 0;
+  globalThis.fetch = async () => { calls += 1; throw new TypeError("connection closed after upload"); };
+  const unknown = await POST(request(body, "lighting-unknown-no-retry"));
+  assert.equal(unknown.status, 400);
+  assert.equal(calls, 1);
+  assert.match((await unknown.json()).error, /дубликат/);
 });

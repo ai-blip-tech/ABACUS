@@ -4,8 +4,42 @@ import { refundAiTokens, reserveAiTokens } from "@/lib/billing";
 import { imageModel } from "@/lib/image-model";
 import { openAIKey } from "@/lib/server-config";
 import { database } from "@/lib/server-runtime";
+import { lightingInventoryText, orderLightingReferences, TECHNICAL_LIGHTING_TEMPLATE_VERSION, type LightingProductInput, type LightingReferenceInput, type OrderedLightingReference } from "@/lib/technical-lighting-generation";
+import { createHash } from "node:crypto";
+
+type TechnicalSharpPipeline = {
+  metadata: () => Promise<{ width?: number; height?: number }>;
+  webp: (options: { lossless: boolean; effort: number }) => { toBuffer: () => Promise<Buffer> };
+};
+type TechnicalSharpFactory = (input: ArrayBuffer | Uint8Array, options?: { failOn: "error" }) => TechnicalSharpPipeline;
+
+const loadTechnicalSharp = async (): Promise<TechnicalSharpFactory> => {
+  if (process.env.ROOM_DESIGN_TECHNICAL_SHARP_DISABLED === "1") {
+    throw new Error("Модуль обработки изображений технического света временно недоступен. Мебельный редактор продолжает работать без него.");
+  }
+  try {
+    const loaded = await import("sharp") as unknown as TechnicalSharpFactory | { default?: TechnicalSharpFactory };
+    const factory = typeof loaded === "function" ? loaded : loaded.default;
+    if (!factory) throw new Error("module has no default factory");
+    return factory;
+  } catch {
+    throw new Error("Модуль обработки изображений технического света временно недоступен. Мебельный редактор продолжает работать без него.");
+  }
+};
 
 const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const safeNetworkError = (error: unknown) => {
+  const cause = error instanceof Error ? error.cause : null;
+  const causeRecord = cause && typeof cause === "object" ? cause as Record<string, unknown> : null;
+  return {
+    errorName: error instanceof Error ? error.name : "unknown",
+    errorMessage: error instanceof Error ? error.message.slice(0, 240) : "unknown",
+    causeName: cause instanceof Error ? cause.name : typeof causeRecord?.name === "string" ? causeRecord.name : null,
+    causeCode: typeof causeRecord?.code === "string" ? causeRecord.code : null,
+    causeMessage: cause instanceof Error ? cause.message.slice(0, 240) : typeof causeRecord?.message === "string" ? causeRecord.message.slice(0, 240) : null,
+  };
+};
 
 async function fetchWithNetworkRetry(input: string | URL, init?: RequestInit, attempts = 3) {
   let lastError: unknown;
@@ -23,8 +57,10 @@ async function fetchWithNetworkRetry(input: string | URL, init?: RequestInit, at
   const target = typeof input === "string" ? input : input.toString();
   let endpoint = "external-service";
   try { endpoint = new URL(target).hostname; } catch { /* Never log request bodies or credentials. */ }
-  console.error("[generate-network-error]", { endpoint, attempts, message: lastError instanceof Error ? lastError.message : "unknown" });
-  throw new Error("Не удалось связаться с сервисом генерации. Выполнены три попытки — попробуйте ещё раз через минуту.");
+  console.error("[generate-network-error]", { endpoint, attempts, ...safeNetworkError(lastError) });
+  throw new Error(attempts === 1
+    ? "Не удалось подтвердить ответ сервиса генерации. Автоматический повтор не выполнялся, чтобы не создать дубликат. Попробуйте ещё раз через минуту."
+    : `Не удалось связаться с сервисом генерации. Выполнено попыток: ${attempts}. Попробуйте ещё раз через минуту.`);
 }
 
 async function fetchImageProviderWithRetry(input: string | URL, init: RequestInit, attempts = 3) {
@@ -52,15 +88,54 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  type LightingProduct = { name?: string; article?: string; type?: string; widthMm?: number|null; lengthMm?: number|null; source?: string; quantity?: number };
+  type LightingProduct = LightingProductInput;
   type LightingTrack = { number?: number; name?: string; article?: string; lengthMm?: number };
   type LightingFixture = { marker?: number; name?: string; article?: string; mounting?: "track" | "ceiling" };
   type LightingOutlinePoint = { number?: number; xMm?: number; yMm?: number };
-  type LightingBrief = { referenceImages?: string[]; products?: LightingProduct[]; tracks?: LightingTrack[]; fixtures?: LightingFixture[]; ceilingOutline?: LightingOutlinePoint[]; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" };
-  const body = await request.json() as { projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string }; lightingPlan?: LightingBrief & { planImage?: string; room?: { width?: number; length?: number } }; lightingEdit?: LightingBrief & { overlayImage?: string } };
-  const idea = body.prompt?.trim()
-    || (body.lightingPlan ? "Create a calm photorealistic contemporary residential interior with neutral natural materials, a clearly visible ceiling, and the exact technical-lighting layout supplied in the plan." : "")
-    || (body.lightingEdit ? "Integrate the marked technical lighting into the current interior." : "");
+  type LightingBrief = { referenceImages?: string[]; referenceManifest?: LightingReferenceInput[]; products?: LightingProduct[]; tracks?: LightingTrack[]; fixtures?: LightingFixture[]; ceilingOutline?: LightingOutlinePoint[]; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" };
+  const body = await request.json() as { technicalLighting?: boolean; projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string }; lightingPlan?: LightingBrief & { planImage?: string; room?: { width?: number; length?: number } }; lightingEdit?: LightingBrief & { overlayImage?: string } };
+  const mixedFurniturePayload = Boolean(body.planRender || body.furnitureCasting || body.templateEdit || body.material || body.adjustment || body.product && body.placement && !body.lightingEdit);
+  if (body.technicalLighting && mixedFurniturePayload) {
+    return Response.json({ error: "Нельзя объединять технический свет и мебельную операцию в одном запросе." }, { status: 400 });
+  }
+  const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
+  const requestFingerprintHeader = request.headers.get("X-Request-Fingerprint")?.trim() || "";
+  const requestFingerprint = /^[a-f0-9]{64}$/i.test(requestFingerprintHeader) ? requestFingerprintHeader.toLowerCase() : null;
+  const disableProviderRetry = request.headers.get("X-Disable-Generation-Retry") === "1";
+  const lightingBrief = body.lightingPlan || body.lightingEdit;
+  const lightingMode = body.lightingPlan ? "lighting_plan" : body.lightingEdit ? "lighting_edit" : body.technicalLighting ? "lighting_correction" : null;
+  const isTechnicalLighting = Boolean(lightingMode);
+  const traceStartedAt = Date.now();
+  const trace = (stage: string, status: "begin" | "succeeded" | "failed", details: Record<string, unknown> = {}) => {
+    if (!lightingMode) return;
+    console.info("[technical-lighting-trace]", JSON.stringify({ operationId, stage, status, elapsedMs: Date.now() - traceStartedAt, mode: lightingMode, templateVersion: TECHNICAL_LIGHTING_TEMPLATE_VERSION, ...details }));
+  };
+  trace("app_ingress", "succeeded", { encodedJsonBytes: Number(request.headers.get("content-length")) || null, requestFingerprint: requestFingerprint?.slice(0, 16) || null });
+  let orderedLightingReferences: OrderedLightingReference[] = [];
+  let lightingManifestError: Error | null = null;
+  if (lightingBrief) {
+    try {
+      orderedLightingReferences = orderLightingReferences(lightingBrief, body.lightingPlan ? 1 : 2);
+      trace("manifest_build", "succeeded", { refsRequested: orderedLightingReferences.length, totalImages: orderedLightingReferences.length + (body.lightingPlan ? 1 : 2) });
+    } catch (error) {
+      lightingManifestError = error instanceof Error ? error : new Error("Некорректный manifest референсов.");
+      trace("manifest_build", "failed", { error: lightingManifestError.message });
+    }
+  }
+  const idea = lightingMode
+    ? body.prompt?.trim()
+      || body.globalEdit?.instruction?.trim()
+      || body.adjustment?.instruction?.trim()
+      || (body.lightingPlan ? "Create a calm photorealistic contemporary residential interior with neutral natural materials, a clearly visible ceiling, and the exact technical-lighting layout supplied in the plan." : "")
+      || (body.lightingEdit ? "Integrate the marked technical lighting into the current interior." : "")
+      || (body.upscale ? "Upscale the current image without changing its content." : "")
+      || body.material?.instruction?.trim()
+      || body.replacement?.name?.trim()
+      || body.removal?.name?.trim()
+      || (body.placement ? body.product?.trim() || "Place the selected item at the marked point." : "")
+    : body.prompt?.trim()
+      || (body.lightingPlan ? "Create a calm photorealistic contemporary residential interior with neutral natural materials, a clearly visible ceiling, and the exact technical-lighting layout supplied in the plan." : "")
+      || (body.lightingEdit ? "Integrate the marked technical lighting into the current interior." : "");
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
   // client versions created arbitrary values such as 1536x864, which makes the
@@ -194,10 +269,14 @@ async function generateResponse(request: Request) {
     body.planRender?.referenceImages?.length ? "The following images are mandatory visual references named in the brief. They may include floor and wall finishes as well as real furniture; follow the brief to apply each reference only to its specified element." : "Use furniture that matches the plan dimensions and categories.",
     `Keep the room dimensions and all objects proportional. Do not add extra furniture${planInstruction ? " unless the explicit additional instruction requires it" : ""}. ${planInstruction ? "Do not add people unless explicitly requested in the additional instruction." : "No people."} No text, logos, or watermark.`,
   ].join("\n");
-  const lightingProducts = [...(body.lightingPlan?.products || []), ...(body.lightingEdit?.products || [])]
-    .slice(0, 16)
-    .map((item, index) => `${Math.max(1, Math.round(item.quantity || 1))} шт. ${item.name || "Светильник"}${item.article ? `, артикул ${item.article}` : ""}${item.type ? `, тип ${item.type}` : ""}${item.widthMm && item.lengthMm ? `, габариты ${Math.round(item.widthMm)} × ${Math.round(item.lengthMm)} мм` : ""}${item.source === "reference" ? ", пользовательский референс" : ""}, эталон внешнего вида — изображение ${index + (body.lightingPlan ? 2 : 3)}`)
-    .join("; ");
+  let lightingProducts = "";
+  if (lightingBrief && !lightingManifestError) {
+    try {
+      lightingProducts = lightingInventoryText(lightingBrief.products || [], orderedLightingReferences);
+    } catch (error) {
+      lightingManifestError = error instanceof Error ? error : new Error("Не удалось согласовать товары и референсы.");
+    }
+  }
   const lightingTrackMap = (body.lightingPlan?.tracks || body.lightingEdit?.tracks || []).map((item) => `трек ${Math.round(item.number || 0)}: ${item.name || "трек"}${item.article ? ` (${item.article})` : ""}, ${Math.round(item.lengthMm || 0)} мм`).join("; ");
   const lightingFixtureMap = (body.lightingPlan?.fixtures || body.lightingEdit?.fixtures || []).map((item) => `маркер ${Math.round(item.marker || 0)}: ${item.name || "светильник"}${item.article ? ` (${item.article})` : ""}, монтаж ${item.mounting === "track" ? "на трек" : "непосредственно в/на потолок"}`).join("; ");
   const trackMountedCount = (body.lightingPlan?.fixtures || body.lightingEdit?.fixtures || []).filter((item) => item.mounting === "track").length;
@@ -259,27 +338,41 @@ async function generateResponse(request: Request) {
     if (!mediaType || !encoded) throw new Error("Некорректный формат изображения.");
     return new Blob([Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))], { type: mediaType });
   };
-  const validatedEditImage = async (source: string | undefined, label: string, mask = false) => {
-    if (!source) throw new Error(`Загрузите ${label}.`);
-    const blob = dataUrlToBlob(source);
-    if (!(["image/png", "image/jpeg", "image/webp"].includes(blob.type)) || (mask && blob.type !== "image/png") || !blob.size || blob.size > 15 * 1024 * 1024) {
-      throw new Error(`Некорректное изображение: ${label}.`);
-    }
+  type ValidatedImage = { blob: Blob; bytes: number; width: number; height: number; mime: "image/png" | "image/jpeg" | "image/webp"; sha256: string };
+  const validateImageBlob = async (blob: Blob, label: string, assetId = label, mask = false): Promise<ValidatedImage> => {
+    if (!blob.size || blob.size > 50 * 1024 * 1024) throw new Error(`Некорректный размер изображения ${assetId}: ${label}.`);
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const png = bytes.length >= 26 && bytes.slice(0, 8).every((byte, index) => byte === [137, 80, 78, 71, 13, 10, 26, 10][index]);
     const jpeg = bytes.length >= 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
     const webp = bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
-    if (!(blob.type === "image/png" && png || blob.type === "image/jpeg" && jpeg || blob.type === "image/webp" && webp)) {
-      throw new Error(`Некорректное изображение: ${label}.`);
-    }
+    const mime = png ? "image/png" : jpeg ? "image/jpeg" : webp ? "image/webp" : null;
+    if (!mime || mask && mime !== "image/png") throw new Error(`Неподдерживаемый или повреждённый файл ${assetId}: ${label}. Разрешены PNG, JPEG и WebP.`);
     if (mask && ![4, 6].includes(bytes[25])) throw new Error("Маска должна быть PNG с прозрачностью.");
-    const dimensions = png ? { width: new DataView(bytes.buffer).getUint32(16), height: new DataView(bytes.buffer).getUint32(20) } : null;
-    if (dimensions && (!dimensions.width || !dimensions.height)) throw new Error(`Некорректное изображение: ${label}.`);
-    return dimensions;
+    let metadata: { width?: number; height?: number };
+    const technicalSharp = await loadTechnicalSharp();
+    try { metadata = await technicalSharp(bytes, { failOn: "error" }).metadata(); }
+    catch { throw new Error(`Изображение ${assetId} не декодируется: ${label}.`); }
+    const width = metadata.width || 0, height = metadata.height || 0;
+    if (!width || !height) throw new Error(`Не удалось определить размеры изображения ${assetId}: ${label}.`);
+    return { blob: new Blob([bytes], { type: mime }), bytes: bytes.byteLength, width, height, mime, sha256: createHash("sha256").update(bytes).digest("hex") };
   };
   const supportedCatalogHost = (hostname: string) => /(^|\.)norrmobler\.ru$/i.test(hostname) || /(^|\.)gomoon\.ru$/i.test(hostname);
-  const imageSourceToBlob = async (source: string, signal?: AbortSignal) => {
-    if (source.startsWith("data:")) return dataUrlToBlob(source);
+  const validatedImageSource = async (source: string, signal?: AbortSignal, label = "изображение", assetId = label, mask = false): Promise<ValidatedImage> => {
+    trace("source_resolve", "begin", { assetId });
+    if (source.startsWith("data:")) {
+      const validated = await validateImageBlob(dataUrlToBlob(source), label, assetId, mask);
+      trace("image_validate", "succeeded", { assetId, mime: validated.mime, bytes: validated.bytes, width: validated.width, height: validated.height, sha256: validated.sha256.slice(0, 16) });
+      return validated;
+    }
+    const projectAsset = source.match(/^\/api\/projects\/([a-zA-Z0-9-]{12,100})\/assets\/([a-zA-Z0-9-]{1,100})$/);
+    if (projectAsset && isTechnicalLighting) {
+      const [, projectId, asset] = projectAsset;
+      const object = await storage().get(`${tenantStoragePrefix(user)}/projects/${projectId}/${asset}`) || await storage().get(`projects/${user.id}/${projectId}/${asset}`);
+      if (!object) throw new Error(`Сохранённое изображение ${assetId} не найдено.`);
+      const validated = await validateImageBlob(new Blob([object.body], { type: object.httpMetadata.contentType || "application/octet-stream" }), label, assetId, mask);
+      trace("image_validate", "succeeded", { assetId, sourceKind: "project", mime: validated.mime, bytes: validated.bytes, width: validated.width, height: validated.height, sha256: validated.sha256.slice(0, 16) });
+      return validated;
+    }
     let imageUrl: URL;
     try {
       imageUrl = new URL(source);
@@ -287,6 +380,62 @@ async function generateResponse(request: Request) {
       throw new Error("Некорректная ссылка на изображение товара.");
     }
     if (imageUrl.protocol !== "https:" || !supportedCatalogHost(imageUrl.hostname)) {
+      throw new Error("Источник изображения товара не поддерживается.");
+    }
+    let imageResponse: Response | null = null;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        trace("asset_fetch", "begin", { assetId, attempt });
+        imageResponse = await fetch(imageUrl, { headers: { Accept: "image/*", "User-Agent": "ROOM-design-catalog/1.0" }, signal });
+        trace("asset_fetch", imageResponse.ok ? "succeeded" : "failed", { assetId, attempt, httpStatus: imageResponse.status });
+        if (imageResponse.ok || imageResponse.status < 500 && imageResponse.status !== 429) break;
+      } catch (error) {
+        lastError = error;
+        trace("asset_fetch", "failed", { assetId, attempt, errorType: error instanceof Error ? error.name : "unknown" });
+        if (signal?.aborted || attempt === 3) break;
+      }
+      if (attempt < 3) await wait(attempt * 400);
+    }
+    if (!imageResponse) throw lastError instanceof Error ? new Error(`Не удалось загрузить референс ${assetId}: ${lastError.message}`) : new Error(`Не удалось загрузить референс ${assetId}.`);
+    if (!imageResponse.ok) throw new Error(`Не удалось загрузить референс ${assetId} из каталога (HTTP ${imageResponse.status}).`);
+    const contentType = imageResponse.headers.get("content-type")?.split(";")[0] || "";
+    if (!contentType.startsWith("image/")) throw new Error(`Каталог вернул для ${assetId} файл, который не является изображением.`);
+    const bytes = await imageResponse.arrayBuffer();
+    const validated = await validateImageBlob(new Blob([bytes], { type: contentType }), label, assetId, mask);
+    trace("image_validate", "succeeded", { assetId, sourceKind: "catalog", mime: validated.mime, bytes: validated.bytes, width: validated.width, height: validated.height, sha256: validated.sha256.slice(0, 16) });
+    return validated;
+  };
+  const technicalImageSourceToBlob = async (source: string, signal?: AbortSignal) => (await validatedImageSource(source, signal)).blob;
+  const validatedTechnicalEditImage = async (source: string | undefined, label: string, mask = false) => {
+    if (!source) throw new Error(`Загрузите ${label}.`);
+    return validatedImageSource(source, undefined, label, label, mask);
+  };
+  const validatedFurnitureEditImage = async (source: string | undefined, label: string, mask = false) => {
+    if (!source) throw new Error(`Загрузите ${label}.`);
+    const blob = dataUrlToBlob(source);
+    if (!["image/png", "image/jpeg", "image/webp"].includes(blob.type) || mask && blob.type !== "image/png" || !blob.size || blob.size > 15 * 1024 * 1024) {
+      throw new Error(`Некорректное изображение: ${label}.`);
+    }
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const png = bytes.length >= 26 && bytes.slice(0, 8).every((byte, index) => byte === [137, 80, 78, 71, 13, 10, 26, 10][index]);
+    const jpeg = bytes.length >= 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+    const webp = bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+    if (!(blob.type === "image/png" && png || blob.type === "image/jpeg" && jpeg || blob.type === "image/webp" && webp)) throw new Error(`Некорректное изображение: ${label}.`);
+    if (mask && ![4, 6].includes(bytes[25])) throw new Error("Маска должна быть PNG с прозрачностью.");
+    const dimensions = png ? { width: new DataView(bytes.buffer).getUint32(16), height: new DataView(bytes.buffer).getUint32(20) } : null;
+    if (dimensions && (!dimensions.width || !dimensions.height)) throw new Error(`Некорректное изображение: ${label}.`);
+    return dimensions;
+  };
+  const furnitureImageSourceToBlob = async (source: string, signal?: AbortSignal) => {
+    if (source.startsWith("data:")) return dataUrlToBlob(source);
+    let imageUrl: URL;
+    try {
+      imageUrl = new URL(source);
+    } catch {
+      throw new Error("Некорректная ссылка на изображение товара.");
+    }
+    if (imageUrl.protocol !== "https:" || !/(^|\.)norrmobler\.ru$/i.test(imageUrl.hostname)) {
       throw new Error("Источник изображения товара не поддерживается.");
     }
     const imageResponse = await fetchWithNetworkRetry(imageUrl, { headers: { Accept: "image/*", "User-Agent": "ROOM-design-catalog/1.0" }, signal });
@@ -297,6 +446,8 @@ async function generateResponse(request: Request) {
     if (!bytes.byteLength || bytes.byteLength > 15 * 1024 * 1024) throw new Error("Фотография товара имеет неподдерживаемый размер.");
     return new Blob([bytes], { type: contentType });
   };
+  const imageSourceToBlob = isTechnicalLighting ? technicalImageSourceToBlob : furnitureImageSourceToBlob;
+  const validatedEditImage = isTechnicalLighting ? validatedTechnicalEditImage : validatedFurnitureEditImage;
   const sampleInteriorBlob = async () => {
     const sample = await fetch("https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=90");
     if (!sample.ok) throw new Error("Не удалось загрузить исходный интерьер.");
@@ -313,21 +464,55 @@ async function generateResponse(request: Request) {
   if (operation === "material" && (body.placement || body.replacement || body.removal || body.adjustment || body.globalEdit || body.planRender || body.upscale || body.product)) {
     return Response.json({ error: "Material operation не может выполнять добавление, замену или удаление объекта." }, { status: 400 });
   }
+  if (isTechnicalLighting) {
+    const completed = await database.prepare("SELECT id, output_key, content_type FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first<{ id: string; output_key: string; content_type: string }>();
+    if (completed) {
+      const existingOutput = await storage().get(completed.output_key);
+      if (existingOutput) {
+        trace("idempotency_replay", "succeeded", { outputBytes: existingOutput.size, beforeInputPreflight: true });
+        return new Response(existingOutput.body, { headers: { "Content-Type": completed.content_type || "image/webp", "Cache-Control": "no-store", "X-Operation-Id": operationId, "X-Generation-Replayed": "1" } });
+      }
+      trace("idempotency_replay", "failed", { error: "stored_output_missing", beforeInputPreflight: true });
+      return Response.json({ error: "Результат этой AI-операции записан, но файл изображения недоступен. Новая генерация с тем же идентификатором заблокирована." }, { status: 409 });
+    }
+  }
+  const operationDeadline = isTechnicalLighting ? AbortSignal.timeout(180_000) : undefined;
+  let preparedLightingPlan: ValidatedImage | null = null;
+  let preparedLightingRoom: ValidatedImage | null = null;
+  let preparedLightingOverlay: ValidatedImage | null = null;
+  let preparedLightingReferences: ValidatedImage[] = [];
   if (body.lightingPlan) {
     try {
-      await validatedEditImage(body.lightingPlan.planImage, "план технического света");
+      if (lightingManifestError) throw lightingManifestError;
+      preparedLightingPlan = await validatedImageSource(body.lightingPlan.planImage || "", operationDeadline, "план технического света", "PLAN");
       if (!(body.lightingPlan.trackCount || body.lightingPlan.fixtureCount)) throw new Error("Добавьте трек или светильник на план.");
       if (body.lightingPlan.products?.some((product) => product.source === "reference" && (!product.widthMm || !product.lengthMm))) throw new Error("Укажите ширину и длину для каждого пользовательского референса.");
+      preparedLightingReferences = await Promise.all(orderedLightingReferences.map((reference) => validatedImageSource(reference.source, operationDeadline, `референс ${reference.article || reference.productId}`, reference.assetId)));
+      trace("prompt_build", "succeeded", { promptChars: lightingPlanPrompt.length, promptHash: createHash("sha256").update(lightingPlanPrompt).digest("hex").slice(0, 16) });
     } catch (error) {
+      trace("input_preflight", "failed", { error: error instanceof Error ? error.message : "unknown" });
       return Response.json({ error: error instanceof Error ? error.message : "Некорректные данные плана." }, { status: 400 });
     }
   } else if (body.lightingEdit) {
     try {
-      await validatedEditImage(body.roomImage, "текущее изображение");
-      await validatedEditImage(body.lightingEdit.overlayImage, "изображение с разметкой света");
+      if (lightingManifestError) throw lightingManifestError;
+      preparedLightingRoom = await validatedImageSource(body.roomImage || "", operationDeadline, "текущее изображение", "ROOM_BASE");
+      preparedLightingOverlay = await validatedImageSource(body.lightingEdit.overlayImage || "", operationDeadline, "изображение с разметкой света", "OVERLAY");
+      if (preparedLightingOverlay.mime === "image/png" && preparedLightingOverlay.bytes > 512 * 1024) {
+        const originalBytes = preparedLightingOverlay.bytes;
+        const compactBytes = await (await loadTechnicalSharp())(await preparedLightingOverlay.blob.arrayBuffer()).webp({ lossless: true, effort: 4 }).toBuffer();
+        if (compactBytes.byteLength < originalBytes) {
+          const compactArray = Uint8Array.from(compactBytes);
+          preparedLightingOverlay = { ...preparedLightingOverlay, blob: new Blob([compactArray], { type: "image/webp" }), bytes: compactArray.byteLength, mime: "image/webp", sha256: createHash("sha256").update(compactArray).digest("hex") };
+          trace("overlay_compact", "succeeded", { originalBytes, compactBytes: compactArray.byteLength, lossless: true });
+        }
+      }
       if (!(body.lightingEdit.trackCount || body.lightingEdit.fixtureCount)) throw new Error("Добавьте трек или светильник на изображение.");
       if (body.lightingEdit.products?.some((product) => product.source === "reference" && (!product.widthMm || !product.lengthMm))) throw new Error("Укажите ширину и длину для каждого пользовательского референса.");
+      preparedLightingReferences = await Promise.all(orderedLightingReferences.map((reference) => validatedImageSource(reference.source, operationDeadline, `референс ${reference.article || reference.productId}`, reference.assetId)));
+      trace("prompt_build", "succeeded", { promptChars: lightingEditPrompt.length, promptHash: createHash("sha256").update(lightingEditPrompt).digest("hex").slice(0, 16) });
     } catch (error) {
+      trace("input_preflight", "failed", { error: error instanceof Error ? error.message : "unknown" });
       return Response.json({ error: error instanceof Error ? error.message : "Некорректные данные изображения." }, { status: 400 });
     }
   } else if (["global_edit", "material", "remove", "replace", "place"].includes(operation)) {
@@ -364,7 +549,6 @@ async function generateResponse(request: Request) {
       return Response.json({ error: error instanceof Error ? error.message : "Некорректные данные изображения." }, { status: 400 });
     }
   }
-  const operationId = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
   const diagnosticBranch = body.lightingPlan ? "lighting_plan"
     : body.lightingEdit ? "lighting_edit"
     : body.roomImage && body.furnitureCasting?.markedImage && furnitureCastingItems.length ? "furniture_casting"
@@ -376,8 +560,8 @@ async function generateResponse(request: Request) {
     : body.roomImage && body.placement && body.pointEdit?.markedImage && (body.referenceImage || body.product) ? "add"
     : "other";
   const diagnosticMaskPresent = Boolean(body.adjustment?.mask);
-  const diagnosticProviderInputImages = diagnosticBranch === "lighting_plan" ? 1 + Math.min(8, body.lightingPlan?.referenceImages?.length || 0)
-    : diagnosticBranch === "lighting_edit" ? 2 + Math.min(6, body.lightingEdit?.referenceImages?.length || 0)
+  const diagnosticProviderInputImages = diagnosticBranch === "lighting_plan" ? 1 + orderedLightingReferences.length
+    : diagnosticBranch === "lighting_edit" ? 2 + orderedLightingReferences.length
     : diagnosticBranch === "furniture_casting" ? 2 + furnitureCastingItems.length
     : diagnosticBranch === "template_edit" ? 1 + templateReferenceImages.length
     : diagnosticBranch === "material" || diagnosticBranch === "replace" || diagnosticBranch === "add" && Boolean(body.referenceImage) ? 3
@@ -385,7 +569,7 @@ async function generateResponse(request: Request) {
     : diagnosticBranch === "global_edit" || Boolean(body.roomImage) ? 1
     : 0;
   const diagnosticProviderEndpoint = body.roomImage || body.planRender?.planImage || body.lightingPlan?.planImage ? "openai.images.edits" : "openai.images.generations";
-  if (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first() || await aiCostLedgerHasRequest(operationId)) {
+  if (!isTechnicalLighting && (await database.prepare("SELECT id FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first() || await aiCostLedgerHasRequest(operationId))) {
     return Response.json({ error: "Эта AI-операция уже выполнена." }, { status: 409 });
   }
   if (await database.prepare("SELECT id FROM token_transactions WHERE user_id = ? AND idempotency_key = ?").bind(user.id, `ai-refund:${operationId}`).first()) {
@@ -429,37 +613,120 @@ async function generateResponse(request: Request) {
       refunded = true;
     }
   };
-  const providerTimeout = body.lightingPlan || body.lightingEdit || ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(body.furnitureCasting || isMoodboardComposition ? 360_000 : 180_000) : undefined;
+  const providerTimeout = isTechnicalLighting ? operationDeadline : body.lightingPlan || body.lightingEdit || ["material", "global_edit", "remove", "replace", "place"].includes(operation) ? AbortSignal.timeout(body.furnitureCasting || isMoodboardComposition ? 360_000 : 180_000) : undefined;
   const providerTimedOut = (error?: unknown) => providerTimeout?.aborted || error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
   const providerTimeoutMessage = body.furnitureCasting ? "Создание единого рендера заняло больше 6 минут. Попробуйте ещё раз с фотографиями меньшего размера." : isMoodboardComposition ? "Сборка мудборда заняла больше 6 минут. Попробуйте ещё раз с меньшим количеством или размером изображений." : "Сервис генерации не ответил вовремя. Попробуйте ещё раз.";
+
+  const fetchCorrectionProvider = async (form: FormData, branch: string) => {
+    if (!isTechnicalLighting) return fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+    trace("multipart_build", "succeeded", { attempt: 1, branch, imageCount: form.getAll("image[]").length, binaryPayloadBytes: form.getAll("image[]").reduce((total, value) => total + (value instanceof Blob ? value.size : 0), 0) });
+    trace("provider_submit", "begin", { attempt: 1, maximumAttempts: 1, branch, deadlineRemainingMs: Math.max(0, 180_000 - (Date.now() - traceStartedAt)) });
+    try {
+      const providerResponse = await fetchWithNetworkRetry("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout }, 1);
+      trace("provider_headers", providerResponse.ok ? "succeeded" : "failed", { attempt: 1, branch, httpStatus: providerResponse.status, providerRequestId: providerResponse.headers.get("x-request-id") || providerResponse.headers.get("request-id") || null });
+      return providerResponse;
+    } catch (error) {
+      trace("provider_submit", "failed", { attempt: 1, branch, outcome: "unknown_provider_outcome", ...safeNetworkError(error) });
+      throw error;
+    }
+  };
+
+  const fetchLightingProvider = async (formFactory: () => FormData) => {
+    const maximumAttempts = disableProviderRetry ? 1 : 2;
+    for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+      const form = formFactory();
+      trace("multipart_build", "succeeded", { attempt, imageCount: form.getAll("image[]").length, binaryPayloadBytes: form.getAll("image[]").reduce((total, value) => total + (value instanceof Blob ? value.size : 0), 0) });
+      trace("provider_submit", "begin", { attempt, maximumAttempts, deadlineRemainingMs: Math.max(0, 180_000 - (Date.now() - traceStartedAt)) });
+      let providerResponse: Response;
+      try {
+        providerResponse = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      } catch (error) {
+        trace("provider_submit", "failed", { attempt, outcome: "unknown_provider_outcome", ...safeNetworkError(error) });
+        throw new Error("Не удалось подтвердить ответ сервиса генерации. Автоматический повтор не выполнялся, чтобы не создать дубликат. Попробуйте ещё раз через минуту.");
+      }
+      const providerRequestId = providerResponse.headers.get("x-request-id") || providerResponse.headers.get("request-id") || null;
+      trace("provider_headers", providerResponse.ok ? "succeeded" : "failed", { attempt, httpStatus: providerResponse.status, providerRequestId });
+      const retryableResponse = providerResponse.status === 429 || providerResponse.status >= 500;
+      if (!retryableResponse || attempt === maximumAttempts) {
+        const contentType = providerResponse.headers.get("content-type") || "";
+        if (!providerResponse.ok || !contentType.includes("text/event-stream")) return providerResponse;
+        if (!providerResponse.body) throw new Error("Поток генерации не содержит данных.");
+        trace("provider_stream", "begin", { attempt, providerRequestId });
+        const reader = providerResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        const completed: { value: { b64_json?: string; usage?: ImageProviderUsage } | null } = { value: null };
+        let eventCount = 0;
+        let partialCount = 0;
+        const consumeBlock = (block: string) => {
+          const data = block.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
+          if (!data || data === "[DONE]") return;
+          const event = JSON.parse(data) as { type?: string; b64_json?: string; partial_image_index?: number; usage?: ImageProviderUsage };
+          eventCount += 1;
+          if (event.type === "image_edit.partial_image") partialCount += 1;
+          trace("provider_stream_event", "succeeded", { attempt, eventType: event.type || "unknown", partialImageIndex: event.partial_image_index ?? null });
+          if (event.type === "image_edit.completed") completed.value = event;
+        };
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            buffer += decoder.decode(value, { stream: !done });
+            const blocks = buffer.split(/\r?\n\r?\n/);
+            buffer = blocks.pop() || "";
+            blocks.forEach(consumeBlock);
+            if (done) break;
+          }
+          if (buffer.trim()) consumeBlock(buffer);
+        } catch (error) {
+          trace("provider_stream", "failed", { attempt, providerRequestId, eventCount, partialCount, outcome: "unknown_provider_outcome", ...safeNetworkError(error) });
+          throw error;
+        }
+        if (!completed.value?.b64_json) throw new Error("Сервис генерации завершил поток без готового изображения.");
+        trace("provider_stream", "succeeded", { attempt, providerRequestId, eventCount, partialCount });
+        const headers = new Headers(providerResponse.headers);
+        headers.set("content-type", "application/json");
+        return new Response(JSON.stringify({ data: [{ b64_json: completed.value.b64_json }], usage: completed.value.usage }), { status: providerResponse.status, headers });
+      }
+      const retryAfter = Number(providerResponse.headers.get("retry-after"));
+      const delayMs = Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter * 1000 : attempt * 500;
+      trace("provider_retry", "begin", { attempt, nextAttempt: attempt + 1, reason: providerResponse.status === 429 ? "rate_limit" : "provider_5xx", delayMs });
+      await providerResponse.body?.cancel().catch(() => undefined);
+      await wait(delayMs);
+    }
+    throw new Error("Сервис генерации не вернул ответ.");
+  };
 
   let response: Response;
   try {
     if (body.lightingPlan?.planImage) {
-      const form = new FormData();
-      form.append("model", model);
-      form.append("prompt", lightingPlanPrompt);
-      form.append("image[]", dataUrlToBlob(body.lightingPlan.planImage), "ceiling-lighting-plan.png");
-      const references = (body.lightingPlan.referenceImages || []).slice(0, 8);
-      const blobs = await Promise.all(references.map((source) => imageSourceToBlob(source, providerTimeout)));
-      blobs.forEach((image, index) => form.append("image[]", image, `lighting-reference-${index + 1}.${image.type.split("/")[1] || "jpg"}`));
-      form.append("size", outputSize);
-      form.append("quality", "high");
-      form.append("output_format", "webp");
-      response = await fetchImageProviderWithRetry("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      response = await fetchLightingProvider(() => {
+        const form = new FormData();
+        form.append("model", model);
+        form.append("prompt", lightingPlanPrompt);
+        form.append("image[]", preparedLightingPlan!.blob, `ceiling-lighting-plan.${preparedLightingPlan!.mime.split("/")[1]}`);
+        preparedLightingReferences.forEach((image, index) => form.append("image[]", image.blob, `lighting-reference-${index + 1}.${image.mime.split("/")[1]}`));
+        form.append("size", outputSize);
+        form.append("quality", "high");
+        form.append("output_format", "webp");
+        form.append("stream", "true");
+        form.append("partial_images", "1");
+        return form;
+      });
     } else if (body.roomImage && body.lightingEdit?.overlayImage) {
-      const form = new FormData();
-      form.append("model", model);
-      form.append("prompt", lightingEditPrompt);
-      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
-      form.append("image[]", dataUrlToBlob(body.lightingEdit.overlayImage), "lighting-overlay.png");
-      const references = (body.lightingEdit.referenceImages || []).slice(0, 6);
-      const blobs = await Promise.all(references.map((source) => imageSourceToBlob(source, providerTimeout)));
-      blobs.forEach((image, index) => form.append("image[]", image, `lighting-reference-${index + 1}.${image.type.split("/")[1] || "jpg"}`));
-      form.append("size", outputSize);
-      form.append("quality", "high");
-      form.append("output_format", "webp");
-      response = await fetchImageProviderWithRetry("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      response = await fetchLightingProvider(() => {
+        const form = new FormData();
+        form.append("model", model);
+        form.append("prompt", lightingEditPrompt);
+        form.append("image[]", preparedLightingRoom!.blob, `clean-interior.${preparedLightingRoom!.mime.split("/")[1]}`);
+        form.append("image[]", preparedLightingOverlay!.blob, `lighting-overlay.${preparedLightingOverlay!.mime.split("/")[1]}`);
+        preparedLightingReferences.forEach((image, index) => form.append("image[]", image.blob, `lighting-reference-${index + 1}.${image.mime.split("/")[1]}`));
+        form.append("size", outputSize);
+        form.append("quality", "high");
+        form.append("output_format", "webp");
+        form.append("stream", "true");
+        form.append("partial_images", "3");
+        return form;
+      });
     } else if (body.planRender?.planImage) {
       const form = new FormData();
       form.append("model", model);
@@ -491,11 +758,11 @@ async function generateResponse(request: Request) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", upscalePrompt);
-      form.append("image[]", dataUrlToBlob(body.roomImage), "source-image.png");
+      form.append("image[]", isTechnicalLighting ? await imageSourceToBlob(body.roomImage, providerTimeout) : dataUrlToBlob(body.roomImage), "source-image.png");
       form.append("size", outputSize);
       form.append("quality", "high");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      response = await fetchCorrectionProvider(form, "upscale");
     } else if (body.roomImage && body.pointEdit?.markedImage && body.referenceImage && body.material) {
       const form = new FormData();
       form.append("model", model);
@@ -523,33 +790,33 @@ async function generateResponse(request: Request) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", globalEditPrompt);
-      form.append("image[]", dataUrlToBlob(body.roomImage), "current-interior.png");
+      form.append("image[]", isTechnicalLighting ? await imageSourceToBlob(body.roomImage, providerTimeout) : dataUrlToBlob(body.roomImage), "current-interior.png");
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      response = await fetchCorrectionProvider(form, "global_edit");
     } else if (body.roomImage && body.pointEdit?.markedImage && body.referenceImage && body.replacement) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", replacementPrompt);
-      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
+      form.append("image[]", isTechnicalLighting ? await imageSourceToBlob(body.roomImage, providerTimeout) : dataUrlToBlob(body.roomImage), "clean-interior.png");
       form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
       const referenceBlob = await imageSourceToBlob(body.referenceImage, providerTimeout);
       form.append("image[]", referenceBlob, `furniture-reference.${referenceBlob.type.split("/")[1] || "jpg"}`);
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      response = await fetchCorrectionProvider(form, "replace");
     } else if (body.roomImage && body.pointEdit?.markedImage && body.removal) {
       const form = new FormData();
       form.append("model", model);
       form.append("prompt", removalPrompt);
-      form.append("image[]", dataUrlToBlob(body.roomImage), "clean-interior.png");
+      form.append("image[]", isTechnicalLighting ? await imageSourceToBlob(body.roomImage, providerTimeout) : dataUrlToBlob(body.roomImage), "clean-interior.png");
       form.append("image[]", dataUrlToBlob(body.pointEdit.markedImage), "marked-interior.png");
       form.append("size", outputSize);
       form.append("quality", "medium");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      response = await fetchCorrectionProvider(form, "remove");
     } else if (body.roomImage && body.adjustment?.mask) {
       const form = new FormData();
       form.append("model", model);
@@ -592,6 +859,7 @@ async function generateResponse(request: Request) {
   } catch (error) {
     await completeAiCostLedgerEntry(operationId, "provider_failed", null, providerTimedOut(error) ? "provider_timeout" : "provider_request_failed");
     await refundReservation("Возврат после технической ошибки подготовки AI-операции");
+    trace("provider_submit", "failed", { outcome: providerTimedOut(error) ? "timeout" : "request_failed", ...safeNetworkError(error) });
     return Response.json({ error: providerTimedOut(error) ? providerTimeoutMessage : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
   }
   console.info("[generate-runtime-diagnostic]", JSON.stringify({
@@ -611,9 +879,11 @@ async function generateResponse(request: Request) {
   let responseText: string;
   try {
     responseText = await response.text();
+    trace("provider_body", "succeeded", { httpStatus: response.status, responseBytes: new TextEncoder().encode(responseText).byteLength });
   } catch {
     await completeAiCostLedgerEntry(operationId, "provider_response_read_failed", null, "provider_response_read_failed");
     await refundReservation("Возврат после ошибки чтения ответа AI-провайдера");
+    trace("provider_body", "failed", { httpStatus: response.status });
     return Response.json({ error: providerTimedOut() ? providerTimeoutMessage : "Не удалось получить ответ сервиса генерации." }, { status: providerTimedOut() ? 504 : 502 });
   }
   let result: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string }; usage?: ImageProviderUsage } = {};
@@ -639,6 +909,7 @@ async function generateResponse(request: Request) {
     await completeAiCostLedgerEntry(operationId, "provider_failed", null, `provider_http_${response.status}`);
     await refundReservation("Возврат после ошибки AI-провайдера");
     console.error("Image edit failed", { status: response.status, operation, message: result.error?.message });
+    trace("provider_result", "failed", { httpStatus: response.status, errorType: "provider_error" });
     return Response.json({ error: result.error?.message || `Сервис генерации временно недоступен (код ${response.status}). Попробуйте ещё раз.` }, { status: response.status });
   }
 
@@ -646,6 +917,7 @@ async function generateResponse(request: Request) {
   if (!encodedImage) {
     await completeAiCostLedgerEntry(operationId, "result_invalid", null, "missing_image");
     await refundReservation("Возврат: AI-провайдер не вернул изображение");
+    trace("output_decode", "failed", { error: "missing_b64_json" });
     return Response.json({ error: "Изображение не вернулось от модели." }, { status: 502 });
   }
 
@@ -653,6 +925,7 @@ async function generateResponse(request: Request) {
   try {
     binary = Uint8Array.from(atob(encodedImage), (character) => character.charCodeAt(0));
     if (!binary.byteLength) throw new Error("Пустое изображение.");
+    trace("output_decode", "succeeded", { outputBytes: binary.byteLength, outputSha256: createHash("sha256").update(binary).digest("hex").slice(0, 16) });
   } catch {
     await completeAiCostLedgerEntry(operationId, "result_invalid", null, "invalid_image");
     await refundReservation("Возврат после некорректного изображения AI-провайдера");
@@ -660,15 +933,20 @@ async function generateResponse(request: Request) {
   }
   const outputKey = `${tenantStoragePrefix(user)}/generations/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.webp`;
   try {
+    trace("storage_write", "begin", { outputKeyHash: createHash("sha256").update(outputKey).digest("hex").slice(0, 16) });
     await storage().put(outputKey, binary, { httpMetadata: { contentType: "image/webp" } });
+    trace("storage_write", "succeeded", { outputBytes: binary.byteLength });
     const tokenTransaction = reservation.transaction as { id?: string } | null;
-    await recordGeneration(user, { id: operationId, operation, prompt: body.prompt || "", outputKey, contentType: "image/webp", bytes: binary.byteLength, inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens, totalTokens: result.usage?.total_tokens, tokenTransactionId: tokenTransaction?.id || null, tokenCost: reservation.quote.tokenCost, bruttoCoefficientSnapshot: reservation.quote.bruttoCoefficient });
+    const recordedPrompt = body.lightingPlan ? lightingPlanPrompt : body.lightingEdit ? lightingEditPrompt : body.prompt || "";
+    await recordGeneration(user, { id: operationId, operation, prompt: recordedPrompt, outputKey, contentType: "image/webp", bytes: binary.byteLength, inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens, totalTokens: result.usage?.total_tokens, tokenTransactionId: tokenTransaction?.id || null, tokenCost: reservation.quote.tokenCost, bruttoCoefficientSnapshot: reservation.quote.bruttoCoefficient });
+    trace("generation_record", "succeeded", { usageInputTokens: result.usage?.input_tokens ?? null, usageOutputTokens: result.usage?.output_tokens ?? null, localTokenCharge: reservation.quote.tokenCost });
   } catch (error) {
     await completeAiCostLedgerEntry(operationId, "result_save_failed", null, "result_save_failed");
     await refundReservation("Возврат после ошибки сохранения результата AI-операции");
     return Response.json({ error: error instanceof Error ? error.message : "Не удалось сохранить результат генерации." }, { status: 503 });
   }
   await completeAiCostLedgerEntry(operationId, "succeeded", operationId);
+  trace("response_deliver", "succeeded", { outputBytes: binary.byteLength });
   const usageHeaders: Record<string, string> = {
     "Content-Type": "image/webp",
     "Cache-Control": "no-store",
@@ -676,6 +954,9 @@ async function generateResponse(request: Request) {
     "X-Room-AI-Operation": operation,
     "X-Room-AI-Token-Cost": String(reservation.quote.tokenCost),
     "X-Room-AI-Charging": reservation.quote.chargingEnabled ? "enabled" : "estimate-only",
+    "X-Operation-Id": operationId,
+    "X-Provider-Request-Id": providerRequestId || "",
+    "X-Technical-Lighting-Template": isTechnicalLighting ? TECHNICAL_LIGHTING_TEMPLATE_VERSION : "",
   };
   if (result.usage?.input_tokens !== undefined) usageHeaders["X-Room-AI-Input-Tokens"] = String(result.usage.input_tokens);
   if (result.usage?.output_tokens !== undefined) usageHeaders["X-Room-AI-Output-Tokens"] = String(result.usage.output_tokens);
