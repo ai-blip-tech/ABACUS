@@ -275,7 +275,7 @@ test("technical-lighting retries a transient provider file-load failure", async 
   globalThis.fetch = async (url) => {
     calls += 1;
     assert.equal(url, "https://api.openai.com/v1/images/edits");
-    if (calls === 1) return Response.json({ error: { message: "load file not found" } }, { status: 400 });
+    if (calls === 1) return Response.json({ error: { message: "load failed" } }, { status: 400 });
     return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 31, output_tokens: 22, total_tokens: 53 } });
   };
   const response = await POST(request({

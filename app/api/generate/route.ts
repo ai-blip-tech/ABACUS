@@ -37,7 +37,7 @@ async function fetchImageProviderWithRetry(input: string | URL, init: RequestIni
       const payload = await response.clone().json() as { error?: { message?: string } };
       providerMessage = payload.error?.message || "";
     } catch { /* A non-JSON provider error is handled by the normal response path. */ }
-    const retryableFileLoadError = /(?:load|read|decode).{0,24}file|file.{0,24}(?:load|read|decode|not found)/i.test(providerMessage);
+    const retryableFileLoadError = /(?:load|loading|read|decode).{0,32}(?:file|image|fail|failure|error|not found)|(?:file|image).{0,32}(?:load|loading|read|decode|fail|failure|error|not found)/i.test(providerMessage);
     if (!retryableFileLoadError && response.status < 500) return response;
     console.warn("[generate-provider-retry]", { attempt, status: response.status, reason: retryableFileLoadError ? "file_load" : "provider_5xx" });
     await wait(attempt * 750);
