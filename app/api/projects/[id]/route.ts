@@ -58,6 +58,7 @@ type SavedState = {
   proposalVisualizationVersion?: string;
   proposalHistoryId?: string | null;
   proposalDocument?: Record<string, string>;
+  technicalLighting?: unknown;
 };
 
 const validProjectId = (id: string) => /^[a-zA-Z0-9-]{12,100}$/.test(id);
@@ -189,15 +190,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   let persistedProposalVisualizationVersion: string | undefined;
   let persistedProposalHistoryId: string | null | undefined;
   let persistedProposalDocument: Record<string, string> | undefined;
+  let persistedTechnicalLighting: unknown;
   const persistedOverrides = new Map<string, unknown>();
   if (existingProject?.state_json) {
     try {
-      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalVisualizationVersion?: string; proposalHistoryId?: string | null; proposalDocument?: Record<string, string>; planItems?: Array<{ id?: string; proposalOverride?: unknown }>; proposalItems?: Array<{ id?: string; proposalOverride?: unknown }> };
+      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalVisualizationVersion?: string; proposalHistoryId?: string | null; proposalDocument?: Record<string, string>; technicalLighting?: unknown; planItems?: Array<{ id?: string; proposalOverride?: unknown }>; proposalItems?: Array<{ id?: string; proposalOverride?: unknown }> };
       persistedShowPrices = persisted.proposalShowPrices !== false;
       persistedProposalVisualizationAsset = persisted.proposalVisualizationAsset;
       persistedProposalVisualizationVersion = persisted.proposalVisualizationVersion;
       persistedProposalHistoryId = persisted.proposalHistoryId;
       persistedProposalDocument = persisted.proposalDocument;
+      persistedTechnicalLighting = persisted.technicalLighting;
       for (const item of persisted.planItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
       for (const item of persisted.proposalItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
     } catch { /* a normal project save will replace an unreadable legacy state */ }
@@ -330,6 +333,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     proposalVisualizationVersion: persistedProposalVisualizationVersion,
     proposalHistoryId: persistedProposalHistoryId,
     proposalDocument: persistedProposalDocument,
+    technicalLighting: persistedTechnicalLighting,
   };
   const now = new Date().toISOString();
   if (existingProject) {

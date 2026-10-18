@@ -12,7 +12,11 @@ async function generateResponse(request: Request) {
   if (!apiKey) return Response.json({ error: "Генерация не настроена на сервере: укажите действительный OPENAI_API_KEY и перезапустите PM2 с --update-env." }, { status: 503 });
   const model = imageModel();
 
-  const body = await request.json() as { projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string }; lightingPlan?: { planImage?: string; room?: { width?: number; length?: number }; referenceImages?: string[]; products?: Array<{ name?: string; article?: string; type?: string; widthMm?: number|null; lengthMm?: number|null; source?: string }>; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" }; lightingEdit?: { overlayImage?: string; referenceImages?: string[]; products?: Array<{ name?: string; article?: string; type?: string; widthMm?: number|null; lengthMm?: number|null; source?: string }>; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" } };
+  type LightingProduct = { name?: string; article?: string; type?: string; widthMm?: number|null; lengthMm?: number|null; source?: string; quantity?: number };
+  type LightingTrack = { number?: number; name?: string; article?: string; lengthMm?: number };
+  type LightingFixture = { marker?: number; name?: string; article?: string; mounting?: "track" | "ceiling" };
+  type LightingBrief = { referenceImages?: string[]; products?: LightingProduct[]; tracks?: LightingTrack[]; fixtures?: LightingFixture[]; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" };
+  const body = await request.json() as { projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string }; lightingPlan?: LightingBrief & { planImage?: string; room?: { width?: number; length?: number } }; lightingEdit?: LightingBrief & { overlayImage?: string } };
   const idea = body.prompt?.trim()
     || (body.lightingPlan ? "Create a calm photorealistic contemporary residential interior with neutral natural materials, a clearly visible ceiling, and the exact technical-lighting layout supplied in the plan." : "")
     || (body.lightingEdit ? "Integrate the marked technical lighting into the current interior." : "");
@@ -151,23 +155,35 @@ async function generateResponse(request: Request) {
   ].join("\n");
   const lightingProducts = [...(body.lightingPlan?.products || []), ...(body.lightingEdit?.products || [])]
     .slice(0, 16)
-    .map((item) => `${item.name || "Светильник"}${item.article ? `, артикул ${item.article}` : ""}${item.type ? `, тип ${item.type}` : ""}${item.widthMm && item.lengthMm ? `, габариты ${Math.round(item.widthMm)} × ${Math.round(item.lengthMm)} мм` : ""}${item.source === "reference" ? ", пользовательский референс" : ""}`)
+    .map((item, index) => `${Math.max(1, Math.round(item.quantity || 1))} шт. ${item.name || "Светильник"}${item.article ? `, артикул ${item.article}` : ""}${item.type ? `, тип ${item.type}` : ""}${item.widthMm && item.lengthMm ? `, габариты ${Math.round(item.widthMm)} × ${Math.round(item.lengthMm)} мм` : ""}${item.source === "reference" ? ", пользовательский референс" : ""}, эталон внешнего вида — изображение ${index + (body.lightingPlan ? 2 : 3)}`)
     .join("; ");
+  const lightingTrackMap = (body.lightingPlan?.tracks || body.lightingEdit?.tracks || []).map((item) => `трек ${Math.round(item.number || 0)}: ${item.name || "трек"}${item.article ? ` (${item.article})` : ""}, ${Math.round(item.lengthMm || 0)} мм`).join("; ");
+  const lightingFixtureMap = (body.lightingPlan?.fixtures || body.lightingEdit?.fixtures || []).map((item) => `маркер ${Math.round(item.marker || 0)}: ${item.name || "светильник"}${item.article ? ` (${item.article})` : ""}, монтаж ${item.mounting === "track" ? "на трек" : "непосредственно в/на потолок"}`).join("; ");
+  const trackMountedCount = (body.lightingPlan?.fixtures || body.lightingEdit?.fixtures || []).filter((item) => item.mounting === "track").length;
+  const ceilingMountedCount = Math.max(0, Math.round((body.lightingPlan?.fixtureCount || body.lightingEdit?.fixtureCount || 0) - trackMountedCount));
   const lightingPlanPrompt = [
     "Use image 1 as an authoritative top-down technical ceiling lighting plan.",
     `The room is ${Math.round(body.lightingPlan?.room?.width || 6000)} × ${Math.round(body.lightingPlan?.room?.length || 4500)} mm. The plan contains ${Math.round(body.lightingPlan?.trackCount || 0)} track lines and ${Math.round(body.lightingPlan?.fixtureCount || 0)} luminaires.`,
-    "Create one photorealistic premium residential interior view in which the ceiling is clearly visible. Reproduce every dark track line from the plan as a ceiling track, preserve its topology and relative position, and place one luminaire for every numbered circular marker.",
+    "Create a ceiling-focused architectural visualisation, not a general room render. Frame the ceiling and upper part of the room from a slightly upward-looking camera; the ceiling and lighting installation must occupy at least two thirds of the image. Show only enough furniture below to establish scale.",
+    "Treat the plan as a strict bill of materials and placement map. Reproduce every track line and every numbered marker exactly once. Missing, duplicated, substituted or additional tracks and luminaires are forbidden.",
+    `Hard inventory constraint: exactly ${Math.round(body.lightingPlan?.trackCount || 0)} track segments, exactly ${trackMountedCount} track-mounted luminaires, and exactly ${ceilingMountedCount} recessed or surface ceiling luminaires.`,
+    lightingTrackMap ? `Track mapping: ${lightingTrackMap}.` : "",
+    lightingFixtureMap ? `Numbered marker mapping: ${lightingFixtureMap}. Each marker must use the named product and mounting type.` : "",
     lightingProducts ? `The selected catalog products are: ${lightingProducts}. Subsequent images are product references; reproduce their shape, colour, proportions and mounting type.` : "Use restrained contemporary architectural lighting.",
+    "Product colour is a hard constraint. Read the exact finish from each corresponding reference image; never default a metallic, brass or gold track to black. Every repeated instance of one article must have the same colour and finish.",
     `Set the emitted light colour temperature to ${Math.round(body.lightingPlan?.cctK || 3000)} K.`,
     body.lightingPlan?.timeOfDay === "night" ? "Render a true night scene: the exterior through every window is dark, there is no daylight or sunlight, and the specified luminaires are the only active light sources." : "Render a daytime scene with natural daylight visible outside while preserving the requested artificial-light colour temperature.",
     body.prompt?.trim() || "Create a calm contemporary interior with neutral materials.",
-    "Do not add extra tracks or luminaires. Keep all tracks on the ceiling. No people, text, labels, logos or watermark.",
+    "Verify the final image against the inventory before returning it. Keep all tracks and luminaires on the ceiling. No people, text, labels, logos or watermark.",
   ].join("\n");
   const lightingEditPrompt = [
     "Use image 1 as the clean completed interior and preserve its camera, architecture, walls, floor, furniture, materials and décor.",
     "Image 2 is the same interior with a temporary technical-lighting overlay. Dark orange lines mark exact ceiling-track routes. Numbered orange circles mark exact luminaire positions. The overlay graphics and numbers must not appear in the result.",
-    `Install ${Math.round(body.lightingEdit?.trackCount || 0)} marked track routes and ${Math.round(body.lightingEdit?.fixtureCount || 0)} marked luminaires on the ceiling, matching the perspective and the existing light and shadows.`,
+    `Install exactly ${Math.round(body.lightingEdit?.trackCount || 0)} marked track routes and exactly ${Math.round(body.lightingEdit?.fixtureCount || 0)} marked luminaires on the ceiling, matching the perspective and the existing light and shadows. Missing, duplicated, substituted or additional items are forbidden.`,
+    lightingTrackMap ? `Track mapping: ${lightingTrackMap}.` : "",
+    lightingFixtureMap ? `Numbered marker mapping: ${lightingFixtureMap}. Each marker must use the named product and mounting type.` : "",
     lightingProducts ? `The selected catalog products are: ${lightingProducts}. Subsequent images are mandatory product references; reproduce their shape, colour, proportions and mounting type.` : "Use restrained contemporary architectural lighting.",
+    "Product colour is a hard constraint. Read the exact finish from each corresponding reference image; never default a metallic, brass or gold track to black. Every repeated instance of one article must have the same colour and finish.",
     `Set the emitted light colour temperature to ${Math.round(body.lightingEdit?.cctK || 3000)} K.`,
     body.lightingEdit?.timeOfDay === "night" ? "Convert the scene to a true night view: the exterior is dark, remove daylight and sunlight, and illuminate the interior only with the specified luminaires." : "Keep or create a daytime exterior with natural daylight while preserving the requested artificial-light colour temperature.",
     body.prompt?.trim() || "Integrate the selected technical lighting naturally.",
@@ -385,7 +401,7 @@ async function generateResponse(request: Request) {
       const blobs = await Promise.all(references.map((source) => imageSourceToBlob(source, providerTimeout)));
       blobs.forEach((image, index) => form.append("image[]", image, `lighting-reference-${index + 1}.${image.type.split("/")[1] || "jpg"}`));
       form.append("size", outputSize);
-      form.append("quality", "medium");
+      form.append("quality", "high");
       form.append("output_format", "webp");
       response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else if (body.roomImage && body.lightingEdit?.overlayImage) {
@@ -398,7 +414,7 @@ async function generateResponse(request: Request) {
       const blobs = await Promise.all(references.map((source) => imageSourceToBlob(source, providerTimeout)));
       blobs.forEach((image, index) => form.append("image[]", image, `lighting-reference-${index + 1}.${image.type.split("/")[1] || "jpg"}`));
       form.append("size", outputSize);
-      form.append("quality", "medium");
+      form.append("quality", "high");
       form.append("output_format", "webp");
       response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else if (body.planRender?.planImage) {
