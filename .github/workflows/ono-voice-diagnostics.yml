@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type DIAGNOSE_ONO_VOICE"
+        description: "Type DIAGNOSE_ONO_VOICE or DIAGNOSE_TECHNICAL_LIGHTING"
         required: true
         type: string
 
@@ -26,9 +26,10 @@ jobs:
         shell: bash
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
-        run: test "$CONFIRMATION" = "DIAGNOSE_ONO_VOICE"
+        run: test "$CONFIRMATION" = "DIAGNOSE_ONO_VOICE" || test "$CONFIRMATION" = "DIAGNOSE_TECHNICAL_LIGHTING"
 
       - name: Inspect voice provider failures without changing production
+        if: ${{ inputs.confirmation == 'DIAGNOSE_ONO_VOICE' }}
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -57,4 +58,50 @@ jobs:
               | tail -n 80 \
               | sed -E 's/(sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]*/\1[REDACTED]/g' || true
             echo "VOICE_FAILURE_LOGS_END"
+            echo "PRODUCTION_MODIFIED=no"
+
+      - name: Inspect technical-lighting failures without changing production
+        if: ${{ inputs.confirmation == 'DIAGNOSE_TECHNICAL_LIGHTING' }}
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -eu
+            cd "$HOME/ABACUS"
+            test -f .env
+            test -d data
+            test -f data/room-design.sqlite
+            echo "PRODUCTION_SHA=$(git rev-parse HEAD)"
+            echo "SITE_HEALTH=$(curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null && echo ok)"
+            grep -q '^OPENAI_API_KEY=.' .env && echo "OPENAI_API_KEY_PRESENT=yes" || echo "OPENAI_API_KEY_PRESENT=no"
+            echo "TECHNICAL_LIGHTING_LOGS_BEGIN"
+            pm2 logs roomdesign --nostream --lines 5000 2>&1 \
+              | grep -E '\[technical-lighting-trace\]|\[generate-runtime-diagnostic\]|\[generate-network-error\]|Image edit failed' \
+              | tail -n 600 \
+              | sed -E 's/(sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]*/\1[REDACTED]/g' || true
+            echo "TECHNICAL_LIGHTING_LOGS_END"
+            echo "RECENT_GENERATION_LEDGER_BEGIN"
+            python3 - <<'PY'
+            import json
+            import sqlite3
+
+            connection = sqlite3.connect("file:data/room-design.sqlite?mode=ro", uri=True)
+            connection.row_factory = sqlite3.Row
+            for table in ("ai_cost_ledger", "generations", "token_transactions"):
+                try:
+                    columns = [row[1] for row in connection.execute(f"PRAGMA table_info({table})")]
+                    selected = [name for name in ("request_id", "id", "reference_id", "operation_type", "operation", "status", "provider_request_id", "provider_http_status", "error_code", "created_at", "updated_at") if name in columns]
+                    if not selected:
+                        continue
+                    order = "created_at" if "created_at" in columns else "rowid"
+                    rows = connection.execute(f"SELECT {', '.join(selected)} FROM {table} ORDER BY {order} DESC LIMIT 20").fetchall()
+                    print(json.dumps({"table": table, "rows": [dict(row) for row in rows]}, ensure_ascii=False))
+                except Exception as error:
+                    print(json.dumps({"table": table, "error": str(error)}, ensure_ascii=False))
+            connection.close()
+            PY
+            echo "RECENT_GENERATION_LEDGER_END"
             echo "PRODUCTION_MODIFIED=no"
