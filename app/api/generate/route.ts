@@ -5,6 +5,7 @@ import { imageModel } from "@/lib/image-model";
 import { openAIKey } from "@/lib/server-config";
 import { database } from "@/lib/server-runtime";
 import { lightingInventoryText, orderLightingReferences, TECHNICAL_LIGHTING_TEMPLATE_VERSION, type LightingProductInput, type LightingReferenceInput, type OrderedLightingReference } from "@/lib/technical-lighting-generation";
+import { registerTechnicalLightingOperation } from "@/lib/technical-lighting-operations";
 import { createHash } from "node:crypto";
 
 type TechnicalSharpPipeline = {
@@ -464,7 +465,19 @@ async function generateResponse(request: Request) {
   if (operation === "material" && (body.placement || body.replacement || body.removal || body.adjustment || body.globalEdit || body.planRender || body.upscale || body.product)) {
     return Response.json({ error: "Material operation не может выполнять добавление, замену или удаление объекта." }, { status: 400 });
   }
+  let technicalOperationRegistration: "created" | "existing" | null = null;
   if (isTechnicalLighting) {
+    const registration = await registerTechnicalLightingOperation({
+      requestId: operationId,
+      requestFingerprint,
+      operationType: operation,
+      userId: user.id,
+      tenantId: user.tenantId,
+    });
+    if (registration === "conflict") {
+      return Response.json({ error: "Идентификатор операции уже используется другим запросом." }, { status: 409 });
+    }
+    technicalOperationRegistration = registration;
     const completed = await database.prepare("SELECT id, output_key, content_type FROM generations WHERE id = ? AND user_id = ?").bind(operationId, user.id).first<{ id: string; output_key: string; content_type: string }>();
     if (completed) {
       const existingOutput = await storage().get(completed.output_key);
@@ -474,6 +487,10 @@ async function generateResponse(request: Request) {
       }
       trace("idempotency_replay", "failed", { error: "stored_output_missing", beforeInputPreflight: true });
       return Response.json({ error: "Результат этой AI-операции записан, но файл изображения недоступен. Новая генерация с тем же идентификатором заблокирована." }, { status: 409 });
+    }
+    if (technicalOperationRegistration === "existing") {
+      trace("idempotency_pending", "succeeded", { beforeInputPreflight: true });
+      return Response.json({ status: "pending", operationId, message: "Операция уже выполняется. Новый запрос провайдеру не отправлен." }, { status: 202, headers: { "Cache-Control": "no-store", "X-Operation-Id": operationId } });
     }
   }
   const operationDeadline = isTechnicalLighting ? AbortSignal.timeout(180_000) : undefined;

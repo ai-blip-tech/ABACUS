@@ -112,7 +112,7 @@ test("generation prompts stay independent of the current catalog brand", () => {
 
 test("products used in the current render move first and receive a visible catalog marker", () => {
   assert.match(source, /imageProducts,setImageProducts/);
-  assert.match(source, /products:nextImageProducts/);
+  assert.match(source, /completeRecoveredGeneration\([^;]+nextImageProducts/);
   assert.match(source, /setImageProducts\(item\.products\)/);
   assert.match(source, /visibleCatalogProducts/);
   assert.match(source, /imageProductIds\.has\(b\.id\)/);

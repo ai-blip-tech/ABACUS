@@ -17,6 +17,9 @@ const auth = await import("../lib/auth.ts");
 const billing = await import("../lib/billing.ts");
 const { database } = await import("../lib/server-runtime.ts");
 const { POST } = await import("../app/api/generate/route.ts");
+const { GET: generationStatus } = await import("../app/api/lighting/generate/status/route.ts");
+const { GET: generationImage } = await import("../app/api/account/generations/[id]/route.ts");
+const { registerTechnicalLightingOperation } = await import("../lib/technical-lighting-operations.ts");
 await auth.ensureStore();
 const user = { id: "safety-user", email: "safety@example.test", role: "user", tenantId: "tenant_norrmobler", tenantSlug: "norrmobler", tenantRole: "member", firstName: "Test", lastName: "", phone: "", companyRole: "" };
 const now = new Date().toISOString();
@@ -429,6 +432,72 @@ test("technical-lighting replays a completed result before reloading unavailable
   assert.equal(replay.status, 200);
   assert.equal(replay.headers.get("x-generation-replayed"), "1");
   assert.equal(calls, 1);
+});
+
+test("technical-lighting status recovers a stored result after the original response is lost", async () => {
+  const id = "lighting-lost-response-recovery";
+  const set = lightingSet(1, "lost-response");
+  const body = { technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, ...set, trackCount: 1, fixtureCount: 0 } };
+  const before = await balance();
+  let providerCalls = 0;
+  globalThis.fetch = async () => {
+    providerCalls += 1;
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 31, output_tokens: 22, total_tokens: 53 } });
+  };
+  const lostResponse = await POST(request(body, id));
+  assert.equal(lostResponse.status, 200);
+  // Intentionally do not consume the original response body: this represents a
+  // browser/proxy disconnect after the server has stored the generated image.
+  const statusResponse = await generationStatus(new Request(`https://norr-club.testaimoblernorr.chatgpt.site/api/lighting/generate/status?operationId=${id}`, { headers: { Cookie: `room_session=${session}` } }));
+  assert.equal(statusResponse.status, 200);
+  const status = await statusResponse.json();
+  assert.equal(status.status, "succeeded");
+  assert.equal(status.operationId, id);
+  assert.equal(status.imageUrl, `/api/account/generations/${id}`);
+  const imageResponse = await generationImage(new Request(`https://norr-club.testaimoblernorr.chatgpt.site${status.imageUrl}`, { headers: { Cookie: `room_session=${session}` } }), { params: Promise.resolve({ id }) });
+  assert.equal(imageResponse.status, 200);
+  assert.equal((await imageResponse.arrayBuffer()).byteLength > 0, true);
+  assert.equal(providerCalls, 1);
+  assert.equal(await generationCount(id), 1);
+  assert.equal(await balance(), before - (await billing.quoteAiOperation("plan_render")).tokenCost);
+});
+
+test("a repeated technical-lighting request while pending never reaches the provider twice", async () => {
+  const id = "lighting-pending-repeat";
+  const set = lightingSet(1, "pending-repeat");
+  const body = { technicalLighting: true, operation: "plan_render", lightingPlan: { planImage: png, ...set, trackCount: 1, fixtureCount: 0 } };
+  const before = await balance();
+  let providerCalls = 0;
+  let releaseProvider;
+  let providerStarted;
+  const started = new Promise((resolve) => { providerStarted = resolve; });
+  globalThis.fetch = async () => {
+    providerCalls += 1;
+    providerStarted();
+    return new Promise((resolve) => { releaseProvider = resolve; });
+  };
+  const firstRequest = POST(request(body, id));
+  await started;
+  const repeated = await POST(request(body, id));
+  assert.equal(repeated.status, 202);
+  assert.equal((await repeated.json()).status, "pending");
+  assert.equal(providerCalls, 1);
+  releaseProvider(Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 31, output_tokens: 22, total_tokens: 53 } }));
+  assert.equal((await firstRequest).status, 200);
+  assert.equal(providerCalls, 1);
+  assert.equal(await generationCount(id), 1);
+  assert.equal(await balance(), before - (await billing.quoteAiOperation("plan_render")).tokenCost);
+});
+
+test("technical-lighting status reports an operation that exceeded its deadline as stuck", async () => {
+  const id = "lighting-stuck-status";
+  await registerTechnicalLightingOperation({ requestId: id, requestFingerprint: "b".repeat(64), operationType: "plan_render", userId: user.id, tenantId: user.tenantId });
+  await database.prepare("UPDATE technical_lighting_operations SET created_at = ? WHERE request_id = ?").bind(new Date(Date.now() - 5 * 60 * 1000).toISOString(), id).run();
+  const response = await generationStatus(new Request(`https://norr-club.testaimoblernorr.chatgpt.site/api/lighting/generate/status?operationId=${id}`, { headers: { Cookie: `room_session=${session}` } }));
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.status, "stuck");
+  assert.match(payload.message, /зависшая.*Повторный запрос провайдеру не отправлен/);
 });
 
 test("technical-lighting control request disables retry and unknown outcomes never retry", async () => {
