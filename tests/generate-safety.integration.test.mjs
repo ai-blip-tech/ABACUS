@@ -237,6 +237,7 @@ test("technical-lighting plan uses its default idea and sends the plan plus prod
     assert.match(providerPrompt, /authoritative top-down technical ceiling lighting plan/);
     assert.match(providerPrompt, /3000 K/);
     assert.match(providerPrompt, /true night scene/);
+    assert.match(providerPrompt, /strict non-rectangular polygon/);
     return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 31, output_tokens: 22, total_tokens: 53 } });
   };
   const response = await POST(request({
@@ -244,6 +245,14 @@ test("technical-lighting plan uses its default idea and sends the plan plus prod
     lightingPlan: {
       planImage: png,
       room: { width: 6000, length: 4500 },
+      ceilingOutline: [
+        { number: 1, xMm: 0, yMm: 0 },
+        { number: 2, xMm: 6000, yMm: 0 },
+        { number: 3, xMm: 6000, yMm: 4500 },
+        { number: 4, xMm: 2500, yMm: 4500 },
+        { number: 5, xMm: 2500, yMm: 2200 },
+        { number: 6, xMm: 0, yMm: 2200 },
+      ],
       referenceImages: [png],
       products: [{ name: "Трек 2 м", type: "track", widthMm: 35, lengthMm: 2000, source: "catalog" }],
       trackCount: 1,
@@ -256,6 +265,33 @@ test("technical-lighting plan uses its default idea and sends the plan plus prod
   assert.equal(calls, 1);
   assert.equal(await generationCount(id), 1);
   assert.deepEqual(await transactions(id), ["generation"]);
+  assert.equal(await balance(), before - (await billing.quoteAiOperation("plan_render")).tokenCost);
+});
+
+test("technical-lighting retries a transient provider file-load failure", async () => {
+  const id = "retry-lighting-file-load";
+  const before = await balance();
+  let calls = 0;
+  globalThis.fetch = async (url) => {
+    calls += 1;
+    assert.equal(url, "https://api.openai.com/v1/images/edits");
+    if (calls === 1) return Response.json({ error: { message: "load file not found" } }, { status: 400 });
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 31, output_tokens: 22, total_tokens: 53 } });
+  };
+  const response = await POST(request({
+    operation: "plan_render",
+    lightingPlan: {
+      planImage: png,
+      products: [{ name: "Трек", type: "track", widthMm: 35, lengthMm: 2000, source: "catalog" }],
+      trackCount: 1,
+      fixtureCount: 0,
+      cctK: 3000,
+      timeOfDay: "day",
+    },
+  }, id));
+  assert.equal(response.status, 200);
+  assert.equal(calls, 2);
+  assert.equal(await generationCount(id), 1);
   assert.equal(await balance(), before - (await billing.quoteAiOperation("plan_render")).tokenCost);
 });
 

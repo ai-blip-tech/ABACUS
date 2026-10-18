@@ -5,6 +5,46 @@ import { imageModel } from "@/lib/image-model";
 import { openAIKey } from "@/lib/server-config";
 import { database } from "@/lib/server-runtime";
 
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function fetchWithNetworkRetry(input: string | URL, init?: RequestInit, attempts = 3) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetch(input, init);
+    } catch (error) {
+      lastError = error;
+      const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+      if (init?.signal?.aborted || timedOut || attempt === attempts) break;
+      await wait(attempt * 500);
+    }
+  }
+  if (lastError instanceof Error && (lastError.name === "TimeoutError" || lastError.name === "AbortError")) throw lastError;
+  const target = typeof input === "string" ? input : input.toString();
+  let endpoint = "external-service";
+  try { endpoint = new URL(target).hostname; } catch { /* Never log request bodies or credentials. */ }
+  console.error("[generate-network-error]", { endpoint, attempts, message: lastError instanceof Error ? lastError.message : "unknown" });
+  throw new Error("Не удалось связаться с сервисом генерации. Выполнены три попытки — попробуйте ещё раз через минуту.");
+}
+
+async function fetchImageProviderWithRetry(input: string | URL, init: RequestInit, attempts = 3) {
+  let response: Response | undefined;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    response = await fetchWithNetworkRetry(input, init);
+    if (response.ok || attempt === attempts) return response;
+    let providerMessage = "";
+    try {
+      const payload = await response.clone().json() as { error?: { message?: string } };
+      providerMessage = payload.error?.message || "";
+    } catch { /* A non-JSON provider error is handled by the normal response path. */ }
+    const retryableFileLoadError = /(?:load|read|decode).{0,24}file|file.{0,24}(?:load|read|decode|not found)/i.test(providerMessage);
+    if (!retryableFileLoadError && response.status < 500) return response;
+    console.warn("[generate-provider-retry]", { attempt, status: response.status, reason: retryableFileLoadError ? "file_load" : "provider_5xx" });
+    await wait(attempt * 750);
+  }
+  return response as Response;
+}
+
 async function generateResponse(request: Request) {
   const user = await requireTenantUser(request);
   if (!user) return Response.json({ error: "Войдите или зарегистрируйтесь, чтобы запускать генерации." }, { status: 401 });
@@ -15,7 +55,8 @@ async function generateResponse(request: Request) {
   type LightingProduct = { name?: string; article?: string; type?: string; widthMm?: number|null; lengthMm?: number|null; source?: string; quantity?: number };
   type LightingTrack = { number?: number; name?: string; article?: string; lengthMm?: number };
   type LightingFixture = { marker?: number; name?: string; article?: string; mounting?: "track" | "ceiling" };
-  type LightingBrief = { referenceImages?: string[]; products?: LightingProduct[]; tracks?: LightingTrack[]; fixtures?: LightingFixture[]; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" };
+  type LightingOutlinePoint = { number?: number; xMm?: number; yMm?: number };
+  type LightingBrief = { referenceImages?: string[]; products?: LightingProduct[]; tracks?: LightingTrack[]; fixtures?: LightingFixture[]; ceilingOutline?: LightingOutlinePoint[]; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" };
   const body = await request.json() as { projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string }; lightingPlan?: LightingBrief & { planImage?: string; room?: { width?: number; length?: number } }; lightingEdit?: LightingBrief & { overlayImage?: string } };
   const idea = body.prompt?.trim()
     || (body.lightingPlan ? "Create a calm photorealistic contemporary residential interior with neutral natural materials, a clearly visible ceiling, and the exact technical-lighting layout supplied in the plan." : "")
@@ -161,9 +202,11 @@ async function generateResponse(request: Request) {
   const lightingFixtureMap = (body.lightingPlan?.fixtures || body.lightingEdit?.fixtures || []).map((item) => `маркер ${Math.round(item.marker || 0)}: ${item.name || "светильник"}${item.article ? ` (${item.article})` : ""}, монтаж ${item.mounting === "track" ? "на трек" : "непосредственно в/на потолок"}`).join("; ");
   const trackMountedCount = (body.lightingPlan?.fixtures || body.lightingEdit?.fixtures || []).filter((item) => item.mounting === "track").length;
   const ceilingMountedCount = Math.max(0, Math.round((body.lightingPlan?.fixtureCount || body.lightingEdit?.fixtureCount || 0) - trackMountedCount));
+  const ceilingOutline = (body.lightingPlan?.ceilingOutline || []).map((point) => `угол ${Math.round(point.number || 0)}: X ${Math.round(point.xMm || 0)} мм, Y ${Math.round(point.yMm || 0)} мм`).join("; ");
   const lightingPlanPrompt = [
     "Use image 1 as an authoritative top-down technical ceiling lighting plan.",
     `The room is ${Math.round(body.lightingPlan?.room?.width || 6000)} × ${Math.round(body.lightingPlan?.room?.length || 4500)} mm. The plan contains ${Math.round(body.lightingPlan?.trackCount || 0)} track lines and ${Math.round(body.lightingPlan?.fixtureCount || 0)} luminaires.`,
+    ceilingOutline ? `The ceiling is a strict non-rectangular polygon described clockwise by: ${ceilingOutline}. Preserve every recess, projection, angled bay and side length; do not simplify it to a rectangle.` : "Preserve the exact outer ceiling outline shown in the plan.",
     "Create a ceiling-focused architectural visualisation, not a general room render. Frame the ceiling and upper part of the room from a slightly upward-looking camera; the ceiling and lighting installation must occupy at least two thirds of the image. Show only enough furniture below to establish scale.",
     "Treat the plan as a strict bill of materials and placement map. Reproduce every track line and every numbered marker exactly once. Missing, duplicated, substituted or additional tracks and luminaires are forbidden.",
     `Hard inventory constraint: exactly ${Math.round(body.lightingPlan?.trackCount || 0)} track segments, exactly ${trackMountedCount} track-mounted luminaires, and exactly ${ceilingMountedCount} recessed or surface ceiling luminaires.`,
@@ -246,7 +289,7 @@ async function generateResponse(request: Request) {
     if (imageUrl.protocol !== "https:" || !supportedCatalogHost(imageUrl.hostname)) {
       throw new Error("Источник изображения товара не поддерживается.");
     }
-    const imageResponse = await fetch(imageUrl, { headers: { Accept: "image/*", "User-Agent": "ROOM-design-catalog/1.0" }, signal });
+    const imageResponse = await fetchWithNetworkRetry(imageUrl, { headers: { Accept: "image/*", "User-Agent": "ROOM-design-catalog/1.0" }, signal });
     if (!imageResponse.ok) throw new Error("Не удалось загрузить фотографию товара из каталога.");
     const contentType = imageResponse.headers.get("content-type")?.split(";")[0] || "";
     if (!contentType.startsWith("image/")) throw new Error("Каталог вернул файл, который не является изображением.");
@@ -403,7 +446,7 @@ async function generateResponse(request: Request) {
       form.append("size", outputSize);
       form.append("quality", "high");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      response = await fetchImageProviderWithRetry("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else if (body.roomImage && body.lightingEdit?.overlayImage) {
       const form = new FormData();
       form.append("model", model);
@@ -416,7 +459,7 @@ async function generateResponse(request: Request) {
       form.append("size", outputSize);
       form.append("quality", "high");
       form.append("output_format", "webp");
-      response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
+      response = await fetchImageProviderWithRetry("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": `Bearer ${apiKey}` }, body: form, signal: providerTimeout });
     } else if (body.planRender?.planImage) {
       const form = new FormData();
       form.append("model", model);
