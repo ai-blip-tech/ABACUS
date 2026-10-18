@@ -6,6 +6,7 @@ const source = await readFile(new URL("../app/technical-lighting/page.tsx", impo
 const generationRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const catalogRoute = await readFile(new URL("../app/api/lighting/catalog/route.ts", import.meta.url), "utf8");
 const homeSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const projectLightingRoute = await readFile(new URL("../app/api/projects/[id]/technical-lighting/route.ts", import.meta.url), "utf8");
 
 test("planogram adds catalog tracks at their real catalog length", () => {
   assert.match(source, /product\.specs\.lengthMm\|\|2000/);
@@ -24,7 +25,7 @@ test("planogram supports precise rotation, copy-paste and live wall offsets", ()
   assert.match(source, /Угол поворота трека/);
   assert.match(source, /onDoubleClick=/);
   assert.match(source, /setRotationEditingId\(track\.id\)/);
-  assert.match(source, /target\.closest\("\.folio-track-hit,\.folio-track-rotate-handle,\.folio-fixture"\)/);
+  assert.match(source, /target\.closest\("\.folio-track-hit,\.folio-track-rotate-handle,\.folio-fixture,\.folio-ceiling-vertex"\)/);
   assert.match(source, /folio-track-rotate-handle/);
   assert.match(source, /setRotatingTrack/);
   assert.match(source, /event\.key\.toLowerCase\(\)/);
@@ -130,15 +131,20 @@ test("technical-lighting header stays clean without a project breadcrumb", () =>
   assert.doesNotMatch(source, /className="folio-crumb"/);
 });
 
-test("ceiling plan resizes live from all four sides and keeps track dimensions physical", () => {
-  assert.match(source, /RoomResizeDrag/);
-  assert.match(source, /\["top","right","bottom","left"\]/);
-  assert.match(source, /className=\{`folio-room-resize \$\{side\}`\}/);
-  assert.match(source, /setRoomResize\(\{side/);
+test("ceiling plan supports exact arbitrary polygon geometry", () => {
+  assert.match(source, /type CeilingPreset="rectangle"\|"l-shape"\|"bay"\|"custom"/);
+  assert.match(source, /Г-образный/);
+  assert.match(source, /Нарисовать контур/);
+  assert.match(source, /Замкнуть контур/);
+  assert.match(source, /ceilingVertexDrag/);
+  assert.match(source, /updateCeilingSegmentLength/);
+  assert.match(source, /ТОЧНЫЕ РАЗМЕРЫ СТОРОН/);
   assert.match(source, /updateRoomDimensions/);
   assert.match(source, /pointsFor\(track\.lengthMm,sized/);
   assert.match(source, /folio-room-measure width/);
   assert.match(source, /folio-room-measure length/);
+  assert.match(source, /axisBounds\(\{x,y\},ceilingPoints\)/);
+  assert.match(source, /pointInPolygon\(p,ceilingPoints\)/);
 });
 
 test("moving a fixture or track shows live distances to nearby lighting elements", () => {
@@ -167,7 +173,8 @@ test("technical lighting can be saved into an existing or a new project", () => 
   assert.match(source, /Существующих проектов пока нет/);
   assert.match(source, /Создать новый/);
   assert.match(source, /\/technical-lighting`/);
-  assert.match(source, /technicalLighting:\{room,tracks,fixtures,photo/);
+  assert.match(source, /technicalLighting:\{room,ceilingPoints,ceilingPreset,tracks,fixtures,photo/);
+  assert.match(projectLightingRoute, /ceilingPoints: safeCeilingPoints/);
   assert.match(homeSource, /\/technical-lighting\?project=\$\{encodeURIComponent\(projectId\)\}/);
 });
 
@@ -178,5 +185,6 @@ test("lighting prompt carries strict inventory, marker mapping and ceiling-focus
   assert.match(generationRoute, /Numbered marker mapping/);
   assert.match(generationRoute, /Product colour is a hard constraint/);
   assert.match(generationRoute, /at least two thirds of the image/);
+  assert.match(generationRoute, /strict non-rectangular polygon/);
   assert.match(generationRoute, /form\.append\("quality", "high"\)/);
 });

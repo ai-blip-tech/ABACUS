@@ -115,6 +115,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return [{ id: shortText(fixture.id, 120) || crypto.randomUUID(), point: point(fixture.point), product: productFor(fixture.product), trackId: shortText(fixture.trackId, 120) || undefined }];
   });
   const roomInput = input.room && typeof input.room === "object" ? input.room as JsonObject : {};
+  const ceilingPoints = (Array.isArray(input.ceilingPoints) ? input.ceilingPoints : []).slice(0, 64).map(point);
+  const safeCeilingPoints = ceilingPoints.length >= 3 ? ceilingPoints : [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+  const ceilingPreset = ["rectangle", "l-shape", "bay", "custom"].includes(String(input.ceilingPreset)) ? String(input.ceilingPreset) : "custom";
   const photo = shortText(input.photo, 25_000_000);
   const photoAsset = photo.startsWith("data:") ? "technical-current" : "";
   try {
@@ -132,6 +135,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const technicalLighting = {
     version: 1,
     room: { width: finiteNumber(roomInput.width, 6000, 1000, 20000), length: finiteNumber(roomInput.length, 4500, 1000, 20000) },
+    ceilingPoints: safeCeilingPoints,
+    ceilingPreset,
     tracks,
     fixtures,
     photoAsset: photoAsset || undefined,
