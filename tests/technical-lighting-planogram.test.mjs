@@ -5,6 +5,7 @@ import test from "node:test";
 const source = await readFile(new URL("../app/technical-lighting/page.tsx", import.meta.url), "utf8");
 const generationRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const catalogRoute = await readFile(new URL("../app/api/lighting/catalog/route.ts", import.meta.url), "utf8");
+const homeSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
 test("planogram adds catalog tracks at their real catalog length", () => {
   assert.match(source, /product\.specs\.lengthMm\|\|2000/);
@@ -148,4 +149,34 @@ test("moving a fixture or track shows live distances to nearby lighting elements
   assert.match(source, /`до светильника \$\{index\+1\}`/);
   assert.match(source, /className=\{`folio-relative-measure \$\{measurement\.kind\}`\}/);
   assert.match(source, /measurement\.distance\} мм/);
+});
+
+test("ceiling plan supports wheel and button zoom without changing physical dimensions", () => {
+  assert.match(source, /planZoom,setPlanZoom/);
+  assert.match(source, /onWheel=\{zoomPlanWithWheel\}/);
+  assert.match(source, /Уменьшить масштаб/);
+  assert.match(source, /Увеличить масштаб/);
+  assert.match(source, /50,Math\.min\(180/);
+  assert.match(source, /room\.width\} × \$\{room\.length\} мм/);
+});
+
+test("technical lighting can be saved into an existing or a new project", () => {
+  assert.match(source, /Сохранить проект/);
+  assert.match(source, /Добавить в существующий/);
+  assert.doesNotMatch(source, /disabled=\{!projects\.length\}/);
+  assert.match(source, /Существующих проектов пока нет/);
+  assert.match(source, /Создать новый/);
+  assert.match(source, /\/technical-lighting`/);
+  assert.match(source, /technicalLighting:\{room,tracks,fixtures,photo/);
+  assert.match(homeSource, /\/technical-lighting\?project=\$\{encodeURIComponent\(projectId\)\}/);
+});
+
+test("lighting prompt carries strict inventory, marker mapping and ceiling-focused framing", () => {
+  assert.match(source, /quantity:\[\.\.\.activeTracks/);
+  assert.match(source, /fixtureItems=activeFixtures\.map/);
+  assert.match(generationRoute, /Hard inventory constraint/);
+  assert.match(generationRoute, /Numbered marker mapping/);
+  assert.match(generationRoute, /Product colour is a hard constraint/);
+  assert.match(generationRoute, /at least two thirds of the image/);
+  assert.match(generationRoute, /form\.append\("quality", "high"\)/);
 });
