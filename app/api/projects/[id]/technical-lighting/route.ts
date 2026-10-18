@@ -32,6 +32,8 @@ function sanitizeProduct(value: unknown, referenceAssets: Map<string, string>) {
   const type = ["track", "track_fixture", "fixture", "power", "accessory"].includes(String(product.type)) ? String(product.type) : "fixture";
   return {
     id,
+    provider: shortText(product.provider, 80) || (id.startsWith("gomoon:") ? "gomoon" : ""),
+    brand: shortText(product.brand, 160) || (id.startsWith("gomoon:") ? "GoMoon" : ""),
     article: shortText(product.article, 160),
     name: shortText(product.name, 240) || "Светильник",
     image,

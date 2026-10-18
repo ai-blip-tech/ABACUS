@@ -10,7 +10,7 @@ import "./technical-lighting-project.css";
 type Point={x:number;y:number};
 type CeilingPoint=Point;
 type CeilingPreset="rectangle"|"l-shape"|"bay"|"custom";
-type Product={id:string;article:string;name:string;image:string;price:number;available:boolean;categoryTrail:string;type:"track"|"track_fixture"|"fixture"|"power"|"accessory";isReference?:boolean;specs:{powerW:number|null;voltageV:number|null;cctK:number|null;beamDeg:number|null;widthMm?:number|null;lengthMm:number|null}};
+type Product={id:string;provider?:"gomoon";brand?:string;article:string;name:string;image:string;price:number;available:boolean;categoryTrail:string;type:"track"|"track_fixture"|"fixture"|"power"|"accessory";isReference?:boolean;specs:{powerW:number|null;voltageV:number|null;cctK:number|null;beamDeg:number|null;widthMm?:number|null;lengthMm:number|null}};
 type Track={id:string;points:[Point,Point];product:Product;lengthMm:number;rotation:number};
 type Fixture={id:string;point:Point;product:Product;trackId?:string};
 type Selection={kind:"track"|"fixture";id:string}|null;

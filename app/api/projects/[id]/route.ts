@@ -20,6 +20,8 @@ type SavedPlanItem = {
   referenceName?: string;
   referenceProductId?: string;
   referenceArticle?: string;
+  referenceBrand?: string;
+  referenceCatalogSource?: string;
   referenceUrl?: string;
   referencePrice?: number;
   referenceOldPrice?: number;
@@ -239,6 +241,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       referenceName: shortText(item.referenceName, 240) || undefined,
       referenceProductId: shortText(item.referenceProductId, 160) || undefined,
       referenceArticle: shortText(item.referenceArticle, 160) || undefined,
+      referenceBrand: shortText(item.referenceBrand, 240) || undefined,
+      referenceCatalogSource: shortText(item.referenceCatalogSource, 80) || undefined,
       referenceUrl: storedImageUrl(item.referenceUrl),
       referencePrice: typeof item.referencePrice === "number" && Number.isFinite(item.referencePrice) ? item.referencePrice : undefined,
       referenceOldPrice: typeof item.referenceOldPrice === "number" && Number.isFinite(item.referenceOldPrice) ? item.referenceOldPrice : undefined,

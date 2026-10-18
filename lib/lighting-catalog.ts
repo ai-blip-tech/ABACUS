@@ -27,6 +27,10 @@ export type LightingProduct = {
   };
 };
 
+const LIGHTING_FEED_URL = "https://gomoon.ru/bitrix/catalog_export/yandex_801943.php";
+const LIGHTING_CACHE_TTL = 30 * 60 * 1000;
+let lightingCache: { expiresAt: number; products: LightingProduct[] } | null = null;
+
 type Category = { id: string; parentId: string; name: string };
 
 const decodeXml = (value = "") => value
@@ -131,6 +135,15 @@ export function parseLightingCatalog(xml: string): LightingProduct[] {
       },
     });
   }
+  return products;
+}
+
+export async function loadLightingCatalog() {
+  if (lightingCache && lightingCache.expiresAt > Date.now()) return lightingCache.products;
+  const response = await fetch(LIGHTING_FEED_URL, { headers: { Accept: "application/xml,text/xml", "User-Agent": "ROOM-design-lighting/1.0" }, cache: "no-store" });
+  if (!response.ok) throw new Error(`GoMoon feed responded with ${response.status}`);
+  const products = parseLightingCatalog(await response.text());
+  lightingCache = { expiresAt: Date.now() + LIGHTING_CACHE_TTL, products };
   return products;
 }
 

@@ -6,7 +6,7 @@ if (typeof window !== "undefined" && !(window as Window & { __roomPlanControls?:
   const later = (callback: () => void) => window.setTimeout(callback, 0);
   const trigger = (selector: string) => document.querySelector<HTMLButtonElement>(`.plan-properties ${selector}`)?.click();
 
-  type CatalogProduct = { id:string;name:string;article:string;image:string;images?:string[];url:string;price:number;available:boolean;subtype:string;widthMm:number|null;depthMm:number|null };
+  type CatalogProduct = { id:string;name:string;article:string;image:string;images?:string[];url:string;price:number;available:boolean;subtype:string;widthMm:number|null;depthMm:number|null;brand:string;source?:"norrmobler"|"leve-home" };
   const catalogType = (item: HTMLElement) => {
     const name = (item.getAttribute("aria-label") || "").toLocaleLowerCase("ru-RU");
     if (item.classList.contains("sofa")) return "sofa";
@@ -39,16 +39,24 @@ if (typeof window !== "undefined" && !(window as Window & { __roomPlanControls?:
     drawer.className = "catalog-drawer catalog-drawer-dom";
     drawer.setAttribute("aria-label", "Каталог товаров");
     const title = (item.getAttribute("aria-label") || "Предмет").split(":")[0];
-    drawer.innerHTML = `<header><div><span>КАТАЛОГ</span><b></b></div><button type="button" aria-label="Закрыть каталог">×</button></header><div class="catalog-search"><input placeholder="Название или артикул" aria-label="Поиск по названию или артикулу"><label><input type="checkbox">В наличии</label></div><div class="catalog-chips"></div><div class="catalog-results-head"><span>Загружаем товары…</span></div><div class="catalog-grid"></div><footer>Товар получит изображение, артикул и реальные габариты из каталога.</footer>`;
+    drawer.innerHTML = `<header><div><span>КАТАЛОГ</span><b></b></div><button type="button" aria-label="Закрыть каталог">×</button></header><div class="catalog-search"><input placeholder="Название или артикул" aria-label="Поиск по названию или артикулу"><label><input type="checkbox">В наличии</label></div><div class="catalog-brand-filter plan-catalog-brand-filter" role="group" aria-label="Выбор бренда"><span>БРЕНД</span><div><button type="button" class="active" data-brand="">Все бренды</button><button type="button" data-brand="norrmobler"><i></i>NORR Møbler</button><button type="button" data-brand="leve-home"><i></i>LEVE HOME</button></div></div><div class="catalog-chips"></div><div class="catalog-results-head"><span>Загружаем товары…</span></div><div class="catalog-grid"></div><footer>Товар получит изображение, артикул и реальные габариты из каталога.</footer>`;
     drawer.querySelector("header b")!.textContent = title;
     drawer.querySelector("header button")!.addEventListener("click", closeCatalog);
     document.querySelector(".planogram-workspace")?.append(drawer);
     const search = drawer.querySelector<HTMLInputElement>(".catalog-search>input")!;
     const available = drawer.querySelector<HTMLInputElement>('.catalog-search input[type="checkbox"]')!;
     const chips = drawer.querySelector<HTMLElement>(".catalog-chips")!;
+    const brandButtons = Array.from(drawer.querySelectorAll<HTMLButtonElement>("[data-brand]"));
     const head = drawer.querySelector<HTMLElement>(".catalog-results-head")!;
     const grid = drawer.querySelector<HTMLElement>(".catalog-grid")!;
+    const selectedBrands = new Set<string>();
     let subtype = "", page = 1, total = 0, timer = 0, loading = false, requestToken = 0, controller: AbortController | null = null;
+    const updateBrandButtons = () => {
+      brandButtons.forEach((button) => {
+        const brand = button.dataset.brand || "";
+        button.classList.toggle("active", brand ? selectedBrands.has(brand) : selectedBrands.size === 0);
+      });
+    };
     const renderProducts = (products: CatalogProduct[], append: boolean) => {
       if (!append) grid.replaceChildren();
       products.forEach((product, productIndex) => {
@@ -71,6 +79,7 @@ if (typeof window !== "undefined" && !(window as Window & { __roomPlanControls?:
           else { image.classList.add("failed"); media.classList.add("loaded"); }
         });
         media.append(image);
+        if (product.brand) { const sourceBadge = document.createElement("em"); sourceBadge.className = "catalog-source-badge"; sourceBadge.textContent = product.brand; media.append(sourceBadge); }
         if (!product.available) { const badge = document.createElement("em"); badge.textContent = "Под заказ"; media.append(badge); }
         const name = document.createElement("b"); name.textContent = product.name;
         const article = document.createElement("small"); article.textContent = `Арт. ${product.article}`;
@@ -89,6 +98,7 @@ if (typeof window !== "undefined" && !(window as Window & { __roomPlanControls?:
       head.innerHTML = `<span>${append ? "Загружаем ещё…" : "Загружаем товары…"}</span>`;
       const params = new URLSearchParams({ type, q: search.value.trim(), subtype, page: String(page), limit: "12" });
       if (available.checked) params.set("available", "1");
+      if (selectedBrands.size) params.set("brands", Array.from(selectedBrands).join(","));
       fetch(`/api/catalog?${params}`, { signal: controller.signal }).then(async (response) => { const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "Не удалось загрузить каталог."); return payload; }).then((payload) => {
         total = payload.total || 0; renderProducts(payload.products || [], append); head.innerHTML = `<span>${total} товаров</span>`;
         if (!chips.children.length && payload.subtypes?.length > 1) {
@@ -99,6 +109,17 @@ if (typeof window !== "undefined" && !(window as Window & { __roomPlanControls?:
     };
     search.addEventListener("input", () => { window.clearTimeout(timer); timer = window.setTimeout(() => { page = 1; load(false); }, 300); });
     available.addEventListener("change", () => { page = 1; load(false); });
+    brandButtons.forEach((button) => button.addEventListener("click", () => {
+      const brand = button.dataset.brand || "";
+      if (!brand) selectedBrands.clear();
+      else if (selectedBrands.has(brand)) selectedBrands.delete(brand);
+      else selectedBrands.add(brand);
+      subtype = "";
+      page = 1;
+      chips.replaceChildren();
+      updateBrandButtons();
+      load(false);
+    }));
     grid.addEventListener("scroll", () => {
       if (!loading && grid.children.length < total && grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 240) {
         page += 1;
