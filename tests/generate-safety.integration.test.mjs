@@ -497,7 +497,27 @@ test("technical-lighting status reports an operation that exceeded its deadline 
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.equal(payload.status, "stuck");
-  assert.match(payload.message, /зависшая.*Повторный запрос провайдеру не отправлен/);
+  assert.match(payload.message, /зависшая.*не означает, что генерация прекратилась.*Повторный запрос провайдеру не отправлен/);
+});
+
+test("a late technical-lighting result replaces stuck status and remains recoverable", async () => {
+  const id = "lighting-late-after-stuck";
+  await registerTechnicalLightingOperation({ requestId: id, requestFingerprint: "c".repeat(64), operationType: "plan_render", userId: user.id, tenantId: user.tenantId });
+  await database.prepare("UPDATE technical_lighting_operations SET created_at = ? WHERE request_id = ?").bind(new Date(Date.now() - 5 * 60 * 1000).toISOString(), id).run();
+  const statusRequest = () => new Request(`https://norr-club.testaimoblernorr.chatgpt.site/api/lighting/generate/status?operationId=${id}`, { headers: { Cookie: `room_session=${session}` } });
+  const delayed = await generationStatus(statusRequest());
+  assert.equal((await delayed.json()).status, "stuck");
+  const bytes = Uint8Array.from(atob(png.split(",")[1]), (character) => character.charCodeAt(0));
+  const outputKey = `${auth.tenantStoragePrefix(user)}/generations/late/${id}.webp`;
+  await auth.storage().put(outputKey, bytes, { httpMetadata: { contentType: "image/webp" } });
+  await auth.recordGeneration(user, { id, operation: "plan_render", prompt: "late result", outputKey, contentType: "image/webp", bytes: bytes.byteLength });
+  const completed = await generationStatus(statusRequest());
+  const completedPayload = await completed.json();
+  assert.equal(completedPayload.status, "succeeded");
+  assert.equal(completedPayload.imageUrl, `/api/account/generations/${id}`);
+  const imageResponse = await generationImage(new Request(`https://norr-club.testaimoblernorr.chatgpt.site${completedPayload.imageUrl}`, { headers: { Cookie: `room_session=${session}` } }), { params: Promise.resolve({ id }) });
+  assert.equal(imageResponse.status, 200);
+  assert.equal((await imageResponse.arrayBuffer()).byteLength, bytes.byteLength);
 });
 
 test("technical-lighting control request disables retry and unknown outcomes never retry", async () => {
