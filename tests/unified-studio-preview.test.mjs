@@ -61,6 +61,10 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(page, /aria-label="Категории мебели"/);
   assert.match(css, /inspector:has\(\.studio-bottom-catalog\)[\s\S]*height: 238px/);
   assert.match(css, /studio-bottom-catalog \.furniture-catalog-grid[\s\S]*overflow-x: auto/);
+  assert.match(css, /room-canvas:has\(\.studio-point-menu\) \.material-brush-trigger svg[\s\S]*translate\(-50%,-50%\)/);
+  assert.match(css, /@media \(min-width: 768px\)[\s\S]*inspector:has\(\.studio-bottom-catalog\)[\s\S]*inset: auto 0 0!important/);
+  assert.match(css, /furniture-catalog-card > span img[\s\S]*transform: scale\(1\.35\)/);
+  assert.match(css, /furniture-catalog-card > b[\s\S]*font-size: 7\.5px/);
 });
 
 test("responsive studio provides tablet drawers and mobile bottom sheets", () => {
