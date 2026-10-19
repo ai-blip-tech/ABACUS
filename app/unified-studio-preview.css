@@ -626,7 +626,6 @@
   background: var(--studio-burgundy);
   color: #fff;
 }
-.unified-studio-preview[data-studio-mode="image"]:has(.studio-bottom-catalog) .room-canvas .material-tool { display: none; }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:hover,
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:focus-visible,
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:active {
