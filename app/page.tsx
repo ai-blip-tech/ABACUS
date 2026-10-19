@@ -32,6 +32,10 @@ type DashboardBrand = { brandId:string; brandName:string; uniqueProductCount:num
 type PersonalCatalogDashboard = { projectsCount:number; uniqueProductsCount:number; favoritesCount:number; usedBrandsCount:number; topProducts:DashboardFurnitureItem[]; brands:DashboardBrand[]; furnitureState:"ready"|"empty"|"unavailable" };
 type AccountOverview = { projects: AccountProject[]; generations: AccountGeneration[]; summary: { generation_count?: number; total_tokens?: number; cost_usd?: number }; dashboard?:PersonalCatalogDashboard };
 type ProjectStateOverride = Partial<{ interiorImage: string; generatedImage: string; interiorName: string; generated: boolean; activeHistoryId: string | null; historyVersions: HistoryItem[]; proposalItems: PlanItem[] }>;
+type AppView = "home" | "account" | "newProject" | "projectMenu" | "studio";
+type ProjectBrief = { client:string; object:string; goal:string; style:string; requirements:string; budget:string; timeline:string; conditions:string };
+
+const EMPTY_PROJECT_BRIEF: ProjectBrief = { client:"", object:"", goal:"", style:"", requirements:"", budget:"", timeline:"", conditions:"" };
 
 const products: Product[] = [
   { name: "Модульный диван Осло", type: "Диваны", price: "$2,400", image: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=500&q=85" },
@@ -106,7 +110,7 @@ const DEFAULT_PROJECT_PROMPT = "Создайте тёплую скандинав
 const DEFAULT_PRESERVED_PARTS = ["Архитектуру", "Окна", "Пол", "Потолок"];
 
 export default function Home() {
-  const [view, setView] = useState<"home" | "account" | "newProject" | "studio">("home");
+  const [view, setView] = useState<AppView>("home");
   const [user, setUser] = useState<SignedInUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -117,6 +121,7 @@ export default function Home() {
   const [projectId, setProjectId] = useState("");
   const [projectType, setProjectType] = useState("Квартира");
   const [projectDescription, setProjectDescription] = useState("");
+  const [projectBrief, setProjectBrief] = useState<ProjectBrief>(EMPTY_PROJECT_BRIEF);
   const [projectError, setProjectError] = useState("");
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isLoadingProject, setIsLoadingProject] = useState(false);
@@ -127,6 +132,10 @@ export default function Home() {
   const [saveProjectName, setSaveProjectName] = useState("");
   const [saveProjectError, setSaveProjectError] = useState("");
   const [activeTool, setActiveTool] = useState("Добавить мебель"); const [selected, setSelected] = useState("Модульный диван Осло");
+  const [unifiedStudioPreview, setUnifiedStudioPreview] = useState(false);
+  const [imageStudioTool, setImageStudioTool] = useState("Добавить мебель");
+  const [studioDrawer, setStudioDrawer] = useState<"context" | "history" | null>(null);
+  const studioWorkspaceRef = useRef<HTMLElement>(null);
   const [isGenerating, setIsGenerating] = useState(false); const [generated, setGenerated] = useState(false); const [favorite, setFavorite] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState("");
@@ -183,7 +192,7 @@ export default function Home() {
   const [proposalError, setProposalError] = useState("");
   const resetProjectWorkspace = (clearDetails = false) => {
     setProjectId("");
-    if (clearDetails) { setProjectName(""); setProjectType("Квартира"); setProjectDescription(""); }
+    if (clearDetails) { setProjectName(""); setProjectType("Квартира"); setProjectDescription(""); setProjectBrief(EMPTY_PROJECT_BRIEF); }
     setProjectError(""); setProjectSaved(false); setIsLoadingProject(false); setIsSavingProject(false);
     setSaveProjectDialogOpen(false); setSaveProjectName(""); setSaveProjectError("");
     setActiveTool("Добавить мебель"); setSelected("Модульный диван Осло"); setGenerated(false); setFavorite(false);
@@ -381,7 +390,7 @@ export default function Home() {
     }
   };
   useEffect(() => {
-    if (view !== "studio" || !projectId) return;
+    if ((view !== "studio" && view !== "projectMenu") || !projectId) return;
     if (skipNextProjectLoadRef.current === projectId) {
       skipNextProjectLoadRef.current = "";
       setIsLoadingProject(false);
@@ -523,36 +532,81 @@ export default function Home() {
     }
   };
   const productMode = activeTool === "Добавить мебель";
-  const navigate = (nextView: "home" | "account" | "newProject" | "studio", nextProjectId = projectId) => {
-    const paths = { home: "", account: "#кабинет", newProject: "#новый-проект", studio: "#студия" };
+  const studioMode: "image" | "plan" = activeTool === "Планограмма" ? "plan" : "image";
+  const selectedHistoryVersion = historyVersions.find((version) => version.id === activeHistoryId) || historyVersions.at(-1) || null;
+  const selectStudioMode = (mode: "image" | "plan") => {
+    setStudioDrawer(null);
+    if (mode === "plan") {
+      if (activeTool !== "Планограмма") setImageStudioTool(activeTool);
+      setActiveTool("Планограмма");
+    } else {
+      setActiveTool(imageStudioTool === "Планограмма" ? "Добавить мебель" : imageStudioTool);
+    }
+    if (!unifiedStudioPreview) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("studioPreview", "unified");
+    url.searchParams.set("studioMode", mode);
+    window.history.pushState({ ...window.history.state, studioMode: mode }, "", `${url.pathname}${url.search}${url.hash}`);
+  };
+  const toggleStudioFullscreen = async () => {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await studioWorkspaceRef.current?.requestFullscreen();
+  };
+  const navigate = (nextView: AppView, nextProjectId = projectId) => {
+    const paths: Record<AppView, string> = { home: "", account: "#кабинет", newProject: "#новый-проект", projectMenu: "#меню-проекта", studio: "#студия" };
     const url = new URL(window.location.href);
     url.pathname = "/";
-    if (nextView === "studio" && nextProjectId) url.searchParams.set("project", nextProjectId);
+    if ((nextView === "studio" || nextView === "projectMenu") && nextProjectId) url.searchParams.set("project", nextProjectId);
     else url.searchParams.delete("project");
     url.hash = paths[nextView];
-    window.history.pushState({ norrView: nextView, projectId: nextView === "studio" ? nextProjectId : "" }, "", `${url.pathname}${url.search}${url.hash}`);
-    if (nextView === "studio") setProjectId(nextProjectId);
+    window.history.pushState({ norrView: nextView, projectId: nextView === "studio" || nextView === "projectMenu" ? nextProjectId : "" }, "", `${url.pathname}${url.search}${url.hash}`);
+    if (nextView === "studio" || nextView === "projectMenu") setProjectId(nextProjectId);
     setView(nextView);
   };
   const openAuth = (mode: "register" | "login" = "register") => { setAuthMode(mode); setAuthOpen(true); };
   const continueToProject = () => user ? navigate("account") : openAuth("register");
   useEffect(() => {
-    const viewFromUrl = () => { const hash=decodeURIComponent(window.location.hash); return hash==="#кабинет"?"account":hash==="#новый-проект"?"newProject":hash==="#студия"?"studio":"home"; };
+    const viewFromUrl = (): AppView => { const rawHash=window.location.hash.slice(1);const hash=`#${new URLSearchParams(`value=${rawHash}`).get("value")||rawHash}`; return hash==="#кабинет"?"account":hash==="#новый-проект"?"newProject":hash==="#меню-проекта"?"projectMenu":hash==="#студия"?"studio":"home"; };
     const projectFromUrl = () => new URLSearchParams(window.location.search).get("project")?.trim() || "";
     const initialView = viewFromUrl();
-    const initialProjectId = initialView === "studio" ? projectFromUrl() : "";
+    const initialProjectId = initialView === "studio" || initialView === "projectMenu" ? projectFromUrl() : "";
     if (initialProjectId) setProjectId(initialProjectId);
     window.history.replaceState({ ...window.history.state, norrView:initialView, projectId:initialProjectId }, "", window.location.href);
     const frame=requestAnimationFrame(()=>setView(initialView));
     const onPopState = (event: PopStateEvent) => {
       const nextView = event.state?.norrView ?? viewFromUrl();
-      const nextProjectId = nextView === "studio" ? String(event.state?.projectId || projectFromUrl()) : "";
+      const nextProjectId = nextView === "studio" || nextView === "projectMenu" ? String(event.state?.projectId || projectFromUrl()) : "";
       setProjectId(nextProjectId);
       setView(nextView);
     };
     window.addEventListener("popstate", onPopState);
     return () => {cancelAnimationFrame(frame);window.removeEventListener("popstate", onPopState);};
   }, []);
+  useEffect(() => {
+    const syncPreviewMode = () => {
+      const params = new URLSearchParams(window.location.search);
+      const enabled = params.get("studioPreview") === "unified";
+      setUnifiedStudioPreview(enabled);
+      if (enabled) setActiveTool(params.get("studioMode") === "plan" ? "Планограмма" : "Добавить мебель");
+    };
+    syncPreviewMode();
+    window.addEventListener("popstate", syncPreviewMode);
+    return () => window.removeEventListener("popstate", syncPreviewMode);
+  }, []);
+  useEffect(() => {
+    if (!unifiedStudioPreview) return;
+    const closeTemporaryLayer = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setStudioDrawer(null);
+      setPlacementPoint(null);
+      setSelectedObject(null);
+    };
+    window.addEventListener("keydown", closeTemporaryLayer);
+    return () => window.removeEventListener("keydown", closeTemporaryLayer);
+  }, [unifiedStudioPreview]);
+  useEffect(() => {
+    if (activeTool !== "Планограмма") setImageStudioTool(activeTool);
+  }, [activeTool]);
   useEffect(() => {
     let active = true;
     void fetch("/api/auth/me")
@@ -584,8 +638,8 @@ export default function Home() {
   useEffect(() => { const handlePlanSave = () => { void saveProject(); }; window.addEventListener("room-save-project", handlePlanSave); return () => window.removeEventListener("room-save-project", handlePlanSave); });
   const selectedPlanItemForIt = planItems.find((item) => item.id === planSelectedId) || null;
   const itContext: RoomDesignContext = {
-    route: view === "studio" ? "#студия" : `#${view}`,
-    page: view === "home" ? "landing" : view === "account" ? "projects" : view === "newProject" ? "project-setup" : "studio",
+    route: view === "studio" ? "#студия" : view === "projectMenu" ? "#меню-проекта" : `#${view}`,
+    page: view === "home" ? "landing" : view === "account" ? "projects" : view === "newProject" ? "project-setup" : view === "projectMenu" ? "other" : "studio",
     projectId: projectId || null,
     projectName: projectName || "Новый проект",
     section: activeTool === "Планограмма" ? "planogram" : "image-editor",
@@ -693,49 +747,78 @@ export default function Home() {
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
   </>;
   if (view === "account") return <>
-    <AccountDashboardWithProfile user={user} onUserUpdated={setUser} onHome={()=>navigate("home")} onCreate={()=>{resetProjectWorkspace(true);navigate("newProject","");}} onOpenProject={(project)=>{resetProjectWorkspace(false);setProjectName(project.name);navigate("studio",project.id)}} onOpenGeneration={async(generation)=>{try{const image=await blobAsDataUrl(`/api/account/generations/${generation.id}`);resetProjectWorkspace(true);setInteriorImage(image);setGeneratedImage(image);setInteriorName("Сохранённая генерация");setGenerated(true);setRatioFromImage(image);setHistoryVersions([{id:generation.id,name:"Сохранённая генерация",image,generated:true}]);setActiveHistoryId(generation.id);navigate("studio","");}catch{setGenerationError("Не удалось открыть сохранённую генерацию.");}}} onLogin={()=>openAuth("login")}/>
+    <AccountDashboardWithProfile user={user} onUserUpdated={setUser} onHome={()=>navigate("home")} onCreate={()=>{resetProjectWorkspace(true);navigate("newProject","");}} onOpenProject={(project)=>{resetProjectWorkspace(false);setProjectName(project.name);navigate(unifiedStudioPreview?"projectMenu":"studio",project.id)}} onOpenGeneration={async(generation)=>{try{const image=await blobAsDataUrl(`/api/account/generations/${generation.id}`);resetProjectWorkspace(true);setInteriorImage(image);setGeneratedImage(image);setInteriorName("Сохранённая генерация");setGenerated(true);setRatioFromImage(image);setHistoryVersions([{id:generation.id,name:"Сохранённая генерация",image,generated:true}]);setActiveHistoryId(generation.id);navigate("studio","");}catch{setGenerationError("Не удалось открыть сохранённую генерацию.");}}} onLogin={()=>openAuth("login")}/>
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);}}/>}
   </>;
-  if (view === "newProject") return <main className="project-page project-page-concept">
+  if (view === "newProject") return <main className={`project-page project-page-concept${unifiedStudioPreview?" is-brief-preview":""}`}>
     <header className="project-nav">
       <div className="project-brand">
         <button className="project-wordmark room-design-wordmark" type="button" onClick={() => navigate("home")} aria-label="ROOM DESIGN — на главную">ROOM DESIGN</button>
         <i aria-hidden="true"/>
         <button className="project-back" type="button" onClick={() => user ? navigate("account") : navigate("home")}>← {user ? "Кабинет" : "На главную"}</button>
       </div>
-      {user ? <AccountDropdown user={user}/> : <button className="project-login" type="button" onClick={()=>openAuth("login")}>Войти</button>}
+      {user ? <AccountDropdown user={user} dashboard={unifiedStudioPreview}/> : <button className="project-login" type="button" onClick={()=>openAuth("login")}>Войти</button>}
     </header>
     <section className="project-form-wrap">
       <section className="project-intro" aria-label="Новый проект">
-        <img src="/concept-d-create-project-hero.avif" alt=""/>
-        <div className="project-intro-shade" aria-hidden="true"/>
+        <img src={unifiedStudioPreview?"/project-brief-blueprint.png":"/concept-d-create-project-hero.avif"} alt=""/>
+        {unifiedStudioPreview&&projectBrief.client.trim()&&<div className="project-brief-signature" aria-hidden="true">
+          <span>{projectBrief.client.trim()}</span>
+        </div>}
+        {!unifiedStudioPreview&&<><div className="project-intro-shade" aria-hidden="true"/>
         <div className="project-intro-copy">
           <p className="project-kicker"><span>01</span><i aria-hidden="true"/>НОВЫЙ ПРОЕКТ</p>
           <h1>Создайте<br/>пространство<br/>для своей идеи.</h1>
           <p className="project-lead">Начните с названия — затем добавьте<br className="project-desktop-break"/> комнаты и изображения.</p>
         </div>
-        <p className="project-slogan"><i aria-hidden="true"/>ВДОХНОВЕНИЕ ПРЕВРАЩАЕТ ПРОСТРАНСТВО В ДОМ</p>
+        <p className="project-slogan"><i aria-hidden="true"/>ВДОХНОВЕНИЕ ПРЕВРАЩАЕТ ПРОСТРАНСТВО В ДОМ</p></>}
       </section>
       <section className="project-panel">
         <form className="project-form" noValidate onSubmit={async (e) => {
           e.preventDefault();
           if (!user || isCreatingProject) { if (!user) openAuth("register"); return; }
-          const name = projectName.trim();
-          if (!name) { setProjectError("Введите название проекта."); return; }
+          const briefDescription = [
+            ["Заказчик и контактное лицо",projectBrief.client], ["Объект и адрес",projectBrief.object], ["Цель проекта",projectBrief.goal],
+            ["Стиль и настроение",projectBrief.style], ["Ключевые требования",projectBrief.requirements], ["Бюджет и вилка",projectBrief.budget],
+            ["Сроки и этапы",projectBrief.timeline], ["Особые условия",projectBrief.conditions],
+          ].filter(([,value])=>value.trim()).map(([label,value])=>`${label}: ${value.trim()}`).join("\n");
+          const briefName = projectBrief.object.trim().split(/\n|,|\./)[0]?.trim().slice(0,96) || projectBrief.client.trim().split(/\n|,|\./)[0]?.trim().slice(0,96);
+          const name = unifiedStudioPreview ? briefName : projectName.trim();
+          if (!name) { setProjectError(unifiedStudioPreview?"Укажите объект и адрес.":"Введите название проекта."); return; }
+          const nextProjectType = unifiedStudioPreview ? (/офис/i.test(projectBrief.object)?"Офис":/дом|коттедж/i.test(projectBrief.object)?"Дом":/отел|ресторан|кафе|гостин/i.test(projectBrief.object)?"Гостеприимство":"Квартира") : projectType;
+          const nextDescription = unifiedStudioPreview ? briefDescription : projectDescription;
           setProjectError(""); setIsCreatingProject(true);
           try {
-            const response = await fetch("/api/projects", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name,projectType,description:projectDescription}) });
+            const response = await fetch("/api/projects", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name,projectType:nextProjectType,description:nextDescription}) });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload.project?.id) throw new Error(payload.error || "Не удалось создать проект.");
             const newProjectId = String(payload.project.id);
             resetProjectWorkspace(false);
             skipNextProjectLoadRef.current = newProjectId;
-            setProjectName(name); setProjectId(newProjectId); setProjectSaved(false); navigate("studio", newProjectId);
+            setProjectName(name); setProjectType(nextProjectType); setProjectDescription(nextDescription); setProjectId(newProjectId); setProjectSaved(false); navigate(unifiedStudioPreview ? "projectMenu" : "studio", newProjectId);
           } catch (error) {
             setProjectError(error instanceof Error ? error.message : "Не удалось создать проект.");
           } finally { setIsCreatingProject(false); }
         }}>
-          <div className={projectError ? "project-field has-error" : "project-field"}>
+          {unifiedStudioPreview?<>
+            <header className="project-brief-heading"><span>НОВЫЙ ПРОЕКТ</span><h1>Короткий бриф</h1><p>Заполните главное — детали можно уточнить позже.</p></header>
+            <div className="project-brief-grid">
+              {([
+                ["client","ЗАКАЗЧИК И КОНТАКТНОЕ ЛИЦО","Имя, компания, кто принимает решения"],
+                ["object","ОБЪЕКТ И АДРЕС","Квартира, дом или офис · площадь · этаж · адрес"],
+                ["goal","ЦЕЛЬ ПРОЕКТА","Например: ремонт под ключ или обновить кухню"],
+                ["style","СТИЛЬ И НАСТРОЕНИЕ","1–2 направления и ссылки на 2–3 референса"],
+                ["requirements","КЛЮЧЕВЫЕ ТРЕБОВАНИЯ","Функции, хранение, состав помещений, обязательные решения"],
+                ["budget","БЮДЖЕТ И ВИЛКА","Общий бюджет или ориентир за м²"],
+                ["timeline","СРОКИ И ЭТАПЫ","Дата старта, контрольные точки и завершение"],
+                ["conditions","ОСОБЫЕ УСЛОВИЯ","Животные, эргономика, шум, ограничения перепланировки"],
+              ] as const).map(([key,label,placeholder])=><div key={key} className={`project-field project-brief-field${key==="requirements"||key==="conditions"?" is-wide":""}${projectError&&key==="object"?" has-error":""}`}>
+                <label htmlFor={`project-brief-${key}`}>{label}</label>
+                <textarea id={`project-brief-${key}`} value={projectBrief[key]} onChange={(event)=>{setProjectBrief((value)=>({...value,[key]:event.target.value}));if(projectError&&key==="object")setProjectError("");}} placeholder={placeholder}/>
+                {projectError&&key==="object"&&<p id="project-name-error" className="project-error" role="alert">{projectError}</p>}
+              </div>)}
+            </div>
+          </>:<><div className={projectError ? "project-field has-error" : "project-field"}>
             <label htmlFor="project-name">НАЗВАНИЕ ПРОЕКТА</label>
             <input id="project-name" required aria-invalid={Boolean(projectError)} aria-describedby={projectError ? "project-name-error" : undefined} value={projectName} onChange={(e) => { setProjectName(e.target.value); if (projectError) setProjectError(""); }} placeholder="Например, квартира на Патриарших"/>
             {projectError && <p id="project-name-error" className="project-error" role="alert">{projectError}</p>}
@@ -747,23 +830,79 @@ export default function Home() {
           <div className="project-field">
             <div className="project-label-row"><label htmlFor="project-description">ОПИСАНИЕ</label><small>необязательно</small></div>
             <textarea id="project-description" value={projectDescription} onChange={(e)=>setProjectDescription(e.target.value)} placeholder="Коротко опишите проект"/>
-          </div>
+          </div></>}
           <button className="create-project" type="submit" disabled={isCreatingProject}>{isCreatingProject ? "Создаём…" : "Создать проект"} <span aria-hidden="true">→</span></button>
         </form>
-        <footer className="project-panel-footer"><span>ROOM DESIGN</span><i aria-hidden="true"/><em>БОЛЬШЕ, ЧЕМ ИНТЕРЬЕР</em><b>№ 001</b></footer>
+        {!unifiedStudioPreview&&<footer className="project-panel-footer"><span>ROOM DESIGN</span><i aria-hidden="true"/><em>БОЛЬШЕ, ЧЕМ ИНТЕРЬЕР</em><b>№ 001</b></footer>}
       </section>
     </section>
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
   </main>;
-  return <main className="studio-shell">
-    <header className="topbar"><button className="wordmark room-design-wordmark" type="button" onClick={() => navigate("home")} aria-label="ROOM DESIGN — на главную">ROOM DESIGN</button><div className="crumb"><button onClick={() => window.history.back()}>← Проекты</button><i>›</i><b>{projectName || "Новый проект"}</b><i>›</i><span>Гостиная</span></div><div className="top-actions"><button className="help">?</button>{user?<AccountDropdown user={user} studio/>:<button className="avatar" title="Аккаунт" onClick={()=>openAuth("login")}>?</button>}</div></header>
-    <section className="studio"><aside className="tools" aria-label="Добавить мебель">
-      <button data-it-target="image-editor" onClick={() => { setActiveTool("Добавить мебель"); setFurnitureAction("add"); setFurnitureMode("choice"); }} className={activeTool === "Добавить мебель" ? "tool active furniture-tool" : "tool furniture-tool"} aria-label="Редактор изображений"><em className="furniture-symbol" aria-hidden="true"><i/><i/><i/></em><span>Редактор изображений</span></button>
+  if (view === "projectMenu") return <ProjectMenuPreview
+    user={user}
+    projectName={projectName || "Новый проект"}
+    projectType={projectType}
+    projectDescription={projectDescription}
+    projectId={projectId}
+    coverImage={generatedImage || interiorImage}
+    historyCount={historyVersions.length}
+    furnitureCount={planItems.length || proposalItems.length}
+    isLoading={isLoadingProject}
+    projectSaved={projectSaved}
+    onHome={()=>navigate("home")}
+    onProjects={()=>user?navigate("account"):navigate("home")}
+    onOpenStudio={()=>navigate("studio",projectId)}
+    onOpenTechnical={()=>{window.location.assign(`/technical-lighting${projectId?`?project=${encodeURIComponent(projectId)}&studioPreview=unified`:"?studioPreview=unified"}`)}}
+  />;
+  return <main ref={studioWorkspaceRef} className={`studio-shell${unifiedStudioPreview ? ` unified-studio-preview drawer-${studioDrawer || "closed"}` : ""}`} data-studio-mode={studioMode}>
+    <header className="topbar"><button className="wordmark room-design-wordmark" type="button" onClick={() => navigate("home")} aria-label="ROOM DESIGN — на главную">ROOM DESIGN</button><div className="crumb"><button onClick={() => unifiedStudioPreview&&projectId?navigate("projectMenu",projectId):user?navigate("account"):navigate("home")}>← {unifiedStudioPreview&&projectId?"Меню проекта":"Проекты"}</button><i>›</i><b>{projectName || "Новый проект"}</b><i>›</i><span>Гостиная</span></div><div className="top-actions"><button className="help" aria-label="Помощь" title="Помощь">?</button>{user?<AccountDropdown user={user} studio/>:<button className="avatar" title="Аккаунт" onClick={()=>openAuth("login")}>?</button>}</div></header>
+    {unifiedStudioPreview&&<section className="studio-project-bar" aria-label="Управление студией">
+      <div className="studio-project-identity">
+        <div><span>ПРОЕКТ</span><strong title={projectName || "Новый проект"}>{projectName || "Новый проект"}</strong><small>Гостиная</small></div>
+        <div className="studio-save-status" role="status" aria-live="polite"><i className={generationError?"is-error":projectSaved?"is-saved":"is-draft"}/><span>{isLoadingProject?"Загрузка проекта…":isSavingProject?"Сохранение…":generationError?"Требуется внимание":projectSaved?"Сохранено":"Есть несохранённые изменения"}</span></div>
+      </div>
+      <div className="studio-mode-tabs" role="tablist" aria-label="Режим студии интерьера">
+        <button type="button" role="tab" aria-selected={studioMode==="image"} onClick={()=>selectStudioMode("image")}>Редактор изображений</button>
+        <button type="button" role="tab" aria-selected={studioMode==="plan"} onClick={()=>selectStudioMode("plan")}>Создание интерьера</button>
+      </div>
+      <div className="studio-mobile-panels" aria-label="Панели студии">
+        <button type="button" aria-expanded={studioDrawer==="context"} onClick={()=>setStudioDrawer(studioDrawer==="context"?null:"context")}>{studioMode==="plan"?"Параметры":"Материалы"}</button>
+        {studioMode==="image"&&<button type="button" aria-expanded={studioDrawer==="history"} onClick={()=>setStudioDrawer(studioDrawer==="history"?null:"history")}>История</button>}
+      </div>
+      <div className="studio-project-actions">
+        {studioMode==="image"&&<button type="button" onClick={()=>setStudioDrawer(studioDrawer==="context"?null:"context")} aria-expanded={studioDrawer==="context"} aria-label="Инструменты редактирования" title="Каталог, референс и текстовая правка">✎</button>}
+        <button type="button" onClick={()=>setFavorite(!favorite)} aria-label={favorite?"Убрать из избранного":"Добавить в избранное"} title={favorite?"Убрать из избранного":"Добавить в избранное"}>{favorite?"♥":"♡"}</button>
+        <button type="button" disabled={!selectedHistoryVersion} onClick={()=>selectedHistoryVersion&&void downloadHistoryVersion(selectedHistoryVersion)} aria-label="Скачать выбранную версию" title="Скачать выбранную версию">⇩</button>
+        <button type="button" onClick={()=>void openCommercialProposal()} disabled={isSavingProject||isLoadingProject} aria-label="Создать коммерческое предложение" title="Создать коммерческое предложение">▤</button>
+        <button type="button" onClick={()=>void toggleStudioFullscreen()} aria-label="Полноэкранный режим рабочей зоны" title="Полноэкранный режим">⛶</button>
+        <button type="button" className="studio-save-button" onClick={()=>void saveProject()} disabled={isSavingProject||isLoadingProject}>{isSavingProject?"Сохраняем…":projectSaved?"Сохранено":"Сохранить проект"}</button>
+      </div>
+    </section>}
+    <section className="studio">{unifiedStudioPreview?<aside className="studio-source-rail" aria-label="Исходные материалы проекта">
+      <section className="studio-source-section">
+        <header><span>ИСХОДНОЕ ИЗОБРАЖЕНИЕ</span><h2>Пространство</h2></header>
+        <label className={interiorImage?"studio-source-upload has-image":"studio-source-upload"}>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event)=>loadInterior(event.target.files?.[0])}/>
+          <span className="studio-source-media">{interiorImage?<img src={interiorImage} alt="Исходное изображение интерьера"/>:<strong aria-hidden="true">＋</strong>}</span>
+          <em>SRC</em>
+          <span className="studio-source-copy"><b>{interiorImage?"Заменить исходное изображение":"Добавить исходное изображение"}</b><small>Загрузите фотографию</small><small>JPG, PNG или WEBP</small></span>
+        </label>
+      </section>
+      <section className="studio-source-section">
+        <header><span>РЕФЕРЕНС</span><h2>Направление</h2></header>
+        <label className={referenceImage?"studio-source-upload has-image":"studio-source-upload"}>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event)=>{const file=event.target.files?.[0];setReferenceName(file?.name||"");if(!file){setReferenceImage("");return;}const reader=new FileReader();reader.onload=()=>{setReferenceImage(String(reader.result||""));setLinkedCatalogProduct(null);};reader.readAsDataURL(file);}}/>
+          <span className="studio-source-media">{referenceImage?<img src={referenceImage} alt="Референс проекта"/>:<strong aria-hidden="true">＋</strong>}</span>
+          <em>REF</em>
+          <span className="studio-source-copy"><b>{referenceImage?"Заменить референс":"Добавить из референса"}</b><small>Загрузите фотографию</small><small>Стиль, мебель или настроение</small></span>
+        </label>
+      </section>
+      <p className="studio-source-motto"><i aria-hidden="true"/>ВДОХНОВЕНИЕ<br/>ПРЕВРАЩАЕТ ПРОСТРАНСТВО<br/>В ДОМ</p>
+    </aside>:<aside className="tools" aria-label="Навигация проекта"><button data-it-target="image-editor" onClick={() => { setActiveTool("Добавить мебель"); setFurnitureAction("add"); setFurnitureMode("choice"); }} className={activeTool === "Добавить мебель" ? "tool active furniture-tool" : "tool furniture-tool"} aria-label="Редактор изображений"><em className="furniture-symbol" aria-hidden="true"><i/><i/><i/></em><span>Редактор изображений</span></button>
       <button data-it-target="planogram" onClick={() => setActiveTool("Планограмма")} className={activeTool === "Планограмма" ? "tool planogram-tool active" : "tool planogram-tool"} aria-label="Создание интерьера"><em aria-hidden="true">⌗</em><span>Создание интерьера</span></button>
-      <a className="tool technical-lighting-beta-tool" href={projectId?`/technical-lighting?project=${encodeURIComponent(projectId)}`:"/technical-lighting"} aria-label="Технический свет Beta"><em aria-hidden="true">✦</em><span>Технический свет <small>Beta</small></span></a>
-      <div className="tool-spacer"/></aside>
+      <a className="tool technical-lighting-beta-tool" href={projectId?`/technical-lighting?project=${encodeURIComponent(projectId)}`:"/technical-lighting"} aria-label="Технический свет Beta"><em aria-hidden="true">✦</em><span>Технический свет <small>Beta</small></span></a><div className="tool-spacer"/></aside>}
       <section className="canvas-area">{activeTool === "Планограмма" ? <PlanogramWorkspace items={planItems} room={planRoom} selectedId={planSelectedId} onSelect={setPlanSelectedId} onChange={setPlanItems} onRoomChange={setPlanRoom} floorReference={planFloorReference} wallReference={planWallReference} onFloorReferenceChange={setPlanFloorReference} onWallReferenceChange={setPlanWallReference} camera={planCamera} onCameraChange={setPlanCamera} onCreateReference={createPlanReference} isCreatingReference={isPlanRendering}/> : <><div className="canvas-head"><div><span className="status-dot"/> {isLoadingProject ? "Загружаем проект…" : generated ? "Визуализация готова" : interiorImage ? "Исходное изображение" : "Загрузите фото интерьера"}</div><div className="canvas-actions"><button type="button" className={projectSaved ? "project-save-control project-save-head saved" : "project-save-control project-save-head"} onClick={()=>void saveProject()} disabled={isSavingProject||isLoadingProject}>{isLoadingProject ? "Загружаем…" : isSavingProject ? "Сохраняем…" : projectSaved ? "Сохранено" : "Сохранить проект"}</button><div className="proposal-control"><button type="button" className="proposal-print proposal-editor-open" onClick={()=>void openCommercialProposal()} disabled={isSavingProject||isLoadingProject} aria-label="Создать коммерческое предложение" title="Создать коммерческое предложение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2 2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 13h10v8H7z"/></svg><span>Создать коммерческое предложение</span></button>{proposalError&&<span className="proposal-inline-error" role="alert">{proposalError}</span>}</div><button className="favorite-icon" onClick={() => setFavorite(!favorite)} aria-label={favorite ? "Убрать из избранного" : "Добавить в избранное"} title={favorite ? "Убрать из избранного" : "Добавить в избранное"}>{favorite ? "♥" : "♡"}</button></div></div>
-        <div className={isGenerating ? "room-canvas processing" : "room-canvas"} style={{aspectRatio:canvasRatio,flex:"0 1 auto"}}><img src={generatedImage || interiorImage || "/project-loading-blueprint.png"} alt={generatedImage || interiorImage ? (generated ? "Сгенерированная интерьерная визуализация" : "Загруженный интерьер") : "Эскиз интерьера"}/>{isLoadingProject ? <div className="project-loading-screen" role="status" aria-live="polite"><div className="project-loading-card"><b>ROOM DESIGN</b><i aria-hidden="true"/><strong>Готовим ваш проект</strong><span>Собираем пространство, материалы и историю работы</span><div className="project-loading-progress" aria-label="Проект загружается"><em/><em/><em/></div></div></div> : !interiorImage && !generatedImage ? <div className="project-empty-screen"><div className="project-empty-card"><strong>Начните с вашего пространства</strong><p>Загрузите фотографию интерьера, чтобы добавить мебель и создать первую визуализацию.</p><label className="project-empty-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event)=>loadInterior(event.target.files?.[0])}/><span aria-hidden="true">↥</span><b>Загрузить фото интерьера</b><small>JPG, PNG или WEBP</small></label></div></div> : null}<div className="canvas-shade"/>{activeTool === "Слои" && interiorImage && <div role="application" aria-label="Обвести предмет кистью" onMouseDown={beginLayerBrush} onMouseMove={continueLayerBrush} onMouseUp={finishLayerBrush} onMouseLeave={finishLayerBrush} style={{position:"absolute",inset:0,zIndex:2,cursor:"crosshair",touchAction:"none"}}><svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:"100%",height:"100%",overflow:"visible",pointerEvents:"none"}}>{layerStrokes.map((stroke)=><path key={stroke.id} d={`M ${stroke.points.map((point)=>`${point[0]} ${point[1]}`).join(" L ")} Z`} fill="rgba(213,232,90,.16)" stroke="#d5e85a" strokeWidth=".45" vectorEffect="non-scaling-stroke"/>)}{layerDrawing&&layerDrawing.length>1&&<path d={`M ${layerDrawing.map((point)=>`${point[0]} ${point[1]}`).join(" L ")}`} fill="none" stroke="#d5e85a" strokeWidth=".45" vectorEffect="non-scaling-stroke" strokeLinecap="round"/>}</svg><span style={{position:"absolute",left:12,top:12,padding:"6px 8px",background:"#242520",borderRadius:4,color:"#fff",fontSize:11,fontWeight:700,pointerEvents:"none"}}>Зажмите и обведите предмет</span></div>}{activeTool === "Добавить мебель" && interiorImage && <><div className="furniture-switch"><button className={furnitureAction === "add" ? "active" : ""} onClick={()=>{setFurnitureAction("add");setPlacementPoint(null);setReplacementTarget(null);setFurnitureMode("choice")}}>Добавить</button><button className={furnitureAction === "replace" ? "active" : ""} onClick={()=>{setFurnitureAction("replace");setPlacementPoint(null);setReplacementTarget(null);setFurnitureMode("choice")}}>Заменить</button></div><button type="button" aria-label={furnitureAction === "replace" ? "Поставить точку в центре предмета для замены" : "Поставить точку размещения предмета"} onClick={(event)=>{const next=layerCursorPosition(event);if(placementPoint&&Math.hypot(next.x-placementPoint.x,next.y-placementPoint.y)<4)setPlacementPoint(null);else setPlacementPoint(next)}} style={{position:"absolute",inset:0,zIndex:3,border:0,padding:0,background:"transparent",cursor:"crosshair"}}>{placementPoint&&<span style={{position:"absolute",left:`${placementPoint.x}%`,top:`${placementPoint.y}%`,width:28,height:28,transform:"translate(-50%,-50%)",borderRadius:"50%",border:"2px solid #d5e85a",background:"#1f201c",color:"#fff",display:"grid",placeItems:"center",fontSize:22,fontWeight:400,boxShadow:"0 2px 10px #0008",pointerEvents:"none"}}>+</span>}</button></>}{activeTool === "Заменить" && Object.entries(exactPolygons).map(([id,polygons])=>{const item=detectedObjects.find((object)=>object.id===id);if(!item)return null;const active=selectedObject?.id===id||hoveredObject===id;const path=polygons.map((polygon)=>polygon.length?`M ${polygon.map((point,index)=>`${index?"L":""}${point[0]} ${point[1]}`).join(" ")} Z`:"").join(" ");return <button key={id} className="object-contour" style={{position:"absolute",inset:0,zIndex:4,width:"100%",height:"100%",padding:0,border:0,background:"transparent",cursor:"pointer"}} onMouseEnter={()=>setHoveredObject(id)} onMouseLeave={()=>setHoveredObject(null)} onFocus={()=>setHoveredObject(id)} onBlur={()=>setHoveredObject(null)} onClick={()=>previewObject(item)} aria-label={`Выбрать: ${item.name}`}><svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:"100%",height:"100%",overflow:"visible",pointerEvents:"none"}}><path d={path} fill={active?"rgba(213,232,90,.26)":"rgba(213,232,90,.11)"} stroke="#d5e85a" strokeWidth={active?0.46:0.28} vectorEffect="non-scaling-stroke"/></svg>{active&&<span style={{position:"absolute",left:`${item.x}%`,top:`${Math.max(2,item.y-4)}%`,padding:"5px 8px",background:"#242520",borderRadius:4,color:"#fff",fontSize:11,fontWeight:700,pointerEvents:"none"}}>{item.name}</span>}</button>})}{activeTool === "Добавить мебель" && interiorImage && placementPoint&&<div className="material-tool" onClick={(event)=>event.stopPropagation()}><button type="button" className="material-brush-trigger" aria-label="Изменить материал выбранной поверхности" aria-expanded={materialMenuOpen} onClick={()=>{if(materialMenuOpen){setMaterialMenuOpen(false);return;}enterMaterialMode();}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 3.3 6 6-8.4 8.4-6-6 8.4-8.4Z"/><path d="M5.2 12.8c-2.4.9-3.2 2.5-2.9 5 .3 2.4-1.1 3.2-1.1 3.2s4.7.7 6.8-1.5c1.2-1.2 1-3.2.1-4.6"/></svg><span className="sr-only">Материал / отделка</span></button>{materialMenuOpen&&materialSelection&&<div className="material-menu" role="dialog" aria-label="Изменить материал"><input ref={materialInputRef} className="material-reference-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event)=>loadMaterialReference(event.target.files?.[0])}/><button type="button" onClick={()=>materialInputRef.current?.click()}>Загрузить референс</button><button type="button" className="material-catalog-action" onClick={()=>{setGenerationError("Каталог материалов готовится.");setMaterialMenuOpen(false)}}>Добавить из каталога</button></div>}</div>}<div className="canvas-note"><span>{activeTool === "Слои" ? "РУЧНОЕ ВЫДЕЛЕНИЕ СЛОЁВ" : activeTool === "Добавить мебель" ? furnitureAction === "replace" ? "ЗАМЕНА ПРЕДМЕТА" : "ДОБАВЛЕНИЕ ПРЕДМЕТА" : generated ? "ИИ-ВИЗУАЛИЗАЦИЯ" : "ИСХОДНОЕ ИЗОБРАЖЕНИЕ"}</span><strong>{activeTool === "Слои" ? "Зажмите и обведите предмет кистью" : activeTool === "Добавить мебель" ? furnitureAction === "replace" ? "Поставьте точку в центре предмета, который хотите заменить." : "Поставьте точку на изображении, куда хотите установить предмет." : generated ? `Ваша идея / ${creativity.toLowerCase()} креативность` : "Гостиная"}</strong></div>{isGenerating && <div className="generating"><div className="orb"/><strong>Создаём ваш дизайн…</strong><span>Norr AI готовит визуализацию</span></div>}</div>
+        <div className={isGenerating ? "room-canvas processing" : "room-canvas"} style={{aspectRatio:canvasRatio,flex:"0 1 auto"}}><img src={generatedImage || interiorImage || "/project-loading-blueprint.png"} alt={generatedImage || interiorImage ? (generated ? "Сгенерированная интерьерная визуализация" : "Загруженный интерьер") : "Эскиз интерьера"}/>{isLoadingProject ? <div className="project-loading-screen" role="status" aria-live="polite"><div className="project-loading-card"><b>ROOM DESIGN</b><i aria-hidden="true"/><strong>Готовим ваш проект</strong><span>Собираем пространство, материалы и историю работы</span><div className="project-loading-progress" aria-label="Проект загружается"><em/><em/><em/></div></div></div> : !interiorImage && !generatedImage ? <div className="project-empty-screen"><div className="project-empty-card"><strong>Начните с вашего пространства</strong><p>Загрузите фотографию интерьера, чтобы добавить мебель и создать первую визуализацию.</p><label className="project-empty-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event)=>loadInterior(event.target.files?.[0])}/><span aria-hidden="true">↥</span><b>Загрузить фото интерьера</b><small>JPG, PNG или WEBP</small></label></div></div> : null}<div className="canvas-shade"/>{activeTool === "Слои" && interiorImage && <div role="application" aria-label="Обвести предмет кистью" onMouseDown={beginLayerBrush} onMouseMove={continueLayerBrush} onMouseUp={finishLayerBrush} onMouseLeave={finishLayerBrush} style={{position:"absolute",inset:0,zIndex:2,cursor:"crosshair",touchAction:"none"}}><svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:"100%",height:"100%",overflow:"visible",pointerEvents:"none"}}>{layerStrokes.map((stroke)=><path key={stroke.id} d={`M ${stroke.points.map((point)=>`${point[0]} ${point[1]}`).join(" L ")} Z`} fill="rgba(213,232,90,.16)" stroke="#d5e85a" strokeWidth=".45" vectorEffect="non-scaling-stroke"/>)}{layerDrawing&&layerDrawing.length>1&&<path d={`M ${layerDrawing.map((point)=>`${point[0]} ${point[1]}`).join(" L ")}`} fill="none" stroke="#d5e85a" strokeWidth=".45" vectorEffect="non-scaling-stroke" strokeLinecap="round"/>}</svg><span style={{position:"absolute",left:12,top:12,padding:"6px 8px",background:"#242520",borderRadius:4,color:"#fff",fontSize:11,fontWeight:700,pointerEvents:"none"}}>Зажмите и обведите предмет</span></div>}{activeTool === "Добавить мебель" && interiorImage && <><div className="furniture-switch"><button className={furnitureAction === "add" ? "active" : ""} onClick={()=>{setFurnitureAction("add");setPlacementPoint(null);setReplacementTarget(null);setFurnitureMode("choice")}}>Добавить</button><button className={furnitureAction === "replace" ? "active" : ""} onClick={()=>{setFurnitureAction("replace");setPlacementPoint(null);setReplacementTarget(null);setFurnitureMode("choice")}}>Заменить</button></div><button type="button" aria-label={furnitureAction === "replace" ? "Поставить точку в центре предмета для замены" : "Поставить точку размещения предмета"} onClick={(event)=>{const next=layerCursorPosition(event);if(placementPoint&&Math.hypot(next.x-placementPoint.x,next.y-placementPoint.y)<4)setPlacementPoint(null);else setPlacementPoint(next)}} style={{position:"absolute",inset:0,zIndex:3,border:0,padding:0,background:"transparent",cursor:"crosshair"}}>{placementPoint&&<span style={{position:"absolute",left:`${placementPoint.x}%`,top:`${placementPoint.y}%`,width:28,height:28,transform:"translate(-50%,-50%)",borderRadius:"50%",border:"2px solid #d5e85a",background:"#1f201c",color:"#fff",display:"grid",placeItems:"center",fontSize:22,fontWeight:400,boxShadow:"0 2px 10px #0008",pointerEvents:"none"}}>+</span>}</button>{placementPoint&&<section className="studio-point-menu" role="dialog" aria-label="Действия в выбранной точке" style={{left:`${Math.min(placementPoint.x,68)}%`,top:`${Math.max(placementPoint.y,24)}%`}} onClick={(event)=>event.stopPropagation()}><header><span>ВЫБРАННАЯ ТОЧКА</span><button type="button" aria-label="Закрыть меню точки" onClick={()=>{setPlacementPoint(null);setStudioDrawer(null)}}>×</button></header>{(linkedCatalogProduct?.image||referenceImage)&&<div className="studio-point-reference"><img src={linkedCatalogProduct?.image||referenceImage} alt=""/><span><b>{linkedCatalogProduct?.name||referenceName||"Референс"}</b><small>{linkedCatalogProduct?.article||"Готов к размещению"}</small></span></div>}<div className="studio-point-actions"><button type="button" className={furnitureAction==="add"?"active":""} onClick={()=>{setFurnitureAction("add");setFurnitureMode("choice");setStudioDrawer("context")}}>Добавить</button><button type="button" className={furnitureAction==="replace"?"active":""} onClick={()=>{setFurnitureAction("replace");setFurnitureMode("choice");setStudioDrawer("context")}}>Заменить</button><button type="button" className="danger" onClick={()=>void removeAtPlacement(placementPoint)}>Удалить</button></div><button type="button" className="studio-point-tools" onClick={()=>setStudioDrawer("context")}>Каталог, референс и текстовая правка →</button></section>}</>}{activeTool === "Заменить" && Object.entries(exactPolygons).map(([id,polygons])=>{const item=detectedObjects.find((object)=>object.id===id);if(!item)return null;const active=selectedObject?.id===id||hoveredObject===id;const path=polygons.map((polygon)=>polygon.length?`M ${polygon.map((point,index)=>`${index?"L":""}${point[0]} ${point[1]}`).join(" ")} Z`:"").join(" ");return <button key={id} className="object-contour" style={{position:"absolute",inset:0,zIndex:4,width:"100%",height:"100%",padding:0,border:0,background:"transparent",cursor:"pointer"}} onMouseEnter={()=>setHoveredObject(id)} onMouseLeave={()=>setHoveredObject(null)} onFocus={()=>setHoveredObject(id)} onBlur={()=>setHoveredObject(null)} onClick={()=>previewObject(item)} aria-label={`Выбрать: ${item.name}`}><svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:"100%",height:"100%",overflow:"visible",pointerEvents:"none"}}><path d={path} fill={active?"rgba(213,232,90,.26)":"rgba(213,232,90,.11)"} stroke="#d5e85a" strokeWidth={active?0.46:0.28} vectorEffect="non-scaling-stroke"/></svg>{active&&<span style={{position:"absolute",left:`${item.x}%`,top:`${Math.max(2,item.y-4)}%`,padding:"5px 8px",background:"#242520",borderRadius:4,color:"#fff",fontSize:11,fontWeight:700,pointerEvents:"none"}}>{item.name}</span>}</button>})}{activeTool === "Добавить мебель" && interiorImage && placementPoint&&<div className="material-tool" onClick={(event)=>event.stopPropagation()}><button type="button" className="material-brush-trigger" aria-label="Изменить материал выбранной поверхности" aria-expanded={materialMenuOpen} onClick={()=>{if(materialMenuOpen){setMaterialMenuOpen(false);return;}enterMaterialMode();}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 3.3 6 6-8.4 8.4-6-6 8.4-8.4Z"/><path d="M5.2 12.8c-2.4.9-3.2 2.5-2.9 5 .3 2.4-1.1 3.2-1.1 3.2s4.7.7 6.8-1.5c1.2-1.2 1-3.2.1-4.6"/></svg><span className="sr-only">Материал / отделка</span></button>{materialMenuOpen&&materialSelection&&<div className="material-menu" role="dialog" aria-label="Изменить материал"><input ref={materialInputRef} className="material-reference-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event)=>loadMaterialReference(event.target.files?.[0])}/><button type="button" onClick={()=>materialInputRef.current?.click()}>Загрузить референс</button><button type="button" className="material-catalog-action" onClick={()=>{setGenerationError("Каталог материалов готовится.");setMaterialMenuOpen(false)}}>Добавить из каталога</button></div>}</div>}<div className="canvas-note"><span>{activeTool === "Слои" ? "РУЧНОЕ ВЫДЕЛЕНИЕ СЛОЁВ" : activeTool === "Добавить мебель" ? furnitureAction === "replace" ? "ЗАМЕНА ПРЕДМЕТА" : "ДОБАВЛЕНИЕ ПРЕДМЕТА" : generated ? "ИИ-ВИЗУАЛИЗАЦИЯ" : "ИСХОДНОЕ ИЗОБРАЖЕНИЕ"}</span><strong>{activeTool === "Слои" ? "Зажмите и обведите предмет кистью" : activeTool === "Добавить мебель" ? furnitureAction === "replace" ? "Поставьте точку в центре предмета, который хотите заменить." : "Поставьте точку на изображении, куда хотите установить предмет." : generated ? `Ваша идея / ${creativity.toLowerCase()} креативность` : "Гостиная"}</strong></div>{isGenerating && <div className="generating"><div className="orb"/><strong>Создаём ваш дизайн…</strong><span>Norr AI готовит визуализацию</span></div>}</div>
         {activeTool === "Добавить мебель" && interiorImage && <><div className="furniture-action-bar" role="group" aria-label="Действие с мебелью"><button className={furnitureAction === "add" ? "active" : ""} onClick={()=>{setFurnitureAction("add");setPlacementPoint(null);setReplacementTarget(null);setFurnitureMode("choice")}}>Добавить</button><button className={furnitureAction === "replace" ? "active" : ""} onClick={()=>{setFurnitureAction("replace");setPlacementPoint(null);setReplacementTarget(null);setFurnitureMode("choice")}}>Заменить</button><button className={furnitureAction === "remove" ? "active danger" : "danger"} onClick={()=>{setFurnitureAction("remove");setReplacementTarget(null);setFurnitureMode("choice");if(placementPoint)void removeAtPlacement(placementPoint)}}>Удалить</button></div>{furnitureAction === "remove" && <button type="button" className="furniture-delete-overlay" aria-label="Поставить точку на предмете для удаления" onClick={(event)=>{const next=layerCursorPosition(event);if(placementPoint&&Math.hypot(next.x-placementPoint.x,next.y-placementPoint.y)<4){setPlacementPoint(null);return;}setPlacementPoint(next);void removeAtPlacement(next)}} style={{aspectRatio:canvasRatio}}/>}</>}
         <div className="history-strip"><div className="history-title"><b>История рендеров</b><span>{historyVersions.length} {historyVersions.length === 1 ? "версия" : "версии"}</span></div><div className="history-cards">{historyVersions.length ? historyVersions.map((version) => <div key={version.id} className="history-card-wrap"><button className={activeHistoryId === version.id ? "history-card current" : "history-card"} onClick={() => void openHistoryVersion(version)}><img src={version.image} alt=""/><span>{version.name}</span></button><button className="history-download" onClick={(event)=>{event.stopPropagation();void downloadHistoryVersion(version)}} aria-label={`Скачать: ${version.name}`} title="Скачать"><span className="history-download-icon" aria-hidden="true"><i/></span></button></div>) : <span className="history-empty">Создайте первую версию, чтобы увидеть её здесь.</span>}</div></div>
         {upscaleVersion&&<section className="upscale-panel" aria-label="Апскейл выбранной версии"><div className="upscale-preview"><img src={upscaleVersion.image} alt={`Предпросмотр: ${upscaleVersion.name}`}/><span>Предпросмотр перед апскейлом</span></div><div className="upscale-copy"><label>КАЧЕСТВО ИЗОБРАЖЕНИЯ</label><h2>Сделать апскейл</h2><p>Улучшим детализацию и чёткость выбранной версии. Композиция, предметы и кадр останутся прежними.</p><button className="generate" type="button" onClick={()=>void upscaleHistoryVersion()} disabled={isGenerating}>{isGenerating?"Улучшаем качество…":"✦ Сделать апскейл"}</button>{generationError&&<p className="generation-error" role="alert">{generationError}</p>}</div></section>}
@@ -772,6 +911,132 @@ export default function Home() {
     {saveProjectDialogOpen&&<div className="auth-overlay save-project-overlay" role="dialog" aria-modal="true" aria-labelledby="save-project-title"><form className="auth-card save-project-card" onSubmit={saveGenerationAsProject}><button className="auth-close" type="button" aria-label="Закрыть" onClick={()=>setSaveProjectDialogOpen(false)}>×</button><span>НОВЫЙ ПРОЕКТ</span><h2 id="save-project-title">Сохранить как проект</h2><p>Назовите проект, чтобы продолжить работу с этой визуализацией позже.</p><label htmlFor="save-project-name">Название проекта<input id="save-project-name" value={saveProjectName} onChange={(event)=>{setSaveProjectName(event.target.value);if(saveProjectError)setSaveProjectError("");}} required maxLength={120} placeholder="Например, гостиная на Патриарших"/></label>{saveProjectError&&<p className="auth-error" role="alert">{saveProjectError}</p>}<button className="auth-submit" disabled={isSavingProject}>{isSavingProject?"Сохраняем…":"Сохранить"}</button></form></div>}
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);setNorrEntryAuth(false);}} context={norrEntryAuth ? "norr-product" : "default"} required={norrEntryAuth}/>}
     {adminOpen && <AdminDashboard onClose={()=>setAdminOpen(false)}/>}
+  </main>;
+}
+
+type ProjectMenuStageId = "sources" | "planning" | "interior" | "materials" | "porcelain" | "bathroom" | "lighting" | "documentation";
+
+const PROJECT_MENU_STAGES: Array<{ id: ProjectMenuStageId; label: string; available: boolean }> = [
+  { id: "sources", label: "Обмерный план", available: false },
+  { id: "planning", label: "Планировочное решение", available: false },
+  { id: "materials", label: "Концепция и материалы", available: false },
+  { id: "interior", label: "Интерьер и меблировка", available: true },
+  { id: "lighting", label: "Технический свет", available: true },
+  { id: "bathroom", label: "Санузел", available: false },
+  { id: "porcelain", label: "Керамогранит", available: false },
+  { id: "documentation", label: "Документация", available: false },
+];
+
+function ProjectMenuPreview({
+  user,
+  projectName,
+  projectType,
+  projectDescription,
+  projectId,
+  coverImage,
+  historyCount,
+  furnitureCount,
+  isLoading,
+  projectSaved,
+  onHome,
+  onProjects,
+  onOpenStudio,
+  onOpenTechnical,
+}: {
+  user: SignedInUser | null;
+  projectName: string;
+  projectType: string;
+  projectDescription: string;
+  projectId: string;
+  coverImage: string;
+  historyCount: number;
+  furnitureCount: number;
+  isLoading: boolean;
+  projectSaved: boolean;
+  onHome: () => void;
+  onProjects: () => void;
+  onOpenStudio: () => void;
+  onOpenTechnical: () => void;
+}) {
+  const [selectedStage, setSelectedStage] = useState<ProjectMenuStageId>("interior");
+  const [unavailableStage, setUnavailableStage] = useState<string | null>(null);
+  const stage = PROJECT_MENU_STAGES.find((item) => item.id === selectedStage) || PROJECT_MENU_STAGES[2];
+  const stageIndex = PROJECT_MENU_STAGES.findIndex((item) => item.id === selectedStage);
+  const nextStage = PROJECT_MENU_STAGES[stageIndex + 1] || null;
+  const isInterior = selectedStage === "interior";
+  const isLighting = selectedStage === "lighting";
+  const openSelectedStage = () => {
+    if (isInterior) onOpenStudio();
+    if (isLighting) onOpenTechnical();
+  };
+  const openNextStage = () => {
+    if (!nextStage) return;
+    if (!nextStage.available) {
+      setUnavailableStage(nextStage.label);
+      return;
+    }
+    if (nextStage.id === "interior") onOpenStudio();
+    if (nextStage.id === "lighting") onOpenTechnical();
+  };
+  const stageDescription = isInterior
+    ? "Создавайте визуализации, расставляйте мебель и работайте с планом комнаты в единой студии."
+    : "Спроектируйте план потолка, выберите светильники и проверьте свет в интерьере.";
+  const renderLabel = historyCount === 1 ? "1 визуализация" : `${historyCount} визуализаций`;
+  useEffect(()=>{if(!unavailableStage)return;const timer=window.setTimeout(()=>setUnavailableStage(null),3600);return()=>window.clearTimeout(timer);},[unavailableStage]);
+
+  return <main className="project-menu-preview">
+    <header className="project-menu-header">
+      <button className="project-menu-wordmark room-design-wordmark" type="button" onClick={onHome}>ROOM DESIGN</button>
+      <nav aria-label="Путь проекта">
+        <button type="button" onClick={onProjects}>Проекты</button><span>›</span><b>{projectName}</b><span>›</span><em>Меню проекта</em>
+      </nav>
+      <div className="project-menu-account">{user?<AccountDropdown user={user} dashboard/>:<span aria-hidden="true">?</span>}</div>
+    </header>
+    <div className="project-menu-layout">
+      <aside className="project-menu-sidebar" aria-label="Этапы проекта">
+        <div className="project-menu-summary">
+          <span>ДИЗАЙН-ПРОЕКТ</span>
+          <h1>{projectName}</h1>
+          <p>{projectType}{projectDescription?` · ${projectDescription}`:""}</p>
+          <strong>2 из 8 разделов доступны</strong>
+          <i aria-hidden="true"><b/></i>
+        </div>
+        <ol className="project-menu-stages">
+          {PROJECT_MENU_STAGES.map((item,index)=><li key={item.id} className={`${selectedStage===item.id?"is-active ":""}${item.available?"is-available":"is-placeholder"}`}>
+            <button type="button" onClick={()=>item.available?setSelectedStage(item.id):setUnavailableStage(item.label)} aria-current={selectedStage===item.id?"step":undefined}>
+              <span>{String(index+1).padStart(2,"0")}</span><b>{item.label}</b><small>{item.available?"доступно":"скоро"}</small>
+            </button>
+          </li>)}
+        </ol>
+        <button className="project-menu-back" type="button" onClick={onProjects}>← Все проекты</button>
+      </aside>
+      <section className="project-menu-content" aria-live="polite">
+        <>
+          <div className="project-menu-title-row">
+            <div><span>РАЗДЕЛ ПРОЕКТА</span><h2>{stage.label}</h2><p>{stageDescription}</p></div>
+            <mark>{isLoading?"Загрузка…":projectSaved?"Сохранено":"Можно начать"}</mark>
+          </div>
+          <div className="project-menu-workspace">
+            <article className={`project-menu-feature ${isLighting?"is-lighting":"is-interior"}`}>
+              <div className="project-menu-visual">
+                <img src={coverImage||"/project-loading-blueprint.png"} alt={coverImage?`Последняя визуализация проекта «${projectName}»`:"Эскиз будущего интерьера"}/>
+                <span>{isLighting?"Технический свет":"Студия интерьера"}</span>
+              </div>
+              <div className="project-menu-feature-copy">
+                <div><span>{isInterior?"ЕДИНАЯ РАБОЧАЯ СРЕДА":"СВЕТОВОЙ СЦЕНАРИЙ"}</span><h3>{isInterior?"Интерьер и план комнаты":"План света и визуализация"}</h3><p>{isInterior?`${renderLabel} · ${furnitureCount} предметов в рабочем проекте`:"План потолка · каталог светильников · проверка результата"}</p></div>
+                <button type="button" onClick={openSelectedStage}>{historyCount||furnitureCount?"Продолжить":"Начать работу"} <b>→</b></button>
+              </div>
+            </article>
+            <aside className="project-menu-details">
+              <section><span>СОСТАВ РАЗДЕЛА</span>{isInterior?<><p><b>Редактор изображений</b><em>{historyCount?"есть история":"готов"}</em></p><p><b>Создание интерьера</b><em>{furnitureCount?`${furnitureCount} предметов`:"готово к работе"}</em></p><p><b>История рендеров</b><em>{historyCount}</em></p></>:<><p><b>План потолка</b><em>доступен</em></p><p><b>Каталог света</b><em>доступен</em></p><p><b>Визуализации</b><em>в проекте</em></p></>}</section>
+              {nextStage&&<section className="project-menu-next"><span>СЛЕДУЮЩИЙ РАЗДЕЛ</span><h3>{nextStage.label}</h3><p>{nextStage.available?"Продолжите работу над проектом на следующем этапе.":"Этот этап скоро появится в маршруте проекта."}</p><button type="button" onClick={openNextStage}>Перейти <b>→</b></button></section>}
+            </aside>
+          </div>
+          <section className="project-menu-materials"><div><span>МАТЕРИАЛЫ ПРОЕКТА</span><h3>Всё, что уже собрано</h3></div><p><b>{historyCount}</b> визуализаций</p><p><b>{furnitureCount}</b> предметов</p><p><b>{projectId?"1":"0"}</b> проект</p></section>
+        </>
+      </section>
+    </div>
+    {unavailableStage&&<div className="project-menu-toast" role="alert" aria-live="assertive"><i aria-hidden="true">!</i><div><b>Раздел в работе</b><span>«{unavailableStage}» скоро появится.</span></div><button type="button" onClick={()=>setUnavailableStage(null)} aria-label="Закрыть уведомление">×</button></div>}
   </main>;
 }
 

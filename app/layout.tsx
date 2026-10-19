@@ -8,6 +8,8 @@ import "./home-override.css";
 import "./create-project.css";
 import "./account-dashboard-concept-d.css";
 import "./studio-preview-iteration.css";
+import "./unified-studio-preview.css";
+import "./project-menu-preview.css";
 import "./it-orb.css";
 import "./templates-foundation.css";
 import "./templates-home-v2.css";
