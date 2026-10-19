@@ -621,6 +621,12 @@
   background: #fffdf9;
   color: #2f201b;
 }
+.unified-studio-preview[data-studio-mode="image"]:has(.studio-bottom-catalog) .studio-point-actions button.active {
+  border-color: var(--studio-burgundy);
+  background: var(--studio-burgundy);
+  color: #fff;
+}
+.unified-studio-preview[data-studio-mode="image"]:has(.studio-bottom-catalog) .room-canvas .material-tool { display: none; }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:hover,
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:focus-visible,
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:active {
@@ -658,6 +664,13 @@
   stroke-linejoin: round;
   transform: translate(-50%,-50%);
 }
+
+.studio-catalog-reference-input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.furniture-reference-upload-card > span { border: 1px dashed #c79aa3; background: #fff8f8!important; }
+.furniture-reference-upload-card > span > strong { color: var(--studio-burgundy); font: 300 32px/1 Arial,sans-serif; }
+.furniture-reference-upload-card > b { color: var(--studio-burgundy); }
+.studio-catalog-generate { min-width: 156px; height: 30px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--studio-burgundy); color: #fff; font: 700 8px/1 var(--font-manrope),Arial,sans-serif; letter-spacing: .03em; cursor: pointer; }
+.studio-catalog-generate:disabled { background: #d7cfca; cursor: not-allowed; }
 .unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span {
   z-index: 11;
   width: 44px!important;
@@ -698,7 +711,7 @@
   }
   .unified-studio-preview .inspector:has(.studio-bottom-catalog) .furniture-catalog-panel,
   .unified-studio-preview .inspector:has(.studio-bottom-catalog) .studio-bottom-catalog { height: 100%; padding: 0; }
-  .unified-studio-preview .studio-bottom-catalog { display: grid; grid-template-rows: 50px minmax(0,1fr) 29px; overflow: hidden; }
+  .unified-studio-preview .studio-bottom-catalog { display: grid; grid-template-rows: 50px minmax(0,1fr) 42px; overflow: hidden; }
   .unified-studio-preview .studio-catalog-bar {
     min-width: 0;
     display: flex;
@@ -722,7 +735,7 @@
   .unified-studio-preview .studio-catalog-bar nav button.active { background: var(--studio-burgundy); color: #fff; }
   .unified-studio-preview .studio-catalog-total { flex: 0 0 auto; color: var(--studio-muted); font-size: 8px; white-space: nowrap; }
   .unified-studio-preview .studio-catalog-bar .catalog-window-actions { flex: 0 0 auto; }
-  .unified-studio-preview .studio-bottom-catalog > .catalog-chips { position: absolute; left: 20px; bottom: 29px; z-index: 2; max-width: calc(100% - 40px); padding: 4px 0; background: rgba(255,255,255,.95); }
+  .unified-studio-preview .studio-bottom-catalog > .catalog-chips { position: absolute; left: 20px; bottom: 42px; z-index: 2; max-width: calc(100% - 40px); padding: 4px 0; background: rgba(255,255,255,.95); }
   .unified-studio-preview .studio-bottom-catalog .furniture-catalog-grid {
     height: auto;
     min-height: 0;
@@ -755,9 +768,9 @@
   .unified-studio-preview .studio-bottom-catalog .furniture-catalog-card > b { min-height: 0; margin-top: 0; overflow: hidden; font: 500 9px/1.25 Georgia,serif; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
   .unified-studio-preview .studio-bottom-catalog .furniture-catalog-card > small { align-self: end; font-size: 7px; }
   .unified-studio-preview .studio-bottom-catalog .furniture-catalog-card > strong { align-self: end; color: var(--studio-burgundy); font-size: 9px; }
-  .unified-studio-preview .studio-bottom-catalog > footer { display: block; height: 29px; padding: 7px 20px; border-top: 1px solid #eee8e3; color: var(--studio-muted); font-size: 7px; letter-spacing: .04em; }
+  .unified-studio-preview .studio-bottom-catalog > footer { height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 5px 20px; border-top: 1px solid #eee8e3; color: var(--studio-muted); font-size: 7px; letter-spacing: .04em; }
   .unified-studio-preview .inspector:has(.studio-bottom-catalog.catalog-fullscreen) { inset: 62px 0 0; height: auto; }
-  .unified-studio-preview .studio-bottom-catalog.catalog-fullscreen { grid-template-rows: 58px minmax(0,1fr) 34px; }
+  .unified-studio-preview .studio-bottom-catalog.catalog-fullscreen { grid-template-rows: 58px minmax(0,1fr) 42px; }
   .unified-studio-preview .studio-bottom-catalog.catalog-fullscreen .furniture-catalog-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); grid-auto-rows: 220px; align-content: start; overflow-x: hidden; overflow-y: auto; }
   .unified-studio-preview .studio-bottom-catalog.catalog-fullscreen .furniture-catalog-card { width: auto; height: 220px; display: flex; flex-direction: column; }
   .unified-studio-preview .studio-bottom-catalog.catalog-fullscreen .furniture-catalog-card > span { width: 100%; height: 130px; flex: 0 0 130px; }
@@ -933,7 +946,7 @@
   }
   .unified-studio-preview .inspector:has(.studio-bottom-catalog) .furniture-catalog-panel,
   .unified-studio-preview .inspector:has(.studio-bottom-catalog) .studio-bottom-catalog { height: 100%; max-height: none; padding: 0; }
-  .unified-studio-preview .studio-bottom-catalog { grid-template-rows: 50px minmax(0,1fr) 29px; }
+  .unified-studio-preview .studio-bottom-catalog { grid-template-rows: 50px minmax(0,1fr) 42px; }
   .unified-studio-preview .studio-bottom-catalog .furniture-catalog-grid {
     height: auto!important;
     min-height: 0;
@@ -948,7 +961,7 @@
   .unified-studio-preview .studio-bottom-catalog .furniture-catalog-card {
     flex: 0 0 clamp(220px,18vw,252px);
     width: auto!important;
-    height: clamp(105px,14dvh,132px)!important;
+    height: clamp(96px,12dvh,116px)!important;
     min-height: 0!important;
     grid-template-columns: 118px minmax(0,1fr);
     grid-template-rows: minmax(38px,1fr) 20px 22px;
@@ -958,7 +971,7 @@
   .unified-studio-preview .studio-bottom-catalog .furniture-catalog-card > span {
     width: 118px;
     height: 100%;
-    min-height: 92px;
+    min-height: 84px;
     overflow: hidden;
     background: #f7f4ef;
   }
