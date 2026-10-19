@@ -565,43 +565,43 @@
 /* The image-editor orbit follows the approved reference: one anchor, a thin arc,
    three furniture actions and the material brush. */
 .unified-studio-preview[data-studio-mode="image"] .studio-point-menu {
-  width: 340px;
-  height: 190px;
+  width: 252px;
+  height: 148px;
   transform: translate(-50%,-100%);
 }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-menu::before {
-  left: 27px;
-  right: 27px;
-  bottom: 15px;
-  height: 142px;
+  left: 20px;
+  right: 20px;
+  bottom: 11px;
+  height: 108px;
   border-color: rgba(245,238,232,.72);
-  border-radius: 190px 190px 0 0;
+  border-radius: 145px 145px 0 0;
 }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button {
-  width: 64px;
-  height: 64px;
+  width: 46px;
+  height: 46px;
   border-color: #d8d0ca;
   background: #fffdf9;
   color: #2f201b;
-  box-shadow: 0 9px 24px rgba(39,27,21,.22);
+  box-shadow: 0 6px 17px rgba(39,27,21,.2);
   line-height: 0;
 }
-.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(1) { left: 0; top: auto; bottom: 18px; }
-.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(2) { left: 80px; top: 20px; bottom: auto; }
-.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(3) { right: 0; top: auto; bottom: 18px; }
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(1) { left: 0; top: auto; bottom: 13px; }
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(2) { left: 60px; top: 17px; bottom: auto; }
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(3) { right: 0; top: auto; bottom: 13px; }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button::before {
   content: "";
   position: absolute;
   left: 50%;
   top: 50%;
   display: block;
-  width: 26px;
-  height: 26px;
+  width: 19px;
+  height: 19px;
   background: currentColor;
   transform: translate(-50%,-50%);
 }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(1)::before {
-  background: linear-gradient(currentColor,currentColor) center/2px 26px no-repeat,linear-gradient(currentColor,currentColor) center/26px 2px no-repeat;
+  background: linear-gradient(currentColor,currentColor) center/1.5px 19px no-repeat,linear-gradient(currentColor,currentColor) center/19px 1.5px no-repeat;
 }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(2)::before {
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 7v5h-5M4 17v-5h5M6.1 8.2A7 7 0 0 1 18.8 10M17.9 15.8A7 7 0 0 1 5.2 14' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
@@ -621,19 +621,26 @@
   background: #fffdf9;
   color: #2f201b;
 }
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:hover,
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:focus-visible,
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:active {
+  border-color: var(--studio-burgundy);
+  background: var(--studio-burgundy);
+  color: #fff;
+}
 .unified-studio-preview[data-studio-mode="image"] .room-canvas:has(.studio-point-menu) .material-tool {
-  left: calc(var(--studio-point-x) + 70px);
-  top: calc(var(--studio-point-y) - 172px);
-  margin-left: -32px;
+  left: calc(var(--studio-point-x) + 53px);
+  top: calc(var(--studio-point-y) - 132px);
+  margin-left: -23px;
 }
 .unified-studio-preview[data-studio-mode="image"] .room-canvas:has(.studio-point-menu) .material-brush-trigger {
-  width: 64px;
-  height: 64px;
-  flex-basis: 64px;
+  width: 46px;
+  height: 46px;
+  flex-basis: 46px;
   border-color: #d8d0ca;
   background: #fffdf9;
   color: #2f201b;
-  box-shadow: 0 9px 24px rgba(39,27,21,.22);
+  box-shadow: 0 6px 17px rgba(39,27,21,.2);
   position: relative;
   padding: 0;
   line-height: 0;
@@ -642,8 +649,8 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 27px;
-  height: 27px;
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -653,14 +660,14 @@
 }
 .unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span {
   z-index: 11;
-  width: 58px!important;
-  height: 58px!important;
-  border: 5px solid #fff!important;
+  width: 44px!important;
+  height: 44px!important;
+  border: 4px solid #fff!important;
   background: var(--studio-burgundy)!important;
   color: #fff!important;
   font-size: 0!important;
   font-weight: 300!important;
-  box-shadow: 0 0 0 9px rgba(164,14,44,.22),0 8px 22px rgba(38,22,19,.3)!important;
+  box-shadow: 0 0 0 6px rgba(164,14,44,.2),0 6px 17px rgba(38,22,19,.28)!important;
 }
 .unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span::before,
 .unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span::after {
@@ -673,8 +680,8 @@
   background: #fff;
   transform: translate(-50%,-50%);
 }
-.unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span::before { width: 24px; height: 2px; }
-.unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span::after { width: 2px; height: 24px; }
+.unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span::before { width: 18px; height: 1.5px; }
+.unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span::after { width: 1.5px; height: 18px; }
 
 /* Reuse the proven Technical Lighting catalog geometry in the unified preview. */
 @media (min-width: 821px) {
@@ -900,6 +907,15 @@
 /* Browser zoom can reduce the CSS viewport below the tablet breakpoint even on
    a desktop monitor. Keep the catalog as a compact bottom rail from 768px up. */
 @media (min-width: 768px) {
+  .unified-studio-preview:has(.studio-bottom-catalog:not(.catalog-fullscreen)) .canvas-area {
+    padding-bottom: clamp(218px,26dvh,250px);
+  }
+  .unified-studio-preview[data-studio-mode="image"]:has(.studio-bottom-catalog:not(.catalog-fullscreen)) .canvas-area > .room-canvas {
+    align-self: start;
+    max-height: calc(100dvh - clamp(218px,26dvh,250px) - 166px);
+    margin-top: 12px;
+    margin-bottom: 0;
+  }
   .unified-studio-preview .inspector:has(.studio-bottom-catalog) {
     position: fixed;
     z-index: 430;

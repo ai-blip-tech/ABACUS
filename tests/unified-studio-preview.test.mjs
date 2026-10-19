@@ -51,7 +51,7 @@ test("image editor uses a contextual point menu and preserves advanced tools", (
 });
 
 test("point orbit and catalog reuse the approved visual patterns", () => {
-  assert.match(css, /studio-point-menu[\s\S]*width: 340px/);
+  assert.match(css, /studio-point-menu[\s\S]*width: 252px/);
   assert.match(css, /mask: url\("data:image\/svg\+xml/);
   assert.match(css, /content: "Добавить"/);
   assert.match(css, /content: "Заменить"/);
@@ -65,6 +65,9 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(css, /@media \(min-width: 768px\)[\s\S]*inspector:has\(\.studio-bottom-catalog\)[\s\S]*inset: auto 0 0!important/);
   assert.match(css, /furniture-catalog-card > span img[\s\S]*transform: scale\(1\.35\)/);
   assert.match(css, /furniture-catalog-card > b[\s\S]*font-size: 7\.5px/);
+  assert.match(css, /studio-point-actions button:hover,[\s\S]*background: var\(--studio-burgundy\)/);
+  assert.match(css, /:has\(\.studio-bottom-catalog:not\(\.catalog-fullscreen\)\) \.canvas-area[\s\S]*padding-bottom: clamp\(218px,26dvh,250px\)/);
+  assert.match(page, /room-open-furniture-catalog/);
 });
 
 test("responsive studio provides tablet drawers and mobile bottom sheets", () => {
