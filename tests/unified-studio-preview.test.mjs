@@ -50,6 +50,19 @@ test("image editor uses a contextual point menu and preserves advanced tools", (
   assert.match(css, /data-studio-mode="image"\] \.inspector-title \{ display: none/);
 });
 
+test("point orbit and catalog reuse the approved visual patterns", () => {
+  assert.match(css, /studio-point-menu[\s\S]*width: 340px/);
+  assert.match(css, /mask: url\("data:image\/svg\+xml/);
+  assert.match(css, /content: "Добавить"/);
+  assert.match(css, /content: "Заменить"/);
+  assert.match(css, /content: "Удалить"/);
+  assert.match(page, /studio-bottom-catalog/);
+  assert.match(page, /studio-catalog-bar/);
+  assert.match(page, /aria-label="Категории мебели"/);
+  assert.match(css, /inspector:has\(\.studio-bottom-catalog\)[\s\S]*height: 238px/);
+  assert.match(css, /studio-bottom-catalog \.furniture-catalog-grid[\s\S]*overflow-x: auto/);
+});
+
 test("responsive studio provides tablet drawers and mobile bottom sheets", () => {
   assert.match(css, /@media \(max-width: 1279px\)/);
   assert.match(css, /@media \(max-width: 767px\)/);
