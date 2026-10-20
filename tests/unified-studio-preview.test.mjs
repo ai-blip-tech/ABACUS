@@ -69,7 +69,9 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(css, /:has\(\.studio-bottom-catalog:not\(\.catalog-fullscreen\)\) \.canvas-area[\s\S]*padding-bottom: clamp\(218px,26dvh,250px\)/);
   assert.match(page, /room-open-furniture-catalog/);
   assert.match(page, /Загрузить референс/);
-  assert.match(page, /Создать генерацию →/);
+  assert.match(page, /Создать рендер →/);
+  assert.match(page, /studioPreview\"\)==\=\"unified\"/);
+  assert.match(page, /persistentCatalogEnabled/);
   assert.match(css, /studio-catalog-generate/);
   assert.match(css, /:has\(\.studio-bottom-catalog\) \.studio-point-actions button\.active/);
 });
