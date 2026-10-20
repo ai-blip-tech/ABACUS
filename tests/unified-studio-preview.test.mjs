@@ -73,7 +73,8 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(page, /studioPreview\"\)==\=\"unified\"/);
   assert.match(page, /persistentCatalogEnabled/);
   assert.match(css, /studio-catalog-generate/);
-  assert.match(css, /:has\(\.studio-bottom-catalog\) \.studio-point-actions button\.active/);
+  assert.match(css, /data-studio-mode="image"\] \.studio-point-actions button\.active/);
+  assert.doesNotMatch(css, /button\.active:not\(:hover\):not\(:focus-visible\)/);
 });
 
 test("responsive studio provides tablet drawers and mobile bottom sheets", () => {

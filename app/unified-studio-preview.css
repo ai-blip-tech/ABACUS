@@ -616,12 +616,7 @@
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(1)::after { content: "Добавить"; }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(2)::after { content: "Заменить"; }
 .unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:nth-child(3)::after { content: "Удалить"; }
-.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button.active:not(:hover):not(:focus-visible) {
-  border-color: #d8d0ca;
-  background: #fffdf9;
-  color: #2f201b;
-}
-.unified-studio-preview[data-studio-mode="image"]:has(.studio-bottom-catalog) .studio-point-actions button.active {
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button.active {
   border-color: var(--studio-burgundy);
   background: var(--studio-burgundy);
   color: #fff;
