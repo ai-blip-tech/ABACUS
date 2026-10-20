@@ -5,6 +5,7 @@ import test from "node:test";
 const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/unified-studio-preview.css", import.meta.url), "utf8");
+const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const discovery = await readFile(new URL("../docs/unified-studio-preview-discovery.md", import.meta.url), "utf8");
 
 test("unified studio is guarded by an explicit preview query flag", () => {
@@ -80,6 +81,22 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(css, /data-studio-mode="image"\] \.studio-point-actions button\.active/);
   assert.match(css, /button:hover:not\(\.deactivated\)/);
   assert.doesNotMatch(css, /button\.active:not\(:hover\):not\(:focus-visible\)/);
+});
+
+test("custom furniture references collect real dimensions and pass them to generation", () => {
+  assert.match(page, /studio-source-reference-specs/);
+  assert.match(page, /Название референса/);
+  assert.match(page, /Описание референса/);
+  assert.match(page, /Ширина, мм/);
+  assert.match(page, /Глубина, мм/);
+  assert.match(page, /Высота, мм/);
+  assert.match(page, /furnitureReference:furnitureReferenceDetails/);
+  assert.match(page, /Укажите ширину, глубину и высоту пользовательского референса/);
+  assert.match(css, /studio-source-reference-dimensions/);
+  assert.doesNotMatch(page, /studio-furniture-reference-specs/);
+  assert.match(generateRoute, /Hard physical dimensions: width/);
+  assert.match(generateRoute, /mandatory real-world scale constraints/);
+  assert.match(generateRoute, /Укажите ширину, глубину и высоту пользовательского референса/);
 });
 
 test("responsive studio provides tablet drawers and mobile bottom sheets", () => {

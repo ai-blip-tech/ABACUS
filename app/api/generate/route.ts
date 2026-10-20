@@ -94,7 +94,7 @@ async function generateResponse(request: Request) {
   type LightingFixture = { marker?: number; name?: string; article?: string; mounting?: "track" | "ceiling" };
   type LightingOutlinePoint = { number?: number; xMm?: number; yMm?: number };
   type LightingBrief = { referenceImages?: string[]; referenceManifest?: LightingReferenceInput[]; products?: LightingProduct[]; tracks?: LightingTrack[]; fixtures?: LightingFixture[]; ceilingOutline?: LightingOutlinePoint[]; trackCount?: number; fixtureCount?: number; cctK?: number; timeOfDay?: "day" | "night" };
-  const body = await request.json() as { technicalLighting?: boolean; projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string }; lightingPlan?: LightingBrief & { planImage?: string; room?: { width?: number; length?: number } }; lightingEdit?: LightingBrief & { overlayImage?: string } };
+  const body = await request.json() as { technicalLighting?: boolean; projectId?: string; operation?: string; prompt?: string; preserved?: string[]; creativity?: string; product?: string; roomImage?: string; referenceImage?: string; furnitureReference?: { name?: string; description?: string; widthMm?: number; depthMm?: number; heightMm?: number }; outputSize?: string; pointEdit?: { x?: number; y?: number; markedImage?: string }; furnitureCasting?: { markedImage?: string; items?: Array<{ x?: number; y?: number; name?: string; referenceImage?: string }> }; templateEdit?: { templateId?: string; instructions?: string; referenceImages?: string[]; outputLabel?: string }; removal?: { name?: string }; replacement?: { name?: string }; placement?: { x?: number; y?: number }; adjustment?: { instruction?: string; mask?: string }; globalEdit?: { instruction?: string }; material?: { instruction?: string }; upscale?: boolean; planRender?: { planImage?: string; room?: { width?: number; length?: number }; items?: Array<{ name?: string; width?: number; depth?: number; x?: number; y?: number; rotation?: number; referenceName?: string }>; referenceImages?: string[]; instruction?: string }; lightingPlan?: LightingBrief & { planImage?: string; room?: { width?: number; length?: number } }; lightingEdit?: LightingBrief & { overlayImage?: string } };
   const mixedFurniturePayload = Boolean(body.planRender || body.furnitureCasting || body.templateEdit || body.material || body.adjustment || body.product && body.placement && !body.lightingEdit);
   if (body.technicalLighting && mixedFurniturePayload) {
     return Response.json({ error: "Нельзя объединять технический свет и мебельную операцию в одном запросе." }, { status: 400 });
@@ -166,10 +166,17 @@ async function generateResponse(request: Request) {
   ].filter(Boolean).join("\n");
 
   const pointDescription = body.pointEdit ? `The marker centre is at ${Math.round(body.pointEdit.x || 0)}% from the left and ${Math.round(body.pointEdit.y || 0)}% from the top.` : "";
+  const customFurnitureReference = body.furnitureReference;
+  const furnitureReferenceBrief = customFurnitureReference ? [
+    `The custom furniture reference is named "${String(customFurnitureReference.name || "custom furniture").trim().slice(0, 240)}".`,
+    customFurnitureReference.description ? `Description: ${String(customFurnitureReference.description).trim().slice(0, 600)}.` : "",
+    `Hard physical dimensions: width ${Math.round(Number(customFurnitureReference.widthMm))} mm, depth ${Math.round(Number(customFurnitureReference.depthMm))} mm, height ${Math.round(Number(customFurnitureReference.heightMm))} mm. Treat these dimensions as mandatory real-world scale constraints; do not infer a different size from the reference image.`,
+  ].filter(Boolean).join(" ") : "";
   const editPrompt = [
     "Use image 1 as the clean completed interior to preserve.",
     "Image 2 is the same interior with a temporary crosshair marker. The marker centre is the insertion location and must not appear in the result.",
     "Use image 3 as the exact furniture reference. Add that specific furniture item naturally at the marked location.",
+    furnitureReferenceBrief,
     pointDescription,
     "Match perspective, scale, lighting, material realism and contact shadows. Preserve the rest of the room as closely as possible.",
     "No people, no text, no logos, no watermark.",
@@ -317,6 +324,7 @@ async function generateResponse(request: Request) {
     "Image 2 is the same interior with a temporary crosshair marker. Identify the complete semantic object containing the marker centre; the marker must not appear in the result.",
     `Replace only that selected object: ${body.replacement.name}.`,
     "Image 3 is the exact furniture reference to place instead of the selected object.",
+    furnitureReferenceBrief,
     "Reproduce the furniture from image 3 faithfully: preserve its exact number of modules, silhouette, proportions, upholstery, seams, legs, colour, and distinctive details.",
     pointDescription,
     "Do not add a second item. The reference furniture must occupy the position of the selected existing object only, with believable scale, perspective, contact shadows, and lighting.",
@@ -556,6 +564,7 @@ async function generateResponse(request: Request) {
       }
       if (!body.furnitureCasting && (["material", "replace"].includes(operation) || operation === "place" && !body.product)) {
         if (!body.referenceImage) throw new Error(operation === "material" ? "Загрузите референс материала." : "Загрузите референс предмета.");
+        if (body.furnitureReference && [body.furnitureReference.widthMm, body.furnitureReference.depthMm, body.furnitureReference.heightMm].some((value) => !Number.isFinite(value) || Number(value) <= 0)) throw new Error("Укажите ширину, глубину и высоту пользовательского референса.");
         if (body.referenceImage.startsWith("data:")) await validatedEditImage(body.referenceImage, operation === "material" ? "референс материала" : "референс предмета");
         else {
           const url = new URL(body.referenceImage);
