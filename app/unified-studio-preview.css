@@ -270,8 +270,8 @@
   transition: opacity .15s ease,transform .15s ease;
   pointer-events: none;
 }
-.studio-point-actions button:hover,
-.studio-point-actions button:focus-visible,
+.studio-point-actions button:hover:not(.deactivated),
+.studio-point-actions button:focus-visible:not(.deactivated),
 .studio-point-actions button.active { border-color: var(--studio-burgundy); background: var(--studio-burgundy); color: #fff; }
 .studio-point-actions button:hover::after,
 .studio-point-actions button:focus-visible::after { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -289,8 +289,9 @@
   border-color: #d7d0ca;
   box-shadow: 0 8px 22px rgba(37,27,22,.2);
 }
-.unified-studio-preview[data-studio-mode="image"] .room-canvas:has(.studio-point-menu) .material-brush-trigger:hover,
-.unified-studio-preview[data-studio-mode="image"] .room-canvas:has(.studio-point-menu) .material-brush-trigger[aria-expanded="true"] { border-color: var(--studio-burgundy); background: var(--studio-burgundy); }
+.unified-studio-preview[data-studio-mode="image"] .room-canvas:has(.studio-point-menu) .material-brush-trigger:hover:not(.deactivated),
+.unified-studio-preview[data-studio-mode="image"] .room-canvas:has(.studio-point-menu) .material-brush-trigger[aria-expanded="true"],
+.unified-studio-preview[data-studio-mode="image"] .room-canvas:has(.studio-point-menu) .material-brush-trigger.active { border-color: var(--studio-burgundy); background: var(--studio-burgundy); color: #fff; }
 .unified-studio-preview[data-studio-mode="image"] .room-canvas:has(.studio-point-menu) .material-brush-trigger::after {
   content: "Кисть";
   position: absolute;
@@ -621,9 +622,9 @@
   background: var(--studio-burgundy);
   color: #fff;
 }
-.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:hover,
-.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:focus-visible,
-.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:active {
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:hover:not(.deactivated),
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:focus-visible:not(.deactivated),
+.unified-studio-preview[data-studio-mode="image"] .studio-point-actions button:active:not(.deactivated) {
   border-color: var(--studio-burgundy);
   background: var(--studio-burgundy);
   color: #fff;

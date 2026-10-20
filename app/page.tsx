@@ -176,6 +176,47 @@ export default function Home() {
   const [materialMenuOpen, setMaterialMenuOpen] = useState(false);
   const [materialSelection, setMaterialSelection] = useState<MaterialSelection | null>(null);
   const materialInputRef = useRef<HTMLInputElement>(null);
+  const [orbitAction, setOrbitAction] = useState<"add" | "replace" | "material" | null>(null);
+  const [orbitSuppressedAction, setOrbitSuppressedAction] = useState<"add" | "replace" | "material" | null>(null);
+  useEffect(()=>{
+    if(!unifiedStudioPreview)return;
+    if(!placementPoint){setOrbitAction(null);setOrbitSuppressedAction(null);return;}
+    const root=studioWorkspaceRef.current;
+    const actions=root?.querySelectorAll<HTMLButtonElement>(".studio-point-actions > button");
+    const brush=root?.querySelector<HTMLButtonElement>(".material-brush-trigger");
+    if(!actions||actions.length<3||!brush)return;
+    const toggleAction=(action:"add"|"replace"|"material")=>{const next=orbitAction===action?null:action;setOrbitAction(next);setOrbitSuppressedAction(next?null:action);};
+    const chooseAdd=()=>{setMaterialMenuOpen(false);toggleAction("add");};
+    const chooseReplace=()=>{setMaterialMenuOpen(false);toggleAction("replace");};
+    const chooseRemove=()=>{setMaterialMenuOpen(false);setOrbitAction(null);setOrbitSuppressedAction(null);};
+    const chooseMaterial=()=>toggleAction("material");
+    const releaseAdd=()=>setOrbitSuppressedAction((current)=>current==="add"?null:current);
+    const releaseReplace=()=>setOrbitSuppressedAction((current)=>current==="replace"?null:current);
+    const releaseMaterial=()=>setOrbitSuppressedAction((current)=>current==="material"?null:current);
+    actions[0].addEventListener("click",chooseAdd);
+    actions[1].addEventListener("click",chooseReplace);
+    actions[2].addEventListener("click",chooseRemove);
+    brush.addEventListener("click",chooseMaterial);
+    actions[0].addEventListener("mouseleave",releaseAdd);
+    actions[1].addEventListener("mouseleave",releaseReplace);
+    brush.addEventListener("mouseleave",releaseMaterial);
+    return()=>{actions[0].removeEventListener("click",chooseAdd);actions[1].removeEventListener("click",chooseReplace);actions[2].removeEventListener("click",chooseRemove);brush.removeEventListener("click",chooseMaterial);actions[0].removeEventListener("mouseleave",releaseAdd);actions[1].removeEventListener("mouseleave",releaseReplace);brush.removeEventListener("mouseleave",releaseMaterial);};
+  },[unifiedStudioPreview,placementPoint,orbitAction]);
+  useEffect(()=>{
+    if(!unifiedStudioPreview)return;
+    const root=studioWorkspaceRef.current;
+    const actions=root?.querySelectorAll<HTMLButtonElement>(".studio-point-actions > button");
+    const brush=root?.querySelector<HTMLButtonElement>(".material-brush-trigger");
+    actions?.[0]?.classList.toggle("active",orbitAction==="add");
+    actions?.[1]?.classList.toggle("active",orbitAction==="replace");
+    actions?.[0]?.classList.toggle("deactivated",orbitSuppressedAction==="add");
+    actions?.[1]?.classList.toggle("deactivated",orbitSuppressedAction==="replace");
+    actions?.[0]?.setAttribute("aria-pressed",String(orbitAction==="add"));
+    actions?.[1]?.setAttribute("aria-pressed",String(orbitAction==="replace"));
+    brush?.classList.toggle("active",orbitAction==="material");
+    brush?.classList.toggle("deactivated",orbitSuppressedAction==="material");
+    brush?.setAttribute("aria-pressed",String(orbitAction==="material"));
+  },[unifiedStudioPreview,placementPoint,orbitAction,orbitSuppressedAction]);
   const [layerDrag, setLayerDrag] = useState<{x:number;y:number}|null>(null);
   const [layerEdit, setLayerEdit] = useState<{id:string;mode:"move"|"n"|"s"|"e"|"w"|"ne"|"nw"|"se"|"sw";x:number;y:number;source:{x:number;y:number;width:number;height:number}}|null>(null);
   const [isBuildingLayers, setIsBuildingLayers] = useState(false);
@@ -457,8 +498,10 @@ export default function Home() {
   } catch (error) { setGenerationError(error instanceof Error ? error.message : "Не удалось создать визуализацию"); } finally { setIsGenerating(false); } };
   const queueCatalogProduct = (product:CatalogProduct) => {
     if (!placementPoint) { setGenerationError("Сначала поставьте точку на изображении."); return false; }
+    const selectedAction=unifiedStudioPreview?orbitAction:furnitureAction;
+    if (selectedAction!=="add"&&selectedAction!=="replace") { setGenerationError("Выберите режим «Добавить» или «Заменить»."); return false; }
     if (furnitureEdits.length >= 5) { setGenerationError("Можно выбрать не более пяти товаров за одну генерацию."); return false; }
-    setFurnitureEdits((items)=>[...items,{id:`edit-${Date.now()}-${Math.random()}`,action:furnitureAction === "replace" ? "replace" : "add",point:placementPoint,referenceName:product.name,referenceImage:product.image,product}]);
+    setFurnitureEdits((items)=>[...items,{id:`edit-${Date.now()}-${Math.random()}`,action:selectedAction === "replace" ? "replace" : "add",point:placementPoint,referenceName:product.name,referenceImage:product.image,product}]);
     setPlacementPoint(null); setGenerationError("");
     return true;
   };
