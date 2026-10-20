@@ -698,12 +698,114 @@
   transform: translate(-50%,-50%);
 }
 
+/* Keep the point orbit intact at every image edge by opening it into the
+   largest available part of the canvas. */
+.unified-studio-preview[data-studio-orbit] .studio-point-menu {
+  left: var(--studio-point-x)!important;
+  top: var(--studio-point-y)!important;
+}
+.unified-studio-preview[data-studio-orbit="below"] .studio-point-menu { transform: translate(-50%,0); }
+.unified-studio-preview[data-studio-orbit="below"] .studio-point-menu::before {
+  top: 11px;
+  bottom: auto;
+  border-top: 0;
+  border-bottom: 1px solid rgba(245,238,232,.72);
+  border-radius: 0 0 145px 145px;
+}
+.unified-studio-preview[data-studio-orbit="below"] .studio-point-actions button:nth-child(1) { top: 13px; bottom: auto; }
+.unified-studio-preview[data-studio-orbit="below"] .studio-point-actions button:nth-child(2) { top: auto; bottom: 17px; }
+.unified-studio-preview[data-studio-orbit="below"] .studio-point-actions button:nth-child(3) { top: 13px; bottom: auto; }
+.unified-studio-preview[data-studio-orbit="below"] .room-canvas:has(.studio-point-menu) .material-tool {
+  left: calc(var(--studio-point-x) + 53px);
+  top: calc(var(--studio-point-y) + 86px);
+}
+.unified-studio-preview[data-studio-orbit="right"] .studio-point-menu,
+.unified-studio-preview[data-studio-orbit="left"] .studio-point-menu { width: 148px; height: 252px; }
+.unified-studio-preview[data-studio-orbit="right"] .studio-point-menu { transform: translate(0,-50%); }
+.unified-studio-preview[data-studio-orbit="left"] .studio-point-menu { transform: translate(-100%,-50%); }
+.unified-studio-preview[data-studio-orbit="right"] .studio-point-menu::before,
+.unified-studio-preview[data-studio-orbit="left"] .studio-point-menu::before {
+  top: 20px;
+  bottom: 20px;
+  width: 108px;
+  height: auto;
+}
+.unified-studio-preview[data-studio-orbit="right"] .studio-point-menu::before {
+  left: 11px;
+  right: auto;
+  border-left: 0;
+  border-bottom: 1px solid rgba(245,238,232,.72);
+  border-radius: 0 145px 145px 0;
+}
+.unified-studio-preview[data-studio-orbit="left"] .studio-point-menu::before {
+  left: auto;
+  right: 11px;
+  border-right: 0;
+  border-bottom: 1px solid rgba(245,238,232,.72);
+  border-radius: 145px 0 0 145px;
+}
+.unified-studio-preview[data-studio-orbit="right"] .studio-point-actions button:nth-child(1) { left: 13px; top: 0; right: auto; bottom: auto; }
+.unified-studio-preview[data-studio-orbit="right"] .studio-point-actions button:nth-child(2) { left: auto; top: 60px; right: 0; bottom: auto; }
+.unified-studio-preview[data-studio-orbit="right"] .studio-point-actions button:nth-child(3) { left: 13px; top: auto; right: auto; bottom: 0; }
+.unified-studio-preview[data-studio-orbit="left"] .studio-point-actions button:nth-child(1) { left: auto; top: 0; right: 13px; bottom: auto; }
+.unified-studio-preview[data-studio-orbit="left"] .studio-point-actions button:nth-child(2) { left: 0; top: 60px; right: auto; bottom: auto; }
+.unified-studio-preview[data-studio-orbit="left"] .studio-point-actions button:nth-child(3) { left: auto; top: auto; right: 13px; bottom: 0; }
+.unified-studio-preview[data-studio-orbit="right"] .room-canvas:has(.studio-point-menu) .material-tool {
+  left: calc(var(--studio-point-x) + 88px);
+  top: calc(var(--studio-point-y) + 53px);
+}
+.unified-studio-preview[data-studio-orbit="left"] .room-canvas:has(.studio-point-menu) .material-tool {
+  left: calc(var(--studio-point-x) - 88px);
+  top: calc(var(--studio-point-y) + 53px);
+}
+.unified-studio-preview .room-canvas.processing .studio-point-menu,
+.unified-studio-preview .room-canvas.processing .material-tool,
+.unified-studio-preview .room-canvas.processing > button[aria-label^="Поставить точку"] > span { display: none!important; }
+
+.studio-canvas-render-button {
+  position: absolute;
+  z-index: 24;
+  right: 18px;
+  bottom: 18px;
+  min-width: 156px;
+  height: 38px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--studio-burgundy);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(83,16,28,.3);
+  font: 700 10px/1 var(--font-manrope),Arial,sans-serif;
+  letter-spacing: .03em;
+  cursor: pointer;
+}
+.studio-canvas-render-button:hover,
+.studio-canvas-render-button:focus-visible { background: #721025; transform: translateY(-1px); }
+
 .studio-catalog-reference-input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .furniture-reference-upload-card > span { border: 1px dashed #c79aa3; background: #fff8f8!important; }
 .furniture-reference-upload-card > span > strong { color: var(--studio-burgundy); font: 300 32px/1 Arial,sans-serif; }
 .furniture-reference-upload-card > b { color: var(--studio-burgundy); }
 .studio-catalog-generate { min-width: 156px; height: 30px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--studio-burgundy); color: #fff; font: 700 8px/1 var(--font-manrope),Arial,sans-serif; letter-spacing: .03em; cursor: pointer; }
 .studio-catalog-generate:disabled { background: #d7cfca; cursor: not-allowed; }
+.studio-bottom-catalog .furniture-catalog-card.selected {
+  border-color: var(--studio-burgundy);
+  box-shadow: inset 0 0 0 2px var(--studio-burgundy);
+  background: #fff8f8;
+}
+.studio-bottom-catalog .catalog-selected-mark {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--studio-burgundy);
+  color: #fff;
+  font: 700 11px/1 var(--font-manrope),Arial,sans-serif;
+}
 .unified-studio-preview[data-studio-mode="image"] .room-canvas > button[aria-label^="Поставить точку"] > span {
   z-index: 11;
   width: 44px!important;

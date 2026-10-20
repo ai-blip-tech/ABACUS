@@ -51,6 +51,9 @@ test("image editor uses a contextual point menu and preserves advanced tools", (
   assert.match(page, /orbitAction/);
   assert.match(page, /orbitSuppressedAction/);
   assert.match(page, /orbitAction===action\?null:action/);
+  assert.match(page, /studioOrbit=placementPoint\.x<22\?"right"/);
+  assert.match(page, /createPortal\(<button className="studio-canvas-render-button"/);
+  assert.match(page, /selectedProductIds=\{queuedEdits\.map/);
   assert.match(page, /Выберите режим «Добавить» или «Заменить»/);
   assert.match(css, /data-studio-mode="image"\] \.inspector-title \{ display: none/);
 });
@@ -79,6 +82,12 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(page, /persistentCatalogEnabled/);
   assert.match(css, /studio-catalog-generate/);
   assert.match(css, /data-studio-mode="image"\] \.studio-point-actions button\.active/);
+  assert.match(css, /data-studio-orbit="right"/);
+  assert.match(css, /data-studio-orbit="left"/);
+  assert.match(css, /data-studio-orbit="below"/);
+  assert.match(css, /room-canvas\.processing \.studio-point-menu/);
+  assert.match(css, /studio-canvas-render-button/);
+  assert.match(css, /furniture-catalog-card\.selected/);
   assert.match(css, /button:hover:not\(\.deactivated\)/);
   assert.doesNotMatch(css, /button\.active:not\(:hover\):not\(:focus-visible\)/);
 });
