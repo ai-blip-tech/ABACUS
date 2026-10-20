@@ -789,6 +789,21 @@
   opacity: .82;
   transform: none;
 }
+.studio-canvas-generation-error {
+  position: absolute;
+  z-index: 25;
+  right: 18px;
+  bottom: 68px;
+  max-width: min(390px,calc(100% - 36px));
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(156,16,45,.28);
+  border-radius: 12px;
+  background: rgba(255,248,249,.96);
+  color: #89122a;
+  box-shadow: 0 10px 28px rgba(83,16,28,.16);
+  font: 600 10px/1.45 var(--font-manrope),Arial,sans-serif;
+}
 
 .studio-catalog-reference-input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .furniture-reference-upload-card > span { border: 1px dashed #c79aa3; background: #fff8f8!important; }

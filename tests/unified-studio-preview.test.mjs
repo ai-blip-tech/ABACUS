@@ -58,6 +58,7 @@ test("image editor uses a contextual point menu and preserves advanced tools", (
   assert.match(page, /if\(selectedEdit\)\{onRemoveQueued\(selectedEdit\.id\);return;\}/);
   assert.match(page, /previousOrbitAction\.current!==orbitAction/);
   assert.match(page, /selectedProductIds=\{queuedEdits\.map/);
+  assert.match(page, /studio-canvas-generation-error/);
   assert.match(page, /Выберите режим «Добавить» или «Заменить»/);
   assert.match(css, /data-studio-mode="image"\] \.inspector-title \{ display: none/);
 });
@@ -92,6 +93,7 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(css, /room-canvas\.processing \.studio-point-menu/);
   assert.match(css, /studio-canvas-render-button/);
   assert.match(css, /studio-canvas-render-button:disabled/);
+  assert.match(css, /studio-canvas-generation-error/);
   assert.match(css, /furniture-catalog-card\.selected/);
   assert.match(css, /button:hover:not\(\.deactivated\)/);
   assert.doesNotMatch(css, /button\.active:not\(:hover\):not\(:focus-visible\)/);
@@ -118,6 +120,9 @@ test("custom furniture references collect real dimensions and pass them to gener
   assert.match(generateRoute, /Hard physical dimensions: width/);
   assert.match(generateRoute, /mandatory real-world scale constraints/);
   assert.match(generateRoute, /Укажите ширину, глубину и высоту пользовательского референса/);
+  assert.match(generateRoute, /levehome\\\.ru/);
+  assert.match(generateRoute, /rom-divan\\\.ru/);
+  assert.match(generateRoute, /!supportedCatalogHost\(imageUrl\.hostname\)/);
 });
 
 test("responsive studio provides tablet drawers and mobile bottom sheets", () => {

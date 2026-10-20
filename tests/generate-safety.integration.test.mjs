@@ -148,6 +148,34 @@ test("success sends clean plus marked images, never a segmentation mask, and cha
   }
 });
 
+test("LEVE HOME catalog images reach the furniture provider instead of failing the source allowlist", async () => {
+  const id = "success-leve-home-place";
+  const referenceImage = "https://levehome.ru/upload/pic/2000000055251/main/1.jpg";
+  let catalogCalls = 0;
+  let providerCalls = 0;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === referenceImage) {
+      catalogCalls += 1;
+      return new Response(Buffer.from(png.split(",")[1], "base64"), { headers: { "Content-Type": "image/png" } });
+    }
+    assert.equal(url, "https://api.openai.com/v1/images/edits");
+    providerCalls += 1;
+    assert.equal(options.body.getAll("image[]").length, 3);
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 11, output_tokens: 22, total_tokens: 33 } });
+  };
+  const response = await POST(request({
+    operation: "place",
+    prompt: "Добавь выбранный пуф",
+    roomImage: png,
+    referenceImage,
+    pointEdit,
+    placement: { x: 50, y: 50 },
+  }, id));
+  assert.equal(response.status, 200);
+  assert.equal(catalogCalls, 1);
+  assert.equal(providerCalls, 1);
+});
+
 test("moodboard builder accepts sixteen equal image references in one provider request", async () => {
   const id = "success-moodboard-builder";
   const before = await balance();

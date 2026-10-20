@@ -365,7 +365,10 @@ async function generateResponse(request: Request) {
     if (!width || !height) throw new Error(`Не удалось определить размеры изображения ${assetId}: ${label}.`);
     return { blob: new Blob([bytes], { type: mime }), bytes: bytes.byteLength, width, height, mime, sha256: createHash("sha256").update(bytes).digest("hex") };
   };
-  const supportedCatalogHost = (hostname: string) => /(^|\.)norrmobler\.ru$/i.test(hostname) || /(^|\.)gomoon\.ru$/i.test(hostname);
+  const supportedCatalogHost = (hostname: string) => /(^|\.)norrmobler\.ru$/i.test(hostname)
+    || /(^|\.)gomoon\.ru$/i.test(hostname)
+    || /(^|\.)levehome\.ru$/i.test(hostname)
+    || /(^|\.)rom-divan\.ru$/i.test(hostname);
   const validatedImageSource = async (source: string, signal?: AbortSignal, label = "изображение", assetId = label, mask = false): Promise<ValidatedImage> => {
     trace("source_resolve", "begin", { assetId });
     if (source.startsWith("data:")) {
@@ -444,7 +447,7 @@ async function generateResponse(request: Request) {
     } catch {
       throw new Error("Некорректная ссылка на изображение товара.");
     }
-    if (imageUrl.protocol !== "https:" || !/(^|\.)norrmobler\.ru$/i.test(imageUrl.hostname)) {
+    if (imageUrl.protocol !== "https:" || !supportedCatalogHost(imageUrl.hostname)) {
       throw new Error("Источник изображения товара не поддерживается.");
     }
     const imageResponse = await fetchWithNetworkRetry(imageUrl, { headers: { Accept: "image/*", "User-Agent": "ROOM-design-catalog/1.0" }, signal });
