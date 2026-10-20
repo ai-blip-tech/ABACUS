@@ -40,6 +40,21 @@ test("project actions call the established handlers instead of placeholder actio
   assert.match(page, /downloadHistoryVersion\(selectedHistoryVersion\)/);
 });
 
+test("preview header keeps one working upscale action and uses the full account control", () => {
+  assert.match(page, /!unifiedStudioPreview&&<button className="help"/);
+  assert.match(page, /<AccountDropdown user=\{user\} studio=\{!unifiedStudioPreview\}/);
+  assert.match(page, /className="studio-upscale-icon"/);
+  assert.match(page, /onClick=\{\(\)=>void upscaleHistoryVersion\(\)\}/);
+  assert.match(page, /studioMode==="plan"&&<button type="button" onClick=\{\(\)=>setStudioDrawer/);
+  assert.match(page, />Параметры<\/button>/);
+  assert.match(page, /!unifiedStudioPreview&&studioMode==="image"&&<button/);
+  assert.match(page, /aria-label="Инструменты редактирования"/);
+  assert.match(page, /!unifiedStudioPreview&&<button type="button" onClick=\{\(\)=>setFavorite/);
+  assert.match(page, /!unifiedStudioPreview&&<button type="button" disabled=\{!selectedHistoryVersion\}/);
+  assert.match(css, /studio-upscale-action[\s\S]*border-color: #ded2c5/);
+  assert.match(css, /top-actions \.account-trigger[\s\S]*border-radius: 999px/);
+});
+
 test("image editor uses a contextual point menu and preserves advanced tools", () => {
   assert.match(page, /studio-point-menu/);
   assert.match(page, /Действия в выбранной точке/);
