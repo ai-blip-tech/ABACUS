@@ -186,19 +186,19 @@
 .studio-project-actions .studio-save-button:hover { background: var(--studio-burgundy-dark); color: #fff; }
 .studio-project-actions .studio-upscale-action {
   min-width: 126px;
-  height: 44px;
+  height: 40px;
   display: inline-flex;
   flex-direction: row;
-  gap: 9px;
-  padding: 0 18px;
+  gap: 4px;
+  padding: 0 14px;
   border-color: #ded2c5;
   background: #fffdf9;
   color: #2d241f;
 }
 .studio-project-actions .studio-upscale-action:hover { border-color: #b9aa9c; color: #2d241f; }
 .studio-project-actions .studio-upscale-action b { font-size: 12px; font-weight: 500; }
-.studio-upscale-icon { width: 25px; height: 25px; display: grid; place-items: center; }
-.studio-upscale-icon svg { width: 25px; height: 25px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.studio-upscale-icon { width: 22px; height: 22px; display: grid; place-items: center; }
+.studio-upscale-icon svg { width: 22px; height: 22px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .studio-mobile-panels { display: none; }
 
@@ -1207,7 +1207,7 @@
   .studio-project-actions { grid-column: 2; grid-row: 1; gap: 4px; }
   .studio-mode-tabs { grid-column: 1/-1; grid-row: 2; width: min(520px,100%); }
   .studio-project-actions > button { min-width: 36px; width: 36px; height: 36px; padding: 0; }
-  .studio-project-actions .studio-upscale-action { min-width: 82px; width: auto; padding-inline: 10px; }
+  .studio-project-actions .studio-upscale-action { min-width: 108px; width: auto; height: 36px; gap: 4px; padding-inline: 10px; }
   .studio-project-actions .studio-save-button { min-width: 108px; width: auto; padding-inline: 12px; }
   .unified-studio-preview .studio,
   .unified-studio-preview[data-studio-mode="plan"] .studio { height: calc(100dvh - 168px); }

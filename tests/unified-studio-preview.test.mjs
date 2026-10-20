@@ -52,6 +52,8 @@ test("preview header keeps one working upscale action and uses the full account 
   assert.match(page, /!unifiedStudioPreview&&<button type="button" onClick=\{\(\)=>setFavorite/);
   assert.match(page, /!unifiedStudioPreview&&<button type="button" disabled=\{!selectedHistoryVersion\}/);
   assert.match(css, /studio-upscale-action[\s\S]*border-color: #ded2c5/);
+  assert.match(css, /studio-upscale-action[\s\S]*height: 40px[\s\S]*gap: 4px/);
+  assert.match(css, /studio-upscale-action \{ min-width: 108px; width: auto; height: 36px; gap: 4px/);
   assert.match(css, /top-actions \.account-trigger[\s\S]*border-radius: 999px/);
 });
 
