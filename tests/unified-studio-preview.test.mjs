@@ -116,6 +116,25 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.doesNotMatch(css, /button\.active:not\(:hover\):not\(:focus-visible\)/);
 });
 
+test("preview separates the full catalog from the current project material rail", () => {
+  assert.match(page, /function FurnitureCatalogPage/);
+  assert.match(page, /catalog","furniture"/);
+  assert.match(page, /← Вернуться в проект/);
+  assert.match(page, /NORR Møbler/);
+  assert.match(page, /LEVE HOME/);
+  assert.match(page, /minPrice/);
+  assert.match(page, /widthMinMm/);
+  assert.match(page, /Некоторые бренды временно недоступны/);
+  assert.match(page, /studio-material-tray/);
+  assert.match(page, /Материалы, выбранные для этого проекта/);
+  assert.match(page, /Добавьте первый материал — каталог не запускает генерацию автоматически/);
+  assert.match(page, /studioMaterials:override\.studioMaterials\?\?studioMaterials/);
+  assert.match(page, /referenceImage,referenceName,referenceDetails,materialReference/);
+  assert.match(css, /room-catalog-page/);
+  assert.match(css, /studio-material-actions/);
+  assert.match(css, /room-catalog-grid[\s\S]*repeat\(4,minmax\(0,1fr\)\)/);
+});
+
 test("custom furniture references collect real dimensions and pass them to generation", () => {
   assert.match(page, /studio-source-reference-specs/);
   assert.match(page, /РЕФЕРЕНС · НАСТРОЙКА/);
