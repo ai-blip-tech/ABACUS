@@ -74,7 +74,7 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(css, /:has\(\.studio-bottom-catalog:not\(\.catalog-fullscreen\)\) \.canvas-area[\s\S]*padding-bottom: clamp\(218px,26dvh,250px\)/);
   assert.match(page, /room-open-furniture-catalog/);
   assert.match(page, /Загрузить референс/);
-  assert.match(page, /Создать рендер →/);
+  assert.match(page, /"Создать рендер"/);
   assert.match(page, /studioPreview\"\)==\=\"unified\"/);
   assert.match(page, /persistentCatalogEnabled/);
   assert.match(css, /studio-catalog-generate/);
@@ -85,6 +85,13 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
 
 test("custom furniture references collect real dimensions and pass them to generation", () => {
   assert.match(page, /studio-source-reference-specs/);
+  assert.match(page, /РЕФЕРЕНС · НАСТРОЙКА/);
+  assert.match(page, /orbitAction==="add"\|\|orbitAction==="replace"/);
+  assert.match(page, /orbitAction==="material"/);
+  assert.match(page, /РЕФЕРЕНС · МАТЕРИАЛ/);
+  assert.match(page, /Размеры для этого режима не требуются/);
+  assert.match(page, /setMaterialReference/);
+  assert.doesNotMatch(page, /<h2>Направление<\/h2>/);
   assert.match(page, /Название референса/);
   assert.match(page, /Описание референса/);
   assert.match(page, /Ширина, мм/);
