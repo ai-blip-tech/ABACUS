@@ -1218,6 +1218,13 @@
 /* Browser zoom can reduce the CSS viewport below the tablet breakpoint even on
    a desktop monitor. Keep the catalog as a compact bottom rail from 768px up. */
 @media (min-width: 768px) {
+  .unified-studio-preview:has(.studio-bottom-catalog:not(.catalog-fullscreen)) .studio-source-rail {
+    height: calc(100% - clamp(218px,26dvh,250px));
+    max-height: calc(100% - clamp(218px,26dvh,250px));
+    align-self: start;
+    padding-bottom: 24px;
+    scroll-padding-bottom: 24px;
+  }
   .unified-studio-preview:has(.studio-bottom-catalog:not(.catalog-fullscreen)) .canvas-area {
     padding-bottom: clamp(218px,26dvh,250px);
   }
