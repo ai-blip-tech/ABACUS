@@ -40,6 +40,44 @@ jobs:
             git pull --ff-only origin main
             test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 
+            # The live .next directory and verified production backups are never
+            # touched here. Rotate only disposable build artifacts left by old
+            # or interrupted deployments, keeping the two newest rollback builds.
+            python3 - "$live_dir" <<'PY'
+            from pathlib import Path
+            import shutil
+            import sys
+
+            live = Path(sys.argv[1]).resolve()
+            parent = live.parent
+
+            def remove(target: Path, expected_parent: Path) -> None:
+                resolved = target.resolve()
+                if resolved.parent != expected_parent or not resolved.is_dir():
+                    raise SystemExit(f"Refusing unsafe build cleanup target: {resolved}")
+                shutil.rmtree(resolved)
+                print(f"REMOVED_OLD_BUILD={resolved.name}")
+
+            rollbacks = sorted(
+                (path for path in live.glob(".next.rollback-*") if path.is_dir()),
+                key=lambda path: path.stat().st_mtime,
+                reverse=True,
+            )
+            for path in rollbacks[2:]:
+                remove(path, live)
+
+            for pattern in (".next.failed-*", ".next.candidate-*"):
+                for path in live.glob(pattern):
+                    if path.is_dir():
+                        remove(path, live)
+
+            for path in parent.glob("ABACUS-release-*"):
+                if path.is_dir():
+                    remove(path, parent)
+            PY
+            echo "RESOURCE_SNAPSHOT_AFTER_BUILD_ROTATION"
+            df -h . || true
+
             release_sha="$(git rev-parse HEAD)"
             release_dir="../ABACUS-release-${release_sha}-$(date +%Y%m%d%H%M%S)"
             rollback_dir=""
@@ -54,6 +92,22 @@ jobs:
                 wait "$candidate_pid" 2>/dev/null || true
                 candidate_pid=""
               fi
+            }
+
+            cleanup_release_dir() {
+              python3 - "$live_dir" "$release_dir" <<'PY'
+            from pathlib import Path
+            import shutil
+            import sys
+
+            live = Path(sys.argv[1]).resolve()
+            target = (live / sys.argv[2]).resolve()
+            if target.parent != live.parent or not target.name.startswith("ABACUS-release-"):
+                raise SystemExit(f"Refusing unsafe release cleanup target: {target}")
+            if target.is_dir():
+                shutil.rmtree(target)
+                print(f"REMOVED_RELEASE_BUILD={target.name}")
+            PY
             }
 
             rollback_release() {
@@ -75,6 +129,7 @@ jobs:
                 pm2 restart roomdesign --update-env
                 curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null || true
               fi
+              cleanup_release_dir
               exit "$result"
             }
             trap rollback_release ERR INT TERM
@@ -147,6 +202,7 @@ jobs:
             candidate_dir=".next.candidate-${release_sha}"
             test ! -e "$candidate_dir"
             mv "$release_dir/.next" "$candidate_dir"
+            cleanup_release_dir
             rollback_dir=".next.rollback-${previous_sha}-$(date +%Y%m%d%H%M%S)"
             test ! -e "$rollback_dir"
             mv .next "$rollback_dir"
