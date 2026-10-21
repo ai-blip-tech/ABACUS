@@ -33,6 +33,49 @@ jobs:
             pm2 describe roomdesign
             curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null
 
+            # Free build space before Git needs to create any lock or temporary
+            # files. The active .next, application data and verified backups are
+            # deliberately outside this disposable-artifact allowlist.
+            python3 - "$live_dir" <<'PY'
+            from pathlib import Path
+            import shutil
+            import sys
+
+            live = Path(sys.argv[1]).resolve()
+            parent = live.parent
+
+            def remove(target: Path, expected_parent: Path) -> None:
+                resolved = target.resolve()
+                if resolved.parent != expected_parent or not resolved.is_dir():
+                    raise SystemExit(f"Refusing unsafe build cleanup target: {resolved}")
+                shutil.rmtree(resolved)
+                print(f"REMOVED_OLD_BUILD={resolved.name}")
+
+            stale_lock = live / ".git" / "index.lock"
+            if stale_lock.is_file():
+                stale_lock.unlink()
+                print("REMOVED_STALE_GIT_LOCK=index.lock")
+
+            rollbacks = sorted(
+                (path for path in live.glob(".next.rollback-*") if path.is_dir()),
+                key=lambda path: path.stat().st_mtime,
+                reverse=True,
+            )
+            for path in rollbacks[2:]:
+                remove(path, live)
+
+            for pattern in (".next.failed-*", ".next.candidate-*"):
+                for path in live.glob(pattern):
+                    if path.is_dir():
+                        remove(path, live)
+
+            for path in parent.glob("ABACUS-release-*"):
+                if path.is_dir():
+                    remove(path, parent)
+            PY
+            echo "RESOURCE_SNAPSHOT_AFTER_EARLY_BUILD_ROTATION"
+            df -h . || true
+
             git status --short
             test -z "$(git status --porcelain -- . ':(exclude)package-lock.json' ':(exclude)next-env.d.ts' ':(exclude).next.rollback-*' ':(exclude).next.failed-*' ':(exclude)roomdesign')"
             git restore --source=HEAD -- package-lock.json next-env.d.ts
