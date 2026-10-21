@@ -407,6 +407,64 @@
 .studio-reference-settings { margin-top: -8px; }
 .studio-reference-settings header { margin-bottom: 6px; }
 .studio-reference-settings header span { font-size: 7px; letter-spacing: .13em; }
+.studio-text-instruction {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--studio-line);
+}
+.studio-text-instruction header { margin-bottom: 7px; }
+.studio-text-instruction textarea {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  padding: 9px 10px;
+  resize: vertical;
+  border: 1px solid #d9cec4;
+  border-radius: 10px;
+  background: #fff;
+  color: #30241f;
+  font: 12px/1.4 inherit;
+  box-sizing: border-box;
+}
+.studio-text-instruction textarea:focus { outline: 2px solid rgba(151,15,40,.12); border-color: var(--studio-burgundy); }
+.studio-text-instruction button {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 7px;
+  border: 1px solid #d8cbc0;
+  border-radius: 999px;
+  background: #f4efeb;
+  color: #756962;
+  font: 700 11px inherit;
+  cursor: pointer;
+}
+.studio-text-instruction button.saved { border-color: var(--studio-burgundy); background: var(--studio-burgundy); color: #fff; }
+.studio-text-instruction button:disabled { cursor: default; opacity: .72; }
+.studio-text-instruction p { margin: 6px 2px 0; color: #998d84; font-size: 9px; line-height: 1.35; }
+.studio-text-instruction + .studio-reference-settings { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--studio-line); }
+.studio-plan-surfaces {
+  display: grid;
+  gap: 7px;
+  margin-top: -6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--studio-line);
+}
+.studio-plan-surfaces header { margin-bottom: 2px; }
+.studio-plan-surfaces .plan-surface-reference {
+  width: 100%;
+  min-height: 54px;
+  padding: 7px 8px;
+  border: 1px solid #d9cec4;
+  border-radius: 12px;
+  background: #fff;
+  color: #30241f;
+  cursor: pointer;
+}
+.studio-plan-surfaces .plan-surface-reference:hover { border-color: var(--studio-burgundy); background: #fcf7f6; }
+.studio-plan-surfaces .plan-surface-reference img { width: 50px; height: 38px; }
+.studio-plan-surfaces .plan-surface-reference > i { width: 34px; height: 34px; color: var(--studio-burgundy); }
+.studio-plan-surfaces .plan-surface-reference small { color: var(--studio-burgundy); font-size: 7px; }
+.studio-plan-surfaces .plan-surface-reference b { overflow: hidden; font-size: 9px; line-height: 1.25; text-overflow: ellipsis; }
 .studio-source-upload {
   position: relative;
   min-height: 118px;
@@ -974,6 +1032,55 @@
 .unified-studio-preview[data-studio-mode="plan"] .planogram-workspace { min-height: 100%; background: #f2f0ed; }
 .unified-studio-preview[data-studio-mode="plan"] .planogram-toolbar { background: #fff; border-bottom-color: var(--studio-line); }
 .unified-studio-preview[data-studio-mode="plan"] .planogram-toolbar .plan-save { display: none; }
+.unified-studio-preview[data-studio-mode="plan"] .planogram-editor-scroll { background: #e9e3dc; }
+.unified-studio-preview[data-studio-mode="plan"] .planogram-dimensioned-board {
+  overflow: visible;
+  border-width: 2px;
+  border-color: #2d2825;
+  background: #eee9e3;
+  box-shadow: 0 12px 35px rgba(61,45,34,.12);
+}
+.planogram-technical-grid,
+.planogram-relative-measurements {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.planogram-technical-grid { z-index: 0; }
+.planogram-relative-measurements { z-index: 5; }
+.planogram-live-measurements { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.planogram-live-measurements > i { position: absolute; display: block; border-color: var(--studio-burgundy); opacity: .65; }
+.planogram-live-measurements > i.left,
+.planogram-live-measurements > i.right { height: 0; border-top: 1px dashed var(--studio-burgundy); }
+.planogram-live-measurements > i.top,
+.planogram-live-measurements > i.bottom { width: 0; border-left: 1px dashed var(--studio-burgundy); }
+.planogram-live-measurements > span {
+  position: absolute;
+  padding: 3px 5px;
+  transform: translate(-50%,-50%);
+  border: 1px solid #d6b4b9;
+  border-radius: 3px;
+  background: rgba(255,253,249,.94);
+  color: var(--studio-burgundy);
+  box-shadow: 0 2px 5px rgba(43,32,29,.1);
+  font: 700 7px/1 var(--font-manrope),Arial,sans-serif;
+  white-space: nowrap;
+}
+.planogram-relative-measurements line { stroke: #47744f; stroke-width: .55; stroke-dasharray: 1.5 1; vector-effect: non-scaling-stroke; }
+.planogram-relative-measurements circle { fill: #fff; stroke: #47744f; stroke-width: .55; vector-effect: non-scaling-stroke; }
+.planogram-relative-measurements text { fill: #27452d; stroke: #fffdf9; stroke-width: .65; paint-order: stroke; font: 700 1.45px/1 Arial,sans-serif; text-anchor: middle; }
+.unified-studio-preview[data-studio-mode="plan"] .plan-render-button {
+  right: 18px;
+  bottom: 18px;
+  min-width: 156px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--studio-burgundy);
+  color: #fff;
+}
 
 .unified-studio-preview:fullscreen { width: 100vw; height: 100vh; }
 

@@ -148,6 +148,31 @@ test("success sends clean plus marked images, never a segmentation mask, and cha
   }
 });
 
+test("combined furniture edit forwards the saved text instruction to the provider prompt", async () => {
+  const id = "success-place-with-text-instruction";
+  const additionalInstruction = "Покрасить стены в оранжевый цвет";
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    calls += 1;
+    assert.equal(url, "https://api.openai.com/v1/images/edits");
+    const providerPrompt = String(options.body.get("prompt"));
+    assert.match(providerPrompt, /MANDATORY SIMULTANEOUS USER CHANGE/);
+    assert.match(providerPrompt, /Покрасить стены в оранжевый цвет/);
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }], usage: { input_tokens: 11, output_tokens: 22, total_tokens: 33 } });
+  };
+  const response = await POST(request({
+    operation: "place",
+    prompt: "Добавь выбранное кресло",
+    additionalInstruction,
+    roomImage: png,
+    referenceImage: png,
+    pointEdit,
+    placement: { x: 50, y: 50 },
+  }, id));
+  assert.equal(response.status, 200);
+  assert.equal(calls, 1);
+});
+
 test("LEVE HOME catalog images reach the furniture provider instead of failing the source allowlist", async () => {
   const id = "success-leve-home-place";
   const referenceImage = "https://levehome.ru/upload/pic/2000000055251/main/1.jpg";

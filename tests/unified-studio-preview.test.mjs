@@ -71,13 +71,59 @@ test("image editor uses a contextual point menu and preserves advanced tools", (
   assert.match(page, /studioOrbit=placementPoint\.x<22\?"right"/);
   assert.match(page, /createPortal\(<button className="studio-canvas-render-button"/);
   assert.match(page, /disabled=\{!catalogCanGenerate\}/);
-  assert.match(page, /const selectedEdit=queuedEdits\.find/);
-  assert.match(page, /if\(selectedEdit\)\{onRemoveQueued\(selectedEdit\.id\);return;\}/);
+  assert.match(page, /const selectedEdit=queuedEdits\[0\]/);
+  assert.match(page, /selectedEdit\?\.product\.id===product\.id/);
   assert.match(page, /previousOrbitAction\.current!==orbitAction/);
   assert.match(page, /selectedProductIds=\{queuedEdits\.map/);
   assert.match(page, /studio-canvas-generation-error/);
   assert.match(page, /Выберите режим «Добавить» или «Заменить»/);
   assert.match(css, /data-studio-mode="image"\] \.inspector-title \{ display: none/);
+});
+
+test("one point owns one active product and references stay reusable", () => {
+  assert.match(page, /setFurnitureEdits\(\[\{id:`edit-/);
+  assert.doesNotMatch(page, /for \(const edit of furnitureEdits\)/);
+  assert.match(page, /const edit=furnitureEdits\[0\]/);
+  assert.match(page, /referenceSelected\?"studio-material-card active":"studio-material-card"/);
+  assert.match(page, /aria-pressed=\{referenceSelected\}/);
+  assert.match(page, /onClick=\{selectReference\}/);
+  assert.match(page, /referenceSelected&&<section className="studio-source-section studio-reference-settings"/);
+  assert.match(page, /referenceSelected&&referenceReady/);
+  assert.doesNotMatch(page, /setReferenceImage\(""\); setReferenceName\(""\)/);
+});
+
+test("saved image instruction can render alone and reaches combined provider prompts", () => {
+  assert.match(page, /setPlacementPrompt\(next\)/);
+  assert.match(page, /else if\(placementPrompt\.trim\(\)\)onAdjust\(\)/);
+  assert.match(page, /:instructionReady;/);
+  assert.match(page, /additionalInstruction:imageInstruction\|\|undefined/);
+  assert.match(generateRoute, /const additionalInstructionPrompt = additionalInstruction/);
+  assert.match(generateRoute, /MANDATORY SIMULTANEOUS USER CHANGE/);
+  assert.match(generateRoute, /form\.append\("prompt", replacementPrompt\)/);
+  assert.match(generateRoute, /form\.append\("prompt", editPrompt\)/);
+  assert.match(generateRoute, /form\.append\("prompt", globalEditPrompt\)/);
+});
+
+test("plan mode reuses technical-lighting grid, live measurements and render action layout", () => {
+  assert.match(page, /studioMode==="plan"&&<section className="studio-source-section studio-plan-surfaces"/);
+  assert.match(page, /room-plan-floor-reference/);
+  assert.match(page, /room-plan-wall-reference/);
+  assert.match(page, /planogram-technical-grid/);
+  assert.match(page, /planogram-live-measurements/);
+  assert.match(page, /planogram-relative-measurements/);
+  assert.match(page, /distance=Math\.round\(Math\.hypot/);
+  assert.match(page, /className="studio-canvas-render-button plan-render-button"/);
+  assert.doesNotMatch(page, /<div className="plan-final-actions">/);
+  assert.match(css, /planogram-minor-grid|planogram-technical-grid/);
+  assert.match(css, /planogram-live-measurements/);
+  assert.match(css, /planogram-relative-measurements/);
+  assert.match(css, /plan-render-button/);
+});
+
+test("upscale status is independent from ordinary rendering", () => {
+  assert.match(page, /const \[isUpscaling, setIsUpscaling\]/);
+  assert.match(page, /setIsUpscaling\(true\);setIsGenerating\(true\)/);
+  assert.match(page, /\{isUpscaling\?"Улучшаем…":"Апскейл"\}/);
 });
 
 test("point orbit and catalog reuse the approved visual patterns", () => {

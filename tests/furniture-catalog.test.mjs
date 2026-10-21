@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { parseFurnitureCatalog } from "../lib/furniture-catalog.ts";
+import { furnitureBrandForDisplay, parseFurnitureCatalog } from "../lib/furniture-catalog.ts";
 import { matchesCatalogType } from "../lib/catalog-filter.ts";
 
 const leveFeed = `<?xml version="1.0"?><yml_catalog><shop><categories>
@@ -36,6 +36,13 @@ test("NORR feed maps the product brand ROM to the public NORR Møbler brand", ()
   const [product] = products;
   assert.equal(product.brand, "NORR Møbler");
   assert.equal(product.source, "norrmobler");
+});
+
+test("legacy one-r Normobler values are always shown as NORR Møbler", () => {
+  assert.equal(furnitureBrandForDisplay("Normobler"), "NORR Møbler");
+  const products = parseFurnitureCatalog(norrBrandFeed.replace("ROM", "Normobler"), "norrmobler");
+  assert.equal(products.length, 1);
+  assert.equal(products[0].brand, "NORR Møbler");
 });
 
 test("LEVE HOME category names map to every new furniture section", () => {

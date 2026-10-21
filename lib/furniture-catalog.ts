@@ -18,9 +18,10 @@ export const FURNITURE_CATALOG_SOURCES = [
 export const NORR_ALLOWED_PRODUCT_BRANDS = ["NORR Mobler", "ROM", "NORR Carpets", "FUGA", "SEYVAA PARIS", "MOBLIBERICA"] as const;
 const normalizeBrand = (value: string) => value.toLocaleUpperCase("ru-RU").replace(/Ё/g, "Е").replace(/[^A-ZА-Я0-9]+/g, " ").trim();
 const norrAllowedBrandByKey = new Map(NORR_ALLOWED_PRODUCT_BRANDS.map((brand) => [normalizeBrand(brand), brand]));
+norrAllowedBrandByKey.set("NORMOBLER", "NORR Mobler");
 export const furnitureBrandForDisplay = (value: string) => {
   const key = normalizeBrand(value);
-  return key === "ROM" || key === "NORR MOBLER" ? "NORR Møbler" : value.trim();
+  return key === "ROM" || key === "NORR MOBLER" || key === "NORMOBLER" ? "NORR Møbler" : value.trim();
 };
 
 type SourceCache = { expiresAt: number; products: FurnitureCatalogProduct[] };

@@ -138,6 +138,10 @@ async function generateResponse(request: Request) {
       || (body.lightingPlan ? "Create a calm photorealistic contemporary residential interior with neutral natural materials, a clearly visible ceiling, and the exact technical-lighting layout supplied in the plan." : "")
       || (body.lightingEdit ? "Integrate the marked technical lighting into the current interior." : "");
   if (!idea) return Response.json({ error: "Опишите идею для визуализации." }, { status: 400 });
+  const additionalInstruction = String((body as typeof body & { additionalInstruction?: string }).additionalInstruction || "").trim().slice(0, 2000);
+  const additionalInstructionPrompt = additionalInstruction
+    ? `MANDATORY SIMULTANEOUS USER CHANGE: ${additionalInstruction}. Apply this change in the same final image in addition to the selected furniture/material operation.`
+    : "";
   // The image edit endpoint accepts a small set of stable canvas sizes.  Older
   // client versions created arbitrary values such as 1536x864, which makes the
   // provider reject an otherwise valid furniture-replacement request.
@@ -178,6 +182,7 @@ async function generateResponse(request: Request) {
     "Use image 3 as the exact furniture reference. Add that specific furniture item naturally at the marked location.",
     furnitureReferenceBrief,
     pointDescription,
+    additionalInstructionPrompt,
     "Match perspective, scale, lighting, material realism and contact shadows. Preserve the rest of the room as closely as possible.",
     "No people, no text, no logos, no watermark.",
   ].join("\n");
@@ -187,6 +192,7 @@ async function generateResponse(request: Request) {
     "Image 1 is the clean original room and is the composition, camera, architecture and lighting source to preserve.",
     "Image 2 is the same room with numbered location markers. Remove every marker from the final result.",
     ...furnitureCastingItems.map((item, index) => `Image ${index + 3} is furniture item ${index + 1}${item.name ? ` (${item.name})` : ""}. Place it exactly once at marker ${index + 1}, centred near ${Math.round(item.x || 0)}% from the left and ${Math.round(item.y || 0)}% from the top.`),
+    additionalInstructionPrompt,
     `The final room must contain all ${furnitureCastingItems.length} supplied furniture items together in one coherent image. Do not omit an item and do not return intermediate variants.`,
     "Match believable scale, perspective, lighting, occlusion and contact shadows for every inserted item. Preserve everything else in the room as closely as possible.",
     "Return exactly one final image. No people, no text, no logos, no watermark.",
@@ -196,6 +202,7 @@ async function generateResponse(request: Request) {
     "Image 2 is the same interior with a temporary crosshair marker. The marker centre is the insertion location and must not appear in the result.",
     `Add this item naturally: ${body.product || "selected furniture"}.`,
     pointDescription,
+    additionalInstructionPrompt,
     "Match perspective, scale, lighting and contact shadows. Preserve the rest of the room as closely as possible.",
     "No people, no text, no logos, no watermark.",
   ].join("\n");
@@ -257,6 +264,7 @@ async function generateResponse(request: Request) {
     "Use image 3 exclusively as a source of colour, material, texture, pattern, finish, and surface character, even when it depicts a complete object.",
     pointDescription,
     body.material.instruction || "Transfer the referenced material to the selected surface.",
+    additionalInstructionPrompt,
     "Preserve the selected object's exact identity, silhouette, geometry, shape, dimensions, construction, position, perspective, seams, and surrounding scene.",
     "Do not add, insert, copy, reconstruct, or reproduce the object depicted in the reference. Do not replace the selected object with the reference object or change its furniture category.",
     "Change predominantly the selected object's surface. Preserve the surrounding scene as closely as possible.",
@@ -327,6 +335,7 @@ async function generateResponse(request: Request) {
     furnitureReferenceBrief,
     "Reproduce the furniture from image 3 faithfully: preserve its exact number of modules, silhouette, proportions, upholstery, seams, legs, colour, and distinctive details.",
     pointDescription,
+    additionalInstructionPrompt,
     "Do not add a second item. The reference furniture must occupy the position of the selected existing object only, with believable scale, perspective, contact shadows, and lighting.",
     "Preserve all other furniture, décor, architecture, lighting, materials and composition as closely as possible.",
     "Keep the original image dimensions and camera framing exactly unchanged. No people, no text, no logos, no watermark.",
@@ -336,6 +345,7 @@ async function generateResponse(request: Request) {
     "Image 2 is the same interior with a temporary crosshair marker. Identify the complete semantic object containing the marker centre; the marker must not appear in the result.",
     `Remove that entire selected object: ${body.removal.name}.`,
     pointDescription,
+    additionalInstructionPrompt,
     "Naturally reconstruct the background that was hidden behind the removed object. Do not add or replace it with another object.",
     "Preserve all other furniture, décor, walls, floor, lighting, materials, perspective and composition as closely as possible.",
     "Keep the original image dimensions and camera framing exactly unchanged.",
