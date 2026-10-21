@@ -90,6 +90,9 @@ test("one point owns one active product and references stay reusable", () => {
   assert.match(page, /onClick=\{selectReference\}/);
   assert.match(page, /referenceSelected&&<section className="studio-source-section studio-reference-settings"/);
   assert.match(page, /referenceSelected&&referenceReady/);
+  assert.match(page, /activeStudioMaterialId=\{linkedCatalogProduct\?\.id\|\|""\}/);
+  assert.match(page, /const active=linkedCatalogProduct\?\.id===product\.id/);
+  assert.match(page, /setReferenceSelected\(selected\);if\(selected\)setLinkedCatalogProduct\(null\)/);
   assert.doesNotMatch(page, /setReferenceImage\(""\); setReferenceName\(""\)/);
 });
 
@@ -177,8 +180,12 @@ test("preview separates the full catalog from the current project material rail"
   assert.match(page, /Добавьте первый материал — каталог не запускает генерацию автоматически/);
   assert.match(page, /studioMaterials:override\.studioMaterials\?\?studioMaterials/);
   assert.match(page, /referenceImage,referenceName,referenceDetails,materialReference/);
+  assert.match(page, /setStudioMaterials\(\(items\)=>items\.filter\(\(item\)=>item\.product\.id!==product\.id\)\)/);
+  assert.doesNotMatch(page, /setLinkedCatalogProduct\(existing\.product\);closeStudioCatalog\(\)/);
+  assert.match(page, /if\(!linkedCatalogProduct\|\|!placementPoint\|\|\(orbitAction!=="add"&&orbitAction!=="replace"\)\)return/);
   assert.match(css, /room-catalog-page/);
   assert.match(css, /studio-material-actions/);
+  assert.match(css, /studio-source-rail[\s\S]*overflow-y: auto;[\s\S]*overflow-x: hidden;[\s\S]*scrollbar-gutter: stable/);
   assert.match(css, /room-catalog-grid[\s\S]*repeat\(4,minmax\(0,1fr\)\)/);
 });
 

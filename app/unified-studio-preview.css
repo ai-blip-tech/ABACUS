@@ -387,6 +387,9 @@
   gap: 24px;
   padding: 20px 17px 18px;
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border-right: 1px solid var(--studio-line);
   background: #fff;
 }
@@ -1173,6 +1176,8 @@
   .studio-point-menu { width: min(300px,82%); transform: translate(10px,-10px); }
   .studio-source-rail {
     height: auto;
+    max-height: none;
+    overflow: visible;
     display: grid;
     grid-template-columns: repeat(2,minmax(0,1fr));
     gap: 10px;
