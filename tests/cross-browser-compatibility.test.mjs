@@ -26,7 +26,7 @@ test("serves Concept D fonts locally through next/font", () => {
 });
 
 test("root hydration preserves Concept D deep links instead of rewriting them to the landing page", () => {
-  assert.match(page, /decodeURIComponent\(window\.location\.hash\)/);
+  assert.match(page, /new URLSearchParams\(`value=\$\{rawHash\}`\)\.get\("value"\)/);
   assert.match(page, /window\.location\.href/);
   assert.doesNotMatch(page, /replaceState\(\{ norrView: "home" \}, "", "\/"\)/);
 });

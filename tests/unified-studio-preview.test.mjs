@@ -8,8 +8,9 @@ const css = await readFile(new URL("../app/unified-studio-preview.css", import.m
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const discovery = await readFile(new URL("../docs/unified-studio-preview-discovery.md", import.meta.url), "utf8");
 
-test("unified studio is guarded by an explicit preview query flag", () => {
-  assert.match(page, /params\.get\("studioPreview"\) === "unified"/);
+test("unified studio is the production default with an explicit legacy rollback flag", () => {
+  assert.match(page, /useState\(true\)/);
+  assert.match(page, /params\.get\("studioPreview"\) !== "legacy"/);
   assert.match(page, /unifiedStudioPreview \?/);
   assert.match(page, /unified-studio-preview/);
 });
@@ -146,7 +147,7 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
   assert.match(page, /room-open-furniture-catalog/);
   assert.match(page, /Загрузить референс/);
   assert.match(page, /"Создать рендер"/);
-  assert.match(page, /studioPreview\"\)==\=\"unified\"/);
+  assert.match(page, /params\.get\("studioPreview"\) !== "legacy"/);
   assert.match(page, /persistentCatalogEnabled/);
   assert.match(css, /studio-catalog-generate/);
   assert.match(css, /data-studio-mode="image"\] \.studio-point-actions button\.active/);

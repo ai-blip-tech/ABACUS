@@ -13,7 +13,7 @@ test("Concept D create-project page preserves the existing project handoff", () 
   assert.match(page, /skipNextProjectLoadRef\.current = newProjectId/);
   assert.match(page, /setProjectId\(newProjectId\)/);
   assert.match(page, /setProjectSaved\(false\)/);
-  assert.match(page, /navigate\("studio", newProjectId\)/);
+  assert.match(page, /navigate\(unifiedStudioPreview \? "projectMenu" : "studio", newProjectId\)/);
   assert.match(page, /<option>Квартира<\/option><option>Дом<\/option><option>Офис<\/option><option>Гостеприимство<\/option><option>Другое<\/option>/);
 });
 
@@ -26,7 +26,7 @@ test("create-project validation is inline and accessible", () => {
 });
 
 test("Concept D create-project shell keeps the approved layout and typography tokens", () => {
-  assert.match(page, /src="\/concept-d-create-project-hero\.avif" alt=""/);
+  assert.match(page, /src=\{unifiedStudioPreview\?"\/project-brief-blueprint\.png":"\/concept-d-create-project-hero\.avif"\} alt=""/);
   assert.doesNotMatch(page, /generated-bleed-runner\.png/);
   assert.match(styles, /grid-template-columns: minmax\(0, 61fr\) minmax\(440px, 39fr\)/);
   assert.match(styles, /padding: clamp\(48px, 4vw, 58px\).*clamp\(88px, 11vw, 170px\)/);

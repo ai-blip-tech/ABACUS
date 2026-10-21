@@ -15,22 +15,23 @@ test("free-text edit targets the current full image rather than the last placed 
   assert.match(page, /Применить изменения/);
   assert.match(route, /body\.globalEdit \? "global_edit"/);
   assert.match(route, /body\.roomImage && body\.globalEdit\?\.instruction/);
-  assert.match(route, /image\[\]", dataUrlToBlob\(body\.roomImage\), "current-interior\.png"/);
+  assert.match(route, /image\[\]", isTechnicalLighting \? await imageSourceToBlob\(body\.roomImage, providerTimeout\) : dataUrlToBlob\(body\.roomImage\), "current-interior\.png"/);
 });
 
 test("material brush is selection-gated and uses a distinct point-guided material operation", () => {
   assert.match(page, /activeTool === "Добавить мебель" && interiorImage && placementPoint&&<div className="material-tool"/);
   assert.match(page, /type MaterialSelection = \{ point:\{x:number;y:number\}; roomImage:string \}/);
-  assert.match(page, /const enterMaterialMode[\s\S]*?setMaterialSelection\(\{point,roomImage:source\}\)[\s\S]*?setMaterialMenuOpen\(true\)/);
+  assert.match(page, /const enterMaterialMode[\s\S]*?setMaterialSelection\(\{point,roomImage:source\}\)[\s\S]*?setMaterialMenuOpen\(false\)/);
   assert.match(page, /aria-label="Изменить материал выбранной поверхности"/);
   assert.match(page, /materialInputRef\.current\?\.click\(\)[\s\S]*?>Загрузить референс<\/button>/);
   assert.match(page, /material-catalog-action[\s\S]*?>Добавить из каталога<\/button>/);
   assert.match(page, /Каталог материалов готовится\./);
   assert.match(page, /type="file" accept="image\/png,image\/jpeg,image\/webp"[^>]*onChange=\{\(event\)=>loadMaterialReference/);
-  assert.match(page, /const loadMaterialReference[\s\S]*?void applyMaterial\(String\(reader\.result\),file\.name\)/);
+  assert.match(page, /const loadMaterialReference[\s\S]*?setMaterialReference\(\{image:String\(reader\.result\|\|""\),name:file\.name\.replace/);
+  assert.doesNotMatch(page.match(/const loadMaterialReference[\s\S]*?const upscaleHistoryVersion/)?.[0] || "", /void applyMaterial/);
   assert.match(page, /const applyMaterial[\s\S]*?const selection=materialSelection[\s\S]*?createPointMarkerImage\(roomImage,selection\.point\)/);
   assert.match(page, /const applyMaterial[\s\S]*?operation:"material"/);
-  assert.match(page, /const applyMaterial[\s\S]*?roomImage,referenceImage:materialReference,pointEdit,material:\{instruction:/);
+  assert.match(page, /const applyMaterial[\s\S]*?roomImage,referenceImage:materialReferenceImage,pointEdit,material:\{instruction:/);
   assert.doesNotMatch(page.match(/const applyMaterial[\s\S]*?const detectObjects/)?.[0] || "", /placement:|replacement:|removal:|furnitureAction/);
   assert.doesNotMatch(page.match(/const applyMaterial[\s\S]*?const detectObjects/)?.[0] || "", /getSurfaceMask|prepareLocalEdit|\/api\/segment|mask:/);
   assert.match(page, /const applyMaterial[\s\S]*?setActiveTool\("Добавить мебель"\)/);

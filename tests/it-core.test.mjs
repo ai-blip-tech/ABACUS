@@ -233,7 +233,7 @@ test("the verified product knowledge covers both editors and known limitations",
 
 test("Ono knows every registered template, its availability, inputs and result", () => {
   const definitions = ROOM_DESIGN_PRODUCT_KNOWLEDGE.templates.definitions;
-  assert.equal(definitions.length, 33);
+  assert.equal(definitions.length, 34);
   assert.equal(new Set(definitions.map((template) => template.slug)).size, definitions.length);
   for (const template of definitions) {
     assert.ok(template.title);
@@ -244,7 +244,7 @@ test("Ono knows every registered template, its availability, inputs and result",
     assert.ok(template.inputs.every((input) => input.label && typeof input.required === "boolean"));
     assert.equal(template.status, "Доступен");
   }
-  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.navigation.templates, /35 работающих сценариев/);
+  assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.navigation.templates, /34 работающих сценария/);
   assert.doesNotMatch(ROOM_DESIGN_PRODUCT_KNOWLEDGE.templates.statuses, /Preview|Beta|Скоро/);
   assert.match(ROOM_DESIGN_PRODUCT_KNOWLEDGE.templates.statuses, /главнее старых ответов ассистента/iu);
   assert.equal(definitions.find((template) => template.slug === "design-battle")?.title, "Дизайн-баттл");

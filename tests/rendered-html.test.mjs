@@ -110,8 +110,8 @@ test("planogram keeps a remembered render instruction separate from immediate im
   const generateSource = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const projectSource = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
 
-  assert.match(pageSource, /plan-instruction-panel/);
-  assert.match(pageSource, />Запомнить<\/button>/);
+  assert.match(pageSource, /studio-text-instruction/);
+  assert.match(pageSource, />Сохранить<\/button>/);
   assert.match(pageSource, /referenceImages,instruction:planInstruction,outputSize/);
   assert.match(generateSource, /explicit additional instruction is mandatory/);
   assert.match(projectSource, /planInstruction:\s*typeof draft\.planInstruction/);

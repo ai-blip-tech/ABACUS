@@ -135,7 +135,7 @@ export default function Home() {
   const [saveProjectName, setSaveProjectName] = useState("");
   const [saveProjectError, setSaveProjectError] = useState("");
   const [activeTool, setActiveTool] = useState("Добавить мебель"); const [selected, setSelected] = useState("Модульный диван Осло");
-  const [unifiedStudioPreview, setUnifiedStudioPreview] = useState(false);
+  const [unifiedStudioPreview, setUnifiedStudioPreview] = useState(true);
   const [imageStudioTool, setImageStudioTool] = useState("Добавить мебель");
   const [studioDrawer, setStudioDrawer] = useState<"context" | "history" | null>(null);
   const studioWorkspaceRef = useRef<HTMLElement>(null);
@@ -681,7 +681,7 @@ export default function Home() {
   useEffect(() => {
     const syncPreviewMode = () => {
       const params = new URLSearchParams(window.location.search);
-      const enabled = params.get("studioPreview") === "unified";
+      const enabled = params.get("studioPreview") !== "legacy";
       setUnifiedStudioPreview(enabled);
       if (enabled) setActiveTool(params.get("studioMode") === "plan" ? "Планограмма" : "Добавить мебель");
     };

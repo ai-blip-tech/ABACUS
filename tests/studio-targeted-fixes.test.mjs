@@ -107,7 +107,7 @@ test("creating or opening a project clears the previous workspace before the nex
     /setProposalItems\(\[\]\)/,
   ]) assert.match(page, reset);
   assert.match(page, /onCreate=\{\(\)=>\{resetProjectWorkspace\(true\);navigate\("newProject",""\);\}\}/);
-  assert.match(page, /onOpenProject=\{\(project\)=>\{resetProjectWorkspace\(false\);setProjectName\(project\.name\);navigate\("studio",project\.id\)\}\}/);
+  assert.match(page, /onOpenProject=\{\(project\)=>\{resetProjectWorkspace\(false\);setProjectName\(project\.name\);navigate\(unifiedStudioPreview\?"projectMenu":"studio",project\.id\)\}\}/);
   assert.match(page, /const newProjectId = String\(payload\.project\.id\);\s*resetProjectWorkspace\(false\);\s*skipNextProjectLoadRef\.current = newProjectId/);
 });
 

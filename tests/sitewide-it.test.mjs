@@ -42,7 +42,7 @@ test("template catalog and template workspaces receive contextual assistant prom
   assert.match(sitewide, /template\.inputSlots\.map/);
   assert.match(agent, /CURRENT_ROOM_DESIGN_CONTEXT=/);
   assert.match(agent, /roomDesignProductKnowledgePromptFor\(input\.context\)/);
-  assert.match(knowledge, /Статус «Скоро»/);
+  assert.match(knowledge, /Не показывай пользователю внутренние lifecycle-метки разработки/);
 });
 
 test("Ono remains available on account, admin and proposal routes", () => {
