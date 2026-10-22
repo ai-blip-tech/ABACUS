@@ -187,6 +187,8 @@ test("preview separates the full catalog from the current project material rail"
   assert.match(css, /studio-material-actions/);
   assert.match(css, /studio-source-rail[\s\S]*overflow-y: auto;[\s\S]*overflow-x: hidden;[\s\S]*scrollbar-gutter: stable/);
   assert.match(css, /:has\(\.studio-bottom-catalog:not\(\.catalog-fullscreen\)\) \.studio-source-rail[\s\S]*height: calc\(100% - clamp\(218px,26dvh,250px\)\)[\s\S]*align-self: start/);
+  assert.match(css, /\.unified-studio-preview[\s\S]*height: 100dvh;[\s\S]*display: flex;[\s\S]*flex-direction: column/);
+  assert.match(css, /:has\(\.studio-material-tray\) \.studio-source-rail[\s\S]*margin-bottom: var\(--studio-material-tray-height\)[\s\S]*scroll-padding-bottom: 24px/);
   assert.match(css, /room-catalog-grid[\s\S]*repeat\(4,minmax\(0,1fr\)\)/);
 });
 
