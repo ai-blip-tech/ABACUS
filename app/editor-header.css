@@ -1,0 +1,12 @@
+.topbar.editor-header { position: relative; z-index: 40; flex: 0 0 62px; height: 62px; padding-inline: 24px; background: #fff; font-family: var(--font-manrope), Arial, sans-serif; }
+.editor-header .crumb { min-width: 0; }
+.editor-header .crumb b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editor-header .crumb button { white-space: nowrap; cursor: pointer; }
+.editor-header .top-actions { flex: 0 0 auto; }
+.editor-header .top-actions .account-trigger { min-width: 184px; max-width: 240px; min-height: 48px; padding: 4px 12px 4px 4px!important; gap: 11px; border-radius: 999px!important; background: #fffdf9!important; box-shadow: 0 10px 28px #36251c14; }
+.editor-header .top-actions .account-trigger-avatar { width: 40px; height: 40px; flex-basis: 40px; }
+.editor-header .top-actions .account-trigger-copy { flex: 1 1 auto; }
+.editor-header .top-actions .account-trigger-copy b { font: 500 15px/1.1 var(--font-cormorant-garamond), Georgia, serif; }
+.editor-header-login { border: 1px solid #ded2c5; border-radius: 999px; padding: 10px 18px; background: #fffdf9; cursor: pointer; }
+@media(max-width:900px) { .topbar.editor-header { gap: 14px; } .editor-header .crumb { gap: 6px; font-size: 11px; } }
+@media(max-width:600px) { .topbar.editor-header { height: 58px; flex-basis: 58px; padding-inline: 12px; gap: 10px; } .editor-header .room-design-wordmark { font-size: 19px; } .editor-header .crumb i, .editor-header .crumb > span, .editor-header .crumb b { display: none; } .editor-header .top-actions .account-trigger { min-width: 40px; max-width: 40px; padding: 0!important; } .editor-header .account-trigger-copy, .editor-header .account-trigger-chevron { display: none; } }

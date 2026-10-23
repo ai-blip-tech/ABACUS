@@ -1,3 +1,12 @@
+.folio-app > .editor-header { position: sticky; top: 0; }
+.folio-editor-toolbar { position: relative; }
+.folio-app .folio-studio { height: calc(100dvh - 122px); }
+.folio-photo.viewing { cursor: default; }
+.folio-canvas:has(.folio-photo) { container-type: size; }
+.folio-canvas > .folio-photo { width: min(900px, 100%, calc(100cqh * var(--photo-ratio))); min-height: 0; max-height: 100%; }
+.folio-photo .editor-image-actions svg { position: static; inset: auto; width: 22px; height: 22px; }
+@media(max-width:820px) { .folio-app .folio-studio { height: auto; } }
+
 .folio-workspace-controls {
   display: flex !important;
   flex-direction: row !important;
