@@ -47,7 +47,7 @@ export function issues(doc:MeasureDoc){const list:{id:string;label:string;wallId
  if(doc.heightMode==='different'&&!doc.zones.length)add('zones','Добавьте хотя бы одну зону перепада');
  for(const z of doc.zones)if(!Number.isFinite(z.elevation)||!z.height||z.height<1000||z.height>10000||z.polygon.length<3||polygonArea(z.polygon)<10000)add(z.id,'Укажите корректную высоту и отметку пола: '+z.name);
  if(doc.walls.length<3)add('walls','Нужно не менее трёх стен');
- for(const w of doc.walls)for(const [i,reason] of wallMissing(doc,w,false).entries())add(w.id+'-parameter-'+i,w.name+': '+reason,{wallId:w.id});
+ for(const w of doc.walls)for(const [i,reason] of wallMissing(doc,w,doc.source.method==='raster-estimated').entries())add(w.id+'-parameter-'+i,w.name+': '+reason,{wallId:w.id});
  for(const [index,o] of doc.openings.entries())for(const [i,reason] of openingMissing(doc,o,false).entries())add(o.id+'-parameter-'+i,(o.kind==='window'?'Окно':o.kind==='door'?'Дверь':'Проём')+' '+(index+1)+': '+reason,{wallId:o.wallId,openingId:o.id});
  if(doc.floor.length<3||doc.floor.some(p=>p.some(n=>!Number.isFinite(n)))||polygonArea(doc.floor)<100000)add('floor','Задайте замкнутый контур пола минимум из трёх точек');
  if(doc.floor.length>=3)for(const w of doc.walls)if(!inside(w.a,doc.floor)||!inside(w.b,doc.floor))add(w.id+'-outside','Стена выходит за контур пола: '+w.name,{wallId:w.id});
