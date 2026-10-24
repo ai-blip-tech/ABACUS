@@ -248,7 +248,7 @@ jobs:
             echo "RESOURCE_SNAPSHOT_BEFORE_BUILD"
             free -h || true
             df -h . || true
-            timeout --signal=TERM --kill-after=30s 12m npm run build -- --webpack
+            ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-build-data" timeout --signal=TERM --kill-after=30s 12m npm run build -- --webpack
             test -f .next/BUILD_ID
 
             candidate_port=3901
