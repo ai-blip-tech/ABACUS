@@ -21,7 +21,35 @@ export function detectWalls(data:Uint8ClampedArray,width:number,height:number){
  }
  return merged.sort((a,b)=>Math.hypot(b.b[0]-b.a[0],b.b[1]-b.a[1])-Math.hypot(a.b[0]-a.a[0],a.b[1]-a.a[1])).slice(0,40);
 }
-export function estimatedRasterModel(source:Source,candidates:ReturnType<typeof detectWalls>):MeasureDoc{
+/** Look outside the dark wall body for a supported pale upper outline. Furniture
+ * inside the apartment must not become a perimeter. No unsupported flat closure. */
+export function detectUpperOutline(data:Uint8ClampedArray,width:number,height:number,candidates:ReturnType<typeof detectWalls>):[number,number][]{
+ const thick=Math.max(0,...candidates.map(s=>s.thickness));
+ const vertical=candidates.filter(s=>s.a[0]===s.b[0]&&s.thickness>=thick*.7&&s.b[1]-s.a[1]>Math.max(width,height)*.12);
+ if(vertical.length<2)return[];
+ const top=Math.min(...vertical.map(s=>s.a[1]));
+ const anchors=vertical.filter(s=>Math.abs(s.a[1]-top)<thick*1.2).sort((a,b)=>a.a[0]-b.a[0]);
+ if(anchors.length<2)return[];
+ const left=anchors[0].a,right=anchors[anchors.length-1].a,start=Math.max(1,Math.floor(top-Math.max(width,height)*.2)),end=Math.min(height-1,Math.ceil(top));
+ const gray=(x:number,y:number)=>{const p=(y*width+x)*4;return(data[p]+data[p+1]+data[p+2])/3;};
+ const bg=gray(Math.round((left[0]+right[0])/2),start),threshold=Math.min(235,bg-12);
+ const raw:{x:number;y:number}[]=[];
+ for(let x=Math.ceil(left[0]);x<=Math.floor(right[0]);x++){
+  let found=-1;for(let y=start;y<end;y++){let support=0;for(let dx=-2;dx<=2;dx++)if(x+dx>=0&&x+dx<width&&gray(x+dx,y)<=threshold)support++;if(support>=3){found=y;break;}}
+  raw.push({x,y:found});
+ }
+ const runs:{start:number;end:number;values:number[]}[]=[];
+ for(let i=2;i<raw.length-2;i++){const values=raw.slice(i-2,i+3).map(p=>p.y).filter(y=>y>=0).sort((a,b)=>a-b);if(values.length<3)continue;const y=values[Math.floor(values.length/2)],last=runs[runs.length-1];if(last&&raw[i].x-last.end<=2&&Math.abs(last.values[last.values.length-1]-y)<=3){last.end=raw[i].x;last.values.push(y);}else runs.push({start:raw[i].x,end:raw[i].x,values:[y]});}
+ const stable=runs.filter(r=>r.end-r.start>=Math.max(12,width*.009)).map(r=>({...r,y:[...r.values].sort((a,b)=>a-b)[Math.floor(r.values.length/2)]}));
+ const supported=stable.reduce((n,r)=>n+r.end-r.start,0);
+ if(stable.length<1||supported<(right[0]-left[0])*.85)return[];
+ const points:[number,number][]=[[...left]];
+ let previousY=stable[0].y;points.push([left[0],previousY]);
+ for(let i=1;i<stable.length;i++){const boundary=Math.round((stable[i-1].end+stable[i].start)/2);if(Math.abs(stable[i].y-previousY)>4){points.push([boundary,previousY],[boundary,stable[i].y]);previousY=stable[i].y;}}
+ points.push([right[0],previousY],[...right]);
+ return points.filter((p,i)=>!i||Math.hypot(p[0]-points[i-1][0],p[1]-points[i-1][1])>.1);
+}
+export function estimatedRasterModel(source:Source,candidates:ReturnType<typeof detectWalls>,upperOutline:[number,number][]=[]):MeasureDoc{
  candidates=structuredClone(candidates);
  const major=candidates.filter(s=>Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])>Math.max(source.width,source.height)*.3).map(s=>s.thickness).sort((a,b)=>a-b);
  // A provisional 200 mm stroke is a scale convention, never a recovered measurement.
@@ -41,14 +69,18 @@ export function estimatedRasterModel(source:Source,candidates:ReturnType<typeof 
   for(const b of [...bands].reverse()){floor.push([b.left-margin,b.bottom+margin],[b.left-margin,b.top+(b===bands[0]?-margin:margin)]);}
   const unique=floor.filter((p,i)=>!i||Math.hypot(p[0]-floor[i-1][0],p[1]-floor[i-1][1])>1);
   doc.floor=unique.map(p=>p.map(v=>Math.round(v*scale)) as [number,number]);
-  // Missing top boundary may be a window wall drawn in pale strokes. Infer it
-  // as an editable wall, without pretending that openings were recognized.
-  const top=bands[0];if(!candidates.some(s=>s.a[1]===s.b[1]&&Math.abs(s.a[1]-top.top)<heavy*2))candidates.push({a:[top.left,top.top],b:[top.right,top.top],thickness:heavy});
+  const top=bands[0];if(upperOutline.length>=2&&!candidates.some(s=>s.a[1]===s.b[1]&&Math.abs(s.a[1]-top.top)<heavy*2)){
+   for(let i=1;i<upperOutline.length;i++)candidates.push({a:upperOutline[i-1],b:upperOutline[i],thickness:Math.max(heavy*.35,8)});
+   // Replace the straight top floor edge by the same observed stepped outline.
+   const first=upperOutline[0],last=upperOutline[upperOutline.length-1];doc.floor[0][1]=Math.round(last[1]*scale);doc.floor[doc.floor.length-1][1]=Math.round(first[1]*scale);
+   doc.floor.push(...upperOutline.map(p=>p.map(v=>Math.round(v*scale)) as [number,number]));
+  }
  }
  doc.walls=candidates.map((s,i):Wall=>({id:'wall_scan_'+i,name:'Стена '+(i+1),a:s.a.map(x=>Math.round(x*scale)) as [number,number],b:s.b.map(x=>Math.round(x*scale)) as [number,number],thickness:Math.max(75,Math.round(s.thickness*scale)),thicknessConfirmed:false,lengthConfirmed:false,height:null,group:'inner',provenance:'Ориентировочная геометрия по рисунку; требуется обмер'}));
  return doc;
 }
 export async function rasterDocument(source:Source):Promise<MeasureDoc>{
  const image=new Image();image.src=source.image;await image.decode();const max=2200,ratio=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*ratio);canvas.height=Math.round(image.naturalHeight*ratio);const ctx=canvas.getContext('2d')!;ctx.drawImage(image,0,0,canvas.width,canvas.height);const candidates=detectWalls(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
- return estimatedRasterModel(source,candidates.map(s=>({a:s.a.map(x=>x/ratio) as [number,number],b:s.b.map(x=>x/ratio) as [number,number],thickness:s.thickness/ratio})));
+ const upper=detectUpperOutline(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height,candidates);
+ return estimatedRasterModel(source,candidates.map(s=>({a:s.a.map(x=>x/ratio) as [number,number],b:s.b.map(x=>x/ratio) as [number,number],thickness:s.thickness/ratio})),upper.map(p=>p.map(v=>v/ratio) as [number,number]));
 }
