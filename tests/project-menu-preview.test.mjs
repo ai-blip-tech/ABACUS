@@ -13,12 +13,12 @@ test("project menu is part of the preview route without changing the legacy stud
   assert.match(page, /#меню-проекта/);
 });
 
-test("all nine requested stages are present and only two are available", () => {
+test("all nine requested stages are preserved and measured plan is the third available stage", () => {
   for (const label of ["Обмерный план", "Монтаж, демонтаж", "Планировочное решение", "Концепция и материалы", "Интерьер и меблировка", "Технический свет", "Санузел", "Керамогранит", "Документация"]) {
     assert.match(page, new RegExp(label));
   }
-  assert.equal((page.match(/available: true/g) || []).length, 2);
-  assert.equal((page.match(/available: false/g) || []).length, 7);
+  assert.equal((page.match(/available: true/g) || []).length, 3);
+  assert.equal((page.match(/available: false/g) || []).length, 6);
 });
 
 test("active stages use existing destinations and placeholders explain their status", () => {
@@ -26,6 +26,8 @@ test("active stages use existing destinations and placeholders explain their sta
   assert.match(page, /if \(isLighting\) onOpenTechnical\(\)/);
   assert.match(page, /Раздел в работе/);
   assert.match(page, /скоро появится/);
+  assert.match(page, /item\.id==="sources"\?window\.location\.assign/);
+  assert.match(page, /\/measured-plan\?project=/);
   assert.match(page, /item\.available\?setSelectedStage\(item\.id\):setUnavailableStage\(item\.label\)/);
   assert.match(page, /project-menu-toast/);
   assert.doesNotMatch(page, /project-menu-placeholder/);

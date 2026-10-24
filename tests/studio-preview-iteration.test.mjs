@@ -26,7 +26,7 @@ test("Studio keeps the source image uncropped and overlays one render-history ri
   assert.match(styles, /overflow-x:auto/);
   assert.match(styles, /@media\(hover:none\),\(pointer:coarse\)/);
   assert.match(page, /openHistoryVersion\(version\)/);
-  assert.match(page, /downloadHistoryVersion\(version\)/);
+  assert.match(page, /selectedHistoryVersion&&void downloadHistoryVersion\(selectedHistoryVersion\)/);
   assert.match(page, /downloadImageAsJpeg\(version\.image, version\.name\)/);
 });
 
