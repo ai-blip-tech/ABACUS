@@ -1047,10 +1047,11 @@ export default function Home() {
   </main>;
 }
 
-type ProjectMenuStageId = "sources" | "planning" | "interior" | "materials" | "porcelain" | "bathroom" | "lighting" | "documentation";
+type ProjectMenuStageId = "sources" | "installation" | "planning" | "interior" | "materials" | "porcelain" | "bathroom" | "lighting" | "documentation";
 
 const PROJECT_MENU_STAGES: Array<{ id: ProjectMenuStageId; label: string; available: boolean }> = [
   { id: "sources", label: "Обмерный план", available: false },
+  { id: "installation", label: "Монтаж, демонтаж", available: false },
   { id: "planning", label: "Планировочное решение", available: false },
   { id: "materials", label: "Концепция и материалы", available: false },
   { id: "interior", label: "Интерьер и меблировка", available: true },
@@ -1131,7 +1132,7 @@ function ProjectMenuPreview({
           <span>ДИЗАЙН-ПРОЕКТ</span>
           <h1>{projectName}</h1>
           <p>{projectType}{projectDescription?` · ${projectDescription}`:""}</p>
-          <strong>2 из 8 разделов доступны</strong>
+          <strong>{PROJECT_MENU_STAGES.filter((item)=>item.available).length} из {PROJECT_MENU_STAGES.length} разделов доступны</strong>
           <i aria-hidden="true"><b/></i>
         </div>
         <ol className="project-menu-stages">

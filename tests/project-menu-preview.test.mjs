@@ -13,12 +13,12 @@ test("project menu is part of the preview route without changing the legacy stud
   assert.match(page, /#меню-проекта/);
 });
 
-test("all eight requested stages are present and only two are available", () => {
-  for (const label of ["Обмерный план", "Планировочное решение", "Концепция и материалы", "Интерьер и меблировка", "Технический свет", "Санузел", "Керамогранит", "Документация"]) {
+test("all nine requested stages are present and only two are available", () => {
+  for (const label of ["Обмерный план", "Монтаж, демонтаж", "Планировочное решение", "Концепция и материалы", "Интерьер и меблировка", "Технический свет", "Санузел", "Керамогранит", "Документация"]) {
     assert.match(page, new RegExp(label));
   }
   assert.equal((page.match(/available: true/g) || []).length, 2);
-  assert.equal((page.match(/available: false/g) || []).length, 6);
+  assert.equal((page.match(/available: false/g) || []).length, 7);
 });
 
 test("active stages use existing destinations and placeholders explain their status", () => {
@@ -43,7 +43,8 @@ test("menu summaries are based on current project state rather than invented com
   assert.match(page, /historyCount=\{historyVersions\.length\}/);
   assert.match(page, /furnitureCount=\{planItems\.length \|\| proposalItems\.length\}/);
   assert.match(page, /coverImage=\{generatedImage \|\| interiorImage\}/);
-  assert.match(page, /2 из 8 разделов доступны/);
+  assert.match(page, /PROJECT_MENU_STAGES\.filter\(\(item\)=>item\.available\)\.length/);
+  assert.match(page, /PROJECT_MENU_STAGES\.length\} разделов доступны/);
 });
 
 test("project menu stylesheet is loaded and has desktop and mobile layouts", () => {
