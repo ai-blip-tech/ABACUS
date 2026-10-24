@@ -60,31 +60,7 @@ jobs:
             database_name="room-design.sqlite"
             backup_root="$HOME/room-design-backups"
             mkdir -p "$backup_root"
-            python3 - "$backup_root" <<'PY'
-            import pathlib
-            import shutil
-            import sys
-
-            root = pathlib.Path(sys.argv[1]).resolve()
-            candidates = sorted((path for path in root.glob("predeploy-*") if path.is_dir()), key=lambda path: path.stat().st_mtime, reverse=True)
-            verified = []
-            incomplete = []
-            for path in candidates:
-                report = path / "REPORT.txt"
-                archive = path / "room-design-production.tar.gz"
-                checksum = path / "room-design-production.tar.gz.sha256"
-                status = report.read_text(encoding="utf-8", errors="replace") if report.is_file() else ""
-                if "status=PASSED\n" in status and archive.is_file() and checksum.is_file():
-                    verified.append(path)
-                elif not archive.is_file() or "status=FAILED\n" in status:
-                    incomplete.append(path)
-            for path in verified[2:] + incomplete:
-                if path.parent != root or not path.name.startswith("predeploy-"):
-                    raise SystemExit(f"unsafe backup rotation target: {path}")
-                shutil.rmtree(path)
-                print(f"ROTATED_BACKUP={path}")
-            print(f"VERIFIED_BACKUPS_RETAINED_BEFORE_CREATE={min(len(verified), 2)}")
-            PY
+            echo "PREVIOUS_BACKUPS_PRESERVED=yes"
             backup_name="predeploy-${BACKUP_RUN_ID}-${BACKUP_RUN_ATTEMPT}"
             backup_dir="$backup_root/$backup_name"
             snapshot_dir="$backup_dir/snapshot"
@@ -274,7 +250,8 @@ jobs:
             # archived object is hashed, and the archive is read back in full.
             data_kib="$(du -sk "$data_dir" | awk '{print $1}')"
             available_kib="$(df -Pk "$backup_root" | awk 'NR==2 {print $4}')"
-            required_kib="$((data_kib + 524288))"
+            build_kib="$(du -sk "$live_dir/.next" | awk '{print $1}')"
+            required_kib="$((data_kib + build_kib + 1048576))"
             data_size="$(du -sh "$data_dir" | awk '{print $1}')"
             echo "DATA_KIB=$data_kib"
             echo "AVAILABLE_KIB=$available_kib"
@@ -288,6 +265,17 @@ jobs:
               echo "Not enough free disk space for the compact verified archive." >&2
               fail "insufficient-disk-space"
             }
+
+            current_step="preserving current source, build and environment"
+            git archive --format=tar.gz --output="$backup_dir/source-$production_sha.tar.gz" HEAD
+            tar -C "$live_dir" -czf "$backup_dir/running-next-build.tar.gz" .next
+            cp "$env_file" "$backup_dir/environment.env"
+            chmod 600 "$backup_dir/environment.env"
+            (cd "$backup_dir" && sha256sum "source-$production_sha.tar.gz" running-next-build.tar.gz environment.env > release-files.sha256 && sha256sum -c release-files.sha256 >/dev/null)
+            echo "SOURCE_BUILD_ENV_BACKUP=verified"
+            for binary in pdfinfo pdftoppm; do
+              if command -v "$binary" >/dev/null 2>&1; then echo "MEASURED_PLAN_DEPENDENCY_$binary=available"; else echo "MEASURED_PLAN_DEPENDENCY_$binary=MISSING"; fi
+            done
 
             current_step="creating SQLite online backup"
             python3 - "$data_dir/$database_name" "$snapshot_dir/data/$database_name" <<'PY'
