@@ -4,7 +4,7 @@ import {ensureMeasuredStore} from '@/lib/measured-plan/store';
 import {bounds,type MeasureDoc} from '@/lib/measured-plan/measure-model';
 
 import {doorSymbol} from '@/lib/measured-plan/measure-editing';
-import {wallJoins} from '@/lib/measured-plan/measure-display';
+import {wallJoins,wallBodies} from '@/lib/measured-plan/measure-display';
 import {planHeightLabels,heightLabelPosition} from '@/lib/measured-plan/measure-heights';
 import {thicknessNotes,openingWidthMarks,planDrawingDimensions} from '@/lib/measured-plan/measure-annotations';
 import {drawMeasuredFrame,drawMeasuredNotes,sheetFormat} from '@/lib/measured-plan/print-frame';
@@ -30,8 +30,8 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
   const line=(a:[number,number],b:[number,number],thickness=.4,color=black)=>page.drawLine({start:pt(a),end:pt(b),thickness,color});
 
   drawMeasuredFrame(page,font);
-  for(const w of doc.walls)line(w.a,w.b,Math.max(.5,w.thickness*factor));
-  for(const joint of wallJoins(doc.walls,0)){const path=joint.polygon.map((p,i)=>`${i?'L':'M'} ${p[0]-box.x} ${p[1]-box.z}`).join(' ')+' Z';page.drawSvgPath(path,{x:ox,y:oy,scale:factor,color:black});}
+  for(const w of wallBodies(doc.walls))line(w.a,w.b,Math.max(.5,w.thickness*factor));
+  for(const joint of wallJoins(wallBodies(doc.walls),0)){const path=joint.polygon.map((p,i)=>`${i?'L':'M'} ${p[0]-box.x} ${p[1]-box.z}`).join(' ')+' Z';page.drawSvgPath(path,{x:ox,y:oy,scale:factor,color:black});}
   for(const o of doc.openings){const w=doc.walls.find(w=>w.id===o.wallId);if(!w)continue;const l=Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1]),ux=(w.b[0]-w.a[0])/l,uy=(w.b[1]-w.a[1])/l,a:[number,number]=[w.a[0]+ux*(o.offset-o.width/2),w.a[1]+uy*(o.offset-o.width/2)],b:[number,number]=[a[0]+ux*o.width,a[1]+uy*o.width];line(a,b,Math.max(1,w.thickness*factor)+.6,white);if(o.kind==='door'){const symbol=doorSymbol(w,o);line(symbol.hinge,symbol.leaf,.5);const start=Math.atan2(symbol.closed[1]-symbol.hinge[1],symbol.closed[0]-symbol.hinge[0]),end=Math.atan2(symbol.leaf[1]-symbol.hinge[1],symbol.leaf[0]-symbol.hinge[0]);let diff=((end-start+Math.PI*3)%(Math.PI*2))-Math.PI;for(let i=0;i<16;i++){const a=start+diff*i/16,b=start+diff*(i+1)/16;line([symbol.hinge[0]+Math.cos(a)*o.width,symbol.hinge[1]+Math.sin(a)*o.width],[symbol.hinge[0]+Math.cos(b)*o.width,symbol.hinge[1]+Math.sin(b)*o.width],.35);}}else if(o.kind==='window'){for(const side of [-1,1])line([a[0]-uy*w.thickness*.28*side,a[1]+ux*w.thickness*.28*side],[b[0]-uy*w.thickness*.28*side,b[1]+ux*w.thickness*.28*side],.7);line(a,b,.4);}else page.drawLine({start:pt(a),end:pt(b),thickness:.3,dashArray:[2,2],color:black});}
 
   for(const d of planDrawingDimensions(doc)){if(d.value<1)continue;const a=pt(d.a),b=pt(d.b),label=Math.round(d.value).toLocaleString('ru-RU')+' мм';page.drawLine({start:a,end:b,thickness:.3,dashArray:[1,1],color:black});if(d.kind==='room'){const p=dimensionLabelLayout(a,b,font.widthOfTextAtSize(label,6));page.drawText(label,{x:p.x,y:p.y,font,size:6,color:black,rotate:degrees(p.angle)});}else{const nx=-(d.b[1]-d.a[1])/d.value*75,ny=(d.b[0]-d.a[0])/d.value*75;for(const p of [d.a,d.b])line([p[0]-nx,p[1]-ny],[p[0]+nx,p[1]+ny],.5,black);const center={x:(a.x+b.x)/2,y:(a.y+b.y)/2},vertical=Math.abs(d.b[1]-d.a[1])>Math.abs(d.b[0]-d.a[0]);page.drawText(label,{x:vertical?center.x+4:center.x-font.widthOfTextAtSize(label,6)/2,y:vertical?center.y-2:center.y+4+Math.abs((d.b[1]-d.a[1])/(d.b[0]-d.a[0]||1))*font.widthOfTextAtSize(label,6)/2,font,size:6,color:black});}}

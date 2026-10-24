@@ -1,5 +1,29 @@
 import type {Point,Wall} from './measure-model.ts';
 export type WallJoin={walls:[string,string];polygon:Point[]};
+// Raster runs include the thickness of crossing walls in their endpoints.
+// Trim only an existing near-end crossing, never bridge a real gap or alter
+// stored dimensions. Both the editor and print use this same wall-body layout.
+export function wallBodies(walls:Wall[]):Wall[]{
+ return walls.map(w=>{
+  const body=structuredClone(w),dx=w.b[0]-w.a[0],dy=w.b[1]-w.a[1],len=Math.hypot(dx,dy);
+  if(len<1)return body;
+  for(const end of ['a','b'] as const){
+   let nearest=Infinity,point:Point|null=null;
+   for(const host of walls){
+    if(host.id===w.id)continue;
+    const hx=host.b[0]-host.a[0],hy=host.b[1]-host.a[1],hl=Math.hypot(hx,hy),cross=dx*hy-dy*hx;
+    if(!hl||Math.abs(dx*hx+dy*hy)>len*hl*.001||Math.abs(cross)<.001)continue;
+    const qx=host.a[0]-w.a[0],qy=host.a[1]-w.a[1],t=(qx*hy-qy*hx)/cross,u=(qx*dy-qy*dx)/cross;
+    if(t<0||t>1||u<0||u>1)continue;
+    const distance=(end==='a'?t:1-t)*len;
+    if(distance<.01||distance>Math.min(len*.25,(Math.max(w.thickness,70)+Math.max(host.thickness,70))/2)||distance>=nearest)continue;
+    nearest=distance;point=[w.a[0]+t*dx,w.a[1]+t*dy];
+   }
+   if(point)body[end]=point;
+  }
+  return body;
+ });
+}
 // Render-only corner infill. Never moves axes or changes measured dimensions.
 // Only exactly connected endpoints join; genuine gaps and free ends stay open.
 export function wallJoins(walls:Wall[],minimumThickness=70):WallJoin[]{
