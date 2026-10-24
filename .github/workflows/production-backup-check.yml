@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type BACKUP_ROOM_DESIGN_PRODUCTION to run the read-only production check and backup"
+        description: "Type BACKUP_ROOM_DESIGN_PRODUCTION for backup, or INSTALL_ROOM_DESIGN_POPPLER for guarded dependency installation"
         required: true
         type: string
       expected_production_sha:
@@ -22,6 +22,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  install-poppler:
+    name: Install and verify PDF dependency without deploying the application
+    if: ${{ inputs.confirmation == 'INSTALL_ROOM_DESIGN_POPPLER' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-backup
+    steps:
+      - name: Install Poppler with production identity and health guards
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
+        env:
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 12m
+          envs: EXPECTED_PRODUCTION_SHA
+          script: |
+            set -eu
+            umask 077
+            cd "$HOME/ABACUS"
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            # This operation changes only the OS PDF utility package; no app files,
+            # data, environment or running process are replaced or restarted.
+            if ! command -v pdfinfo >/dev/null 2>&1 || ! command -v pdftoppm >/dev/null 2>&1; then
+              sudo -n true
+              sudo -n apt-get update -qq
+              sudo -n env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get install -y --no-install-recommends poppler-utils
+            fi
+            command -v pdfinfo
+            command -v pdftoppm
+            pdfinfo -v
+            pdftoppm -v
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            echo "POPPLER_INSTALL_STATUS=PASSED"
+            echo "APPLICATION_DEPLOYED=no"
+            echo "APPLICATION_RESTARTED=no"
   backup:
     name: Verify production and create a restorable backup
     if: ${{ inputs.confirmation == 'BACKUP_ROOM_DESIGN_PRODUCTION' }}
