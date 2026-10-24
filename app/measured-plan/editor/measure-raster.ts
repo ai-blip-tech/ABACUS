@@ -1,14 +1,16 @@
 import {blankDoc,type Source,type MeasureDoc,type Wall} from '../../../lib/measured-plan/measure-model.ts';
+import {detectRasterDoors} from './measure-raster-openings.ts';
 // Conservative orthogonal filled-wall detector. Pencil strokes/perspective are manual fallback.
 export function detectWalls(data:Uint8ClampedArray,width:number,height:number){
  const mask=new Uint8Array(width*height);for(let i=0;i<mask.length;i++){const j=i*4,r=data[j],g=data[j+1],b=data[j+2],gray=(r+g+b)/3;mask[i]=data[j+3]>128&&gray<120&&Math.max(r,g,b)-Math.min(r,g,b)<38?1:0;}
  const segments:{a:[number,number];b:[number,number];thickness:number}[]=[];
+ const shortSegments:typeof segments=[];
  for(const vertical of [false,true]){
   const rows=vertical?width:height,cols=vertical?height:width;let active:any[]=[];
-  const complete=(run:any)=>{const thick=run.last-run.first+1;if(thick<1||thick>Math.min(width,height)*.06||run.end-run.start<Math.max(thick<3?90:65,Math.max(width,height)*.055,thick*4))return;const mid=(run.first+run.last)/2;segments.push({a:vertical?[mid,run.start]:[run.start,mid],b:vertical?[mid,run.end]:[run.end,mid],thickness:thick});};
+  const complete=(run:any)=>{const thick=run.last-run.first+1,len=run.end-run.start;if(thick<1||thick>Math.min(width,height)*.06)return;const mid=(run.first+run.last)/2,s={a:(vertical?[mid,run.start]:[run.start,mid]) as [number,number],b:(vertical?[mid,run.end]:[run.end,mid]) as [number,number],thickness:thick};if(len<Math.max(thick<3?90:65,Math.max(width,height)*.055,thick*4)){if(thick>=3&&len>=Math.max(12,thick*2))shortSegments.push(s);return;}segments.push(s);};
   for(let row=0;row<rows;row++){
    const found:any[]=[];let start=-1,gap=0;
-   for(let col=0;col<=cols;col++){const on=col<cols&&mask[vertical?col*width+row:row*width+col];if(on){if(start<0)start=col;gap=0;}else if(start>=0){gap++;if(gap>2||col===cols){const end=col-gap+1;if(end-start>=38)found.push({start,end});start=-1;gap=0;}}}
+for(let col=0;col<=cols;col++){const on=col<cols&&mask[vertical?col*width+row:row*width+col];if(on){if(start<0)start=col;gap=0;}else if(start>=0){gap++;if(gap>2||col===cols){const end=col-gap+1;if(end-start>=12)found.push({start,end});start=-1;gap=0;}}}
    const next:any[]=[];for(const f of found){const prior=active.find(r=>!r.used&&Math.abs(r.start-f.start)<7&&Math.abs(r.end-f.end)<7);if(prior){prior.used=true;next.push({...prior,last:row,start:(prior.start+f.start)/2,end:(prior.end+f.end)/2,used:false});}else next.push({...f,first:row,last:row,used:false});}for(const prior of active)if(!prior.used)complete(prior);active=next;
   }for(const prior of active)complete(prior);
  }
@@ -19,7 +21,18 @@ export function detectWalls(data:Uint8ClampedArray,width:number,height:number){
   const prior=merged.find(p=>(p.a[0]===p.b[0]?1:0)===axis&&Math.abs(p.a[normal]-s.a[normal])<=((p.thickness<12&&s.thickness<3&&Math.abs(p.a[axis]-s.a[axis])<15&&Math.abs(p.b[axis]-s.b[axis])<15)?12:(p.thickness+s.thickness)/2+2)&&s.a[axis]<=p.b[axis]+Math.max(p.thickness,s.thickness)&&s.b[axis]>=p.a[axis]-Math.max(p.thickness,s.thickness));
   if(prior){const lo=Math.min(prior.a[normal]-prior.thickness/2,s.a[normal]-s.thickness/2),hi=Math.max(prior.a[normal]+prior.thickness/2,s.a[normal]+s.thickness/2);prior.a[normal]=prior.b[normal]=(lo+hi)/2;prior.thickness=hi-lo;prior.a[axis]=Math.min(prior.a[axis],s.a[axis]);prior.b[axis]=Math.max(prior.b[axis],s.b[axis]);}else merged.push(structuredClone(s));
  }
- return merged.sort((a,b)=>Math.hypot(b.b[0]-b.a[0],b.b[1]-b.a[1])-Math.hypot(a.b[0]-a.a[0],a.b[1]-a.a[1])).slice(0,40);
+ merged.sort((a,b)=>Math.hypot(b.b[0]-b.a[0],b.b[1]-b.a[1])-Math.hypot(a.b[0]-a.a[0],a.b[1]-a.a[1]));
+ // A short return is evidence when it meets an existing wall, even if it is
+ // smaller than the global noise threshold. Isolated short furniture/text stays out.
+ for(const s of shortSegments.sort((a,b)=>b.thickness-a.thickness)){
+  const axis=s.a[0]===s.b[0]?1:0,normal=1-axis;
+  if(merged.some(p=>(p.a[0]===p.b[0]?1:0)===axis&&Math.abs(p.a[normal]-s.a[normal])<(p.thickness+s.thickness)/2+2&&s.a[axis]<=p.b[axis]&&s.b[axis]>=p.a[axis]))continue;
+  const host=merged.find(p=>(p.a[0]===p.b[0]?1:0)!==axis&&s.a[normal]>=p.a[normal]-s.thickness&&s.a[normal]<=p.b[normal]+s.thickness&&Math.min(Math.abs(s.a[axis]-p.a[axis]),Math.abs(s.b[axis]-p.a[axis]))<=Math.max(s.thickness,p.thickness)*1.25+3);
+  if(!host)continue;const next=structuredClone(s),end=Math.abs(s.a[axis]-host.a[axis])<Math.abs(s.b[axis]-host.a[axis])?next.a:next.b;end[axis]=host.a[axis];
+  for(const p of [host.a,host.b])if(Math.hypot(p[0]-end[0],p[1]-end[1])<=Math.max(s.thickness,host.thickness)*1.25+3){p[0]=end[0];p[1]=end[1];}
+  merged.push(next);
+ }
+ return merged.slice(0,60);
 }
 /** Look outside the dark wall body for a supported pale upper outline. Furniture
  * inside the apartment must not become a perimeter. No unsupported flat closure. */
@@ -81,6 +94,9 @@ export function estimatedRasterModel(source:Source,candidates:ReturnType<typeof 
 }
 export async function rasterDocument(source:Source):Promise<MeasureDoc>{
  const image=new Image();image.src=source.image;await image.decode();const max=2200,ratio=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*ratio);canvas.height=Math.round(image.naturalHeight*ratio);const ctx=canvas.getContext('2d')!;ctx.drawImage(image,0,0,canvas.width,canvas.height);const candidates=detectWalls(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
- const upper=detectUpperOutline(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height,candidates);
- return estimatedRasterModel(source,candidates.map(s=>({a:s.a.map(x=>x/ratio) as [number,number],b:s.b.map(x=>x/ratio) as [number,number],thickness:s.thickness/ratio})),upper.map(p=>p.map(v=>v/ratio) as [number,number]));
+ const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data,doors=detectRasterDoors(pixels,canvas.width,canvas.height,candidates);
+ const upper=detectUpperOutline(pixels,canvas.width,canvas.height,doors.walls);
+ const doc=estimatedRasterModel(source,doors.walls.map(s=>({a:s.a.map(x=>x/ratio) as [number,number],b:s.b.map(x=>x/ratio) as [number,number],thickness:s.thickness/ratio})),upper.map(p=>p.map(v=>v/ratio) as [number,number]));
+ doc.openings=doors.doors.map((o,i)=>({id:'door_arc_'+i,wallId:doc.walls[o.wallIndex].id,kind:'door',width:Math.round(o.width/ratio*doc.source.pixelScale),offset:Math.round(o.offset/ratio*doc.source.pixelScale),height:null,sill:0,hingesSide:o.hingesSide,swingDirection:o.swingDirection,confirmed:false}));
+ return doc;
 }
