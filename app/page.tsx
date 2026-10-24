@@ -1050,7 +1050,7 @@ export default function Home() {
 type ProjectMenuStageId = "sources" | "installation" | "planning" | "interior" | "materials" | "porcelain" | "bathroom" | "lighting" | "documentation";
 
 const PROJECT_MENU_STAGES: Array<{ id: ProjectMenuStageId; label: string; available: boolean }> = [
-  { id: "sources", label: "Обмерный план", available: true },
+  { id: "sources", label: "Обмерный план", available: false },
   { id: "installation", label: "Монтаж, демонтаж", available: false },
   { id: "planning", label: "Планировочное решение", available: false },
   { id: "materials", label: "Концепция и материалы", available: false },
@@ -1137,7 +1137,7 @@ function ProjectMenuPreview({
         </div>
         <ol className="project-menu-stages">
           {PROJECT_MENU_STAGES.map((item,index)=><li key={item.id} className={`${selectedStage===item.id?"is-active ":""}${item.available?"is-available":"is-placeholder"}`}>
-            <button type="button" onClick={()=>item.id==="sources"?window.location.assign(`/measured-plan?project=${encodeURIComponent(projectId)}`):item.available?setSelectedStage(item.id):setUnavailableStage(item.label)} aria-current={selectedStage===item.id?"step":undefined}>
+            <button type="button" onClick={()=>item.available?setSelectedStage(item.id):setUnavailableStage(item.label)} aria-current={selectedStage===item.id?"step":undefined}>
               <span>{String(index+1).padStart(2,"0")}</span><b>{item.label}</b><small>{item.available?"доступно":"скоро"}</small>
             </button>
           </li>)}

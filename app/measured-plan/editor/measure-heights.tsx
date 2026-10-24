@@ -1,8 +1,0 @@
-import React from 'react';
-import type {MeasureDoc} from '@/lib/measured-plan/measure-model';
-import {planHeightLabels,heightLabelPosition} from '@/lib/measured-plan/measure-heights';
-import {thicknessNotes,openingWidthMarks} from '@/lib/measured-plan/measure-annotations';
-export function HeightMarks({doc,font,box,pad}:{doc:MeasureDoc;font:number;box:{x:number;z:number;width:number;height:number};pad:number}){
- const labels=planHeightLabels(doc),notes=[labels.common,...thicknessNotes(doc)],notesY=Math.max(box.z+box.height+pad*.65,...openingWidthMarks(doc,font).flatMap(m=>[m.da[1],m.db[1]]))+font*2.2;
- return <g data-height-annotations pointerEvents="none">{notes.map((note,i)=><text key={i} data-common-height={i===0?true:undefined} data-thickness-note={i>0?true:undefined} x={box.x+box.width/2} y={notesY+i*font*1.65} textAnchor="middle" fontSize={font*1.05} fill="#000000" stroke="#fffdf7" strokeWidth={font*.3} paintOrder="stroke">{note}</text>)}{labels.walls.map(item=>{const w=doc.walls.find(w=>w.id===item.id)!,{nx,ny,cx,cy,x,y}=heightLabelPosition(doc,w,item.label,font);return <g key={item.id} data-wall-height={item.id} aria-label={w.name+': '+item.label}><line x1={w.a[0]+nx*(w.thickness/2+font*.35)} y1={w.a[1]+ny*(w.thickness/2+font*.35)} x2={w.b[0]+nx*(w.thickness/2+font*.35)} y2={w.b[1]+ny*(w.thickness/2+font*.35)} stroke="#000000" strokeWidth="1" vectorEffect="non-scaling-stroke"/><line x1={cx+nx*w.thickness/2} y1={cy+ny*w.thickness/2} x2={x} y2={y} stroke="#000000" strokeWidth=".7" vectorEffect="non-scaling-stroke"/><text x={x} y={y-font*.4} textAnchor="middle" fontSize={font*1.05} fill="#000000" stroke="#fffdf7" strokeWidth={font*.35} paintOrder="stroke">{item.label}</text></g>;})}</g>;
-}
