@@ -1,5 +1,6 @@
 import { ensureStore, requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
+import { ensureMeasuredStore } from "@/lib/measured-plan/store";
 
 type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string; proposalItems?: SavedPlanItem[] };
 type SavedPlanParameter = { name: string; value: string };
@@ -162,9 +163,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!project) return Response.json({ error: "Проект не найден." }, { status: 404 });
 
   let assets = new Set<string>();
+  ensureMeasuredStore();
+  const measuredAssets=await database.prepare('SELECT asset FROM measured_plan_assets WHERE project_id=?').bind(id).all<{asset:string}>();
   if (project.state_json) {
     try { assets = collectProjectAssets(JSON.parse(project.state_json)); } catch { /* the project row can still be deleted */ }
   }
+  for(const item of measuredAssets.results)assets.add(item.asset);
   await database.prepare("DELETE FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).run();
   const tenantPrefix = tenantStoragePrefix(user);
   await Promise.allSettled([...assets].flatMap((asset) => [

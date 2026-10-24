@@ -33,6 +33,22 @@ jobs:
             pm2 describe roomdesign
             curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null
 
+            # Fail closed unless a fresh, verified backup matches the running code.
+            python3 - "$HOME/room-design-backups" "$previous_sha" <<'PY'
+            from pathlib import Path
+            import sys, time
+            reports = sorted(Path(sys.argv[1]).glob("predeploy-*/REPORT.txt"), key=lambda p:p.stat().st_mtime, reverse=True)
+            if not reports:
+                raise SystemExit("Missing verified production backup")
+            report = reports[0]
+            fields = dict(line.split("=",1) for line in report.read_text().splitlines() if "=" in line)
+            if fields.get("status") != "PASSED" or fields.get("production_sha") != sys.argv[2] or time.time()-report.stat().st_mtime > 3600:
+                raise SystemExit("Backup is failed, stale, or belongs to a different production version")
+            print("FRESH_BACKUP_GATE=PASSED")
+            PY
+            command -v pdfinfo >/dev/null
+            command -v pdftoppm >/dev/null
+
             # Free build space before Git needs to create any lock or temporary
             # files. The active .next, application data and verified backups are
             # deliberately outside this disposable-artifact allowlist.
@@ -173,6 +189,8 @@ jobs:
                 curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null || true
               fi
               cleanup_release_dir
+              git reset --keep "$previous_sha"
+              echo "PRODUCTION_SOURCE_ROLLED_BACK=$previous_sha"
               exit "$result"
             }
             trap rollback_release ERR INT TERM
@@ -226,6 +244,7 @@ jobs:
 
             cd "$release_dir"
             npm ci
+            ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-unit-data" npm run test:unit
             echo "RESOURCE_SNAPSHOT_BEFORE_BUILD"
             free -h || true
             df -h . || true
@@ -233,12 +252,13 @@ jobs:
             test -f .next/BUILD_ID
 
             candidate_port=3901
-            PORT="$candidate_port" ./node_modules/.bin/next start >candidate.log 2>&1 &
+            ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-smoke-data" PORT="$candidate_port" ./node_modules/.bin/next start >candidate.log 2>&1 &
             candidate_pid=$!
             curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused "http://127.0.0.1:${candidate_port}/api/health" >/dev/null
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/" >/dev/null
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/account" >/dev/null
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/api/it/config" | grep -q '"enabled":true'
+            MEASURE_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/measured-plan-local-smoke.mjs
             cleanup_candidate
 
             cd "$live_dir"
@@ -255,6 +275,8 @@ jobs:
             curl --fail --silent --show-error --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
+            curl --fail --silent --show-error http://127.0.0.1:3000/measured-plan >/dev/null
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/measured-plan)" = "401"
             curl --fail --silent --show-error http://127.0.0.1:3000/api/it/config | grep -q '"enabled":true'
 
             production_html="$(curl --fail --silent --show-error http://127.0.0.1:3000/)"

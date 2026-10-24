@@ -6,6 +6,7 @@ const source = await readFile(new URL("../app/technical-lighting/page.tsx", impo
 const generationRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const catalogRoute = await readFile(new URL("../app/api/lighting/catalog/route.ts", import.meta.url), "utf8");
 const homeSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const imageActionsSource = await readFile(new URL("../app/editor-image-actions.tsx", import.meta.url), "utf8");
 const projectLightingRoute = await readFile(new URL("../app/api/projects/[id]/technical-lighting/route.ts", import.meta.url), "utf8");
 
 test("planogram adds catalog tracks at their real catalog length", () => {
@@ -73,8 +74,12 @@ test("lighting controls and post-generation editing are available", () => {
 test("generated images open in a neutral full-screen viewer and support download and upscale", () => {
   assert.match(source, /useState<EditAction>\(null\)/);
   assert.match(source, /setEditAction\(null\)/);
-  assert.match(source, /Открыть изображение на весь экран/);
-  assert.match(source, /Полноэкранный просмотр изображения/);
+  assert.match(source, /<EditorImageActions image=\{photo\} name=\{photoName\|\|"Технический свет"\} onError=\{setError\}/);
+  assert.match(imageActionsSource, /Открыть изображение на весь экран/);
+  assert.match(imageActionsSource, /Полноэкранный просмотр изображения/);
+  assert.match(imageActionsSource, /dialog\.current\?\.showModal\(\)/);
+  assert.match(imageActionsSource, /await downloadImageAsJpeg\(image, name\)/);
+  assert.match(imageActionsSource, /onCancel=\{\(\) => setOpen\(false\)\}/);
   assert.match(source, /downloadPhoto/);
   assert.match(source, /upscalePhoto/);
   assert.match(source, /operation:"upscale"/);
@@ -126,9 +131,10 @@ test("image changes are applied from the left panel and primary controls use rou
   assert.match(source, /mode==="plan"&&<div className="folio-generate-wrap">/);
 });
 
-test("technical-lighting header stays clean without a project breadcrumb", () => {
+test("technical-lighting uses the shared project header and a section-only toolbar label", () => {
   assert.doesNotMatch(source, /Проект \/ Технический свет/);
-  assert.doesNotMatch(source, /className="folio-crumb"/);
+  assert.match(source, /<EditorHeader user=\{user\} projectName=\{projectName\}/);
+  assert.match(source, /<header className="folio-header folio-editor-toolbar">\s*<span className="folio-crumb">Технический свет<\/span>/);
 });
 
 test("ceiling plan supports exact arbitrary polygon geometry", () => {

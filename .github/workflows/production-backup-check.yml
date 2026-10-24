@@ -4,8 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type BACKUP_ROOM_DESIGN_PRODUCTION for backup, or INSTALL_ROOM_DESIGN_POPPLER for guarded dependency installation"
+        description: "BACKUP_ROOM_DESIGN_PRODUCTION, INSTALL_ROOM_DESIGN_POPPLER, or PREFLIGHT_ROOM_DESIGN_MEASURED_PLAN"
         required: true
+        type: string
+
+      candidate_sha:
+        description: "Full candidate SHA for isolated preflight only"
+        required: false
         type: string
       expected_production_sha:
         description: "Full SHA expected to be running in production"
@@ -22,6 +27,71 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  measured-plan-preflight:
+    name: Verify measured-plan candidate without replacing the live application
+    if: ${{ inputs.confirmation == 'PREFLIGHT_ROOM_DESIGN_MEASURED_PLAN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-backup
+    steps:
+      - name: Run tests, build and PDF smoke on isolated server data
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
+        env:
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 18m
+          envs: EXPECTED_PRODUCTION_SHA,CANDIDATE_SHA
+          script: |
+            set -eu
+            umask 077
+            live_dir="$HOME/ABACUS"
+            cd "$live_dir"
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            printf '%s' "$CANDIDATE_SHA" | grep -Eq '^[a-f0-9]{40}$'
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            command -v pdfinfo >/dev/null
+            command -v pdftoppm >/dev/null
+            test "$(df -Pk "$live_dir" | awk 'NR==2 {print $4}')" -gt 2097152
+            preflight_dir="$(mktemp -d "$HOME/ABACUS-preflight-XXXXXX")"
+            candidate_pid=""
+            finish_preflight() {
+              result=$?
+              trap - EXIT INT TERM
+              if [ -n "$candidate_pid" ]; then kill "$candidate_pid" 2>/dev/null || true; wait "$candidate_pid" 2>/dev/null || true; fi
+              cd "$live_dir"
+              if [ "$(git rev-parse HEAD)" != "$EXPECTED_PRODUCTION_SHA" ]; then result=1; fi
+              if ! curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null; then result=1; fi
+              python3 - "$HOME" "$preflight_dir" <<'PY'
+            from pathlib import Path
+            import shutil, sys
+            home, target = (Path(p).resolve() for p in sys.argv[1:])
+            if target.parent != home or not target.name.startswith("ABACUS-preflight-"):
+                raise SystemExit("Unsafe preflight cleanup target")
+            shutil.rmtree(target)
+            PY
+              if [ "$result" -eq 0 ]; then echo "PREFLIGHT_STATUS=PASSED"; else echo "PREFLIGHT_STATUS=FAILED"; fi
+              echo "PRODUCTION_SOURCE_AFTER=$(git rev-parse HEAD)"
+              echo "PRODUCTION_RESTARTED=no"
+              exit "$result"
+            }
+            trap finish_preflight EXIT INT TERM
+            git fetch origin "$CANDIDATE_SHA"
+            git archive "$CANDIDATE_SHA" | tar -x -C "$preflight_dir"
+            cp "$live_dir/.env" "$preflight_dir/.env"
+            cd "$preflight_dir"
+            npm ci
+            ROOM_DESIGN_DATA_DIR="$preflight_dir/unit-data" npm run test:unit
+            ROOM_DESIGN_DATA_DIR="$preflight_dir/smoke-data" timeout --signal=TERM --kill-after=30s 12m npm run build -- --webpack
+            ROOM_DESIGN_DATA_DIR="$preflight_dir/smoke-data" PORT=3902 ./node_modules/.bin/next start >candidate.log 2>&1 &
+            candidate_pid=$!
+            curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:3902/api/health >/dev/null
+            MEASURE_SMOKE_BASE=http://127.0.0.1:3902 node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/measured-plan-local-smoke.mjs
+            curl --fail --silent --show-error http://127.0.0.1:3902/account >/dev/null
+            curl --fail --silent --show-error http://127.0.0.1:3902/technical-lighting >/dev/null
   install-poppler:
     name: Install and verify PDF dependency without deploying the application
     if: ${{ inputs.confirmation == 'INSTALL_ROOM_DESIGN_POPPLER' }}

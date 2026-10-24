@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {fixtureDoc} from '../lib/measured-plan/measure-model.ts';
+import sharp from 'sharp';
+import {PDFDocument} from 'pdf-lib';
+const base=process.env.MEASURE_SMOKE_BASE;
+assert.ok(base, 'Set MEASURE_SMOKE_BASE to an isolated local test server');
+const target=new URL(base);
+assert.ok(['127.0.0.1','localhost'].includes(target.hostname)&&target.protocol==='http:'&&!['3000','3134','4197',''].includes(target.port),'Only an isolated loopback test port is allowed');
+const stamp=Date.now(),password='LocalMeasure-Preview24!';
+async function account(suffix){const email=`measure-${stamp}-${suffix}@example.test`;const r=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,firstName:'Проверка',lastName:'Обмеров'})});const data=await r.json();assert.equal(r.status,200,JSON.stringify(data));return {email,cookie:r.headers.get('set-cookie').split(';')[0]};}
+const a=await account('a'),b=await account('b');
+async function request(path,method='GET',body,who=a){return fetch(base+path,{method,headers:{...(who?{Cookie:who.cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});}
+const created=await request('/api/projects','POST',{name:'Обмерный план · локальная проверка',projectType:'Квартира'});assert.equal(created.status,200);const {project}=await created.json(),id=project.id,path=`/api/projects/${id}/measured-plan`;
+assert.equal((await request(path,'GET',undefined,null)).status,401);assert.equal((await request(path,'GET',undefined,b)).status,404);
+const initial=await (await request(path)).json();assert.equal(initial.document,null);assert.equal(initial.revision,0);
+const bytes=await readFile(new URL('../public/measured-plan-reference.png',import.meta.url));
+const denied=await fetch(base+path+'/import',{method:'POST',headers:{Cookie:b.cookie,'Content-Type':'image/png'},body:bytes});assert.equal(denied.status,404);
+const imported=await fetch(base+path+'/import',{method:'POST',headers:{Cookie:a.cookie,'Content-Type':'image/png'},body:bytes});const result=await imported.json();assert.equal(imported.status,200,JSON.stringify(result));assert.equal(result.prepared,true);
+const doc=fixtureDoc({name:'БТИ.png',mime:'image/png',hash:result.hash,width:result.width,height:result.height,page:1,pages:1,method:'prepared-user-bti',image:result.image,originalAsset:result.originalAsset,words:[],pixelScale:6.7});doc.name=project.name;doc.scaleConfirmed=true;
+const spoof=await fetch(base+path,{method:'PUT',headers:{Cookie:a.cookie,'Content-Type':'application/json',Origin:'https://untrusted.example'},body:JSON.stringify({revision:0,document:doc})});assert.equal(spoof.status,403);
+const jpeg=await sharp(bytes).jpeg().toBuffer();const jpegResponse=await fetch(base+path+'/import',{method:'POST',headers:{Cookie:a.cookie,'Content-Type':'image/jpeg',Origin:base},body:jpeg});assert.equal(jpegResponse.status,200,await jpegResponse.clone().text());
+const samplePdf=await PDFDocument.create(),embedded=await samplePdf.embedPng(bytes),pdfPage=samplePdf.addPage([500,350]);pdfPage.drawImage(embedded,{x:0,y:0,width:500,height:350});const pdfBytes=await samplePdf.save();const pdfResponse=await fetch(base+path+'/import',{method:'POST',headers:{Cookie:a.cookie,'Content-Type':'application/pdf',Origin:base},body:pdfBytes});assert.equal(pdfResponse.status,200,await pdfResponse.clone().text());assert.equal((await pdfResponse.json()).pages,1);
+assert.equal((await request(path,'PUT',{revision:0,document:doc},b)).status,404);
+const saved=await request(path,'PUT',{revision:0,document:doc});assert.equal(saved.status,200,await saved.clone().text());assert.equal((await saved.json()).revision,1);
+assert.equal((await request(path,'PUT',{revision:0,document:doc})).status,409);
+assert.equal((await request(result.image,'GET',undefined,b)).status,404);
+assert.equal((await request(path+'/print','GET',undefined,b)).status,404);
+const normal=await request(`/api/projects/${id}`,'PUT',{name:project.name,projectType:'Квартира',state:{interiorImage:'data:image/png;base64,'+bytes.toString('base64'),planItems:[]}});assert.equal(normal.status,200,await normal.clone().text());
+const reloaded=await (await request(path)).json();assert.equal(reloaded.document.walls.length,13);assert.equal(reloaded.revision,1);assert.equal(reloaded.document.source.originalAsset,result.originalAsset);
+const print=await request(path+'/print');assert.equal(print.status,200,await print.clone().text());const pdf=new Uint8Array(await print.arrayBuffer());assert.equal(new TextDecoder().decode(pdf.slice(0,5)),'%PDF-');
+assert.equal((await PDFDocument.load(pdf)).getPageCount(),2,'Cover and measured-plan sheet must both be present');
+console.log(JSON.stringify({passed:true,projectId:id,checks:['unauthorized','cross-user read/write/import/assets/pdf','empty project without interior','upload PNG/JPEG/PDF','save/reload','revision conflict','interior save preserves plan','authenticated two-page PDF']},null,2));
