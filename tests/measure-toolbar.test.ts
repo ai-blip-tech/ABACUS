@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const app=readFileSync(new URL('../app/measured-plan/editor/measure-app.tsx',import.meta.url),'utf8');
+test('wall inspector keeps essential measurements and confirmation without duplicate actions',()=>{
+ assert.doesNotMatch(app,/label="Угол стены, °"|Повернуть на 90°|>Развернуть<|>＋ Дверь<|>＋ Окно<|>Удалить стену и её проёмы</);
+ assert.match(app,/Тип выбранной стены/);assert.match(app,/Дополнительные параметры стены/);assert.match(app,/Длина по оси стены, мм/);assert.match(app,/Размеры по рисунку ориентировочные/);assert.match(app,/Подтвердить размеры этой стены/);
+});
 test('toolbar exposes door and window placement next to measurement tools',()=>{
  const toolbar=app.slice(app.indexOf('<div className="measure-draw-tools">'),app.indexOf('aria-label="Масштаб плана"'));
  assert.match(toolbar,/aria-label="Линейка"/);assert.match(toolbar,/aria-label="Дополнительный размер"/);
