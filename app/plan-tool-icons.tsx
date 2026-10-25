@@ -1,0 +1,2 @@
+export function PlanRulerIcon(){return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m3 16 13-13 5 5L8 21zM7 12l3 3M10 9l2 2M13 6l3 3"/></svg>;}
+export function PlanDimensionIcon(){return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 5v14M20 5v14M4 12h16M8 9l-4 3 4 3M16 9l4 3-4 3"/></svg>;}
