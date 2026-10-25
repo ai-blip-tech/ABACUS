@@ -1,11 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {blankDoc,type Wall} from '../lib/measured-plan/measure-model.ts';
-import {snapWallAngle,snapWallPosition} from '../lib/measured-plan/measure-wall-snapping.ts';
+import {snapWallAngle,snapWallPosition,snapWallEdit} from '../lib/measured-plan/measure-wall-snapping.ts';
 import {rotateWall} from '../lib/measured-plan/measure-wall-editing.ts';
 const wall=(id:string,a:[number,number],b:[number,number]):Wall=>({id,name:id,a,b,thickness:200,thicknessConfirmed:true,lengthConfirmed:true,height:2800,group:'inner',provenance:'test'});
 function sample(){const d=blankDoc({name:'test',mime:'image/png',hash:'test',width:100,height:100,page:1,pages:1,method:'test',image:'',words:[],pixelScale:1});d.walls=[wall('host',[0,0],[5000,0]),wall('moving',[2000,1000],[2000,2000])];return d;}
 const angle=(w:Wall)=>Math.atan2(w.b[1]-w.a[1],w.b[0]-w.a[0])*180/Math.PI;
+test('existing raster and fixture partitions snap for rotate, move and both endpoint gestures',()=>{
+ for(const id of ['wall_scan_8','wall_fixture_17','wall_measure_new'])for(const mode of ['rotate','move','a','b'] as const){
+  const d=sample();d.walls[1]=wall(id,[2000,1000],[2150,2000]);d.walls.push(wall('crooked-reference',[4000,1000],[4150,2000]));
+  const pivot=mode==='a'?d.walls[1].b:mode==='b'?d.walls[1].a:null;
+  const next=snapWallEdit(d,id,mode),w=next.walls[1];assert.ok(Math.abs(w.a[0]-w.b[0])<1e-8,`${id}/${mode}`);
+  if(pivot)assert.deepEqual(w[mode==='a'?'b':'a'],pivot);
+  assert.deepEqual(next.walls[0],d.walls[0]);assert.deepEqual(next.walls[2],d.walls[2]);
+ }
+});
+test('endpoint docking preserves the snapped angle and opposite endpoint',()=>{
+ const d=sample();d.walls[1]=wall('wall_scan_8',[4990,90],[4994,2000]);
+ const n=snapWallEdit(d,'wall_scan_8','a',100),w=n.walls[1];assert.deepEqual(w.b,d.walls[1].b);assert.ok(Math.abs(w.a[0]-w.b[0])<1e-8);assert.ok(Math.abs(w.a[1]-100)<1e-8);
+});
+test('nearby parallel offset endpoint cannot undo horizontal angle snapping',()=>{
+ const d=sample();d.walls[1]=wall('wall_scan_8',[4990,10],[6000,10]);const w=snapWallEdit(d,'wall_scan_8','a',100).walls[1];assert.equal(w.a[1],w.b[1]);assert.deepEqual(w.b,d.walls[1].b);
+});
+test('saved partitions have no id restriction and one drag remains one undo step',async()=>{
+ const {historyReducer,initialHistory}=await import('../lib/measured-plan/measure-history.ts');const d=sample();d.walls[1]=wall('wall_scan_8',[2000,1000],[2150,2000]);
+ let h=historyReducer({...initialHistory,present:d},{type:'begin'});h=historyReducer(h,{type:'set',value:snapWallEdit(d,'wall_scan_8','b')});h=historyReducer(h,{type:'end'});assert.equal(h.past.length,1);assert.deepEqual(historyReducer(h,{type:'undo'}).present,d);
+});
 test('rotation snaps near parallel/perpendicular in all quadrants and preserves length',()=>{for(const degrees of [-179,-92,-15,-3,4,15,75,86,94,105,176]){const d=rotateWall(sample(),'moving',degrees),n=snapWallAngle(d,'moving'),w=n.walls[1];assert.ok(Math.abs(angle(w)/90-Math.round(angle(w)/90))<1e-9);assert.ok(Math.abs(Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])-1000)<1e-8);assert.deepEqual(n.walls[0],d.walls[0]);}});
 test('snapping follows oblique reference walls, not only global 0/90',()=>{let d=rotateWall(sample(),'host',23);d=rotateWall(d,'moving',111);assert.ok(Math.abs(angle(snapWallAngle(d,'moving').walls[1])-113)<1e-8);});
 test('free angle outside angular tolerance stays unchanged',()=>{const d=rotateWall(sample(),'moving',40);assert.equal(snapWallAngle(d,'moving'),d);});
