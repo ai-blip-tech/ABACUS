@@ -42,6 +42,19 @@ test('measured stage preview compares source and saved geometry without writing 
  const editor=await readFile(new URL('../app/measured-plan/page.tsx',import.meta.url),'utf8');assert.match(editor,/&stage=sources#меню-проекта/);
 });
 
+test('partition stage opens a read-only preview before its editor, matching the measured stage flow', async () => {
+  const preview = await readFile(new URL('../app/partition-plan/stage-preview.tsx', import.meta.url), 'utf8');
+  assert.match(page, /isInstallation\?<PartitionStagePreview/);
+  assert.match(page, /if \(isInstallation\) window.location.assign\(`\/partition-plan\?project=/);
+  assert.match(page, /onClick=\{\(\)=>item.available\?setSelectedStage\(item.id\)/);
+  assert.match(preview, /Существующая основа/);
+  assert.match(preview, /После демонтажа и монтажа/);
+  assert.match(preview, /onClick=\{onContinue\}/);
+  assert.match(preview, /Продолжить работу/);
+  assert.match(preview, /onClick=\{onNext\}/);
+  assert.doesNotMatch(preview, /method:\s*['"](?:PUT|POST|DELETE)['"]/);
+});
+
 test('source and result provide reversible fullscreen quick view without editing data',async()=>{
  const preview=await readFile(new URL('../app/measured-plan/stage-preview.tsx',import.meta.url),'utf8');
  assert.match(preview,/aria-label="Увеличить исходный файл"/);assert.match(preview,/aria-label="Увеличить обмерный план"/);

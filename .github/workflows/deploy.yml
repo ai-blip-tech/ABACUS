@@ -259,6 +259,7 @@ jobs:
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/account" >/dev/null
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/api/it/config" | grep -q '"enabled":true'
             MEASURE_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/measured-plan-local-smoke.mjs
+            MEASURE_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/partition-plan-local-smoke.mjs
             cleanup_candidate
 
             cd "$live_dir"
@@ -276,6 +277,9 @@ jobs:
             curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/measured-plan >/dev/null
+            curl --fail --silent --show-error http://127.0.0.1:3000/partition-plan >/dev/null
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/partition-plan)" = "401"
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/partition-plan/print)" = "401"
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/measured-plan)" = "401"
             curl --fail --silent --show-error http://127.0.0.1:3000/api/it/config | grep -q '"enabled":true'
 

@@ -90,6 +90,7 @@ jobs:
             candidate_pid=$!
             curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:3902/api/health >/dev/null
             MEASURE_SMOKE_BASE=http://127.0.0.1:3902 node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/measured-plan-local-smoke.mjs
+            MEASURE_SMOKE_BASE=http://127.0.0.1:3902 node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/partition-plan-local-smoke.mjs
             curl --fail --silent --show-error http://127.0.0.1:3902/account >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3902/technical-lighting >/dev/null
   install-poppler:
