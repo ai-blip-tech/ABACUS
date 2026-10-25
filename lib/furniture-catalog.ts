@@ -54,7 +54,6 @@ export function parseFurnitureCatalog(xml: string, source: FurnitureCatalogSourc
     const feedAvailable = attribute(attributes, "available").toLowerCase() !== "false";
     const stockValue = tag(body, "stock"); const stock = stockValue === "" ? null : Number(stockValue.replace(",", "."));
     const available = feedAvailable && (source !== "leve-home" || (Number.isFinite(stock) && Number(stock) > 0));
-    if (source === "leve-home" && !available) continue;
     const params: Record<string, string> = {};
     for (const param of body.matchAll(/<param\b([^>]*)>([\s\S]*?)<\/param>/gi)) { const key = attribute(param[1], "name"); const value = decodeCatalogXml(param[2]); if (key && value && !params[key]) params[key] = value; }
     const sourceBrand = source === "norrmobler"

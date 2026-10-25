@@ -1,4 +1,5 @@
 export type CatalogFilterProduct = {
+  source?: string;
   name: string;
   category: string;
   subtype: string;
@@ -13,6 +14,8 @@ const normalizeCatalogText = (value = "") => value
 const belongsToTableCategory = (categoryText: string) => /(?:^|[\s/])стол(?:ы|ов)?(?:$|[\s/])/.test(categoryText);
 
 export const matchesCatalogType = (product: CatalogFilterProduct, type: string, categoryTrail: string) => {
+  if (type === "technical_light") return product.source === "gomoon";
+  if (product.source === "gomoon") return false;
   const text = normalizeCatalogText(`${product.name} ${product.subtype} ${product.category} ${categoryTrail}`);
   const categoryText = normalizeCatalogText(`${product.category} ${categoryTrail}`);
   if (type === "sofa") return /диван|модул|кушет/.test(text);
