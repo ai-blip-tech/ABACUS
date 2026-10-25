@@ -7,6 +7,7 @@ import type React from "react";
 import AccountDropdown from "./account-dropdown";
 import EditorImageActions from "./editor-image-actions";
 import EditorHeader from "./editor-header";
+import MeasuredStagePreview from "./measured-plan/stage-preview";
 import type { ItUiAction, ItUiTarget, RoomDesignContext } from "@/lib/it/types";
 import TemplatesHome from "./templates-home";
 import { normalizePlanReferenceImages } from "@/lib/plan-render";
@@ -1093,13 +1094,16 @@ function ProjectMenuPreview({
   onOpenTechnical: () => void;
 }) {
   const [selectedStage, setSelectedStage] = useState<ProjectMenuStageId>("interior");
+  useEffect(()=>{if(new URLSearchParams(window.location.search).get('stage')==='sources')setSelectedStage('sources');},[projectId]);
   const [unavailableStage, setUnavailableStage] = useState<string | null>(null);
   const stage = PROJECT_MENU_STAGES.find((item) => item.id === selectedStage) || PROJECT_MENU_STAGES[2];
   const stageIndex = PROJECT_MENU_STAGES.findIndex((item) => item.id === selectedStage);
   const nextStage = PROJECT_MENU_STAGES[stageIndex + 1] || null;
   const isInterior = selectedStage === "interior";
   const isLighting = selectedStage === "lighting";
+  const isMeasured = selectedStage === "sources";
   const openSelectedStage = () => {
+    if (isMeasured) window.location.assign(`/measured-plan?project=${encodeURIComponent(projectId)}`);
     if (isInterior) onOpenStudio();
     if (isLighting) onOpenTechnical();
   };
@@ -1137,7 +1141,7 @@ function ProjectMenuPreview({
         </div>
         <ol className="project-menu-stages">
           {PROJECT_MENU_STAGES.map((item,index)=><li key={item.id} className={`${selectedStage===item.id?"is-active ":""}${item.available?"is-available":"is-placeholder"}`}>
-            <button type="button" onClick={()=>item.id==="sources"?window.location.assign(`/measured-plan?project=${encodeURIComponent(projectId)}`):item.available?setSelectedStage(item.id):setUnavailableStage(item.label)} aria-current={selectedStage===item.id?"step":undefined}>
+            <button type="button" onClick={()=>item.available?setSelectedStage(item.id):setUnavailableStage(item.label)} aria-current={selectedStage===item.id?"step":undefined}>
               <span>{String(index+1).padStart(2,"0")}</span><b>{item.label}</b><small>{item.available?"доступно":"скоро"}</small>
             </button>
           </li>)}
@@ -1145,7 +1149,7 @@ function ProjectMenuPreview({
         <button className="project-menu-back" type="button" onClick={onProjects}>← Все проекты</button>
       </aside>
       <section className="project-menu-content" aria-live="polite">
-        <>
+        {isMeasured?<MeasuredStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:<>
           <div className="project-menu-title-row">
             <div><span>РАЗДЕЛ ПРОЕКТА</span><h2>{stage.label}</h2><p>{stageDescription}</p></div>
             <mark>{isLoading?"Загрузка…":projectSaved?"Сохранено":"Можно начать"}</mark>
@@ -1167,7 +1171,7 @@ function ProjectMenuPreview({
             </aside>
           </div>
           <section className="project-menu-materials"><div><span>МАТЕРИАЛЫ ПРОЕКТА</span><h3>Всё, что уже собрано</h3></div><p><b>{historyCount}</b> визуализаций</p><p><b>{furnitureCount}</b> предметов</p><p><b>{projectId?"1":"0"}</b> проект</p></section>
-        </>
+        </>}
       </section>
     </div>
     {unavailableStage&&<div className="project-menu-toast" role="alert" aria-live="assertive"><i aria-hidden="true">!</i><div><b>Раздел в работе</b><span>«{unavailableStage}» скоро появится.</span></div><button type="button" onClick={()=>setUnavailableStage(null)} aria-label="Закрыть уведомление">×</button></div>}

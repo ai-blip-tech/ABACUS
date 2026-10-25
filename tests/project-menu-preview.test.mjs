@@ -26,11 +26,30 @@ test("active stages use existing destinations and placeholders explain their sta
   assert.match(page, /if \(isLighting\) onOpenTechnical\(\)/);
   assert.match(page, /Раздел в работе/);
   assert.match(page, /скоро появится/);
-  assert.match(page, /item\.id==="sources"\?window\.location\.assign/);
+  assert.doesNotMatch(page, /item\.id==="sources"\?window\.location\.assign/);
+  assert.match(page, /if \(isMeasured\) window.location.assign/);
+  assert.match(page, /isMeasured\?<MeasuredStagePreview/);
   assert.match(page, /\/measured-plan\?project=/);
   assert.match(page, /item\.available\?setSelectedStage\(item\.id\):setUnavailableStage\(item\.label\)/);
   assert.match(page, /project-menu-toast/);
   assert.doesNotMatch(page, /project-menu-placeholder/);
+});
+test('measured stage preview compares source and saved geometry without writing project data',async()=>{
+ const preview=await readFile(new URL('../app/measured-plan/stage-preview.tsx',import.meta.url),'utf8');
+ assert.match(preview,/Исходный файл/);assert.match(preview,/Обмерный план · результат/);assert.match(preview,/MeasuredPlanThumbnail doc=\{doc\}/);assert.match(preview,/Продолжить работу/);assert.match(preview,/onClick=\{onContinue\}/);assert.match(preview,/onClick=\{onNext\}/);
+ assert.match(preview,/cache:'no-store'/);assert.doesNotMatch(preview,/method:\s*['"](?:PUT|POST|DELETE)['"]/);
+ assert.match(preview,/role="alert"/);assert.match(preview,/План ещё не загружен/);
+ const editor=await readFile(new URL('../app/measured-plan/page.tsx',import.meta.url),'utf8');assert.match(editor,/&stage=sources#меню-проекта/);
+});
+
+test('source and result provide reversible fullscreen quick view without editing data',async()=>{
+ const preview=await readFile(new URL('../app/measured-plan/stage-preview.tsx',import.meta.url),'utf8');
+ assert.match(preview,/aria-label="Увеличить исходный файл"/);assert.match(preview,/aria-label="Увеличить обмерный план"/);
+ assert.match(preview,/dialog.showModal\(\)/);assert.match(preview,/dialog.close\(\)/);
+ assert.match(preview,/onCancel=\{e=>\{e.preventDefault\(\);setExpanded\(null\);\}\}/);
+ assert.match(preview,/onClick=\{\(\)=>setExpanded\(null\)\}/);
+ assert.match(preview,/document.body.style.overflow=previousOverflow/);
+ assert.match(css,/\.measured-stage-viewer\{[^}]*height:100dvh/);
 });
 
 test("the secondary card advances to the next project stage instead of duplicating the active action", () => {
