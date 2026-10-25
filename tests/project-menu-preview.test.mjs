@@ -17,8 +17,8 @@ test("all nine requested stages are preserved and measured plan is the third ava
   for (const label of ["Обмерный план", "Монтаж, демонтаж", "Планировочное решение", "Концепция и материалы", "Интерьер и меблировка", "Технический свет", "Санузел", "Керамогранит", "Документация"]) {
     assert.match(page, new RegExp(label));
   }
-  assert.equal((page.match(/available: true/g) || []).length, 3);
-  assert.equal((page.match(/available: false/g) || []).length, 6);
+  assert.equal((page.match(/available: true/g) || []).length, 4);
+  assert.equal((page.match(/available: false/g) || []).length, 5);
 });
 
 test("active stages use existing destinations and placeholders explain their status", () => {

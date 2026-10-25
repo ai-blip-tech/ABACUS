@@ -9,6 +9,7 @@ import EditorImageActions from "./editor-image-actions";
 import EditorHeader from "./editor-header";
 import MeasuredStagePreview from "./measured-plan/stage-preview";
 import ProjectBriefEditor, {type BriefProject} from "./project-brief-editor";
+import PartitionStagePreview from "./partition-plan/stage-preview";
 import type { ItUiAction, ItUiTarget, RoomDesignContext } from "@/lib/it/types";
 import TemplatesHome from "./templates-home";
 import { normalizePlanReferenceImages } from "@/lib/plan-render";
@@ -1054,7 +1055,7 @@ type ProjectMenuStageId = "sources" | "installation" | "planning" | "interior" |
 
 const PROJECT_MENU_STAGES: Array<{ id: ProjectMenuStageId; label: string; available: boolean }> = [
   { id: "sources", label: "Обмерный план", available: true },
-  { id: "installation", label: "Монтаж, демонтаж", available: false },
+  { id: "installation", label: "Монтаж, демонтаж", available: true },
   { id: "planning", label: "Планировочное решение", available: false },
   { id: "materials", label: "Концепция и материалы", available: false },
   { id: "interior", label: "Интерьер и меблировка", available: true },
@@ -1100,7 +1101,7 @@ function ProjectMenuPreview({
   const [editingBrief,setEditingBrief]=useState(false);
   const [briefSaved,setBriefSaved]=useState(false);
   const [selectedStage, setSelectedStage] = useState<ProjectMenuStageId>("interior");
-  useEffect(()=>{if(new URLSearchParams(window.location.search).get('stage')==='sources')setSelectedStage('sources');},[projectId]);
+  useEffect(()=>{const stage=new URLSearchParams(window.location.search).get('stage');if(stage==='sources'||stage==='installation')setSelectedStage(stage);},[projectId]);
   const [unavailableStage, setUnavailableStage] = useState<string | null>(null);
   const stage = PROJECT_MENU_STAGES.find((item) => item.id === selectedStage) || PROJECT_MENU_STAGES[2];
   const stageIndex = PROJECT_MENU_STAGES.findIndex((item) => item.id === selectedStage);
@@ -1108,7 +1109,9 @@ function ProjectMenuPreview({
   const isInterior = selectedStage === "interior";
   const isLighting = selectedStage === "lighting";
   const isMeasured = selectedStage === "sources";
+  const isInstallation = selectedStage === "installation";
   const openSelectedStage = () => {
+    if (isInstallation) window.location.assign(`/partition-plan?project=${encodeURIComponent(projectId)}`);
     if (isMeasured) window.location.assign(`/measured-plan?project=${encodeURIComponent(projectId)}`);
     if (isInterior) onOpenStudio();
     if (isLighting) onOpenTechnical();
@@ -1119,6 +1122,7 @@ function ProjectMenuPreview({
       setUnavailableStage(nextStage.label);
       return;
     }
+    if (nextStage.id === "installation") setSelectedStage('installation');
     if (nextStage.id === "interior") onOpenStudio();
     if (nextStage.id === "lighting") onOpenTechnical();
   };
@@ -1158,7 +1162,7 @@ function ProjectMenuPreview({
       </aside>
       {editingBrief&&<ProjectBriefEditor projectId={projectId} onClose={()=>setEditingBrief(false)} onSaved={project=>{onBriefSaved(project);setBriefSaved(true);}}/>}
       <section className="project-menu-content" aria-live="polite">
-        {isMeasured?<MeasuredStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:<>
+        {isMeasured?<MeasuredStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:isInstallation?<PartitionStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:<>
           <div className="project-menu-title-row">
             <div><span>РАЗДЕЛ ПРОЕКТА</span><h2>{stage.label}</h2><p>{stageDescription}</p></div>
             <mark>{isLoading?"Загрузка…":projectSaved?"Сохранено":"Можно начать"}</mark>

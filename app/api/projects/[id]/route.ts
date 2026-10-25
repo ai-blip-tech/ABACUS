@@ -2,6 +2,7 @@ import { ensureStore, requireTenantUser, storage, tenantStoragePrefix } from "@/
 import { database } from "@/lib/server-runtime";
 import { ensureMeasuredStore } from "@/lib/measured-plan/store";
 import { isSameOrigin } from "@/lib/measured-plan/request-origin";
+import { ensurePartitionStore } from "@/lib/partition-plan/store";
 
 type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string; proposalItems?: SavedPlanItem[] };
 type SavedPlanParameter = { name: string; value: string };
@@ -194,7 +195,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     try { assets = collectProjectAssets(JSON.parse(project.state_json)); } catch { /* the project row can still be deleted */ }
   }
   for(const item of measuredAssets.results)assets.add(item.asset);
-  await database.prepare("DELETE FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id).run();
+  ensurePartitionStore();
+  await database.batch([
+    database.prepare('DELETE FROM partition_plans WHERE project_id=? AND tenant_id=? AND user_id=?').bind(id,user.tenantId,user.id),
+    database.prepare("DELETE FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?").bind(id, user.tenantId, user.id),
+  ]);
   const tenantPrefix = tenantStoragePrefix(user);
   await Promise.allSettled([...assets].flatMap((asset) => [
     storage().delete(assetKey(tenantPrefix, id, asset)),
