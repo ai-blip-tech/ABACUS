@@ -11,11 +11,11 @@ test('toolbar exposes door and window placement next to measurement tools',()=>{
  assert.match(toolbar,/aria-label="Линейка"/);assert.match(toolbar,/aria-label="Дополнительный размер"/);
  assert.match(toolbar,/Добавить дверь/);assert.match(toolbar,/Добавить окно/);
  assert.match(app,/placeOpeningOnWall\(w,svgPoint\(e\)\)/);
- assert.match(app,/moveOpening\(next,o.id,projectOnWall\(w,p\),10\)/);
+ assert.match(app,/openingAt\(doc,w.id,p,tool,id\)/);assert.match(app,/openingInGap\(doc,p,tool,id/);
 });
 test('Delete removes selected opening through undoable document change, not its wall',()=>{
  const removal=app.slice(app.indexOf('function removeSelectedOpening'),app.indexOf('function historyStep'));
- assert.match(removal,/change\(d=>/);assert.match(removal,/d.openings=d.openings.filter/);
+ assert.match(removal,/setDoc\(next\)/);assert.match(removal,/removeOpening\(doc,opening.id\)/);
  assert.doesNotMatch(removal,/deleteWall|d.walls=/);
  assert.match(app,/e.key==='Delete'\|\|e.key==='Backspace'\)&&opening&&tool==='select'/);
  const key=app.slice(app.indexOf('const key=(e:KeyboardEvent)'));
