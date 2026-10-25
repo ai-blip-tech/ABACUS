@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {partitionToolEnabled as enabled} from '../lib/partition-plan/tool-availability.ts';
+test('protected demolition allows selection and measuring but never construction tools',()=>{for(const tool of ['select','ruler','dimension'])assert.equal(enabled(tool,'demolition',true,true,false),true);for(const tool of ['wall','opening','window','scale','floor','zone'])assert.equal(enabled(tool,'demolition',true,true,false),false);});
+test('installation and editable manual bases allow wall, door and window tools',()=>{for(const tool of ['wall','opening','window']){assert.equal(enabled(tool,'installation',true,true,false),true);assert.equal(enabled(tool,'demolition',true,false,false),true);}});
+test('unsupported settings stay unavailable and loading/saving disables editing',()=>{for(const mode of ['demolition','installation'])for(const tool of ['select','ruler','dimension','wall','opening','window','scale','floor','zone']){assert.equal(enabled(tool,mode,false,false,false),false);assert.equal(enabled(tool,mode,true,false,true),false);if(['scale','floor','zone'].includes(tool))assert.equal(enabled(tool,mode,true,false,false),false);}});

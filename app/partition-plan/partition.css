@@ -22,3 +22,12 @@
 @media(max-width:760px){.partition-source-result{width:65px;height:65px;flex-shrink:0}}
 .partition-page .partition-tools>button.partition-tool-icon{width:42px;height:42px;min-width:42px;padding:0;justify-content:center;border-radius:50%;flex-shrink:0}
 .partition-tools .partition-tool-icon>span{display:inline-flex;align-items:center;justify-content:center}
+.partition-page .measure-tools-menu{position:relative;display:flex;align-items:center;gap:12px;min-width:0}
+.partition-page .measure-tools-menu>button{white-space:nowrap;display:flex;align-items:center;gap:12px;height:42px;padding:9px 14px}
+.partition-page .measure-tools-popup{position:absolute;top:calc(100% + 8px);left:0;z-index:30;width:230px;max-width:calc(100vw - 32px);padding:7px;display:flex;flex-direction:column;gap:3px;background:#fff;border:1px solid #e3dcd2;border-radius:14px;box-shadow:0 8px 24px #342d281a}
+.partition-page .measure-tools-popup button{width:100%;text-align:left;border-color:transparent;border-radius:8px;min-height:38px}
+.partition-page .measure-tools-popup button.active,.partition-page .measure-tools-popup button[aria-pressed=true]{border-color:#e6d2d5;color:#8f1128;background:#fbf4f5}
+.partition-page .measure-current-tool{font-size:11px;color:#842b39;white-space:nowrap}
+.partition-page .partition-zoom{gap:7px}.partition-page .partition-zoom button{width:30px;height:30px;min-width:30px;padding:0;border:1px solid #ded2c2;border-radius:5px;background:white;color:#594c40;font-size:16px}
+.partition-page .partition-zoom button:nth-child(2){width:45px;min-width:45px;border-color:transparent;background:transparent;font-size:11px;color:#9b8165}
+@media(max-width:850px){.partition-page .measure-tools-menu{gap:5px}.partition-page .measure-current-tool{display:none}}

@@ -1,3 +1,5 @@
 export function PlanRulerIcon(){return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m3 16 13-13 5 5L8 21zM7 12l3 3M10 9l2 2M13 6l3 3"/></svg>;}
 export function PlanDimensionIcon(){return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 5v14M20 5v14M4 12h16M8 9l-4 3 4 3M16 9l4 3-4 3"/></svg>;}
 export function PlanDoorIcon(){return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 21V3h13v18M3 21h18M7 21V6l10-3"/><path d="M14 12v2"/></svg>;}
+export function PlanWindowIcon(){return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16M3 12h18"/></svg>;}
+export function PlanPartitionIcon(){return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M3 5h12v14H3zM3 11l6-6M3 17 15 5M7 19l8-8M17 15h6M20 12v6"/></svg>;}
