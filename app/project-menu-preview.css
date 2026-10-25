@@ -73,10 +73,36 @@
 .project-menu-summary { padding: 0 10px 24px; border-bottom: 1px solid var(--pm-line); }
 .project-menu-summary>span,.project-menu-title-row span,.project-menu-details section>span,.project-menu-materials span { color: var(--pm-red); font-size: 11px; font-weight: 600; letter-spacing: .16em; }
 .project-menu-summary h1 { margin: 14px 0 6px; font-family: var(--font-cormorant-garamond), Georgia, serif; font-size: 32px; font-weight: 500; line-height: 1; }
-.project-menu-summary p { margin: 0 0 20px; color: var(--pm-muted); font-size: 12px; line-height: 1.45; }
+.project-menu-summary p { margin: 0 0 20px; color: var(--pm-muted); font-size: 12px; line-height: 1.45; display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden; }
 .project-menu-summary strong { display: block; color: #776d65; font-size: 12px; font-weight: 500; }
 .project-menu-summary>i { display: block; height: 4px; margin-top: 18px; overflow: hidden; background: #e8e2da; }
 .project-menu-summary>i b { display: block; width: 25%; height: 100%; background: var(--pm-red); }
+.project-menu-edit-brief{display:inline-flex;align-items:center;gap:7px;margin:0 0 18px;padding:8px 12px;border:1px solid var(--pm-line);border-radius:999px;background:transparent;font-size:12px!important;cursor:pointer}
+.project-menu-edit-brief:hover{border-color:var(--pm-red);color:var(--pm-red)}
+.project-menu-edit-brief:disabled{opacity:.5;cursor:wait}
+.project-menu-brief-saved{display:block;margin:-8px 0 16px;color:#49654f;font-size:11px}
+.project-brief-dialog{position:fixed;inset:0;margin:auto;width:min(820px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0;border:1px solid #ded5c9;border-radius:18px;background:#fffdfa;color:#2b211c;font-family:var(--font-manrope),Arial,sans-serif;box-shadow:0 20px 80px #2b211c30;overflow:auto}
+.project-brief-dialog::backdrop{background:#2b211c66}
+.project-brief-dialog form{padding:28px}
+.project-brief-dialog header{display:flex;justify-content:space-between;gap:16px}
+.project-brief-dialog header span{font-size:10px;letter-spacing:.16em;color:#980d2b}
+.project-brief-dialog h2{margin:8px 0;font-family:var(--font-cormorant-garamond),Georgia,serif;font-size:38px;font-weight:500}
+.project-brief-dialog header p{font-size:12px;color:#887d73;line-height:1.5}
+.project-brief-dialog header>button{align-self:flex-start;border:0;background:transparent;font:26px Arial;cursor:pointer;padding:8px}
+.project-brief-dialog fieldset{border:0;margin:16px 0;padding:0;min-width:0}
+.project-brief-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.project-brief-edit-grid label{display:flex;flex-direction:column;gap:8px;font-size:12px;min-width:0}
+.project-brief-edit-grid input,.project-brief-edit-grid textarea,.project-brief-edit-grid select{box-sizing:border-box;width:100%;padding:12px;border:1px solid #ded5c9;border-radius:12px;background:#fff;color:#2b211c;font:inherit}
+.project-brief-edit-grid textarea{min-height:84px;resize:vertical}
+.project-brief-other{grid-column:1/-1}
+.project-brief-dialog small{display:block;margin-top:12px;font-size:11px;color:#887d73}
+.project-brief-dialog .is-over-limit,.project-brief-edit-error{color:#980d2b}
+.project-brief-edit-error{font-size:13px}
+.project-brief-dialog footer{display:flex;justify-content:flex-end;gap:12px;margin-top:20px}
+.project-brief-dialog footer button{padding:12px 20px;border:1px solid #ded5c9;border-radius:999px;background:transparent;color:inherit;font:inherit;font-size:13px;cursor:pointer}
+.project-brief-dialog footer button[type=submit]{background:#980d2b;border-color:#980d2b;color:white}
+.project-brief-dialog button:disabled{opacity:.5;cursor:wait}
+@media(max-width:700px){.project-brief-dialog form{padding:20px}.project-brief-edit-grid{grid-template-columns:1fr}.project-brief-dialog h2{font-size:32px}.project-brief-dialog footer{flex-direction:column-reverse}}
 
 .project-menu-stages { position: relative; margin: 22px 0; padding: 0; list-style: none; }
 .project-menu-stages::before { content: ""; position: absolute; left: 25px; top: 24px; bottom: 24px; width: 1px; background: var(--pm-line); }

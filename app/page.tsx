@@ -8,6 +8,7 @@ import AccountDropdown from "./account-dropdown";
 import EditorImageActions from "./editor-image-actions";
 import EditorHeader from "./editor-header";
 import MeasuredStagePreview from "./measured-plan/stage-preview";
+import ProjectBriefEditor, {type BriefProject} from "./project-brief-editor";
 import type { ItUiAction, ItUiTarget, RoomDesignContext } from "@/lib/it/types";
 import TemplatesHome from "./templates-home";
 import { normalizePlanReferenceImages } from "@/lib/plan-render";
@@ -954,6 +955,7 @@ export default function Home() {
     projectName={projectName || "Новый проект"}
     projectType={projectType}
     projectDescription={projectDescription}
+    onBriefSaved={(project)=>{setProjectName(project.name);setProjectType(project.project_type);setProjectDescription(project.description||"");}}
     projectId={projectId}
     coverImage={generatedImage || interiorImage}
     historyCount={historyVersions.length}
@@ -1077,6 +1079,7 @@ function ProjectMenuPreview({
   onProjects,
   onOpenStudio,
   onOpenTechnical,
+  onBriefSaved,
 }: {
   user: SignedInUser | null;
   projectName: string;
@@ -1092,7 +1095,10 @@ function ProjectMenuPreview({
   onProjects: () => void;
   onOpenStudio: () => void;
   onOpenTechnical: () => void;
+  onBriefSaved: (project:BriefProject) => void;
 }) {
+  const [editingBrief,setEditingBrief]=useState(false);
+  const [briefSaved,setBriefSaved]=useState(false);
   const [selectedStage, setSelectedStage] = useState<ProjectMenuStageId>("interior");
   useEffect(()=>{if(new URLSearchParams(window.location.search).get('stage')==='sources')setSelectedStage('sources');},[projectId]);
   const [unavailableStage, setUnavailableStage] = useState<string | null>(null);
@@ -1136,6 +1142,8 @@ function ProjectMenuPreview({
           <span>ДИЗАЙН-ПРОЕКТ</span>
           <h1>{projectName}</h1>
           <p>{projectType}{projectDescription?` · ${projectDescription}`:""}</p>
+          <button className="project-menu-edit-brief" type="button" disabled={isLoading||!projectId} onClick={()=>{setBriefSaved(false);setEditingBrief(true);}}><span aria-hidden="true">✎</span> Редактировать бриф</button>
+          {briefSaved&&<small className="project-menu-brief-saved" role="status">Бриф сохранён</small>}
           <strong>{PROJECT_MENU_STAGES.filter((item)=>item.available).length} из {PROJECT_MENU_STAGES.length} разделов доступны</strong>
           <i aria-hidden="true"><b/></i>
         </div>
@@ -1148,6 +1156,7 @@ function ProjectMenuPreview({
         </ol>
         <button className="project-menu-back" type="button" onClick={onProjects}>← Все проекты</button>
       </aside>
+      {editingBrief&&<ProjectBriefEditor projectId={projectId} onClose={()=>setEditingBrief(false)} onSaved={project=>{onBriefSaved(project);setBriefSaved(true);}}/>}
       <section className="project-menu-content" aria-live="polite">
         {isMeasured?<MeasuredStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:<>
           <div className="project-menu-title-row">

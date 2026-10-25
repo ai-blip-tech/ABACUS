@@ -31,3 +31,5 @@ const reloaded=await (await request(path)).json();assert.equal(reloaded.document
 const print=await request(path+'/print');assert.equal(print.status,200,await print.clone().text());const pdf=new Uint8Array(await print.arrayBuffer());assert.equal(new TextDecoder().decode(pdf.slice(0,5)),'%PDF-');
 assert.equal((await PDFDocument.load(pdf)).getPageCount(),2,'Cover and measured-plan sheet must both be present');
 console.log(JSON.stringify({passed:true,projectId:id,checks:['unauthorized','cross-user read/write/import/assets/pdf','empty project without interior','upload PNG/JPEG/PDF','save/reload','revision conflict','interior save preserves plan','authenticated two-page PDF']},null,2));
+// Reuse the same isolated candidate to gate metadata editing on every release.
+await import('./project-brief-local-smoke.mjs');

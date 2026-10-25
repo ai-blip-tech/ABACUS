@@ -1,6 +1,7 @@
 import { ensureStore, requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 import { ensureMeasuredStore } from "@/lib/measured-plan/store";
+import { isSameOrigin } from "@/lib/measured-plan/request-origin";
 
 type SavedHistoryItem = { id: string; name: string; generated: boolean; asset: string; proposalItems?: SavedPlanItem[] };
 type SavedPlanParameter = { name: string; value: string };
@@ -151,6 +152,30 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   } catch {
     return Response.json({ error: "Не удалось прочитать сохранённый проект." }, { status: 500 });
   }
+}
+
+// Metadata-only editing must never run the studio/image save path or replace state_json.
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireTenantUser(request);
+  if (!user) return Response.json({error:"Требуется вход."},{status:401});
+  if (!isSameOrigin(request)) return Response.json({error:"Недопустимый источник запроса."},{status:403});
+  const {id}=await params;
+  if (!validProjectId(id)) return Response.json({error:"Некорректный проект."},{status:400});
+  const raw=await request.text();
+  if(raw.length>12000)return Response.json({error:"Бриф слишком большой."},{status:413});
+  let body:Record<string,unknown>;
+  try{body=JSON.parse(raw);if(!body||Array.isArray(body)||typeof body!=='object')throw Error();}catch{return Response.json({error:"Некорректный бриф."},{status:400});}
+  if(typeof body.name!=='string'||!body.name.trim()||body.name.trim().length>120||typeof body.projectType!=='string'||!body.projectType.trim()||body.projectType.length>80||typeof body.description!=='string'||body.description.length>1000||typeof body.expectedUpdatedAt!=='string')return Response.json({error:"Проверьте название проекта и длину брифа (до 1000 символов)."},{status:400});
+  const name=body.name.trim(),projectType=body.projectType.trim(),description=body.description.trim(),expected=body.expectedUpdatedAt;
+  const result=database.transaction(db=>{
+    const current=db.prepare('SELECT updated_at FROM projects WHERE id=? AND user_id=? AND tenant_id=?').get(id,user.id,user.tenantId) as {updated_at:string}|undefined;
+    if(!current)return {status:404,error:'Проект не найден.'};
+    if(current.updated_at!==expected)return {status:409,error:'Проект изменён в другой вкладке. Закройте и откройте бриф заново, чтобы загрузить актуальную версию.'};
+    const now=new Date().toISOString();
+    db.prepare('UPDATE projects SET name=?,project_type=?,description=?,updated_at=? WHERE id=? AND user_id=? AND tenant_id=?').run(name,projectType,description||null,now,id,user.id,user.tenantId);
+    return {status:200,project:{name,project_type:projectType,description,updated_at:now}};
+  });
+  return Response.json(result.status===200?{project:result.project}:{error:result.error},{status:result.status,headers:{'Cache-Control':'no-store'}});
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
