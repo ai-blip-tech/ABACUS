@@ -9,7 +9,7 @@ export function planDrawingDimensions(doc:MeasureDoc){
 
 /** Thickness is an actual measured dimension, not proof of structural function. */
 export function thicknessNotes(doc:MeasureDoc){
- const lines:string[]=[];
+ const lines:string[]=doc.columns?.length?['К — колонна; цифра — номер колонны.']:[];
  for(const [group,title] of [['outer','Наружные стены'],['inner','Внутренние стены / перегородки']] as const){
   const walls=doc.walls.map((w,i)=>({w,number:i+1})).filter(({w})=>w.group===group);
   if(!walls.length)continue;

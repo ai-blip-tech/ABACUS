@@ -1,4 +1,5 @@
 'use client';
+import {MeasureColumns} from '../measured-plan/editor/measure-columns';
 import {PartitionToolbar} from './partition-toolbar';
 import React,{useEffect,useRef,useState} from 'react';
 import EditorHeader from '../editor-header';
@@ -71,6 +72,7 @@ export default function PartitionPlanPage(){
      <defs><pattern id="partition-grid" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M 100 0 L 0 0 0 100" fill="none" stroke="#d8d2c8" strokeWidth=".35" vectorEffect="non-scaling-stroke"/></pattern><pattern id="partition-new-hatch" width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="60" height="60" fill={mono?'#eee':'#e3eee5'}/><line x1="0" y1="0" x2="0" y2="60" stroke={green} strokeWidth="15"/></pattern></defs>
      <g data-partition-transform transform={`translate(${offset[0]*view[2]/board.width} ${offset[1]*view[3]/board.height}) translate(${box.x+box.width/2} ${box.z+box.height/2}) scale(${zoom}) translate(${-box.x-box.width/2} ${-box.z-box.height/2})`}>
       <rect x={view[0]-view[2]*3} y={view[1]-view[3]*3} width={view[2]*7} height={view[3]*7} fill="url(#partition-grid)" pointerEvents="none"/>
+      <MeasureColumns columns={scene?.columns} font={font} monochrome/>
       {wallJoins(bodies).map((j,i)=><polygon key={'j'+i} points={j.polygon.map(p=>p.join(',')).join(' ')} fill="#292725" pointerEvents="none"/>)}
       {scene?.walls.map((w,i)=>{if(w.id.startsWith('wall_gap_'))return null;const b=bodies[i],range=mode==='demolition'?demolitionRange(doc,w.id):null,removed=!!range,isNew=doc.added.some(x=>x.id===w.id),m=marks[i],number=isNew?'П'+(doc.added.findIndex(x=>x.id===w.id)+1):doc.base.walls.findIndex(x=>x.id===sourceWallId(doc,w.id))+1;return <g key={w.id} role="button" tabIndex={0} aria-label={`${isNew?'Новая перегородка':'Стена'} ${number}`} onDoubleClick={e=>{e.stopPropagation();editDemolition(w.id);}} onPointerDown={e=>down(e,w.id)} onClick={e=>{if(tool==='select'||tool==='opening'||tool==='window'){e.stopPropagation();if(tool==='opening'||tool==='window')addOpeningAt(w.id,point(e));else setSelected(w.id);}}} onKeyDown={e=>{if(e.key==='Enter')setSelected(w.id);}} style={{cursor:tool==='select'?'pointer':'crosshair'}}>
        {selected===w.id&&!(partial===w.id&&mode==='demolition')&&<line x1={b.a[0]} y1={b.a[1]} x2={b.b[0]} y2={b.b[1]} stroke="#980d2b" strokeOpacity=".2" strokeWidth={w.thickness+font*.8}/>}

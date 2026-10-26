@@ -4,7 +4,7 @@ type FoundDoor={wallIndex:number;offset:number;width:number;hingesSide:'left'|'r
 
 /** Doors require a physical wall gap, an opened leaf and a supported quarter arc.
  * No file identity, room coordinates or default door locations are used. */
-export function detectRasterDoors(data:Uint8ClampedArray,width:number,height:number,input:Segment[]){
+export function detectRasterDoors(data:Uint8ClampedArray,width:number,height:number,input:Segment[],columns:{x:number;y:number;width:number;depth:number}[]=[]){
  const walls=structuredClone(input),parent=walls.map((_,i)=>i);
  const root=(i:number):number=>parent[i]===i?i:(parent[i]=root(parent[i]));
  const dark=(x:number,y:number,r=1)=>{let minimum=255;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const xx=Math.round(x+dx),yy=Math.round(y+dy);if(xx<0||yy<0||xx>=width||yy>=height)continue;const p=(yy*width+xx)*4;if(data[p+3]<128)continue;minimum=Math.min(minimum,(data[p]+data[p+1]+data[p+2])/3);}return minimum<232;};
@@ -14,6 +14,7 @@ export function detectRasterDoors(data:Uint8ClampedArray,width:number,height:num
   if((two.a[0]===two.b[0]?1:0)!==axis||Math.abs(one.a[normal]-two.a[normal])>Math.max(3,Math.min(one.thickness,two.thickness)*.5))continue;
   const first=one.a[axis]<two.a[axis]?one:two,second=first===one?two:one,start=first.b[axis],end=second.a[axis],radius=end-start;
   if(radius<Math.max(25,Math.max(width,height)*.02,Math.max(first.thickness,second.thickness)*1.5)||radius>Math.max(width,height)*.2)continue;
+  if(columns.some(c=>axis===0?one.a[1]>=c.y-3&&one.a[1]<=c.y+c.depth+3&&start<c.x+c.width&&end>c.x:one.a[0]>=c.x-3&&one.a[0]<=c.x+c.width+3&&start<c.y+c.depth&&end>c.y))continue;
   if(walls.some((p,k)=>k!==i&&k!==j&&(p.a[0]===p.b[0]?1:0)===axis&&Math.abs(p.a[normal]-one.a[normal])<3&&p.a[axis]>start&&p.b[axis]<end))continue;
   let best:typeof hypotheses[number]|null=null;
   for(const left of [true,false])for(const sign of [-1,1]){

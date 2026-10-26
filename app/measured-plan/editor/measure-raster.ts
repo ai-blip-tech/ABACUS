@@ -1,24 +1,30 @@
 import {blankDoc,type Source,type MeasureDoc,type Wall} from '../../../lib/measured-plan/measure-model.ts';
 import {detectRasterDoors} from './measure-raster-openings.ts';
+import {outlineWallBands,outlineColumns,excludeColumnInteriors,type RasterSegment} from './measure-raster-outlines.ts';
 // Conservative orthogonal filled-wall detector. Pencil strokes/perspective are manual fallback.
-export function detectWalls(data:Uint8ClampedArray,width:number,height:number){
+export function detectWalls(data:Uint8ClampedArray,width:number,height:number){return detectRasterStructure(data,width,height).walls;}
+export function detectRasterStructure(data:Uint8ClampedArray,width:number,height:number){
  const mask=new Uint8Array(width*height);for(let i=0;i<mask.length;i++){const j=i*4,r=data[j],g=data[j+1],b=data[j+2],gray=(r+g+b)/3;mask[i]=data[j+3]>128&&gray<120&&Math.max(r,g,b)-Math.min(r,g,b)<38?1:0;}
  const segments:{a:[number,number];b:[number,number];thickness:number}[]=[];
  const shortSegments:typeof segments=[];
+ const strokes:RasterSegment[]=[];
  for(const vertical of [false,true]){
   const rows=vertical?width:height,cols=vertical?height:width;let active:any[]=[];
-  const complete=(run:any)=>{const thick=run.last-run.first+1,len=run.end-run.start;if(thick<1||thick>Math.min(width,height)*.06)return;const mid=(run.first+run.last)/2,s={a:(vertical?[mid,run.start]:[run.start,mid]) as [number,number],b:(vertical?[mid,run.end]:[run.end,mid]) as [number,number],thickness:thick};if(len<Math.max(thick<3?90:65,Math.max(width,height)*.055,thick*4)){if(thick>=3&&len>=Math.max(12,thick*2))shortSegments.push(s);return;}segments.push(s);};
+  const complete=(run:any)=>{const thick=run.last-run.first+1,len=run.end-run.start;if(thick<1||thick>Math.min(width,height)*.06)return;const mid=(run.first+run.last)/2,s={a:(vertical?[mid,run.start]:[run.start,mid]) as [number,number],b:(vertical?[mid,run.end]:[run.end,mid]) as [number,number],thickness:thick};strokes.push(s);if(len<Math.max(thick<3?90:65,Math.max(width,height)*.055,thick*4)){if(thick>=3&&len>=Math.max(12,thick*2))shortSegments.push(s);return;}segments.push(s);};
   for(let row=0;row<rows;row++){
    const found:any[]=[];let start=-1,gap=0;
 for(let col=0;col<=cols;col++){const on=col<cols&&mask[vertical?col*width+row:row*width+col];if(on){if(start<0)start=col;gap=0;}else if(start>=0){gap++;if(gap>2||col===cols){const end=col-gap+1;if(end-start>=12)found.push({start,end});start=-1;gap=0;}}}
    const next:any[]=[];for(const f of found){const prior=active.find(r=>!r.used&&Math.abs(r.start-f.start)<7&&Math.abs(r.end-f.end)<7);if(prior){prior.used=true;next.push({...prior,last:row,start:(prior.start+f.start)/2,end:(prior.end+f.end)/2,used:false});}else next.push({...f,first:row,last:row,used:false});}for(const prior of active)if(!prior.used)complete(prior);active=next;
   }for(const prior of active)complete(prior);
  }
+ const pairing=outlineWallBands([...segments,...shortSegments],width,height);
+ segments.splice(0,segments.length,...pairing.bands,...pairing.remaining.filter(s=>Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])>=Math.max(65,Math.max(width,height)*.055)));
+ shortSegments.splice(0,shortSegments.length,...pairing.remaining.filter(s=>Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])<Math.max(65,Math.max(width,height)*.055)&&s.thickness>=3));
  // Collapse fragments of the same filled stripe, not neighbouring furniture lines.
  const merged:typeof segments=[];
  for(const s of segments.sort((a,b)=>b.thickness-a.thickness)){
   const axis=s.a[0]===s.b[0]?1:0,normal=1-axis;
-  const prior=merged.find(p=>(p.a[0]===p.b[0]?1:0)===axis&&Math.abs(p.a[normal]-s.a[normal])<=((p.thickness<12&&s.thickness<3&&Math.abs(p.a[axis]-s.a[axis])<15&&Math.abs(p.b[axis]-s.b[axis])<15)?12:(p.thickness+s.thickness)/2+2)&&s.a[axis]<=p.b[axis]+Math.max(p.thickness,s.thickness)&&s.b[axis]>=p.a[axis]-Math.max(p.thickness,s.thickness));
+  const prior=merged.find(p=>(p.a[0]===p.b[0]?1:0)===axis&&(Math.max(p.thickness,s.thickness)/Math.min(p.thickness,s.thickness)<=1.5||Math.min(p.b[axis],s.b[axis])-Math.max(p.a[axis],s.a[axis])>=0)&&Math.abs(p.a[normal]-s.a[normal])<=((p.thickness<12&&s.thickness<3&&Math.abs(p.a[axis]-s.a[axis])<15&&Math.abs(p.b[axis]-s.b[axis])<15)?12:(p.thickness+s.thickness)/2+2)&&s.a[axis]<=p.b[axis]+Math.max(p.thickness,s.thickness)&&s.b[axis]>=p.a[axis]-Math.max(p.thickness,s.thickness));
   if(prior){const lo=Math.min(prior.a[normal]-prior.thickness/2,s.a[normal]-s.thickness/2),hi=Math.max(prior.a[normal]+prior.thickness/2,s.a[normal]+s.thickness/2);prior.a[normal]=prior.b[normal]=(lo+hi)/2;prior.thickness=hi-lo;prior.a[axis]=Math.min(prior.a[axis],s.a[axis]);prior.b[axis]=Math.max(prior.b[axis],s.b[axis]);}else merged.push(structuredClone(s));
  }
  merged.sort((a,b)=>Math.hypot(b.b[0]-b.a[0],b.b[1]-b.a[1])-Math.hypot(a.b[0]-a.a[0],a.b[1]-a.a[1]));
@@ -32,7 +38,16 @@ for(let col=0;col<=cols;col++){const on=col<cols&&mask[vertical?col*width+row:ro
   for(const p of [host.a,host.b])if(Math.hypot(p[0]-end[0],p[1]-end[1])<=Math.max(s.thickness,host.thickness)*1.25+3){p[0]=end[0];p[1]=end[1];}
   merged.push(next);
  }
- return merged.slice(0,60);
+ const columns=outlineColumns(data,width,height,strokes,merged);
+ const significant=merged.filter(s=>s.thickness>=8||Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])>=Math.max(width,height)*.25);
+ const touching=(p:[number,number],w:RasterSegment)=>{const u=w.a[0]===w.b[0]?1:0,n=1-u,tolerance=Math.max(5,w.thickness*1.25);return Math.abs(p[n]-w.a[n])<=w.thickness/2+5&&p[u]>=w.a[u]-tolerance&&p[u]<=w.b[u]+tolerance;};
+ const supported=pairing.bands.length<4?merged:merged.filter(s=>significant.includes(s)||Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])>=18&&significant.some(a=>touching(s.a,a)&&significant.some(b=>b!==a&&touching(s.b,b)))&&!significant.some(w=>touching(s.a,w)&&touching(s.b,w)));
+ // Extend a centre line to a real junction only when an observed face supports
+ // the entire extension. This repairs offset face ends, not arbitrary gaps.
+ const joined=structuredClone(supported);
+ if(pairing.bands.length>=4)for(const s of joined.filter(s=>s.thickness>=8)){const u=s.a[0]===s.b[0]?1:0,n=1-u;for(const face of strokes){if((face.a[0]===face.b[0]?1:0)!==u||Math.abs(face.a[n]-s.a[n])>s.thickness/2+2||Math.min(face.b[u],s.b[u])-Math.max(face.a[u],s.a[u])<(s.b[u]-s.a[u])*.7)continue;if(s.a[u]-face.a[u]>=0&&s.a[u]-face.a[u]<Math.max(width,height)*.1)s.a[u]=face.a[u];if(face.b[u]-s.b[u]>=0&&face.b[u]-s.b[u]<Math.max(width,height)*.1)s.b[u]=face.b[u];}}
+ if(pairing.bands.length>=4)for(const s of joined.filter(s=>s.thickness>=8)){const u=s.a[0]===s.b[0]?1:0,n=1-u;for(const end of [s.a,s.b]){const options=significant.filter(w=>(end===s.a?w.a[u]<=end[u]:w.a[u]>=end[u])&&(w.a[0]===w.b[0]?1:0)!==u&&end[n]>=w.a[n]-s.thickness&&end[n]<=w.b[n]+s.thickness&&Math.abs(end[u]-w.a[u])<Math.max(s.thickness,w.thickness)*1.5).sort((a,b)=>Math.abs(end[u]-a.a[u])-Math.abs(end[u]-b.a[u]));const host=options.find(w=>strokes.some(face=>(face.a[0]===face.b[0]?1:0)===u&&Math.abs(face.a[n]-end[n])<=s.thickness/2+3&&face.a[u]<=Math.min(end[u],w.a[u])+3&&face.b[u]>=Math.max(end[u],w.a[u])-3));if(host)end[u]=host.a[u];}}
+ return {walls:excludeColumnInteriors(joined,columns).filter(s=>Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])>=Math.max(8,s.thickness*.6)).slice(0,100),columns};
 }
 /** Look outside the dark wall body for a supported pale upper outline. Furniture
  * inside the apartment must not become a perimeter. No unsupported flat closure. */
@@ -93,10 +108,11 @@ export function estimatedRasterModel(source:Source,candidates:ReturnType<typeof 
  return doc;
 }
 export async function rasterDocument(source:Source):Promise<MeasureDoc>{
- const image=new Image();image.src=source.image;await image.decode();const max=2200,ratio=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*ratio);canvas.height=Math.round(image.naturalHeight*ratio);const ctx=canvas.getContext('2d')!;ctx.drawImage(image,0,0,canvas.width,canvas.height);const candidates=detectWalls(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
- const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data,doors=detectRasterDoors(pixels,canvas.width,canvas.height,candidates);
+ const image=new Image();image.src=source.image;await image.decode();const max=2200,ratio=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*ratio);canvas.height=Math.round(image.naturalHeight*ratio);const ctx=canvas.getContext('2d')!;ctx.drawImage(image,0,0,canvas.width,canvas.height);const structure=detectRasterStructure(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height),candidates=structure.walls;
+ const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data,doors=detectRasterDoors(pixels,canvas.width,canvas.height,candidates,structure.columns);
  const upper=detectUpperOutline(pixels,canvas.width,canvas.height,doors.walls);
  const doc=estimatedRasterModel(source,doors.walls.map(s=>({a:s.a.map(x=>x/ratio) as [number,number],b:s.b.map(x=>x/ratio) as [number,number],thickness:s.thickness/ratio})),upper.map(p=>p.map(v=>v/ratio) as [number,number]));
  doc.openings=doors.doors.map((o,i)=>({id:'door_arc_'+i,wallId:doc.walls[o.wallIndex].id,kind:'door',width:Math.round(o.width/ratio*doc.source.pixelScale),offset:Math.round(o.offset/ratio*doc.source.pixelScale),height:null,sill:0,hingesSide:o.hingesSide,swingDirection:o.swingDirection,confirmed:false}));
+ doc.columns=structure.columns.map((c,i)=>({id:'column_scan_'+i,name:'Колонна К'+(i+1),a:[c.x/ratio*doc.source.pixelScale,c.y/ratio*doc.source.pixelScale],width:c.width/ratio*doc.source.pixelScale,depth:c.depth/ratio*doc.source.pixelScale,height:null,confirmed:false,structuralStatus:'unknown',provenance:'Предположительная колонна по замкнутому контуру у стыка стен; требуется проверка'}));
  return doc;
 }
