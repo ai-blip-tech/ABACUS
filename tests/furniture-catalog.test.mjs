@@ -18,9 +18,10 @@ const norrBrandFeed = `<?xml version="1.0"?><yml_catalog><shop><categories><cate
   <offer available="true" id="norr-2"><name>Плитка Excluded</name><vendor>Norr Mobler</vendor><categoryId>1</categoryId><picture>https://example.com/tile.jpg</picture><param name="Бренд">CIFRE</param></offer>
 </offers></shop></yml_catalog>`;
 
-test("LEVE HOME imports only products with both availability and positive stock", () => {
+test("LEVE HOME keeps all products and marks stock accurately for the optional availability filter", () => {
   const products = parseFurnitureCatalog(leveFeed, "leve-home");
-  assert.equal(products.length, 1);
+  assert.equal(products.length, 3);
+  assert.deepEqual(products.map(product=>product.available), [true, false, false]);
   assert.equal(products[0].brand, "LEVE HOME");
   assert.equal(products[0].id, "leve-home:coffee-1");
   assert.equal(products[0].article, "LV-01");

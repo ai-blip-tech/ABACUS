@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = (await Promise.all(["../app/page.tsx", "../app/furniture-catalog-page.tsx"].map(path=>readFile(new URL(path, import.meta.url), "utf8")))).join("\n");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/unified-studio-preview.css", import.meta.url), "utf8");
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
@@ -169,7 +169,8 @@ test("point orbit and catalog reuse the approved visual patterns", () => {
 test("preview separates the full catalog from the current project material rail", () => {
   assert.match(page, /function FurnitureCatalogPage/);
   assert.match(page, /catalog","furniture"/);
-  assert.match(page, /← Вернуться в проект/);
+  assert.match(page, /Выбрано товаров —/);
+  assert.match(page, /title="Вернуться в проект"/);
   assert.match(page, /NORR Møbler/);
   assert.match(page, /LEVE HOME/);
   assert.match(page, /minPrice/);

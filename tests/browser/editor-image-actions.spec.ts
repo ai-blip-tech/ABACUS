@@ -16,8 +16,8 @@ test("saved project without preview URL opens the new catalog before and after r
     await expect(page.locator(".studio-material-tray")).toBeVisible();
     await expect(page.locator(".studio-bottom-catalog")).toHaveCount(0);
     await page.getByRole("button", { name: /Выбрать из каталога/ }).click();
-    await expect(page.getByRole("heading", { name: "Каталог мебели" })).toBeVisible();
-    await page.getByRole("button", { name: "← Вернуться в проект" }).click();
+    await expect(page.getByRole("heading", { name: "Каталог брендов партнеров" })).toBeVisible();
+    await page.getByRole("button", { name: /^Выбрано товаров —/ }).click();
     if (!attempt) await page.reload();
   }
 });

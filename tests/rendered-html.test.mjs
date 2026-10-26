@@ -76,7 +76,7 @@ test("global admin overview uses the shared real-data aggregator", async () => {
 });
 
 test("planogram keeps menus readable, rugs below furniture, and supports bedside tables", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const pageSource = (await Promise.all(["../app/page.tsx","../lib/furniture-catalog-options.ts"].map(path=>readFile(new URL(path,import.meta.url),"utf8")))).join("\n");
   const controlsSource = await readFile(new URL("../app/planogram-controls.ts", import.meta.url), "utf8");
   const catalogSource = await readFile(new URL("../app/api/catalog/route.ts", import.meta.url), "utf8");
   const catalogFilterSource = await readFile(new URL("../lib/catalog-filter.ts", import.meta.url), "utf8");
