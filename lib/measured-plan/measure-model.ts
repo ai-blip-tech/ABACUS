@@ -1,5 +1,6 @@
 import {buildBtiScene,liveBtiChecks} from './bti-scene.ts';
 import {openingMissing,wallMissing} from './measure-editing.ts';
+import {automaticFloor} from './measure-auto-floor.ts';
 export type Point=[number,number];
 export type Column={id:string;name:string;a:Point;width:number;depth:number;height:number|null;confirmed:boolean;structuralStatus:'unknown'|'bearing';provenance:string};
 export type PlanDimension={id:string;a:Point;b:Point};
@@ -48,10 +49,10 @@ export function issues(doc:MeasureDoc){const list:{id:string;label:string;wallId
  if(doc.heightMode==='different'&&!doc.zones.length)add('zones','Добавьте хотя бы одну зону перепада');
  for(const z of doc.zones)if(!Number.isFinite(z.elevation)||!z.height||z.height<1000||z.height>10000||z.polygon.length<3||polygonArea(z.polygon)<10000)add(z.id,'Укажите корректную высоту и отметку пола: '+z.name);
  if(doc.walls.length<3)add('walls','Нужно не менее трёх стен');
- for(const c of doc.columns||[])if(!c.confirmed||!(c.height||doc.height))add(c.id,'Уточните размеры и высоту: '+c.name,{wallId:c.id});
+ for(const c of doc.columns||[])if(!c.confirmed||!(c.height||doc.height)||c.width<50||c.width>5000||c.depth<50||c.depth>5000||(c.height??doc.height??0)<100||(c.height??doc.height??0)>10000)add(c.id,'Уточните размеры и высоту: '+c.name,{wallId:c.id});
  for(const w of doc.walls)for(const [i,reason] of wallMissing(doc,w,doc.source.method==='raster-estimated').entries())add(w.id+'-parameter-'+i,w.name+': '+reason,{wallId:w.id});
  for(const [index,o] of doc.openings.entries())for(const [i,reason] of openingMissing(doc,o,false).entries())add(o.id+'-parameter-'+i,(o.kind==='window'?'Окно':o.kind==='door'?'Дверь':'Проём')+' '+(index+1)+': '+reason,{wallId:o.wallId,openingId:o.id});
- if(doc.floor.length<3||doc.floor.some(p=>p.some(n=>!Number.isFinite(n)))||polygonArea(doc.floor)<100000)add('floor','Задайте замкнутый контур пола минимум из трёх точек');
+ if(doc.floor.length<3||doc.floor.some(p=>p.some(n=>!Number.isFinite(n)))||polygonArea(doc.floor)<100000){const result=automaticFloor(doc.walls,doc.columns);add('floor',result.reason==='disconnected'?'Автоконтур: на плане есть отдельные несвязанные группы стен — проверьте их положение':'Автоконтур: проверьте разрыв или примыкание стен; после исправления контур пересчитается сам',result.unclosedWallId?{wallId:result.unclosedWallId}:{});}
  if(doc.floor.length>=3)for(const w of doc.walls)if(!inside(w.a,doc.floor)||!inside(w.b,doc.floor))add(w.id+'-outside','Стена выходит за контур пола: '+w.name,{wallId:w.id});
  for(let i=0;i<doc.floor.length;i++)for(let j=i+2;j<doc.floor.length;j++){if(i===0&&j===doc.floor.length-1)continue;if(crossing(doc.floor[i],doc.floor[(i+1)%doc.floor.length],doc.floor[j],doc.floor[(j+1)%doc.floor.length]))add('floor-crossing','Контур пола пересекает сам себя');}
  for(const c of dimensionChecks(doc))if(c.delta!==0&&!chainResolutionValid(doc,c))add(c.id,`${c.name}: исходник ${c.source}, геометрия ${c.model??'—'} мм — разрешите расхождение`,{wallId:'wall_bti_'+c.wallId});

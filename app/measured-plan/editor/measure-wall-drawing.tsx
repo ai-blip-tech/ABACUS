@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import type {Point,Wall} from '@/lib/measured-plan/measure-model';
 import {drawingLengthPoint,snapDrawingPoint,type DrawingSnap} from '@/lib/measured-plan/measure-wall-drawing';
 
-export function MeasureWallDrawing({walls,view,font,zoom,pointOf,onCommit,onFinish}:{walls:Wall[];view:number[];font:number;zoom:number;pointOf:(e:React.PointerEvent)=>Point;onCommit:(a:Point,b:Point,thickness:number)=>void;onFinish:()=>void}){
+export function MeasureWallDrawing({walls,view,font,zoom,color='#842b39',pointOf,onCommit,onFinish}:{walls:Wall[];view:number[];font:number;zoom:number;color?:string;pointOf:(e:React.PointerEvent)=>Point;onCommit:(a:Point,b:Point,thickness:number)=>void;onFinish:()=>void}){
  const [start,setStart]=useState<Point|null>(null),[first,setFirst]=useState<Point|null>(null),[hover,setHover]=useState<DrawingSnap|null>(null);
  const [typed,setTyped]=useState(''),[error,setError]=useState(''),[thickness,setThickness]=useState(100);
  const input=useRef<HTMLInputElement>(null);
@@ -31,7 +31,7 @@ export function MeasureWallDrawing({walls,view,font,zoom,pointOf,onCommit,onFini
    {/* Crosshair axes through the active point; highlighted guides extend existing geometry. */}
    <path d={`M ${end![0]-extent} ${end![1]} H ${end![0]+extent} M ${end![0]} ${end![1]-extent} V ${end![1]+extent}`} stroke="#998e80" strokeWidth=".8" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" opacity=".65"/>
    {hover.guides.map(g=><line key={g.axis} data-drawing-guide={g.axis} x1={g.axis==='x'?g.value:g.source[0]} y1={g.axis==='y'?g.value:g.source[1]} x2={end![0]} y2={end![1]} stroke="#25866b" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>)}
-   {start&&<line data-wall-preview x1={start[0]} y1={start[1]} x2={end![0]} y2={end![1]} stroke="#842b39" strokeWidth={thickness} opacity=".65"/>}
+   {start&&<line data-wall-preview x1={start[0]} y1={start[1]} x2={end![0]} y2={end![1]} stroke={color} strokeWidth={thickness} opacity=".65"/>}
    {[...(start?[start]:[]),end!].map((p,i)=><path key={i} d={`M ${p[0]-unit*.45} ${p[1]} h ${unit*.9} M ${p[0]} ${p[1]-unit*.65} v ${unit*1.3}`} stroke={hover.label?'#25866b':'#842b39'} strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>)}
    <text x={end![0]+unit*1.2} y={end![1]-unit*2} fontSize={unit} fill="#206d57" stroke="#fffdf7" strokeWidth={unit*.35} paintOrder="stroke">{hover.label}</text>
   </g>}
