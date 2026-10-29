@@ -27,6 +27,104 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  dwg-converter-preflight:
+    name: Build DWG converter in isolated server directory, no deployment
+    if: ${{ inputs.confirmation == 'PREFLIGHT_ROOM_DESIGN_DWG' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production-backup
+    steps:
+      - name: Build and check Linux decoder without changing live application
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
+        env:
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+          DWG_SAMPLE_A: ${{ secrets.ROOM_DWG_PREFLIGHT_A }}
+          DWG_SAMPLE_B: ${{ secrets.ROOM_DWG_PREFLIGHT_B }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 23m
+          envs: EXPECTED_PRODUCTION_SHA,DWG_SAMPLE_A,DWG_SAMPLE_B
+          script: |
+            set -eu
+            umask 077
+            live_dir="$HOME/ABACUS"
+            test "$(git -C "$live_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl -fsS --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            for tool in gcc make curl patch python3 sha256sum timeout nice; do command -v "$tool" >/dev/null; done
+            test "$(df -Pk "$live_dir" | awk 'NR==2 {print $4}')" -gt 1048576
+            build_dir="$(mktemp -d "$HOME/room-dwg-preflight-XXXXXX")"
+            finish_dwg() {
+              result=$?
+              trap - EXIT INT TERM
+              unset DWG_SAMPLE_A DWG_SAMPLE_B
+              rm -f "$build_dir/input.dwg" "$build_dir/output.dxf" "$build_dir/conversion.log"
+              test "$(git -C "$live_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA" || result=1
+              curl -fsS --max-time 15 http://127.0.0.1:3000/api/health >/dev/null || result=1
+              echo "DWG_PREFLIGHT_EXIT=$result"
+              echo "PRODUCTION_RESTARTED=no"
+              echo "CONVERTER_BUILD_DIR=$build_dir"
+              exit "$result"
+            }
+            trap finish_dwg EXIT INT TERM
+            cd "$build_dir"
+            uname -sm
+            curl -fsS --max-time 120 https://ftp.gnu.org/gnu/libredwg/libredwg-0.14.tar.gz -o source.tar.gz
+            echo 'cb6ee0b078c6d9e0f09d66f1feac33ba6342df88ae544e9f9335fab475218351  source.tar.gz' | sha256sum -c -
+            tar -xzf source.tar.gz
+            cd libredwg-0.14
+            patch -p1 <<'PATCH'
+            --- a/src/decode.c
+            +++ b/src/decode.c
+            @@ -2016,6 +2016,14 @@
+                 }
+               if (info->num_sections == 0)
+                 {
+            +      /* R2004 permits an absent Template section. Some Teigha exports retain
+            +         its descriptor with no pages. Do not fabricate a page at address 0:
+            +         those bytes are the file header, not a section page. Preserve the
+            +         header unit settings and let the caller handle the absent Template.
+            +         Keep the existing behavior for other sections and DWG versions. */
+            +      if (type == SECTION_TEMPLATE && is_teigha
+            +          && dat->from_version == R_2004)
+            +        return DWG_ERR_SECTIONNOTFOUND;
+                   // XXX: This Teigha bug is already fixed up before
+                   if (type == SECTION_TEMPLATE && is_teigha && info->size >= 4
+                       && info->unknown == 1)
+            PATCH
+            ./configure --disable-bindings --disable-docs --disable-shared --disable-write --disable-json --disable-werror --enable-release CFLAGS=-O1 > "$build_dir/configure.log" 2>&1
+            (ulimit -v 1572864; timeout --signal=TERM --kill-after=15s 15m nice -n 19 make -j1 -C src) > "$build_dir/build.log" 2>&1
+            timeout 90s make -C programs dwg2dxf >> "$build_dir/build.log" 2>&1
+            binary="$build_dir/libredwg-0.14/programs/dwg2dxf"
+            "$binary" --version
+            if [ -n "$DWG_SAMPLE_A" ] && [ -n "$DWG_SAMPLE_B" ]; then
+              printf '%s%s' "$DWG_SAMPLE_A" "$DWG_SAMPLE_B" | base64 -d | gzip -d > "$build_dir/input.dwg"
+              expected_dxf_sha=cf8b3bff6e2d5aec39a3613b02da538856b9ebf0a98948f63a27639c6de744ac
+              echo "DWG_SAMPLE=user-authorized-private-sample"
+            else
+              cp test/test-data/example_2004.dwg "$build_dir/input.dwg"
+              expected_dxf_sha=033498fc32313e62921a7cfd9fd3ab1040fba6a48b7b2aa4fc2cde90af350865
+              echo "DWG_SAMPLE=public-upstream-example-2004"
+            fi
+            unset DWG_SAMPLE_A DWG_SAMPLE_B
+            (ulimit -v 524288; timeout --signal=TERM --kill-after=5s 30s "$binary" -v1 --as r2004 -o "$build_dir/output.dxf" "$build_dir/input.dwg") > "$build_dir/conversion.log" 2>&1
+            python3 - "$build_dir" "$expected_dxf_sha" <<'PY'
+            import hashlib, pathlib, sys
+            p = pathlib.Path(sys.argv[1])
+            output = (p/'output.dxf').read_bytes()
+            log = (p/'conversion.log').read_text(errors='replace')
+            digest = hashlib.sha256(output).hexdigest()
+            print('DXF_SHA256=' + digest)
+            print('DECODER_ERROR_COUNT=' + str(sum(l.startswith('ERROR:') for l in log.splitlines())))
+            if digest != sys.argv[2]:
+                raise SystemExit('Linux DXF differs from verified macOS output; review required')
+            if any(l.startswith('ERROR:') for l in log.splitlines()):
+                raise SystemExit('Unexpected decoder error on reference sample')
+            print('LINUX_MACOS_DXF_IDENTICAL=yes')
+            PY
+            sha256sum "$binary"
+            echo "DWG_PREFLIGHT_STATUS=PASSED"
   measured-plan-preflight:
     name: Verify measured-plan candidate without replacing the live application
     if: ${{ inputs.confirmation == 'PREFLIGHT_ROOM_DESIGN_MEASURED_PLAN' }}
