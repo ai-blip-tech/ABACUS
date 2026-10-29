@@ -7,6 +7,6 @@ test('both editors share the continuous wall drawing implementation, with instal
  const toolbar=readFileSync('app/partition-plan/partition-toolbar.tsx','utf8');
  assert.match(measured,/<MeasureWallDrawing /);assert.match(partition,/<MeasureWallDrawing /);
  assert.match(partition,/!doc.baseLocked\|\|mode==='installation'/);assert.match(partition,/onCommit=\{commitDrawnPartition\}/);
- assert.match(toolbar,/aria-label="Возвести перегородку"/);assert.match(measured,/onClick=\{\(\)=>selectTool\('wall'\)\}>＋ Стена/);
+ assert.match(toolbar,/aria-label="Стена"/);assert.match(toolbar,/<PlanWallIcon\/>/);assert.match(measured,/onClick=\{\(\)=>selectTool\('wall'\)\}>＋ Стена/);
  assert.match(measured,/<button disabled title="Система рассчитывает контур пола автоматически/);
 });

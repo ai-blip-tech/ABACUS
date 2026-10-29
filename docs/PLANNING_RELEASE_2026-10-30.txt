@@ -1,0 +1,33 @@
+Room Design — manual planning release, 30 October 2026
+Base main: 4f956129c41089b38c194119b582b7f4d7c38a76
+Authorization: publish manual planning section and connect DWG converter;
+stop before promotion on candidate failure, roll back on post-promotion failure.
+
+Included: manual editor, measured/CAD/manual sources, three sheets each, shared
+wall and opening mechanics, dimensions, furniture catalog/reference/tray,
+contextual furniture types, net area, print/PDF, menu stage preview.
+Excluded: experimental AI/ePlanner generation, prompts/skills, datasets and
+private user CAD files. Historical opaque AI metadata is preserved for data
+compatibility only; generation route is absent.
+
+Local verification: 628 passing tests, production build, isolated API/PDF smoke.
+Linux converter sample verification:
+https://github.com/ai-blip-tech/ABACUS/actions/runs/40957478905
+Verified backup:
+https://github.com/ai-blip-tech/ABACUS/actions/runs/40958040360
+Server backup: ~/room-design-backups/predeploy-40958040360-1
+The deployment gate must recheck its freshness and matching running SHA.
+
+DWG decoder binary SHA256:
+27c48be5a5e155f0507a49270767ec28b221929621e1fe5ead5dcc485458e836
+Private versioned wrapper limits memory, CPU, file output and elapsed time.
+Partial readable DXF imports with a warning, even for numeric nonzero decoder
+exit. Missing, unreadable, oversized or interrupted output does not replace
+the working document. Source stages are unchanged; replaced drafts archived.
+
+Server release gate runs converter parse smoke, all unit tests, production
+build and isolated measured/partition/planning API/PDF smoke before switching
+the application. Live source checkout is advanced only after candidate passes.
+Previous build and environment are preserved for rollback. Database recovery
+is not performed over current live writes merely for a code regression.
+No secrets or user drawings are included in this release tree.

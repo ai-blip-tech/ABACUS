@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {readCadFile} from '../../lib/planning-plan/cad-file.ts';
+import {parseDxf} from '../../lib/planning-plan/dxf-import.ts';
+assert.ok(process.env.ROOM_DWG_CONVERTER?.startsWith('/'),'Explicit private converter path required');
+assert.ok(process.argv[2],'Public upstream sample path required');
+const bytes=await readFile(process.argv[2]);
+const result=await readCadFile(bytes,'public-reference.dwg');
+const scene=parseDxf(result.text);
+assert.ok(scene.paths.length>0);
+console.log(JSON.stringify({converter:'passed',visiblePaths:scene.paths.length,diagnosticWarnings:result.warnings.length}));

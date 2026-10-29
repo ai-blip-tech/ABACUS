@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {snapFurnitureAngle} from '../lib/planning-plan/furniture-angle-snap.ts';
+import {snapFurnitureToWalls} from '../lib/planning-plan/furniture-wall-snap.ts';
+import {newFurniture} from '../lib/planning-plan/furniture.ts';
+const wall=(a,b)=>({id:'wall',a,b,thickness:200}),horizontal=wall([-3000,0],[3000,0]);
+const item=rotation=>({...newFurniture('table',[0,440]),width:800,depth:600,rotation});
+test('near wall angle aligns both edges without flipping front/back',()=>{for(const angle of [3,87,183,267,357,-3])assert.ok(Math.abs(snapFurnitureAngle(item(angle),[horizontal])-Math.round(angle/90)*90)<1e-8);});
+test('diagonal walls use actual direction rather than global grid',()=>{const f={...item(34),position:[0,0]};assert.ok(Math.abs(snapFurnitureAngle(f,[wall([-3000,-1200],[3000,2264.101615])])-30)<1e-8);});
+test('far walls, extensions, deliberate angle and zero length do not attract',()=>{assert.equal(snapFurnitureAngle(item(20),[horizontal]),20);assert.equal(snapFurnitureAngle({...item(3),position:[0,2000]},[horizontal]),3);assert.equal(snapFurnitureAngle({...item(3),position:[5000,440]},[horizontal]),3);assert.equal(snapFurnitureAngle(item(3),[wall([0,0],[0,0])]),3);});
+test('translation alignment uses destination and retains wall face collision handling',()=>{const f={...item(87),position:[0,2000]},rotation=snapFurnitureAngle(f,[horizontal],[0,520]);assert.equal(rotation,90);const p=snapFurnitureToWalls({...f,rotation},f.position,[0,100],[horizontal]);assert.ok(Math.abs(p[1]-500)<.001);});

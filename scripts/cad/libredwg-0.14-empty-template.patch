@@ -1,0 +1,17 @@
+--- a/src/decode.c
++++ b/src/decode.c
+@@ -2016,6 +2016,14 @@
+     }
+   if (info->num_sections == 0)
+     {
++      /* R2004 permits an absent Template section. Some Teigha exports retain
++         its descriptor with no pages. Do not fabricate a page at address 0:
++         those bytes are the file header, not a section page. Preserve the
++         header unit settings and let the caller handle the absent Template.
++         Keep the existing behavior for other sections and DWG versions. */
++      if (type == SECTION_TEMPLATE && is_teigha
++          && dat->from_version == R_2004)
++        return DWG_ERR_SECTIONNOTFOUND;
+       // XXX: This Teigha bug is already fixed up before
+       if (type == SECTION_TEMPLATE && is_teigha && info->size >= 4
+           && info->unknown == 1)

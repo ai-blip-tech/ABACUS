@@ -1,0 +1,42 @@
+LibreDWG 0.14: local candidate patch, not a system installation.
+
+Source: https://ftp.gnu.org/gnu/libredwg/libredwg-0.14.tar.gz
+Archive SHA256: cb6ee0b078c6d9e0f09d66f1feac33ba6342df88ae544e9f9335fab475218351
+Original LibreDWG source is GPL-3.0-or-later. Preserve upstream license/notices
+and provide corresponding source/patches as applicable when distributing binaries.
+No third-party binary is included in this application source package.
+
+In a fresh extracted 0.14 source directory:
+  patch -p1 -i /absolute/path/libredwg-0.14-empty-template.patch
+  ./configure --disable-bindings --disable-docs --disable-shared --disable-write --disable-json --disable-werror --enable-release CFLAGS=-O1
+  make -j4 -C src
+  make -C programs dwg2dxf
+
+Local macOS build also used PKG_CONFIG=/usr/bin/true because pkg-config was
+unavailable. This is not an instruction to bypass dependency checks on Linux.
+No make install, system package change or production configuration was performed.
+
+Select the built programs/dwg2dxf with ROOM_DWG_CONVERTER only in the isolated
+candidate server environment. Do not replace the user's active preview binary.
+
+Regression command (paths supplied explicitly, no private files bundled):
+  node scripts/cad/check-decoder-regression.mjs OLD_BINARY NEW_BINARY INPUT_DWG...
+The script requires identical output bytes; it reports any remaining errors.
+Do not interpret identical DXF bytes as certification of every DWG feature.
+
+Verified locally: user sample (error removed, identical DXF), upstream example
+2004/2007/2010 files (identical DXFs; unrelated errors remain unchanged).
+User-approved policy (30 October): decoder diagnostics do not by themselves
+block import if an output DXF exists and passes application parsing/conversion.
+Partial output after a numeric nonzero exit can also be offered with a warning.
+Timeouts, signals, missing/empty/oversized output, unreadable DXF and missing
+units still stop safely without replacing the working document. Never claim
+diagnostics refer only to auxiliary data: objects/lines may be missing.
+Linux x86_64 build and reference conversion passed on 30 October:
+https://github.com/ai-blip-tech/ABACUS/actions/runs/40957478905
+Server executable: ~/room-dwg-preflight-j9Iklx/libredwg-0.14/programs/dwg2dxf
+SHA256: 27c48be5a5e155f0507a49270767ec28b221929621e1fe5ead5dcc485458e836
+Normalized output sections match macOS at 1e-6; only time fields differ.
+Private sample/secrets were removed after verification. No .env setting,
+system installation or production app restart was performed. Production
+deployment and runtime resource-wrapper integration still need release gates.

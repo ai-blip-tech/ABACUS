@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const page = (await Promise.all(["../app/page.tsx", "../app/furniture-catalog-page.tsx"].map(path=>readFile(new URL(path, import.meta.url), "utf8")))).join("\n");
+const page = (await Promise.all(["../app/page.tsx", "../app/furniture-catalog-page.tsx", "../app/furniture-catalog-picker.tsx", "../app/interior-furniture-choices.tsx", "../app/studio-material-tray.tsx"].map(path=>readFile(new URL(path, import.meta.url), "utf8")))).join("\n");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/unified-studio-preview.css", import.meta.url), "utf8");
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
@@ -85,9 +85,11 @@ test("one point owns one active product and references stay reusable", () => {
   assert.match(page, /setFurnitureEdits\(\[\{id:`edit-/);
   assert.doesNotMatch(page, /for \(const edit of furnitureEdits\)/);
   assert.match(page, /const edit=furnitureEdits\[0\]/);
-  assert.match(page, /referenceSelected\?"studio-material-card active":"studio-material-card"/);
-  assert.match(page, /aria-pressed=\{referenceSelected\}/);
-  assert.match(page, /onClick=\{selectReference\}/);
+  assert.match(page, /selected:referenceSelected/);
+  assert.match(page, /item.selected\?'studio-material-card active':'studio-material-card'/);
+  assert.match(page, /aria-pressed=\{item.selected\}/);
+  assert.match(page, /if\(id==='user-reference'\)selectReference\(\)/);
+  assert.match(page, /onClick=\{\(\)=>onSelect\(item.id\)\}/);
   assert.match(page, /referenceSelected&&<section className="studio-source-section studio-reference-settings"/);
   assert.match(page, /referenceSelected&&referenceReady/);
   assert.match(page, /activeStudioMaterialId=\{linkedCatalogProduct\?\.id\|\|""\}/);

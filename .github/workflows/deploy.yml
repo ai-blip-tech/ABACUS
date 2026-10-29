@@ -96,8 +96,7 @@ jobs:
             test -z "$(git status --porcelain -- . ':(exclude)package-lock.json' ':(exclude)next-env.d.ts' ':(exclude).next.rollback-*' ':(exclude).next.failed-*' ':(exclude)roomdesign')"
             git restore --source=HEAD -- package-lock.json next-env.d.ts
             git fetch origin main
-            git pull --ff-only origin main
-            test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+            test "$(git rev-parse origin/main)" = "${{ github.sha }}"
 
             # The live .next directory and verified production backups are never
             # touched here. Rotate only disposable build artifacts left by old
@@ -137,7 +136,7 @@ jobs:
             echo "RESOURCE_SNAPSHOT_AFTER_BUILD_ROTATION"
             df -h . || true
 
-            release_sha="$(git rev-parse HEAD)"
+            release_sha="$(git rev-parse origin/main)"
             release_dir="../ABACUS-release-${release_sha}-$(date +%Y%m%d%H%M%S)"
             rollback_dir=""
             candidate_pid=""
@@ -205,7 +204,22 @@ jobs:
             env_backup="$env_backup_root/env-pre-ono-${previous_sha}-$(date +%Y%m%d%H%M%S)"
             cp "$env_file" "$env_backup"
             chmod 600 "$env_backup"
-            python3 - "$env_file" "$data_dir" <<'PY'
+            # Use the already verified Linux decoder. A hash mismatch stops
+            # before live build promotion, never silently selects another tool.
+            converter_source="$HOME/room-dwg-preflight-j9Iklx/libredwg-0.14/programs/dwg2dxf"
+            echo "27c48be5a5e155f0507a49270767ec28b221929621e1fe5ead5dcc485458e836  $converter_source" | sha256sum -c -
+            converter_dir="$HOME/room-design-tools/dwg2dxf-0.14-templatefix-v1"
+            if [ ! -d "$converter_dir" ]; then
+              mkdir -p "$converter_dir"
+              chmod 700 "$converter_dir"
+              cp "$converter_source" "$converter_dir/dwg2dxf.bin"
+              chmod 500 "$converter_dir/dwg2dxf.bin"
+              git show "$release_sha:scripts/cad/dwg2dxf-linux-wrapper.sh" > "$converter_dir/dwg2dxf"
+              chmod 500 "$converter_dir/dwg2dxf"
+            fi
+            echo "27c48be5a5e155f0507a49270767ec28b221929621e1fe5ead5dcc485458e836  $converter_dir/dwg2dxf.bin" | sha256sum -c -
+            git show "$release_sha:scripts/cad/dwg2dxf-linux-wrapper.sh" | cmp - "$converter_dir/dwg2dxf"
+            python3 - "$env_file" "$data_dir" "$converter_dir/dwg2dxf" <<'PY'
             from pathlib import Path
             import sys
 
@@ -215,6 +229,7 @@ jobs:
                 "OPENAI_TEXT_MODEL": "gpt-6.1-sol",
                 "NEXT_PUBLIC_ONO_V2_ENABLED": "true",
                 "ONO_V2_ENABLED": "true",
+                "ROOM_DWG_CONVERTER": sys.argv[3],
             }
             lines = path.read_text(encoding="utf-8").splitlines()
             output = []
@@ -239,12 +254,13 @@ jobs:
             grep -qx 'ONO_V2_ENABLED=true' "$env_file"
             echo "ONO_RELEASE_ENVIRONMENT=prepared-enabled"
 
-            git archive HEAD | tar -x -C "$release_dir"
+            git archive "$release_sha" | tar -x -C "$release_dir"
             cp "$env_file" "$release_dir/.env"
 
             cd "$release_dir"
             npm ci
             ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-unit-data" npm run test:unit
+            ROOM_DWG_CONVERTER="$converter_dir/dwg2dxf" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/cad/converter-server-smoke.mjs "$HOME/room-dwg-preflight-j9Iklx/libredwg-0.14/test/test-data/2004/Line.dwg"
             echo "RESOURCE_SNAPSHOT_BEFORE_BUILD"
             free -h || true
             df -h . || true
@@ -260,9 +276,12 @@ jobs:
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/api/it/config" | grep -q '"enabled":true'
             MEASURE_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/measured-plan-local-smoke.mjs
             MEASURE_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/partition-plan-local-smoke.mjs
+            PLANNING_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/planning-plan-local-smoke.mjs
+            curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/planning-plan" >/dev/null
             cleanup_candidate
 
             cd "$live_dir"
+            git merge --ff-only "$release_sha"
             candidate_dir=".next.candidate-${release_sha}"
             test ! -e "$candidate_dir"
             mv "$release_dir/.next" "$candidate_dir"
@@ -278,6 +297,11 @@ jobs:
             curl --fail --silent --show-error http://127.0.0.1:3000/account >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/measured-plan >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3000/partition-plan >/dev/null
+            curl --fail --silent --show-error http://127.0.0.1:3000/planning-plan >/dev/null
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/planning-plan)" = "401"
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/planning-plan/print)" = "401"
+            test "$(curl --silent --request POST --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/planning-plan/cad-file)" = "401"
+            test "$(curl --silent --request POST --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/planning-plan/generate)" = "404"
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/partition-plan)" = "401"
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/partition-plan/print)" = "401"
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/measured-plan)" = "401"

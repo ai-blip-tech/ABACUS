@@ -45,7 +45,9 @@ test("both save actions persist the project instead of downloading plan JSON", (
   assert.match(globalCss, /\.canvas-actions \.project-save-control,\.planogram-toolbar-actions \.project-save-control/);
 });
 
-test("planogram templates use a unique key for table variants", () => {
-  assert.match(homeSource, /key=\{`\$\{item\.kind\}:\$\{item\.name\}`\}/);
-  assert.doesNotMatch(homeSource, /key=\{item\.kind\}/);
+test("planogram templates use a unique key for table variants", async () => {
+  const choices=await readFile(new URL('../app/interior-furniture-choices.tsx',import.meta.url),'utf8');
+  assert.match(homeSource, /<InteriorFurnitureChoices/);
+  assert.match(choices, /key=\{`\$\{item\.kind\}:\$\{item\.name\}`\}/);
+  assert.doesNotMatch(choices, /key=\{item\.kind\}/);
 });

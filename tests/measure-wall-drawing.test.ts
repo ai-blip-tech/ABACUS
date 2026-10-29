@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {snapDrawingPoint,drawingLengthPoint} from '../lib/measured-plan/measure-wall-drawing.ts';
+test('new thick wall captures visible end-cap corner, not only thin axis hit target',()=>{const walls:Wall[]=[{id:'h',name:'h',a:[-1550,-4046],b:[6067,-4046],thickness:300,thicknessConfirmed:true,lengthConfirmed:false,height:null,group:'inner',provenance:'test'}];assert.deepEqual(snapDrawingPoint([-1370,-3866],null,walls,60,false,300).point,[-1550,-4046]);assert.deepEqual(snapDrawingPoint([-1370,-3866],null,walls,60,true,300).point,[-1370,-3866]);});
+test('thick wall start does not trap a short next segment in its own corner magnet',()=>{const walls:Wall[]=[{id:'h',name:'h',a:[0,0],b:[3000,0],thickness:300,thicknessConfirmed:true,lengthConfirmed:false,height:null,group:'inner',provenance:'test'}];assert.deepEqual(snapDrawingPoint([0,150],[0,0],walls,20,false,300).point,[0,150]);});
 import type {Wall} from '../lib/measured-plan/measure-model.ts';
 const walls=[{a:[0,0],b:[3000,0]},{a:[0,0],b:[0,2000]}] as Wall[];
 test('drawing snaps exactly to existing endpoints',()=>{

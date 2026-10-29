@@ -1,0 +1,97 @@
+/* Scoped to planning: measured and partition editors retain their default UI. */
+.planning-context-menu>strong,.planning-context-menu>small{display:block;padding:8px 12px;font-size:13px;overflow-wrap:anywhere}
+.planning-context-menu>small{font-size:11px;color:#8a7868}
+.planning-furniture-type-list{max-height:320px;overflow:auto}
+.cad-needs-type .cad-type-outline{animation:cad-type-pulse 2.4s ease-in-out infinite}
+@keyframes cad-type-pulse{0%,100%{stroke-opacity:1}50%{stroke-opacity:.35}}
+@media(prefers-reduced-motion:reduce){.cad-needs-type .cad-type-outline{animation:none}}
+.planning-workspace .measure-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px!important;overflow:hidden}
+.planning-workspace .measure-main{min-width:0;padding:0}
+.planning-workspace .measure-tabs,.planning-workspace .measure-draw-tools{display:none!important}
+.planning-workspace .measure-board{min-height:240px;height:auto;flex:1;background:#f7f4ed}
+.planning-workspace .measure-board>svg{min-height:240px;height:100%;width:100%;display:block}
+.planning-workspace .measure-properties{min-height:0;max-height:none;overflow:auto}
+.planning-workspace .planning-project-bar{grid-template-columns:minmax(130px,.7fr) minmax(510px,1.8fr) auto;gap:14px;min-height:76px}
+.planning-workspace .planning-source-tabs{grid-template-columns:1fr 1fr 1.4fr;min-height:42px;padding:3px;background:#f7f5f2;border-color:#cfcac6}
+.planning-workspace .planning-source-tabs button{min-height:34px;padding:6px 12px;font-size:12px;font-weight:600}
+.planning-workspace .planning-source-tabs button[aria-selected=true]{box-shadow:0 5px 14px #8f10282e}
+.planning-workspace .planning-source-tabs small{display:block;font-size:9px;line-height:1.2;margin-top:2px;color:#9b8b7d}
+.planning-workspace .planning-source-tabs [aria-disabled=true]{color:#968b80;cursor:help}
+.planning-workspace .partition-tools{--p-line:#e2dacf;--p-red:#980d2b;flex-wrap:wrap}
+.planning-workspace .planning-workspace-notice:empty{display:none}
+.planning-workspace .planning-workspace-notice p{padding:10px 20px;margin:0;background:#fbf0db;font-size:12px;color:#826334}
+.planning-workspace .planning-workspace-notice [role=alert]{background:#fff0f0;color:#980d2b}
+.planning-furniture-dialog{width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 40px);box-sizing:border-box;padding:20px;border:1px solid #ded4c7;border-radius:16px;color:#40352a;background:#fffdf9;overflow:auto;box-shadow:0 20px 70px #30221830}
+.planning-furniture-dialog::backdrop{background:#30292360}
+.planning-furniture-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.planning-furniture-dialog>header h2{margin:0;font:26px Georgia,serif}
+.planning-furniture-dialog>header button{border:1px solid #ded4c7;border-radius:50%;width:34px;height:34px;background:white;font-size:22px;cursor:pointer}
+.planning-furniture-dialog .planning-library>h2,.planning-furniture-dialog .planning-library>.section-caption{display:none}
+.planning-furniture-dialog.catalog-only .planning-template-grid,.planning-furniture-dialog.catalog-only .planning-library>p,.planning-furniture-dialog.catalog-only .planning-library>small,.planning-furniture-dialog.catalog-only .planning-library>button,.planning-furniture-dialog.catalog-only details>summary{display:none}
+.planning-furniture-dialog.templates-only .planning-library>details,.planning-furniture-dialog.templates-only .planning-library>button{display:none}
+.planning-furniture-dialog .planning-library details{border:0;padding:0}
+.planning-furniture-dialog .planning-library button{cursor:pointer;padding:9px;border:1px solid #ded4c7;border-radius:8px;background:#fff}
+.planning-context-menu{position:fixed;z-index:1000;width:230px;background:#fffdf9;border:1px solid #ded4c7;border-radius:12px;padding:6px;box-shadow:0 12px 32px #30221830}
+.planning-context-menu button{display:block;width:100%;padding:12px;border:0;background:transparent;text-align:left;font:13px inherit;color:#493e35;cursor:pointer;border-radius:8px}
+.planning-context-menu button:hover{background:#f7edef;color:#980d2b}
+.planning-full-catalog{position:fixed;inset:0;margin:0;padding:0;width:100dvw;height:100dvh;max-width:none;max-height:none;border:0;background:#f7f4ef;overflow:hidden}
+.planning-full-catalog .room-catalog-page{position:absolute;inset:0}
+.planning-reference-preview{display:grid;gap:6px;padding:10px;background:#faf7f2;border:1px solid #e0d5c7;border-radius:8px}
+.planning-reference-preview img{width:100%;max-height:180px;object-fit:contain}
+.planning-reference-preview small{font-size:11px;line-height:1.4;color:#8a7868}
+.planning-workspace .measure-properties{padding:20px 18px}
+.planning-workspace .inspector-heading h2{font-size:23px}
+.planning-interior-sidebar{order:2;flex:none;padding:0;gap:12px!important}
+.planning-interior-sidebar .planning-sidebar-catalog{display:flex;align-items:center;justify-content:space-between;border:1px solid #dbcfc3;border-radius:8px;padding:12px;background:#fff;color:#8f1028;font-size:13px;cursor:pointer}
+.planning-interior-sidebar .plan-template-grid button{font-size:11px!important;min-height:40px}
+.planning-interior-sidebar .plan-room-summary{order:0!important;margin-bottom:5px}
+.planning-interior-sidebar .planning-sidebar-catalog{order:1}
+.planning-interior-sidebar>label{order:2!important}
+.planning-interior-sidebar>.plan-template-grid{order:3!important}
+.planning-interior-sidebar>.planning-equipment{order:4}
+.planning-interior-sidebar>.plan-select-note{order:5!important}
+.planning-equipment summary{cursor:pointer;font-size:12px;color:#827367;padding:10px 0}
+.planning-catalog-dialog{width:min(1000px,calc(100vw - 40px));height:min(830px,calc(100dvh - 40px));max-height:calc(100dvh - 40px);box-sizing:border-box;padding:22px;border:1px solid #ded4c7;border-radius:16px;color:#40352a;background:#fffdf9;overflow:hidden;box-shadow:0 20px 70px #30221830}
+.planning-catalog-dialog[open]{display:flex;flex-direction:column;gap:10px}
+.planning-catalog-dialog::backdrop{background:#30292360}
+.planning-catalog-dialog>header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex:none}
+.planning-catalog-dialog>header small{color:#8f1028;letter-spacing:.12em;font-size:9px}
+.planning-catalog-dialog>header h2{margin:3px 0;font:26px Georgia,serif}
+.planning-catalog-dialog>header button{border:1px solid #ded4c7;border-radius:50%;width:34px;height:34px;background:white;font-size:22px;cursor:pointer}
+.planning-catalog-dialog>p{font-size:12px;margin:0;color:#8c7c6e}
+.planning-catalog-dialog .furniture-catalog-products{height:auto;max-height:none;min-height:0;flex:1}
+.planning-catalog-dialog .studio-catalog-bar{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:none}
+.planning-catalog-dialog .studio-catalog-number,.planning-catalog-dialog .catalog-window-actions{display:none!important}
+.planning-catalog-dialog .catalog-brand-filter{margin:0;align-self:center}
+.planning-catalog-dialog .catalog-brand-filter button{font-size:11px;padding:7px 9px}
+.planning-catalog-dialog .catalog-search{padding:0;display:grid;gap:6px;font-size:11px}
+.planning-catalog-dialog .catalog-search>input{width:100%;box-sizing:border-box;border:1px solid #ded4c7;border-radius:20px;padding:10px 14px;font:12px inherit}
+.planning-catalog-dialog .studio-catalog-bar nav{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:5px}
+.planning-catalog-dialog .studio-catalog-bar nav button{border:1px solid #ded4c7;border-radius:18px;padding:6px 10px;background:#fff;font-size:11px;cursor:pointer;color:#77665b}
+.planning-catalog-dialog .studio-catalog-bar nav button.active{background:#980d2b;border-color:#980d2b;color:white}
+.planning-catalog-dialog .studio-catalog-total{font-size:11px;color:#8c7c6e}
+.planning-catalog-dialog .furniture-catalog-grid{grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(210px,auto);height:0;min-height:160px;overflow:auto;flex:1;padding-top:10px}
+.planning-catalog-dialog .furniture-catalog-card img{max-height:150px}
+.planning-catalog-dialog .furniture-catalog-card>span{aspect-ratio:1.5}
+.planning-catalog-dialog .furniture-catalog-card>b{font-size:12px}
+.planning-catalog-dialog .furniture-catalog-card{border-radius:8px!important;width:100%!important;height:auto!important;min-height:210px;display:block!important;padding:0 0 12px!important;align-self:stretch;overflow:hidden;box-sizing:border-box}
+.planning-catalog-dialog .furniture-catalog-card>span{border-radius:0!important;display:block!important;width:100%;height:150px;overflow:hidden}
+.planning-catalog-dialog .furniture-catalog-card>span>img{padding:7px;width:100%;height:150px;object-fit:contain}
+.planning-catalog-dialog .catalog-chips{display:flex;flex-wrap:wrap;overflow:auto;max-height:70px;padding-top:10px}
+.planning-catalog-dialog .catalog-more{margin:8px 0;padding:8px;border:1px solid #ded4c7;flex:none;background:white;border-radius:12px;cursor:pointer}
+.planning-catalog-dialog footer{padding-top:8px;font-size:11px;color:#8c7c6e;flex:none}
+@media(max-width:760px){.planning-catalog-dialog{padding:15px}.planning-catalog-dialog .studio-catalog-bar{grid-template-columns:1fr}.planning-catalog-dialog .furniture-catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.planning-catalog-dialog .studio-catalog-bar nav{max-height:110px;overflow:auto}}
+@media(max-width:1100px){.planning-workspace .planning-project-bar{grid-template-columns:1fr auto}.planning-workspace .planning-source-tabs{grid-column:1/-1;grid-row:2}.planning-workspace .measure-layout{grid-template-columns:minmax(0,1fr) 250px!important}}
+@media(max-width:760px){.planning-workspace .measure-layout{display:flex;flex-direction:column;overflow:visible}.planning-workspace .measure-properties{max-height:none}.planning-workspace .measure-board{height:550px;min-height:550px}.planning-workspace .planning-source-tabs{grid-template-columns:1fr 1fr 1.2fr;min-width:0}.planning-workspace .planning-source-tabs button{padding:7px;font-size:10px}.planning-workspace .planning-project-bar{padding:12px}.planning-workspace .partition-actions button{font-size:11px}}
+.planning-material-dock{flex:none;height:178px;min-width:0;border-top:1px solid #ded3cc;background:#fff;box-shadow:0 -10px 30px rgba(45,32,25,.06)}
+.planning-material-dock .studio-material-actions button{border-radius:12px}
+.planning-material-dock .studio-material-empty>button{border-radius:16px}
+.planning-material-dock .studio-material-select{padding:0;border:0;border-radius:0;background:transparent}
+.planning-material-dock .studio-material-remove{padding:0;border:0;border-radius:50%}
+.studio-material-thumbnail{width:105px;height:100%;display:grid!important;place-items:center;background:#f7f3ef;padding:12px!important}.studio-material-thumbnail svg{width:100%;max-height:95px;color:#5d625b}
+@media(max-width:820px){.planning-material-dock{height:160px}}
+.planning-sheet-tabs{display:flex;align-items:center;gap:3px;border:1px solid #e2dacf;border-radius:24px;padding:3px;margin-left:8px;background:#f8f5f0;flex-shrink:0}
+.planning-sheet-tabs>button{border:0;border-radius:20px;padding:9px 13px;white-space:nowrap;background:transparent;color:#756a61;font-size:13px;cursor:pointer}
+.planning-sheet-tabs>button[aria-selected=true]{background:#980d2b;color:#fff}
+.planning-sheet-tabs>button:focus-visible{outline:2px solid #980d2b;outline-offset:2px}
+.planning-sheet-tabs>button:disabled{opacity:.5;cursor:wait}

@@ -2,10 +2,10 @@ import type {Point,Wall} from './measure-model.ts';
 
 export type DrawingSnap={point:Point;guides:{axis:'x'|'y';value:number;source:Point}[];label:string};
 // Screen-distance tolerance is supplied by the caller: snapping feels identical at every zoom.
-export function snapDrawingPoint(raw:Point,start:Point|null,walls:Wall[],tolerance:number,free=false):DrawingSnap{
+export function snapDrawingPoint(raw:Point,start:Point|null,walls:Wall[],tolerance:number,free=false,thickness=100):DrawingSnap{
  if(free)return {point:raw,guides:[],label:''};
  const anchors=walls.flatMap(w=>[w.a,w.b]);
- const nearest=anchors.filter(p=>Math.hypot(p[0]-raw[0],p[1]-raw[1])<=tolerance).sort((a,b)=>Math.hypot(a[0]-raw[0],a[1]-raw[1])-Math.hypot(b[0]-raw[0],b[1]-raw[1]))[0];
+ const nearest=walls.flatMap(w=>[w.a,w.b].map(point=>({point,reach:start&&Math.hypot(point[0]-start[0],point[1]-start[1])<.01?tolerance:tolerance+Math.hypot(Math.max(w.thickness||100,70)/2,Math.max(thickness,70)/2)}))).filter(({point,reach})=>Math.hypot(point[0]-raw[0],point[1]-raw[1])<=reach).sort((a,b)=>Math.hypot(a.point[0]-raw[0],a.point[1]-raw[1])-Math.hypot(b.point[0]-raw[0],b.point[1]-raw[1]))[0]?.point;
  const point:Point=nearest?[...nearest]:[Math.round(raw[0]/10)*10,Math.round(raw[1]/10)*10];
  const guides:DrawingSnap['guides']=[];
  let locked=-1;

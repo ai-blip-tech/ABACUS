@@ -24,8 +24,8 @@ export function MeasureWallDrawing({walls,view,font,zoom,color='#842b39',pointOf
  };window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);});
  return <g data-wall-drawing>
   <rect data-wall-drawing-surface x={view[0]-extent} y={view[1]-extent} width={extent*2} height={extent*2} fill="transparent" style={{cursor:'crosshair',touchAction:'none'}}
-   onPointerMove={e=>{e.stopPropagation();if(document.activeElement===input.current)return;setHover(snapDrawingPoint(pointOf(e),start,walls,unit*1.2,e.altKey));}}
-   onPointerDown={e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();input.current?.blur();const snap=snapDrawingPoint(pointOf(e),start,walls,unit*1.2,e.altKey);setHover(snap);commit(snap.point);}}
+   onPointerMove={e=>{e.stopPropagation();if(document.activeElement===input.current)return;setHover(snapDrawingPoint(pointOf(e),start,walls,unit*1.2,e.altKey,thickness));}}
+   onPointerDown={e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();input.current?.blur();const snap=snapDrawingPoint(pointOf(e),start,walls,unit*1.2,e.altKey,thickness);setHover(snap);commit(snap.point);}}
    onClick={e=>e.stopPropagation()}/>
   {hover&&<g pointerEvents="none">
    {/* Crosshair axes through the active point; highlighted guides extend existing geometry. */}

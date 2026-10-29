@@ -76,7 +76,7 @@ test("global admin overview uses the shared real-data aggregator", async () => {
 });
 
 test("planogram keeps menus readable, rugs below furniture, and supports bedside tables", async () => {
-  const pageSource = (await Promise.all(["../app/page.tsx","../lib/furniture-catalog-options.ts"].map(path=>readFile(new URL(path,import.meta.url),"utf8")))).join("\n");
+  const pageSource = (await Promise.all(["../app/page.tsx","../lib/furniture-catalog-options.ts","../lib/interior-furniture-templates.ts"].map(path=>readFile(new URL(path,import.meta.url),"utf8")))).join("\n");
   const controlsSource = await readFile(new URL("../app/planogram-controls.ts", import.meta.url), "utf8");
   const catalogSource = await readFile(new URL("../app/api/catalog/route.ts", import.meta.url), "utf8");
   const catalogFilterSource = await readFile(new URL("../lib/catalog-filter.ts", import.meta.url), "utf8");
@@ -87,8 +87,8 @@ test("planogram keeps menus readable, rugs below furniture, and supports bedside
   assert.match(pageSource, /type:\s*"ottoman"\s*,\s*name:\s*"Пуфы"/);
   assert.match(pageSource, /type:\s*"shelving"\s*,\s*name:\s*"Стеллаж"/);
   assert.match(pageSource, /пуф\|банкетк\|оттоманк\|ottoman\|pouf/);
-  assert.match(pageSource, /kind:\s*"stool"\s*,\s*name:\s*"Пуф"/);
-  assert.match(pageSource, /kind:\s*"nightstand"\s*,\s*name:\s*"Прикроватная тумба"/);
+  assert.match(pageSource, /kind:\s*['"]stool['"]\s*,\s*name:\s*['"]Пуф['"]/);
+  assert.match(pageSource, /kind:\s*['"]nightstand['"]\s*,\s*name:\s*['"]Прикроватная тумба['"]/);
   assert.match(catalogSource, /matchesCatalogType/);
   assert.match(catalogFilterSource, /type\s*===\s*"nightstand"/);
   assert.match(catalogFilterSource, /type\s*===\s*"cabinet"/);

@@ -11,3 +11,4 @@ npm-debug.log*
 *.tsbuildinfo
 playwright-report/
 test-results/
+.local-tools/
