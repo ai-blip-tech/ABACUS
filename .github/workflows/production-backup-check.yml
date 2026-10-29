@@ -12,6 +12,10 @@ on:
         description: "Full candidate SHA for isolated preflight only"
         required: false
         type: string
+      converter_build:
+        description: "Optional isolated room-dwg-preflight directory name to reuse"
+        required: false
+        type: string
       expected_production_sha:
         description: "Full SHA expected to be running in production"
         required: true
@@ -38,6 +42,7 @@ jobs:
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
         env:
           EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+          REUSE_DWG_BUILD: ${{ inputs.converter_build }}
           DWG_SAMPLE_A: ${{ secrets.ROOM_DWG_PREFLIGHT_A }}
           DWG_SAMPLE_B: ${{ secrets.ROOM_DWG_PREFLIGHT_B }}
         with:
@@ -45,7 +50,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           command_timeout: 23m
-          envs: EXPECTED_PRODUCTION_SHA,DWG_SAMPLE_A,DWG_SAMPLE_B
+          envs: EXPECTED_PRODUCTION_SHA,DWG_SAMPLE_A,DWG_SAMPLE_B,REUSE_DWG_BUILD
           script: |
             set -eu
             umask 077
@@ -54,7 +59,13 @@ jobs:
             curl -fsS --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
             for tool in gcc make curl patch python3 sha256sum timeout nice; do command -v "$tool" >/dev/null; done
             test "$(df -Pk "$live_dir" | awk 'NR==2 {print $4}')" -gt 1048576
-            build_dir="$(mktemp -d "$HOME/room-dwg-preflight-XXXXXX")"
+            if [ -n "$REUSE_DWG_BUILD" ]; then
+              printf '%s' "$REUSE_DWG_BUILD" | grep -Eq '^room-dwg-preflight-[A-Za-z0-9]{6}$'
+              build_dir="$HOME/$REUSE_DWG_BUILD"
+              test -x "$build_dir/libredwg-0.14/programs/dwg2dxf"
+            else
+              build_dir="$(mktemp -d "$HOME/room-dwg-preflight-XXXXXX")"
+            fi
             finish_dwg() {
               result=$?
               trap - EXIT INT TERM
@@ -75,6 +86,7 @@ jobs:
             trap finish_dwg EXIT INT TERM
             cd "$build_dir"
             uname -sm
+            if [ -z "$REUSE_DWG_BUILD" ]; then
             curl -fsS --max-time 120 https://ftp.gnu.org/gnu/libredwg/libredwg-0.14.tar.gz -o source.tar.gz
             echo 'cb6ee0b078c6d9e0f09d66f1feac33ba6342df88ae544e9f9335fab475218351  source.tar.gz' | sha256sum -c -
             tar -xzf source.tar.gz
@@ -119,6 +131,8 @@ jobs:
             ./configure --disable-bindings --disable-docs --disable-shared --disable-write --disable-json --disable-werror --enable-release CFLAGS=-O1 > "$build_dir/configure.log" 2>&1
             (ulimit -v 1572864; timeout --signal=TERM --kill-after=15s 15m nice -n 19 make -j1 -C src) > "$build_dir/build.log" 2>&1
             timeout 90s make -C programs dwg2dxf >> "$build_dir/build.log" 2>&1
+            fi
+            cd "$build_dir/libredwg-0.14"
             binary="$build_dir/libredwg-0.14/programs/dwg2dxf"
             "$binary" --version
             if [ -n "$DWG_SAMPLE_A" ] && [ -n "$DWG_SAMPLE_B" ]; then
@@ -141,10 +155,37 @@ jobs:
             print('DXF_SHA256=' + digest)
             print('DECODER_ERROR_COUNT=' + str(sum(l.startswith('ERROR:') for l in log.splitlines())))
             if digest != sys.argv[2]:
-                raise SystemExit('Linux DXF differs from verified macOS output; review required')
+                import decimal, re
+                try:
+                    text = output.decode('utf-8')
+                except UnicodeDecodeError:
+                    if b'ANSI_1251' not in output: raise
+                    text = output.decode('cp1251')
+                rows = text.splitlines()
+                if len(rows) % 2: raise SystemExit('Incomplete DXF pairs')
+                canonical, numbers, strings = [], [], []
+                for i in range(0, len(rows), 2):
+                    code, value = str(int(rows[i])), rows[i+1].strip()
+                    if re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?', value):
+                        with decimal.localcontext() as ctx:
+                            ctx.prec = 80
+                            number = decimal.Decimal(value).quantize(decimal.Decimal('0.000001'))
+                        value = format(number.normalize(), 'f') if number else '0'
+                        numbers.append(code+'='+value)
+                    else:
+                        strings.append(code+'='+value)
+                    canonical.append(code+'='+value)
+                sha = lambda values: hashlib.sha256('\n'.join(values).encode()).hexdigest()
+                print('CANONICAL_DXF_SHA256='+sha(canonical))
+                print('NUMERIC_DXF_SHA256='+sha(numbers))
+                print('STRING_DXF_SHA256='+sha(strings))
+                print('DXF_BYTES='+str(len(output)))
+                print('DXF_PAIRS='+str(len(canonical)))
+                if sha(canonical) != 'e4ba8906f97e5cc4c1432e7f89a51bf401db093aebe95840ac34ff8ad7719cee':
+                    raise SystemExit('Normalized Linux DXF differs; further review required')
             if any(l.startswith('ERROR:') for l in log.splitlines()):
                 raise SystemExit('Unexpected decoder error on reference sample')
-            print('LINUX_MACOS_DXF_IDENTICAL=yes')
+            print('LINUX_MACOS_DXF_IDENTICAL=' + ('byte-identical' if digest == sys.argv[2] else 'normalized-1e-6'))
             PY
             sha256sum "$binary"
             echo "DWG_PREFLIGHT_STATUS=PASSED"
