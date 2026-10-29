@@ -59,6 +59,11 @@ jobs:
               result=$?
               trap - EXIT INT TERM
               unset DWG_SAMPLE_A DWG_SAMPLE_B
+              if [ "$result" -ne 0 ]; then
+                for build_log in "$build_dir/configure.log" "$build_dir/build.log"; do
+                  if [ -f "$build_log" ]; then tail -n 25 "$build_log"; fi
+                done
+              fi
               rm -f "$build_dir/input.dwg" "$build_dir/output.dxf" "$build_dir/conversion.log"
               test "$(git -C "$live_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA" || result=1
               curl -fsS --max-time 15 http://127.0.0.1:3000/api/health >/dev/null || result=1
