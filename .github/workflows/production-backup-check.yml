@@ -78,6 +78,19 @@ jobs:
             curl -fsS --max-time 120 https://ftp.gnu.org/gnu/libredwg/libredwg-0.14.tar.gz -o source.tar.gz
             echo 'cb6ee0b078c6d9e0f09d66f1feac33ba6342df88ae544e9f9335fab475218351  source.tar.gz' | sha256sum -c -
             tar -xzf source.tar.gz
+            # Missing build tools are extracted privately, not installed into OS.
+            if ! command -v pkg-config >/dev/null; then
+              mkdir "$build_dir/build-deps" "$build_dir/build-debs"
+              cd "$build_dir/build-debs"
+              for package in pkg-config pkgconf-bin libpkgconf3; do
+                if apt-cache show "$package" >/dev/null 2>&1; then apt-get download "$package"; fi
+              done
+              for package_file in ./*.deb; do dpkg-deb -x "$package_file" "$build_dir/build-deps"; done
+              export PATH="$build_dir/build-deps/usr/bin:$PATH"
+              export LD_LIBRARY_PATH="$build_dir/build-deps/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+              pkg-config --version
+            fi
+            cd "$build_dir"
             cd libredwg-0.14
             patch -p1 <<'PATCH'
             --- a/src/decode.c
