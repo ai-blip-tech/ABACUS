@@ -163,9 +163,15 @@ jobs:
                     text = output.decode('cp1251')
                 rows = text.splitlines()
                 if len(rows) % 2: raise SystemExit('Incomplete DXF pairs')
-                canonical, numbers, strings = [], [], []
+                canonical, numbers, strings, without_times = [], [], [], []
+                sections = {}
+                section, variable, next_section = '', '', False
                 for i in range(0, len(rows), 2):
                     code, value = str(int(rows[i])), rows[i+1].strip()
+                    if next_section and code == '2': section, next_section = value, False
+                    if code == '0' and value == 'SECTION': next_section = True
+                    if section == 'HEADER' and code == '9': variable = value
+                    skip_time = section == 'HEADER' and variable in {'$TDCREATE','$TDUPDATE','$TDUCREATE','$TDUUPDATE','$TDINDWG','$TDUSRTIMER'}
                     if re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?', value):
                         with decimal.localcontext() as ctx:
                             ctx.prec = 80
@@ -175,14 +181,22 @@ jobs:
                     else:
                         strings.append(code+'='+value)
                     canonical.append(code+'='+value)
+                    sections.setdefault(section, []).append(code+'='+value)
+                    if not skip_time: without_times.append(code+'='+value)
+                    if code == '0' and value == 'ENDSEC': section, variable = '', ''
                 sha = lambda values: hashlib.sha256('\n'.join(values).encode()).hexdigest()
                 print('CANONICAL_DXF_SHA256='+sha(canonical))
                 print('NUMERIC_DXF_SHA256='+sha(numbers))
                 print('STRING_DXF_SHA256='+sha(strings))
                 print('DXF_BYTES='+str(len(output)))
                 print('DXF_PAIRS='+str(len(canonical)))
+                import json
+                print('SECTION_HASHES='+json.dumps({k:sha(v) for k,v in sections.items()},sort_keys=True))
+                print('DXF_EXCLUDING_TIME_SHA256='+sha(without_times))
                 if sha(canonical) != 'e4ba8906f97e5cc4c1432e7f89a51bf401db093aebe95840ac34ff8ad7719cee':
-                    raise SystemExit('Normalized Linux DXF differs; further review required')
+                    if sha(without_times) != '38d22e095280fc5c8bdae2463d43f3b8e8b869a75ce1665e7149398f6af6c679':
+                        raise SystemExit('Normalized Linux DXF differs outside timestamps; further review required')
+                    print('ONLY_TIME_FIELDS_DIFFER=yes')
             if any(l.startswith('ERROR:') for l in log.splitlines()):
                 raise SystemExit('Unexpected decoder error on reference sample')
             print('LINUX_MACOS_DXF_IDENTICAL=' + ('byte-identical' if digest == sys.argv[2] else 'normalized-1e-6'))
