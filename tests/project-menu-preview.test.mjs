@@ -13,14 +13,15 @@ test("project menu is part of the preview route without changing the legacy stud
   assert.match(page, /#меню-проекта/);
 });
 
-test("all nine stages are preserved and manual planning becomes available", () => {
+test("all nine stages are preserved and planning plus materials are available", () => {
   for (const label of ["Обмерный план", "Монтаж, демонтаж", "Планировочное решение", "Концепция и материалы", "Интерьер и меблировка", "Технический свет", "Санузел", "Керамогранит", "Документация"]) {
     assert.match(page, new RegExp(label));
   }
-  assert.equal((page.match(/available: true/g) || []).length, 5);
-  assert.equal((page.match(/available: false/g) || []).length, 4);
+  assert.equal((page.match(/available: true/g) || []).length, 6);
+  assert.equal((page.match(/available: false/g) || []).length, 3);
   assert.match(page, /isPlanning\?<PlanningStagePreview/);
   assert.match(page, /\/planning-plan\?project=/);
+  assert.match(page, /if \(isMaterials\) window.location.assign\(`\/materials-concept\?project=/);
 });
 
 test("active stages use existing destinations and placeholders explain their status", () => {

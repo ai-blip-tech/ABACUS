@@ -9,7 +9,8 @@ import { getTemplateWorkbenchScenario } from "@/lib/templates/workbench";
 import type { TemplateDefinition, TemplateInputSlot } from "@/lib/templates/types";
 
 type UploadedFile = { id: string; name: string; type: string; size: number; dataUrl: string; sourceUrl?: string; createdAt: string; width?: number; height?: number };
-type GenerationItem = { id: string; batchId: string; label: string; dataUrl: string; createdAt: string };
+export type TemplateGenerationItem = { id: string; batchId: string; label: string; dataUrl: string; createdAt: string };
+type GenerationItem = TemplateGenerationItem;
 type LightboxState = { items: GenerationItem[]; index: number };
 type User = { id: string; email: string };
 type Phase = "idle" | "processing" | "failed";
@@ -182,7 +183,7 @@ const generationCount = (template: TemplateDefinition, outputLabels: string[], u
   return outputLabels.length;
 };
 
-export default function TemplateScenarioWorkbench({ template }: { template: TemplateDefinition }) {
+export default function TemplateScenarioWorkbench({ template, onGenerated }: { template: TemplateDefinition; onGenerated?: (items: TemplateGenerationItem[]) => void }) {
   const supportsMoodboardModes = template.slug === "moodboard-to-room";
   const isPlanogram3D = template.slug === "planogram-3d";
   const [moodboardMode, setMoodboardMode] = useState<MoodboardMode>("room");
@@ -528,6 +529,7 @@ export default function TemplateScenarioWorkbench({ template }: { template: Temp
       }));
       setLatestResults(generated);
       setGenerationHistory((current) => [...generated, ...current.filter((item) => !generated.some((result) => result.id === item.id))]);
+      onGenerated?.(generated);
       setPhase("idle");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Генерация не завершилась.");

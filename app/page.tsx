@@ -1063,7 +1063,7 @@ const PROJECT_MENU_STAGES: Array<{ id: ProjectMenuStageId; label: string; availa
   { id: "sources", label: "Обмерный план", available: true },
   { id: "installation", label: "Монтаж, демонтаж", available: true },
   { id: "planning", label: "Планировочное решение", available: true },
-  { id: "materials", label: "Концепция и материалы", available: false },
+  { id: "materials", label: "Концепция и материалы", available: true },
   { id: "interior", label: "Интерьер и меблировка", available: true },
   { id: "lighting", label: "Технический свет", available: true },
   { id: "bathroom", label: "Санузел", available: false },
@@ -1107,7 +1107,7 @@ function ProjectMenuPreview({
   const [editingBrief,setEditingBrief]=useState(false);
   const [briefSaved,setBriefSaved]=useState(false);
   const [selectedStage, setSelectedStage] = useState<ProjectMenuStageId>("interior");
-  useEffect(()=>{const stage=new URLSearchParams(window.location.search).get('stage');if(stage==='sources'||stage==='installation'||stage==='planning')setSelectedStage(stage);},[projectId]);
+  useEffect(()=>{const stage=new URLSearchParams(window.location.search).get('stage') as ProjectMenuStageId|null;if(stage&&PROJECT_MENU_STAGES.some(item=>item.id===stage&&item.available))setSelectedStage(stage);},[projectId]);
   const [unavailableStage, setUnavailableStage] = useState<string | null>(null);
   const stage = PROJECT_MENU_STAGES.find((item) => item.id === selectedStage) || PROJECT_MENU_STAGES[2];
   const stageIndex = PROJECT_MENU_STAGES.findIndex((item) => item.id === selectedStage);
@@ -1117,10 +1117,12 @@ function ProjectMenuPreview({
   const isMeasured = selectedStage === "sources";
   const isInstallation = selectedStage === "installation";
   const isPlanning = selectedStage === "planning";
+  const isMaterials = selectedStage === "materials";
   const openSelectedStage = () => {
     if (isPlanning) window.location.assign(`/planning-plan?project=${encodeURIComponent(projectId)}`);
     if (isInstallation) window.location.assign(`/partition-plan?project=${encodeURIComponent(projectId)}`);
     if (isMeasured) window.location.assign(`/measured-plan?project=${encodeURIComponent(projectId)}`);
+    if (isMaterials) window.location.assign(`/materials-concept?project=${encodeURIComponent(projectId)}`);
     if (isInterior) onOpenStudio();
     if (isLighting) onOpenTechnical();
   };
@@ -1132,12 +1134,15 @@ function ProjectMenuPreview({
     }
     if (nextStage.id === "planning") setSelectedStage("planning");
     if (nextStage.id === "installation") setSelectedStage('installation');
+    if (nextStage.id === "materials") setSelectedStage('materials');
     if (nextStage.id === "interior") onOpenStudio();
     if (nextStage.id === "lighting") onOpenTechnical();
   };
   const stageDescription = isInterior
     ? "Создавайте визуализации, расставляйте мебель и работайте с планом комнаты в единой студии."
-    : "Спроектируйте план потолка, выберите светильники и проверьте свет в интерьере.";
+    : isMaterials
+      ? "Собирайте материалы и мебель на одной песочнице, создавайте moodboard, планограмму и концепцию кухни."
+      : "Спроектируйте план потолка, выберите светильники и проверьте свет в интерьере.";
   const renderLabel = historyCount === 1 ? "1 визуализация" : `${historyCount} визуализаций`;
   useEffect(()=>{if(!unavailableStage)return;const timer=window.setTimeout(()=>setUnavailableStage(null),3600);return()=>window.clearTimeout(timer);},[unavailableStage]);
 
@@ -1180,15 +1185,15 @@ function ProjectMenuPreview({
             <article className={`project-menu-feature ${isLighting?"is-lighting":"is-interior"}`}>
               <div className="project-menu-visual">
                 <img src={coverImage||"/project-loading-blueprint.png"} alt={coverImage?`Последняя визуализация проекта «${projectName}»`:"Эскиз будущего интерьера"}/>
-                <span>{isLighting?"Технический свет":"Студия интерьера"}</span>
+                <span>{isLighting?"Технический свет":isMaterials?"Песочница материалов":"Студия интерьера"}</span>
               </div>
               <div className="project-menu-feature-copy">
-                <div><span>{isInterior?"ЕДИНАЯ РАБОЧАЯ СРЕДА":"СВЕТОВОЙ СЦЕНАРИЙ"}</span><h3>{isInterior?"Интерьер и план комнаты":"План света и визуализация"}</h3><p>{isInterior?`${renderLabel} · ${furnitureCount} предметов в рабочем проекте`:"План потолка · каталог светильников · проверка результата"}</p></div>
+                <div><span>{isInterior?"ЕДИНАЯ РАБОЧАЯ СРЕДА":isMaterials?"МАТЕРИАЛЬНАЯ КОНЦЕПЦИЯ":"СВЕТОВОЙ СЦЕНАРИЙ"}</span><h3>{isInterior?"Интерьер и план комнаты":isMaterials?"Песочница дизайнера":"План света и визуализация"}</h3><p>{isInterior?`${renderLabel} · ${furnitureCount} предметов в рабочем проекте`:isMaterials?"Материалы · мебель · moodboard · планограмма · концепция кухни":"План потолка · каталог светильников · проверка результата"}</p></div>
                 <button type="button" onClick={openSelectedStage}>{historyCount||furnitureCount?"Продолжить":"Начать работу"} <b>→</b></button>
               </div>
             </article>
             <aside className="project-menu-details">
-              <section><span>СОСТАВ РАЗДЕЛА</span>{isInterior?<><p><b>Редактор изображений</b><em>{historyCount?"есть история":"готов"}</em></p><p><b>Создание интерьера</b><em>{furnitureCount?`${furnitureCount} предметов`:"готово к работе"}</em></p><p><b>История рендеров</b><em>{historyCount}</em></p></>:<><p><b>План потолка</b><em>доступен</em></p><p><b>Каталог света</b><em>доступен</em></p><p><b>Визуализации</b><em>в проекте</em></p></>}</section>
+              <section><span>СОСТАВ РАЗДЕЛА</span>{isInterior?<><p><b>Редактор изображений</b><em>{historyCount?"есть история":"готов"}</em></p><p><b>Создание интерьера</b><em>{furnitureCount?`${furnitureCount} предметов`:"готово к работе"}</em></p><p><b>История рендеров</b><em>{historyCount}</em></p></>:isMaterials?<><p><b>Песочница материалов</b><em>доступна</em></p><p><b>Moodboard и планограмма</b><em>доступны</em></p><p><b>Печатный альбом</b><em>доступен</em></p></>:<><p><b>План потолка</b><em>доступен</em></p><p><b>Каталог света</b><em>доступен</em></p><p><b>Визуализации</b><em>в проекте</em></p></>}</section>
               {nextStage&&<section className="project-menu-next"><span>СЛЕДУЮЩИЙ РАЗДЕЛ</span><h3>{nextStage.label}</h3><p>{nextStage.available?"Продолжите работу над проектом на следующем этапе.":"Этот этап скоро появится в маршруте проекта."}</p><button type="button" onClick={openNextStage}>Перейти <b>→</b></button></section>}
             </aside>
           </div>
