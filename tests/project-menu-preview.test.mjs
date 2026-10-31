@@ -5,6 +5,7 @@ import test from "node:test";
 const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/project-menu-preview.css", import.meta.url), "utf8");
+const materialsThumbnail = await readFile(new URL("../app/materials-concept/stage-thumbnail.tsx", import.meta.url), "utf8");
 
 test("project menu is part of the preview route without changing the legacy studio flow", () => {
   assert.match(page, /type AppView = "home" \| "account" \| "newProject" \| "projectMenu" \| "studio"/);
@@ -82,6 +83,16 @@ test("menu summaries are based on current project state rather than invented com
   assert.match(page, /coverImage=\{generatedImage \|\| interiorImage\}/);
   assert.match(page, /PROJECT_MENU_STAGES\.filter\(\(item\)=>item\.available\)\.length/);
   assert.match(page, /PROJECT_MENU_STAGES\.length\} разделов доступны/);
+});
+
+test("materials stage uses its saved sandbox instead of the interior sofa cover", () => {
+  assert.match(page, /isMaterials\?<MaterialsConceptStageThumbnail projectId=\{projectId\}/);
+  assert.match(materialsThumbnail, /\/materials-concept/);
+  assert.match(materialsThumbnail, /cache:"no-store"/);
+  assert.match(materialsThumbnail, /node=>!node\.trayOnly/);
+  assert.match(materialsThumbnail, /ПЕСОЧНИЦА ПОКА ПУСТА/);
+  assert.doesNotMatch(materialsThumbnail, /method:\s*["'](?:PUT|POST|DELETE)["']/);
+  assert.match(css, /\.project-menu-feature\.is-materials \.project-menu-visual/);
 });
 
 test("project menu stylesheet is loaded and has desktop and mobile layouts", () => {

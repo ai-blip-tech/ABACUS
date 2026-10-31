@@ -15,6 +15,7 @@ import MeasuredStagePreview from "./measured-plan/stage-preview";
 import ProjectBriefEditor, {type BriefProject} from "./project-brief-editor";
 import PartitionStagePreview from "./partition-plan/stage-preview";
 import PlanningStagePreview from "./planning-plan/stage-preview";
+import MaterialsConceptStageThumbnail from "./materials-concept/stage-thumbnail";
 import {rotationFromDrag} from "@/lib/planogram-interaction";
 import type { ItUiAction, ItUiTarget, RoomDesignContext } from "@/lib/it/types";
 import TemplatesHome from "./templates-home";
@@ -1182,10 +1183,9 @@ function ProjectMenuPreview({
             <mark>{isLoading?"Загрузка…":projectSaved?"Сохранено":"Можно начать"}</mark>
           </div>
           <div className="project-menu-workspace">
-            <article className={`project-menu-feature ${isLighting?"is-lighting":"is-interior"}`}>
+            <article className={`project-menu-feature ${isLighting?"is-lighting":isMaterials?"is-materials":"is-interior"}`}>
               <div className="project-menu-visual">
-                <img src={coverImage||"/project-loading-blueprint.png"} alt={coverImage?`Последняя визуализация проекта «${projectName}»`:"Эскиз будущего интерьера"}/>
-                <span>{isLighting?"Технический свет":isMaterials?"Песочница материалов":"Студия интерьера"}</span>
+                {isMaterials?<MaterialsConceptStageThumbnail projectId={projectId}/>:<><img src={coverImage||"/project-loading-blueprint.png"} alt={coverImage?`Последняя визуализация проекта «${projectName}»`:"Эскиз будущего интерьера"}/><span>{isLighting?"Технический свет":"Студия интерьера"}</span></>}
               </div>
               <div className="project-menu-feature-copy">
                 <div><span>{isInterior?"ЕДИНАЯ РАБОЧАЯ СРЕДА":isMaterials?"МАТЕРИАЛЬНАЯ КОНЦЕПЦИЯ":"СВЕТОВОЙ СЦЕНАРИЙ"}</span><h3>{isInterior?"Интерьер и план комнаты":isMaterials?"Песочница дизайнера":"План света и визуализация"}</h3><p>{isInterior?`${renderLabel} · ${furnitureCount} предметов в рабочем проекте`:isMaterials?"Материалы · мебель · moodboard · планограмма · концепция кухни":"План потолка · каталог светильников · проверка результата"}</p></div>
