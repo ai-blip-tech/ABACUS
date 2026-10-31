@@ -573,7 +573,7 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
             {slot.consent && slot.consent !== "none" && Boolean(uploads[slot.id]?.length) && <label className="editorial-consent"><input type="checkbox" checked={Boolean(consents[slot.id])} onChange={(event) => setConsents((current) => ({ ...current, [slot.id]: event.target.checked }))} /><span>{slot.consent === "people" ? "У меня есть согласие людей на использование фотографий" : slot.consent === "audio" ? "У меня есть право использовать этот аудиофрагмент" : "Владелец материала подтвердил участие"}</span></label>}
           </>}
         </section>)}
-        <button className="editorial-create-button" type="button" disabled={!ready} onClick={() => void runGeneration()}>{phase === "processing" ? "Создаём результат…" : scenario.actionLabel}<span>→</span></button>
+        <button className="editorial-create-button" type="button" disabled={phase === "processing"} onClick={() => void runGeneration()}>{phase === "processing" ? "Создаём результат…" : scenario.actionLabel}<span>→</span></button>
         {authChecked && !user && <p className="editorial-workbench-note">Для генерации и сохранения истории нужен вход. <Link href="/#кабинет">Войти →</Link></p>}
         {user && !generationConfigured && <p className="editorial-workbench-note">Генерация временно недоступна.</p>}
         {scenario.videoPreview && <p className="editorial-workbench-note">Сейчас создаётся ключевой кадр для проверки сценария. Финальный video pipeline ещё не подключён.</p>}

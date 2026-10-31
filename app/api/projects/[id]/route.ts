@@ -191,10 +191,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   let assets = new Set<string>();
   ensureMeasuredStore();
   const measuredAssets=await database.prepare('SELECT asset FROM measured_plan_assets WHERE project_id=?').bind(id).all<{asset:string}>();
+  await database.prepare('CREATE TABLE IF NOT EXISTS material_board_assets(project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,asset TEXT NOT NULL,PRIMARY KEY(project_id,asset))').run();
+  const materialAssets=await database.prepare('SELECT asset FROM material_board_assets WHERE project_id=?').bind(id).all<{asset:string}>();
   if (project.state_json) {
     try { assets = collectProjectAssets(JSON.parse(project.state_json)); } catch { /* the project row can still be deleted */ }
   }
   for(const item of measuredAssets.results)assets.add(item.asset);
+  for(const item of materialAssets.results)assets.add(item.asset);
   ensurePartitionStore();
   await database.batch([
     database.prepare('DELETE FROM partition_plans WHERE project_id=? AND tenant_id=? AND user_id=?').bind(id,user.tenantId,user.id),
