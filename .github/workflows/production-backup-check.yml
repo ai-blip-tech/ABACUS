@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "BACKUP_ROOM_DESIGN_PRODUCTION, INSTALL_ROOM_DESIGN_POPPLER, or PREFLIGHT_ROOM_DESIGN_MEASURED_PLAN"
+        description: "BACKUP_ROOM_DESIGN_PRODUCTION, PRUNE_10_OLDEST_ROOM_DESIGN_BACKUPS, INSTALL_ROOM_DESIGN_POPPLER, or PREFLIGHT_ROOM_DESIGN_MEASURED_PLAN"
         required: true
         type: string
 
@@ -27,6 +27,71 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prune-old-backups:
+    name: Delete exactly ten oldest verified production backups
+    if: ${{ inputs.confirmation == 'PRUNE_10_OLDEST_ROOM_DESIGN_BACKUPS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production-backup
+    steps:
+      - name: Validate destructive confirmation
+        run: test "${{ inputs.confirmation }}" = "PRUNE_10_OLDEST_ROOM_DESIGN_BACKUPS"
+      - name: Delete ten oldest verified backups over SSH
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
+        env:
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 8m
+          envs: EXPECTED_PRODUCTION_SHA
+          script: |
+            set -eu
+            umask 077
+            live_dir="$HOME/ABACUS"
+            backup_root="$HOME/room-design-backups"
+            cd "$live_dir"
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            python3 - "$backup_root" <<'PY'
+            from pathlib import Path
+            import shutil, sys
+
+            root = Path(sys.argv[1]).resolve()
+            if root.name != "room-design-backups" or root.parent != Path.home().resolve():
+                raise SystemExit(f"Unsafe backup root: {root}")
+
+            verified = []
+            for report in root.glob("predeploy-*/REPORT.txt"):
+                fields = dict(line.split("=", 1) for line in report.read_text().splitlines() if "=" in line)
+                directory = report.parent.resolve()
+                if fields.get("status") == "PASSED" and directory.parent == root and directory.name.startswith("predeploy-"):
+                    verified.append((directory.stat().st_mtime, directory))
+            verified.sort(key=lambda item: (item[0], item[1].name))
+            if len(verified) < 12:
+                raise SystemExit(f"Refusing to leave fewer than two verified backups: found {len(verified)}")
+
+            targets = [directory for _, directory in verified[:10]]
+            before = sum(path.stat().st_size for target in targets for path in target.rglob("*") if path.is_file())
+            print("PRUNE_TARGETS_START")
+            for target in targets:
+                print(target.name)
+            print("PRUNE_TARGETS_END")
+            for target in targets:
+                if target.parent != root or not target.name.startswith("predeploy-"):
+                    raise SystemExit(f"Unsafe deletion target: {target}")
+                shutil.rmtree(target)
+            remaining = sum(1 for report in root.glob("predeploy-*/REPORT.txt") if "status=PASSED" in report.read_text())
+            if remaining != len(verified) - 10:
+                raise SystemExit(f"Unexpected verified backup count after cleanup: {remaining}")
+            print(f"DELETED_VERIFIED_BACKUPS={len(targets)}")
+            print(f"REMAINING_VERIFIED_BACKUPS={remaining}")
+            print(f"FREED_BYTES={before}")
+            PY
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+
   measured-plan-preflight:
     name: Verify measured-plan candidate without replacing the live application
     if: ${{ inputs.confirmation == 'PREFLIGHT_ROOM_DESIGN_MEASURED_PLAN' }}
