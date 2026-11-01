@@ -81,14 +81,15 @@ test("all templates without approved video or custom cover share the blueprint p
   assert.equal(templateRegistry.find((template) => template.slug === "furniture-casting")?.preview.src, "/media/templates/furniture-casting-cover.png");
 });
 
-test("homepage mounts the live Ono hero and keeps one project call to action", () => {
+test("homepage uses the looping 3D video and retains functional project actions", () => {
   assert.doesNotMatch(templatesHomeSource, /room-design-hero\.mp4|room-design-hero-poster\.png|ScrollScrubHero/);
-  assert.match(templatesHomeSource, /id="home-ono-slot"/);
-  assert.match(templatesHomeSource, /«ОНО» — ваш ИИ-ассистент/);
-  assert.match(templatesHomeSource, /С чего начнём\?/);
+  assert.doesNotMatch(templatesHomeSource, /id="home-ono-slot"/);
+  assert.match(templatesHomeSource, /autoPlay loop muted playsInline/);
+  assert.match(templatesHomeSource, /Создай 3D модель/);
   assert.match(templatesHomeSource, /ПРОЕКТНАЯ СРЕДА/);
   assert.match(templatesHomeSource, /Не отдельный рендер/);
-  assert.equal((templatesHomeSource.match(/>Начать проект /g) || []).length, 1);
+  assert.match(templatesHomeSource, /className="home-nav-start" onClick=\{onStartProject\}/);
+  assert.match(templatesHomeSource, /className="home-primary-cta" onClick=\{onStartProject\}/);
   assert.doesNotMatch(templatesHomeSource, /Смотреть шаблоны/);
   assert.doesNotMatch(templatesHomeSource, /Начать создавать|ROOM DESIGN \/ 2026|EDITORIAL AI INTERIORS/);
   assert.match(templatesHomeSource, /<i aria-hidden="true" \/> ШАБЛОНЫ/);
@@ -100,7 +101,7 @@ test("homepage mounts the live Ono hero and keeps one project call to action", (
 test("preview hides framework chrome and branded calls to action have visible feedback", () => {
   assert.match(nextConfigSource, /devIndicators:\s*false/);
   assert.match(templatesHomeCssSource, /templates-nav-actions>button:last-child:hover/);
-  assert.match(templatesHomeCssSource, /templates-nav-actions>button:first-child:not\(:last-child\):hover/);
+  assert.match(templatesHomeCssSource, /templates-nav-actions>button\.home-login:hover/);
   assert.match(templatesHomeCssSource, /home-hero-overlay \.templates-hero-actions>button:hover/);
   assert.match(templatesHomeCssSource, /transform:translateY\(-3px\)/);
   assert.match(templatesHomeCssSource, /prefers-reduced-motion:reduce/);

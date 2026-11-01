@@ -2,12 +2,12 @@ import { expect, test } from "@playwright/test";
 
 const assistantRoutes = ["/templates", "/templates/design-battle", "/account", "/admin"];
 
-test("Ono 2.0 uses one hero instance on the landing and one floating instance on application pages", async ({ page }) => {
+test("Ono stays off the video landing and remains floating on application pages", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".it-orb")).toHaveCount(0);
-  await expect(page.locator(".it-hero-orb")).toHaveCount(1);
-  await expect(page.locator(".ono-orb-canvas")).toHaveCount(1);
-  await expect(page.locator(".home-hero-video")).toHaveCount(0);
+  await expect(page.locator(".it-hero-orb")).toHaveCount(0);
+  await expect(page.locator(".ono-orb-canvas")).toHaveCount(0);
+  await expect(page.locator(".home-model3d-video")).toBeVisible();
 
   for (const route of assistantRoutes) {
     await page.goto(route);
@@ -17,38 +17,42 @@ test("Ono 2.0 uses one hero instance on the landing and one floating instance on
   }
 });
 
-test("homepage suggestion fills the shared composer without sending a request", async ({ page }) => {
+test("3D preview actions stay inert and the first navigation action opens project entry", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Как создать интерьер по фотографии?" }).click();
-  await expect(page.getByLabel("Сообщение для ОНО")).toHaveValue("Как создать интерьер по фотографии?");
-  await expect(page.locator(".it-message")).toHaveCount(0);
+  await page.locator(".home-model3d-cta").click();
+  await page.locator(".home-model3d-nav").click();
+  await expect(page).toHaveURL("/");
+  await expect(page.getByRole("heading", {name:"Создайте аккаунт"})).toHaveCount(0);
+  await expect(page.locator(".templates-nav nav > :first-child")).toHaveText("Начать проект");
+  await page.locator(".home-nav-start").click();
+  await expect(page.getByRole("heading", {name:"Создайте аккаунт"})).toBeVisible();
 });
 
 test("homepage signup action uses the same pill shape as the project action", async ({ page }) => {
   await page.goto("/");
   const signup = page.getByRole("button", { name: "Зарегистрироваться" });
-  const project = page.getByRole("button", { name: "Начать проект →" });
+  const project = page.locator(".home-project-action>button");
   await expect(signup).toBeVisible();
   await expect(project).toBeVisible();
   expect(await signup.evaluate((element) => getComputedStyle(element).borderRadius)).toBe("999px");
   expect(await project.evaluate((element) => getComputedStyle(element).borderRadius)).toBe("999px");
 });
 
-test("homepage shows a clear rest state when Ono is unavailable", async ({ page }) => {
+test("floating Ono shows a clear rest state when unavailable", async ({ page }) => {
   await page.route("**/api/it", async (route) => {
     if (route.request().method() !== "POST") return route.continue();
     await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Модель временно недоступна." }) });
   });
-  await page.goto("/");
-  await page.getByLabel("Сообщение для ОНО").fill("Тестовый вопрос");
+  await page.goto("/templates");
+  await page.getByRole("button", {name:/Открыть Оно/}).click();
+  await page.getByLabel("Сообщение для Оно").fill("Тестовый вопрос");
   await page.getByRole("button", { name: "Отправить" }).click();
-  const response = page.getByRole("region", { name: "Разговор с ОНО" });
+  const response = page.getByRole("region", { name: "Разговор с Оно" });
   await expect(response.getByText("ОНО отдыхает")).toBeVisible();
-  const statusDot = response.locator("header i");
-  expect(await statusDot.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(182, 64, 53)");
+  await expect(page.locator(".it-layer")).toHaveAttribute("data-state", "error");
 });
 
-test("homepage retries one interrupted Ono request without duplicating the message", async ({ page }) => {
+test("floating Ono retries one interrupted Ono request without duplicating the message", async ({ page }) => {
   let postAttempts = 0;
   await page.route("**/api/it", async (route) => {
     if (route.request().method() === "GET") {
@@ -64,8 +68,9 @@ test("homepage retries one interrupted Ono request without duplicating the messa
       body: `${JSON.stringify({ type: "result", turn, sessionId: "11111111-1111-4111-8111-111111111111", requestId: "22222222-2222-4222-8222-222222222222", timing: { firstEventMs: 1, totalMs: 2 } })}\n`,
     });
   });
-  await page.goto("/");
-  await page.getByLabel("Сообщение для ОНО").fill("Найди похожее кресло");
+  await page.goto("/templates");
+  await page.getByRole("button", {name:/Открыть Оно/}).click();
+  await page.getByLabel("Сообщение для Оно").fill("Найди похожее кресло");
   await page.getByRole("button", { name: "Отправить" }).click();
   await expect(page.getByText("Соединение восстановлено.")).toBeVisible();
   await expect(page.locator(".it-message-user")).toHaveCount(1);
@@ -76,7 +81,7 @@ test("homepage retries one interrupted Ono request without duplicating the messa
 test("homepage keeps one compact project action and no audience switch on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Начать проект →" })).toHaveCount(1);
+  await expect(page.locator(".home-project-action>button")).toBeVisible();
   await expect(page.locator(".home-project-copy")).toBeHidden();
   await expect(page.locator(".home-audience-switch")).toHaveCount(0);
   await expect(page.locator(".templates-nav nav")).toBeHidden();
@@ -93,8 +98,9 @@ test("homepage hero stays inside the viewport at the five acceptance sizes", asy
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await expect(page.locator(".it-hero-orb")).toBeVisible();
-    await expect(page.locator(".ono-orb-canvas")).toHaveCount(1);
+    await expect(page.locator(".home-model3d-video")).toBeVisible();
+    await expect(page.locator(".home-model3d-video")).toHaveAttribute("loop", "");
+    await expect(page.locator(".ono-orb-canvas")).toHaveCount(0);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   }
@@ -109,7 +115,7 @@ test("homepage uses the approved neutral background and responsive project divid
     if (!(project instanceof HTMLElement) || !(divider instanceof HTMLElement)) throw new Error("Project environment is missing");
     return {
       body: getComputedStyle(document.body).backgroundColor,
-      hero: getComputedStyle(document.querySelector(".home-ono-hero")!).backgroundColor,
+      hero: getComputedStyle(document.querySelector(".home-model3d-hero")!).backgroundColor,
       project: getComputedStyle(project).backgroundColor,
       templates: getComputedStyle(document.querySelector(".home-template-entry")!).backgroundColor,
       topHeight: getComputedStyle(project, "::before").height,
@@ -123,7 +129,7 @@ test("homepage uses the approved neutral background and responsive project divid
   });
   expect(desktopStyles).toEqual({
     body: "rgb(252, 252, 251)",
-    hero: "rgb(252, 252, 251)",
+    hero: "rgb(39, 39, 35)",
     project: "rgb(252, 252, 251)",
     templates: "rgb(252, 252, 251)",
     topHeight: "1px",

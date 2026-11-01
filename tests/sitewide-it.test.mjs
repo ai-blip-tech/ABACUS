@@ -11,12 +11,13 @@ const templatesHomeCss = await readFile(new URL("../app/templates-home-v2.css", 
 const agent = await readFile(new URL("../lib/it/agent.ts", import.meta.url), "utf8");
 const knowledge = await readFile(new URL("../lib/it/product-knowledge.ts", import.meta.url), "utf8");
 
-test("Ono is mounted once at the app layout and uses the hero placement on the public landing", () => {
+test("Ono is mounted once at app layout, hidden on the landing and floating on other pages", () => {
   assert.match(layout, /<SitewideIt\/>/);
   assert.doesNotMatch(home, /<ItOrb\b/);
   assert.match(sitewide, /context\.page === "landing"/);
-  assert.match(sitewide, /createPortal\(ono, heroTarget\)/);
-  assert.match(sitewide, /placement=\{context\.page === "landing" \? "hero" : "floating"\}/);
+  assert.match(sitewide, /return context\.page === "landing" \? null : ono/);
+  assert.doesNotMatch(sitewide, /createPortal/);
+  assert.match(sitewide, /placement="floating"/);
   assert.match(sitewide, /Как создать интерьер по фотографии/);
   assert.match(sitewide, /roomdesign:it-context/);
   assert.match(sitewide, /headerTitle="«ОНО» - Ваш ИИ-ассистент"/);
@@ -29,7 +30,8 @@ test("homepage suggestions fill the shared composer without submitting", () => {
   assert.match(itOrb, /setValue\(suggestion\)/);
   assert.doesNotMatch(itOrb, /setValue\(suggestion\);\s*void ask\(suggestion\)/);
   assert.match(itOrb, /Спросите «ОНО», загрузите пространство или опишите задачу/);
-  assert.match(templatesHome, /id="home-ono-slot"/);
+  assert.doesNotMatch(templatesHome, /id="home-ono-slot"/);
+  assert.match(templatesHome, /<Model3DHomepageHero \/>/);
   assert.match(templatesHomeCss, /\.it-hero-orb/);
   assert.match(templatesHomeCss, /@media\(max-width:760px\).*\.home-project-copy,\.home-project-action>p\{display:none\}/s);
 });

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { createPortal } from "react-dom";
 
 import ItOrb from "./it-orb";
 import { categoryLabels, getTemplateBySlug, resultLabels, templateAvailabilityLabel } from "@/lib/templates/registry";
@@ -117,7 +116,6 @@ const suggestionsFor = (context: RoomDesignContext) => {
 function RouteAwareIt({ pathname }: { pathname: string }) {
   const routeContext = useMemo(() => contextForPath(pathname), [pathname]);
   const [context, setContext] = useState(routeContext);
-  const [heroTarget, setHeroTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const updateContext = (event: Event) => {
@@ -128,12 +126,6 @@ function RouteAwareIt({ pathname }: { pathname: string }) {
     return () => window.removeEventListener("roomdesign:it-context", updateContext);
   }, []);
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setHeroTarget(context.page === "landing" ? document.getElementById("home-ono-slot") : null);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [context.page]);
 
   const suggestions = suggestionsFor(context);
   const closedLabel = context.page === "template" ? "Подскажу по шаблону" : context.page === "templates" ? "Помогу выбрать шаблон" : "Оно";
@@ -165,10 +157,10 @@ function RouteAwareIt({ pathname }: { pathname: string }) {
     suggestions={suggestions}
     closedLabel={closedLabel}
     headerTitle="«ОНО» - Ваш ИИ-ассистент"
-    placement={context.page === "landing" ? "hero" : "floating"}
+    placement="floating"
     onWidgetEvent={(event) => window.dispatchEvent(new CustomEvent("roomdesign:ono-analytics", { detail: event }))}
   />;
-  return context.page === "landing" ? (heroTarget ? createPortal(ono, heroTarget) : null) : ono;
+  return context.page === "landing" ? null : ono;
 }
 
 export default function SitewideIt() {

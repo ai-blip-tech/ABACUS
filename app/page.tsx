@@ -863,7 +863,7 @@ export default function Home() {
     return () => window.removeEventListener("roomdesign:it-action", handleSitewideItAction);
   });
   if (view === "home") return <>
-    <TemplatesHome accountControl={user ? <AccountDropdown user={user}/> : <><button type="button" onClick={() => openAuth("login")}>Войти</button><button type="button" onClick={() => openAuth("register")}>Зарегистрироваться</button></>} onStartProject={continueToProject}/>
+    <TemplatesHome accountControl={user ? <AccountDropdown user={user}/> : <><button className="home-login" type="button" onClick={() => openAuth("login")}>Войти</button><button type="button" onClick={() => openAuth("register")}>Зарегистрироваться</button></>} onStartProject={continueToProject}/>
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
   </>;
   if (view === "account") return <>
