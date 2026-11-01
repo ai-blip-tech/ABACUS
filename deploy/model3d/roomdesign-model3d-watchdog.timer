@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Room Design GPU deadlines independently of the coordinator
+
+[Timer]
+OnBootSec=20
+OnUnitActiveSec=30
+AccuracySec=1
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+# Add within the existing HTTPS server block; do not replace the current site config.
+# Worker traffic alone bypasses Next.js. Authorization is checked by the coordinator.
+location ^~ /api/models3d/worker/ {
+    client_max_body_size 50m;
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+    proxy_pass http://127.0.0.1:4199/worker/jobs/;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header Host $host;
+}
+# Regular /api/models3d/jobs and /assets remain behind authenticated Next.js routes.

@@ -1,0 +1,57 @@
+// Copy into the Pascal application, which owns the @pascal-app/* dependencies.
+import {Box3,Group,Vector3} from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+import {saveAsset,loadAssetUrl,useScene} from '@pascal-app/core';
+import {submitModel3D,waitForModel3D,type Model3DSettings,type Model3DJob} from './model3d-client';
+
+const defaultBase='/room-api/models3d'; // Production Pascal uses '/api/models3d'.
+const digest=async(value:unknown)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value))))).map(b=>b.toString(16).padStart(2,'0')).join('');
+const sourceIdentity=(node:any)=>({reference:node.metadata?.roomDesignReference,assetId:node.asset.id,scale:node.scale});
+export async function installLibraryModel(id:string,assetId:string,apiBase=defaultBase){
+ const response=await fetch(`${apiBase}/assets/${encodeURIComponent(assetId)}`,{credentials:'same-origin',cache:'no-store'});
+ const data=await response.json();if(!response.ok)throw Error(data.error||'Модель недоступна.');
+ const asset=data.asset;if(!asset.ready)throw Error('Модель ещё не готова.');
+ const file=await fetch(`${apiBase}/assets/${encodeURIComponent(assetId)}/file`,{credentials:'same-origin',cache:'no-store'});
+ if(!file.ok)throw Error('Не удалось получить GLB.');
+ const bytes=await file.arrayBuffer();
+ const gltf=await new GLTFLoader().parseAsync(bytes,location.origin+'/');
+ const model=gltf.scene;model.updateMatrixWorld(true);
+ const bounds=new Box3().setFromObject(model),size=bounds.getSize(new Vector3()),center=bounds.getCenter(new Vector3());
+ if([size.x,size.y,size.z].some(v=>!Number.isFinite(v)||v<=0))throw Error('Некорректные габариты 3D-модели.');
+ const normalized=new Group();normalized.add(model);normalized.scale.set(1/size.x,1/size.y,1/size.z);normalized.position.set(-center.x/size.x,-bounds.min.y/size.y,-center.z/size.z);
+ const buffer=await new GLTFExporter().parseAsync(normalized,{binary:true}) as ArrayBuffer;
+ const assetRef=await saveAsset(new File([buffer],`roomdesign-${asset.id}.glb`,{type:'model/gltf-binary'}));
+ const src=await loadAssetUrl(assetRef),node=useScene.getState().nodes[id] as any;
+ if(!node||node.type!=='item')throw Error('Предмет удалён. Модель остаётся в библиотеке.');
+ useScene.getState().updateNode(id,{name:asset.name,scale:[asset.settings.widthMm/1000,asset.settings.heightMm/1000,asset.settings.depthMm/1000],asset:{...node.asset,id:'roomdesign-library-'+asset.id,name:asset.name,src,dimensions:[1,1,1],scale:[1,1,1],offset:[0,0,0],rotation:[0,0,0]},metadata:{...node.metadata,roomDesignModelAsset:assetRef,roomDesignLibraryAssetId:asset.id,roomDesignModelSha256:asset.sha256,roomDesign3DJob:undefined,representation:'trellis2-image-to-3d',heightStatus:'user-confirmed'}} as any);
+ return asset;
+}
+export async function generateItemModel(id:string,settings:Model3DSettings,options:{apiBase?:string;onProgress?:(job:Model3DJob)=>void}={}){
+ const node=useScene.getState().nodes[id] as any;if(!node||node.type!=='item')throw Error('Предмет не найден.');
+ const ref=node.metadata?.roomDesignReference;
+ if(!ref?.image)throw Error('Сначала загрузите референс или выберите товар из каталога.');
+ const apiBase=options.apiBase||defaultBase;
+ const input={...settings,name:ref.name||node.name,...(ref.product?.id?{catalogProductId:ref.product.id}:{imageDataUrl:ref.image})};
+ const hash=await digest(input),sourceHash=await digest(sourceIdentity(node));
+ const key='roomdesign-model3d-intent:'+id;let intent:any;
+ try{intent=JSON.parse(localStorage.getItem(key)||'null');}catch{/* Create a new intent only if no matching request was saved. */}
+ if(!intent||intent.hash!==hash){intent={hash,requestId:crypto.randomUUID()};localStorage.setItem(key,JSON.stringify(intent));}
+ const result=await submitModel3D(input,{requestId:intent.requestId,apiBase});
+ const current=useScene.getState().nodes[id] as any;
+ if(current)useScene.getState().updateNode(id,{metadata:{...current.metadata,roomDesign3DJob:{id:result.job.id,assetId:result.job.assetId,sourceHash,status:result.job.status}}} as any);
+ try{return await resumeItemModel(id,result.job.id,{apiBase,onProgress:options.onProgress});}
+ catch(error:any){if(error.jobStatus==='failed')localStorage.removeItem(key);throw error;}
+}
+export async function resumeItemModel(id:string,jobId:string,options:{apiBase?:string;onProgress?:(job:Model3DJob)=>void}={}){
+ const apiBase=options.apiBase||defaultBase;
+ const job=await waitForModel3D(jobId,{apiBase,onProgress:progress=>{
+  const current=useScene.getState().nodes[id] as any;
+  if(current?.metadata?.roomDesign3DJob?.id===jobId)useScene.getState().updateNode(id,{metadata:{...current.metadata,roomDesign3DJob:{...current.metadata.roomDesign3DJob,status:progress.status}}} as any);
+  if(progress.status==='failed')localStorage.removeItem('roomdesign-model3d-intent:'+id);
+  options.onProgress?.(progress);
+ }});
+ const node=useScene.getState().nodes[id] as any;
+ if(!node||node.metadata?.roomDesign3DJob?.id!==jobId||node.metadata.roomDesign3DJob.sourceHash!==await digest(sourceIdentity(node)))throw Error('Модель готова в библиотеке. Предмет изменён — автоматическая замена отменена.');
+ return installLibraryModel(id,job.assetId,apiBase);
+}

@@ -1,0 +1,24 @@
+[Unit]
+Description=Room Design durable 3D library and RunPod coordinator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=roomdesign-model3d
+Group=roomdesign-model3d
+EnvironmentFile=/etc/roomdesign-model3d.env
+WorkingDirectory=/opt/roomdesign-model3d
+ExecStart=/usr/bin/node /opt/roomdesign-model3d/server.mjs
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/room-design/model-library
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

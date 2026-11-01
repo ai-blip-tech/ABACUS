@@ -1,0 +1,45 @@
+name: Build Room Design 3D runtime
+on:
+  push:
+    branches: [codex/runpod-model-service]
+    paths: ['services/model3d/**', 'deploy/model3d/Dockerfile.runtime', '.github/workflows/model3d-image.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: model3d-runtime-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disposable runner SDK space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        id: image
+        with:
+          context: .
+          file: deploy/model3d/Dockerfile.runtime
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/ai-blip-tech/roomdesign-trellis-runtime:${{ github.sha }}
+          provenance: false
+      - name: Record immutable image
+        run: |
+          echo 'ghcr.io/ai-blip-tech/roomdesign-trellis-runtime@${{ steps.image.outputs.digest }}' > model3d-image.txt
+          cat model3d-image.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model3d-image-digest
+          path: model3d-image.txt

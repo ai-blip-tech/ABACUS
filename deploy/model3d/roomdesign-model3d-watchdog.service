@@ -1,0 +1,17 @@
+[Unit]
+Description=Stop expired or orphaned Room Design GPU jobs
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=roomdesign-model3d
+Group=roomdesign-model3d
+EnvironmentFile=/etc/roomdesign-model3d.env
+WorkingDirectory=/opt/roomdesign-model3d
+ExecStart=/usr/bin/node /opt/roomdesign-model3d/safety-stop.mjs
+TimeoutStartSec=90
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/room-design/model-library
