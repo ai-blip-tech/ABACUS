@@ -6,7 +6,8 @@ ENV TRELLIS_COMMIT=$TRELLIS_COMMIT HF_HOME=/opt/hf TORCH_CUDA_ARCH_LIST=12.0 MAX
 RUN apt-get update -qq && apt-get install -y --no-install-recommends git build-essential libeigen3-dev libgl1 libglib2.0-0 ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN git clone --recursive https://github.com/microsoft/TRELLIS.2.git /opt/TRELLIS.2 && cd /opt/TRELLIS.2 && git checkout "$TRELLIS_COMMIT" && git submodule update --init --recursive
 WORKDIR /opt/TRELLIS.2
-RUN bash setup.sh --basic --cumesh --o-voxel --flexgemm --nvdiffrast --nvdiffrec && python -m pip install transformers==4.57.1 einops==0.8.2 && python -m pip install --no-deps xformers==0.0.32.post2
+COPY deploy/model3d/build-cuda.sh /tmp/build-cuda.sh
+RUN bash /tmp/build-cuda.sh
 COPY services/model3d/ /opt/model3d/
 RUN --mount=type=secret,id=hf_token,required=true python /opt/model3d/prepare_weights.py && python -m pip freeze > /opt/model3d/requirements-frozen.txt
 ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH=/opt/TRELLIS.2:/opt/model3d
