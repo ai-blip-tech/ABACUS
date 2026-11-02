@@ -190,6 +190,7 @@ export const proposalOverrideFor = (product: ProposalProduct): ProposalOverride 
 });
 
 export function paginateProposalSpecification<T>(items: T[], detailCapacity = 9, finalCapacity = 5): T[][] {
+  if (!items.length) return [];
   if (items.length <= finalCapacity) return [items];
   const pages: T[][] = [];
   let offset = 0;

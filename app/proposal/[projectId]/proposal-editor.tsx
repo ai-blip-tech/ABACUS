@@ -99,7 +99,7 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         setProject(payload); setUser(profile); setProducts(mapped);
         setDocument(mergeProposalDocument(payload.state?.proposalDocument, defaults));
         setShowPrices(payload.state?.proposalShowPrices !== false);
-        setStatus(mapped.length ? "Все изменения сохраняются автоматически" : "В проекте нет товаров с референсами");
+        setStatus(mapped.length ? "Все изменения сохраняются автоматически" : "Можно скачать визуализацию в PDF или PowerPoint без товаров");
         loaded.current = true;
       } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : "Не удалось открыть редактор."); }
     })();
@@ -174,8 +174,8 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
       <div><small>РЕДАКТОР КОММЕРЧЕСКОГО ПРЕДЛОЖЕНИЯ</small><b>{document.projectName || "Проект"}</b></div>
       <div className="proposal-editor-actions">
         <label><input type="checkbox" checked={showPrices} onChange={(event) => setPriceVisibility(event.target.checked)}/> Показывать цены</label>
-        <button type="button" onClick={() => void download("pdf")} disabled={Boolean(downloading) || !products.length}>{downloading === "pdf" ? "Готовим PDF…" : "Скачать PDF"}</button>
-        <button type="button" onClick={() => void download("pptx")} disabled={Boolean(downloading) || !products.length}>{downloading === "pptx" ? "Готовим PPT…" : "Скачать PPT"}</button>
+        <button type="button" onClick={() => void download("pdf")} disabled={Boolean(downloading) || !visual} title={!visual ? "Сначала добавьте визуализацию в проект" : undefined}>{downloading === "pdf" ? "Готовим PDF…" : "Скачать PDF"}</button>
+        <button type="button" onClick={() => void download("pptx")} disabled={Boolean(downloading) || !visual} title={!visual ? "Сначала добавьте визуализацию в проект" : undefined}>{downloading === "pptx" ? "Готовим PPT…" : "Скачать PPT"}</button>
       </div>
     </header>
     <section className="proposal-editor-toolbar"><Link href="/">← Вернуться в проект</Link><span>{status}</span>{error && <strong role="alert">{error}</strong>}</section>

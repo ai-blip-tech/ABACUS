@@ -86,7 +86,6 @@ export async function POST(request: Request) {
     const body = await request.json() as ProposalBody;
     const products = Array.isArray(body.products) ? body.products.slice(0, 40) : [];
     if (!body.coverImage) return Response.json({ error: "Нет изображения визуализации." }, { status: 400 });
-    if (!products.length) return Response.json({ error: "В проекте нет товаров для коммерческого предложения." }, { status: 400 });
     if (!body.projectId || !/^[a-zA-Z0-9-]{12,100}$/.test(body.projectId)) return Response.json({ error: "Некорректный проект." }, { status: 400 });
     const project = await database.prepare("SELECT state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?")
       .bind(body.projectId, user.tenantId, user.id).first<{ state_json: string | null }>();

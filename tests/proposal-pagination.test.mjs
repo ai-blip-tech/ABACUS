@@ -13,3 +13,7 @@ test("long specifications reserve a non-overlapping final page", () => {
   assert.ok(pages.slice(0, -1).every((page) => page.length <= 9));
   assert.ok(pages.at(-1).length <= 5);
 });
+
+test("visualization-only proposals do not include an empty specification", () => {
+  assert.deepEqual(paginateProposalSpecification([]), []);
+});
