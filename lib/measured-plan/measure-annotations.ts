@@ -1,10 +1,11 @@
 import type {MeasureDoc,Point} from './measure-model.ts';
 import {heightLabelPosition} from './measure-heights.ts';
 import {clearDimensions} from './measure-model.ts';
+import {offsetDimension} from './measure-ruler.ts';
 
 /** The editor and printed sheet must use this same list, never per-wall print-only lengths. */
 export function planDrawingDimensions(doc:MeasureDoc){
- return [...clearDimensions(doc).map((d,i)=>({...d,id:'room-'+i,kind:'room' as const,value:Math.hypot(d.b[0]-d.a[0],d.b[1]-d.a[1])})),...(doc.dimensions||[]).map(d=>({...d,kind:'additional' as const,value:Math.hypot(d.b[0]-d.a[0],d.b[1]-d.a[1])}))];
+ return [...clearDimensions(doc).map((d,i)=>({...d,id:'room-'+i,kind:'room' as const,value:Math.hypot(d.b[0]-d.a[0],d.b[1]-d.a[1])})),...(doc.dimensions||[]).map(d=>({...d,...offsetDimension(d.a,d.b,d.offset),kind:'additional' as const,value:Math.hypot(d.b[0]-d.a[0],d.b[1]-d.a[1])}))];
 }
 
 /** Thickness is an actual measured dimension, not proof of structural function. */
