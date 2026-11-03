@@ -1,6 +1,7 @@
 'use client';
 import React,{useRef,useState} from 'react';
 import type {PlanDimension,Point,Wall} from '@/lib/measured-plan/measure-model';
+import {DimensionLabel} from './measure-dimension-label';
 import {offsetDimension,rulerEnd,rulerLength} from '@/lib/measured-plan/measure-ruler';
 export function DimensionMark({a,b,font,color='#842b39',offset=0,ruler=false,unit='мм'}:{a:Point;b:Point;font:number;color?:string;offset?:number;ruler?:boolean;unit?:string}){
  const size=rulerLength(a,b)||1,ux=(b[0]-a[0])/size,uy=(b[1]-a[1])/size,nx=-uy,ny=ux,da:Point=[a[0]+nx*offset,a[1]+ny*offset],db:Point=[b[0]+nx*offset,b[1]+ny*offset],angle=Math.atan2(uy,ux)*180/Math.PI,readable=angle>90||angle<-90?angle+180:angle,mid:Point=[(da[0]+db[0])/2,(da[1]+db[1])/2];
@@ -8,7 +9,7 @@ export function DimensionMark({a,b,font,color='#842b39',offset=0,ruler=false,uni
   {Math.abs(offset)>1&&[a,b].map((point,i)=><line key={'extension-'+i} x1={point[0]} y1={point[1]} x2={point[0]+nx*(offset+Math.sign(offset)*font*.4)} y2={point[1]+ny*(offset+Math.sign(offset)*font*.4)} stroke={color} strokeWidth="1" vectorEffect="non-scaling-stroke"/>)}
   <line x1={da[0]} y1={da[1]} x2={db[0]} y2={db[1]} stroke={color} strokeWidth={ruler?2.8:1.5} strokeDasharray={ruler?'8 5':undefined} vectorEffect="non-scaling-stroke"/>
   {[da,db].map((p,i)=><line key={i} data-dimension-tick x1={p[0]-nx*font*.55-ux*font*.2} y1={p[1]-ny*font*.55-uy*font*.2} x2={p[0]+nx*font*.55+ux*font*.2} y2={p[1]+ny*font*.55+uy*font*.2} stroke={color} strokeWidth={ruler?2.6:1.8} vectorEffect="non-scaling-stroke"/>)}
-  <g transform={`translate(${mid[0]} ${mid[1]}) rotate(${readable})`}><text y={-font*.4} textAnchor="middle" fontSize={font*.9} fontFamily="Arial, Helvetica, sans-serif" fontWeight="600" fill={color} stroke="#fffdf9" strokeWidth={font*.32} paintOrder="stroke">{Math.round(size).toLocaleString('ru-RU')} {unit}</text></g>
+  <DimensionLabel a={da} b={db} font={font} color={color}>{Math.round(size).toLocaleString('ru-RU')} {unit}</DimensionLabel>
  </g>;
 }
 export function SavedDimensions({items,selected,onSelect,onEdit,font,pointOf,walls}:{items:PlanDimension[];selected:string;onSelect:(id:string)=>void;onEdit:(id:string,b:Point)=>void;font:number;pointOf:(e:React.PointerEvent)=>Point;walls:Wall[]}){

@@ -1,4 +1,5 @@
 import React from 'react';
+import {DimensionLabel} from './measure-dimension-label';
 import type {Wall} from '@/lib/measured-plan/measure-model';
 import type {clearWallDimension} from '@/lib/measured-plan/measure-clear-wall';
 export function ClearWallMark({wall,m,font}:{wall:Wall;m:NonNullable<ReturnType<typeof clearWallDimension>>;font:number}){
@@ -9,6 +10,6 @@ export function ClearWallMark({wall,m,font}:{wall:Wall;m:NonNullable<ReturnType<
   <path d={`M ${m.a[0]} ${m.a[1]} L ${ax+nx*font} ${ay+ny*font} M ${m.b[0]} ${m.b[1]} L ${bx+nx*font} ${by+ny*font}`} fill="none" stroke="#000000" strokeWidth={font*.1} strokeDasharray={font*.3+' '+font*.3}/>
   <line x1={ax} y1={ay} x2={bx} y2={by} stroke="#000000" strokeWidth={font*.12}/>
   {[[m.a[0],m.a[1],ax,ay],[m.b[0],m.b[1],bx,by]].map(([x,y,tx,ty],i)=><g key={i} pointerEvents="none"><line x1={x-nx*font*.65} y1={y-ny*font*.65} x2={x+nx*font*.65} y2={y+ny*font*.65} stroke="#000000" strokeWidth="1" vectorEffect="non-scaling-stroke"/><line x1={tx-nx*font*.65} y1={ty-ny*font*.65} x2={tx+nx*font*.65} y2={ty+ny*font*.65} stroke="#000000" strokeWidth={font*.18}/></g>)}
-  <text x={cx} y={cy-font*.6} textAnchor="middle" fontSize={font*1.1} fill="#000000" stroke="#fffdf7" strokeWidth={font*.5} paintOrder="stroke" transform={`rotate(${Math.abs(wall.b[1]-wall.a[1])>Math.abs(wall.b[0]-wall.a[0])?-90:0} ${cx} ${cy})`}>{fmt(m.length)} мм</text>
+  <DimensionLabel a={[ax,ay]} b={[bx,by]} font={font}>{fmt(m.length)} мм</DimensionLabel>
  </g>;
 }
