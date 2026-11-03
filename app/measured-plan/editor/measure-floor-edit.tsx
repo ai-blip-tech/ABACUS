@@ -1,17 +1,19 @@
 'use client';
-import {useEffect,useRef,useState,type PointerEvent} from 'react';
-import type {Point,Wall} from '@/lib/measured-plan/measure-model';
-import {editFloorPolygon,type FloorRegion} from '@/lib/measured-plan/measure-floor-finishes';
-import {snapMeasurePoint} from '@/lib/measured-plan/measure-ruler';
+import {useEffect,useMemo,useRef,useState,type PointerEvent} from 'react';
+import type {Point,MeasureDoc} from '@/lib/measured-plan/measure-model';
+import {type FloorRegion} from '@/lib/measured-plan/measure-floor-finishes';
+import {constrainFloorEdit,constrainFloorPoint} from '@/lib/measured-plan/measure-floor-constraints';
+import {usablePlanArea} from '@/lib/planning-plan/usable-area';
 
 type Drag={pointer:number;start:Point;polygon:Point[];kind:'move'|'edge'|'vertex';index:number};
-export function MeasureFloorEdit({region,walls,unit,pointOf,onChange,onBegin,onEnd,onCancel}:{region:FloorRegion;walls:Wall[];unit:number;pointOf:(event:PointerEvent)=>Point;onChange:(polygon:Point[])=>void;onBegin:()=>void;onEnd:()=>void;onCancel:()=>void}){
+export function MeasureFloorEdit({region,doc,unit,pointOf,onChange,onBegin,onEnd,onCancel}:{region:FloorRegion;doc:MeasureDoc;unit:number;pointOf:(event:PointerEvent)=>Point;onChange:(polygon:Point[])=>void;onBegin:()=>void;onEnd:()=>void;onCancel:()=>void}){
+ const surface=useMemo(()=>usablePlanArea(doc).polygons,[doc.walls,doc.openings,doc.columns,doc.floor]);
  const drag=useRef<Drag|null>(null),[invalid,setInvalid]=useState(false);
  useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&drag.current){event.preventDefault();event.stopImmediatePropagation();drag.current=null;setInvalid(false);onCancel();}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[onCancel]);
- function start(event:PointerEvent<SVGElement>,kind:Drag['kind'],index=0){if(event.button!==0)return;event.preventDefault();event.stopPropagation();event.currentTarget.setPointerCapture(event.pointerId);drag.current={pointer:event.pointerId,start:pointOf(event),polygon:structuredClone(region.polygon),kind,index};onBegin();}
+ function start(event:PointerEvent<SVGElement>,kind:Drag['kind'],index=0){if(event.button!==0)return;event.preventDefault();event.stopPropagation();event.currentTarget.setPointerCapture(event.pointerId);drag.current={pointer:event.pointerId,start:pointOf(event),polygon:region.polygon.map(p=>constrainFloorPoint(p,surface)),kind,index};onBegin();}
  function move(event:PointerEvent<SVGGElement>){const d=drag.current;if(!d||d.pointer!==event.pointerId)return;event.stopPropagation();const p=pointOf(event),delta:Point=[p[0]-d.start[0],p[1]-d.start[1]];let shift=delta;
-  if(!event.altKey&&d.kind!=='move'){const a=d.polygon[d.index],b=d.polygon[(d.index+1)%d.polygon.length],anchor:Point=d.kind==='vertex'?a:[(a[0]+b[0])/2,(a[1]+b[1])/2],candidate:Point=[anchor[0]+delta[0],anchor[1]+delta[1]],snap=snapMeasurePoint(candidate,walls,unit*.85);if(snap.label)shift=[snap.point[0]-anchor[0],snap.point[1]-anchor[1]];}
-  try{onChange(editFloorPolygon(d.polygon,d.kind,d.index,shift));setInvalid(false);}catch{setInvalid(true);}
+  if(!event.altKey&&d.kind!=='move'){const a=d.polygon[d.index],b=d.polygon[(d.index+1)%d.polygon.length],anchor:Point=d.kind==='vertex'?a:[(a[0]+b[0])/2,(a[1]+b[1])/2],candidate:Point=[anchor[0]+delta[0],anchor[1]+delta[1]],snap=constrainFloorPoint(candidate,surface,unit*1.2);shift=[snap[0]-anchor[0],snap[1]-anchor[1]];}
+  try{onChange(constrainFloorEdit(d.polygon,d.kind,d.index,shift,surface,event.altKey?0:unit*1.2));setInvalid(false);}catch{setInvalid(true);}
  }
  function end(event:PointerEvent<SVGGElement>){if(!drag.current||drag.current.pointer!==event.pointerId)return;event.stopPropagation();drag.current=null;setInvalid(false);onEnd();}
  return <g data-floor-edit aria-label="Границы участка пола" onPointerMove={move} onPointerUp={end} onPointerCancel={()=>{if(drag.current){drag.current=null;setInvalid(false);onCancel();}}} onClick={event=>event.stopPropagation()} style={{touchAction:'none'}}>
