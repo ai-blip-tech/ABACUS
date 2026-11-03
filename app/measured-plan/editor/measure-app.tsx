@@ -53,6 +53,7 @@ import {OpeningAlignmentGuides} from './measure-opening-alignment';
 import {alignOpening} from '@/lib/measured-plan/measure-opening-alignment';
 import {floorPolygon,floorRegionGeometry,type FloorRegion} from '@/lib/measured-plan/measure-floor-finishes';
 import {MeasureFloorLayer} from './measure-floor-layer';
+import {MeasureFloorAxis} from './measure-floor-axis';
 import {MeasureFloorEdit} from './measure-floor-edit';
 import {MeasureFloorDrawing} from './measure-floor-drawing';
 import {FloorFinishMenu} from './measure-floor-menu';
@@ -292,6 +293,7 @@ export default function MeasureApp({initialDoc,projectId,projectName,header,onSa
       {tab==='plan'&&tool==='ruler'&&<MeasureRuler key={rulerKey} walls={doc.walls} view={view} font={font} pointOf={svgPoint} calibrated={doc.scaleConfirmed}/>}
       {tab==='plan'&&tool==='dimension'&&<MeasureRuler key={'dimension-'+rulerKey} walls={doc.walls} view={view} font={font} pointOf={svgPoint} calibrated={doc.scaleConfirmed} onFinish={(a,b,offset)=>{if((doc.dimensions?.length||0)>=500){setError('Можно добавить не более 500 размеров');return;}change(d=>{d.dimensions=[...(d.dimensions||[]),{id:'dimension_'+uuid(),a,b,offset}];});}}/>}
       {tab==='plan'&&tool==='select'&&layers.floors&&floorRegion&&<MeasureFloorEdit region={floorRegion} doc={doc} unit={font/pan.zoom} pointOf={svgPoint} onChange={polygon=>change(d=>{const region=d.floorRegions?.find(r=>r.id===selectedFloor);if(region)region.polygon=polygon;})} onBegin={()=>{setDragView([...view]);historyDispatch({type:'begin'});}} onEnd={()=>{historyDispatch({type:'end'});setDragView(null);}} onCancel={()=>{historyDispatch({type:'cancel'});setDragView(null);}}/>}
+      {tab==='plan'&&tool==='select'&&layers.floors&&layers.guides&&floorRegion?.layout&&<MeasureFloorAxis region={floorRegion} doc={doc} unit={font/pan.zoom} pointOf={svgPoint} onChange={patch=>change(d=>{const region=d.floorRegions?.find(r=>r.id===selectedFloor);if(region)Object.assign(region,patch);})} onBegin={()=>{setDragView([...view]);historyDispatch({type:'begin'});}} onEnd={()=>{historyDispatch({type:'end'});setDragView(null);}} onCancel={()=>{historyDispatch({type:'cancel'});setDragView(null);}}/>}
       {tab==='plan'&&tool==='floor-finish'&&<MeasureFloorDrawing doc={doc} view={view} unit={font/pan.zoom} pointOf={svgPoint} onCommit={commitFloor} onCancel={()=>selectTool('select')}/>}
       {tab==='plan'&&tool==='wall'&&<MeasureWallDrawing walls={doc.walls} view={view} font={font} zoom={pan.zoom} pointOf={svgPoint} onCommit={commitDrawnWall} onFinish={()=>selectTool('select')}/>}
      </g></svg><span className="grid-unit">{tab==='source'?'Исходник · пиксели':doc.scaleConfirmed?'Сетка: 100 мм · толстая линия: 1 м':'Без масштаба · условные единицы'}</span>

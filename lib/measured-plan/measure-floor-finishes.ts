@@ -12,7 +12,7 @@ export const parquetLayouts=[
 ] as const;
 export type ParquetLayout=typeof parquetLayouts[number]['id'];
 export type FloorWood='oak'|'walnut';
-export type FloorRegion={id:string;polygon:Point[];layout:ParquetLayout|null;wood:FloorWood};
+export type FloorRegion={id:string;polygon:Point[];layout:ParquetLayout|null;wood:FloorWood;origin?:Point;angle?:number};
 
 const cross=(a:Point,b:Point,c:Point)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
 const on=(a:Point,b:Point,p:Point)=>Math.abs(cross(a,b,p))<.001&&p[0]>=Math.min(a[0],b[0])&&p[0]<=Math.max(a[0],b[0])&&p[1]>=Math.min(a[1],b[1])&&p[1]<=Math.max(a[1],b[1]);
@@ -28,7 +28,7 @@ export function floorPolygon(points:Point[]):Point[]{
 }
 export function validateFloorRegions(value:unknown):FloorRegion[]{
  if(!Array.isArray(value)||value.length>100)throw Error('Можно сохранить не более 100 участков пола');
- const ids=new Set<string>();for(const region of value){if(!region||typeof region.id!=='string'||!/^[a-zA-Z0-9_-]{1,140}$/.test(region.id)||ids.has(region.id)||!['oak','walnut'].includes(region.wood)||region.layout!==null&&!parquetLayouts.some(layout=>layout.id===region.layout))throw Error('Некорректные параметры участка пола');floorPolygon(region.polygon);ids.add(region.id);}
+ const ids=new Set<string>();for(const region of value){if(!region||typeof region.id!=='string'||!/^[a-zA-Z0-9_-]{1,140}$/.test(region.id)||ids.has(region.id)||!['oak','walnut'].includes(region.wood)||region.layout!==null&&!parquetLayouts.some(layout=>layout.id===region.layout))throw Error('Некорректные параметры участка пола');if(region.angle!==undefined&&(!Number.isFinite(region.angle)||Math.abs(region.angle)>36000)||region.origin!==undefined&&(!Array.isArray(region.origin)||region.origin.length!==2||region.origin.some((n:number)=>!Number.isFinite(n)||Math.abs(n)>200000)))throw Error('Некорректная ось раскладки');floorPolygon(region.polygon);ids.add(region.id);}
  return structuredClone(value);
 }
 export function floorRegionGeometry(doc:MeasureDoc,region:FloorRegion){
@@ -48,4 +48,8 @@ export function editFloorPolygon(polygon:Point[],kind:'move'|'vertex'|'edge',ind
  const indexes=kind==='edge'?[index,(index+1)%next.length]:[index];
  for(const i of indexes)next[i]=[next[i][0]+shift[0],next[i][1]+shift[1]];
  return floorPolygon(next);
+}
+export function floorPlacement(region:FloorRegion){
+ const xs=region.polygon.map(p=>p[0]),ys=region.polygon.map(p=>p[1]);
+ return{origin:region.origin||[(Math.min(...xs)+Math.max(...xs))/2,Math.min(...ys)+(Math.max(...ys)-Math.min(...ys))*.68] as Point,angle:region.angle??(['chevron','herringbone'].includes(region.layout||'')?90:0)};
 }

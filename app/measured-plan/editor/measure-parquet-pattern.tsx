@@ -12,7 +12,7 @@ function Board({x,y,width,height,wood,index=0,rotate=0}:{x:number;y:number;width
 }
 
 /** Native vector patterns: layout and wood are independent, without image crops or labels. */
-export function ParquetPattern({id,layout,wood}:{id:string;layout:ParquetLayout;wood:FloorWood}){
+export function ParquetPattern({id,layout,wood,placement}:{id:string;layout:ParquetLayout;wood:FloorWood;placement?:{origin:[number,number];angle:number}}){
  let width=1200,height=360,transform:string|undefined,content;
  if(layout==='straight'||layout==='diagonal'){
   transform=layout==='diagonal'?'rotate(-45)':undefined;
@@ -36,7 +36,7 @@ export function ParquetPattern({id,layout,wood}:{id:string;layout:ParquetLayout;
    <Board x={0} y={0} width={1200} height={100} wood={wood}/><Board x={1200} y={100} width={1100} height={100} rotate={90} wood={wood} index={1}/><Board x={1100} y={1200} width={1100} height={100} rotate={180} wood={wood} index={2}/><Board x={0} y={1100} width={1000} height={100} rotate={-90} wood={wood} index={3}/>
   </>;
  }
- return <pattern id={id} width={width} height={height} patternUnits="userSpaceOnUse" patternTransform={transform}><rect width={width} height={height} fill={tones[wood][0]}/>{content}</pattern>;
+ return <pattern id={id} width={width} height={height} patternUnits="userSpaceOnUse" patternTransform={placement?`translate(${placement.origin.join(' ')}) rotate(${placement.angle-(['chevron','herringbone'].includes(layout)?90:0)}) ${transform||''}`:transform}><rect width={width} height={height} fill={tones[wood][0]}/>{content}</pattern>;
 }
 
 export function ParquetSwatch({layout,wood}:{layout:ParquetLayout;wood:FloorWood}){

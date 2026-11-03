@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {editFloorPolygon,floorPolygon,floorRegionGeometry,parquetLayouts,validateFloorRegions,type FloorRegion} from '../lib/measured-plan/measure-floor-finishes.ts';
+import {floorPlacement,editFloorPolygon,floorPolygon,floorRegionGeometry,parquetLayouts,validateFloorRegions,type FloorRegion} from '../lib/measured-plan/measure-floor-finishes.ts';
 import {blankDoc,type Wall} from '../lib/measured-plan/measure-model.ts';
 import {historyReducer,initialHistory} from '../lib/measured-plan/measure-history.ts';
 const region:FloorRegion={id:'floor_test',polygon:[[0,0],[4000,0],[4000,3000],[0,3000]],layout:'herringbone',wood:'oak'};
@@ -25,4 +25,13 @@ test('a floor drag is one undo step; cancellation restores contour and finish',(
  assert.equal(h.past.length,0);const cancelled=historyReducer(h,{type:'cancel'});assert.deepEqual(cancelled.present,d);
  h=historyReducer(h,{type:'end'});assert.equal(h.past.length,1);assert.deepEqual(historyReducer(h,{type:'undo'}).present,d);
  assert.equal(h.present!.floorRegions![0].layout,region.layout);assert.equal(h.present!.floorRegions![0].wood,region.wood);
+});
+
+test('parquet axis and origin serialize independently of finish and reject invalid placement',()=>{
+ const placed={...region,origin:[1200,1800] as [number,number],angle:45};
+ assert.deepEqual(floorPlacement(placed),{origin:[1200,1800],angle:45});
+ assert.deepEqual(validateFloorRegions(JSON.parse(JSON.stringify([placed]))),[placed]);
+ assert.equal(floorPlacement({...region,layout:'chevron'}).angle,90);
+ assert.throws(()=>validateFloorRegions([{...placed,angle:NaN}]));
+ assert.throws(()=>validateFloorRegions([{...placed,origin:[Infinity,0]}]));
 });
