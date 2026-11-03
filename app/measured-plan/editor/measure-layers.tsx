@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 
 export type MeasureLayers={floors:boolean;walls:boolean;columns:boolean;openings:boolean;furniture:boolean;wallNumbers:boolean;roomNames:boolean;roomAreas:boolean;dimensions:boolean;guides:boolean;source:boolean;grid:boolean};
 export const defaultMeasureLayers=(planning:boolean):MeasureLayers=>({floors:true,walls:true,columns:true,openings:true,furniture:planning,wallNumbers:true,roomNames:true,roomAreas:true,dimensions:true,guides:true,source:!planning,grid:true});
-const labels:Record<keyof MeasureLayers,string>={floors:'Покрытия пола',walls:'Стены',columns:'Колонны',openings:'Окна и двери',furniture:'Мебель',wallNumbers:'Номера стен',roomNames:'Названия помещений',roomAreas:'Площади помещений',dimensions:'Размеры',guides:'Направляющие',source:'Исходная подложка',grid:'Сетка'};
+const labels:Record<keyof MeasureLayers,string>={floors:'Пол',walls:'Стены',columns:'Колонны',openings:'Окна и двери',furniture:'Мебель',wallNumbers:'Номера стен',roomNames:'Названия помещений',roomAreas:'Площади помещений',dimensions:'Размеры',guides:'Направляющие',source:'Исходная подложка',grid:'Сетка'};
 
 export function MeasureLayersMenu({value,onChange,planning=false}:{value:MeasureLayers;onChange:(next:MeasureLayers)=>void;planning?:boolean}){
  const [open,setOpen]=useState(false),root=useRef<HTMLDivElement>(null);

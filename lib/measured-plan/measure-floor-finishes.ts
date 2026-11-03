@@ -37,3 +37,15 @@ export function floorRegionGeometry(doc:MeasureDoc,region:FloorRegion){
  return{polygons,squareMetres:multiArea(polygons)/1e6};
 }
 export function floorRegionPath(polygons:clipping.MultiPolygon){return polygons.flatMap(p=>p.map(r=>'M '+r.map(p=>p.join(' ')).join(' L ')+' Z')).join(' ');}
+
+/** Move the whole region, one corner, or an edge along its normal. */
+export function editFloorPolygon(polygon:Point[],kind:'move'|'vertex'|'edge',index:number,delta:Point):Point[]{
+ const next=polygon.map(p=>[...p] as Point);
+ if(kind==='move')return floorPolygon(next.map(p=>[p[0]+delta[0],p[1]+delta[1]]));
+ if(!Number.isInteger(index)||index<0||index>=next.length)throw Error('Угол участка не найден');
+ let shift=delta;
+ if(kind==='edge'){const a=next[index],b=next[(index+1)%next.length],len=Math.hypot(b[0]-a[0],b[1]-a[1]);if(len<.1)throw Error('Слишком короткая грань');const nx=-(b[1]-a[1])/len,ny=(b[0]-a[0])/len,d=delta[0]*nx+delta[1]*ny;shift=[nx*d,ny*d];}
+ const indexes=kind==='edge'?[index,(index+1)%next.length]:[index];
+ for(const i of indexes)next[i]=[next[i][0]+shift[0],next[i][1]+shift[1]];
+ return floorPolygon(next);
+}
