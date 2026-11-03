@@ -3,7 +3,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {furnitureTemplates,newFurniture,type FurnitureItem,type FurnitureKind} from '@/lib/planning-plan/furniture';
 import {rotationFromDrag} from '@/lib/planogram-interaction';
 import {furnitureMeasurements} from '@/lib/planning-plan/measurements';
-import {snapFurnitureToWalls} from '@/lib/planning-plan/furniture-wall-snap';
+import {snapFurnitureToWalls,furnitureWallContacts} from '@/lib/planning-plan/furniture-wall-snap';
 import {snapFurnitureAngle} from '@/lib/planning-plan/furniture-angle-snap';
 import {needsFurnitureTypeReview} from '@/lib/planning-plan/furniture-type-review';
 import type {CadSymbol} from '@/lib/planning-plan/cad-symbol';
@@ -45,6 +45,7 @@ export function FurnitureLayer({items,walls,selected,unit,active,onSelect,onChan
  }
  function end(e:React.PointerEvent<SVGGElement>,cancel=false){if(!drag.current)return;e.stopPropagation();if(cancel)onCancel();else onEnd();drag.current=null;setMoving('');if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);}
  const current=items.find(f=>f.id===moving),measurements=current?furnitureMeasurements(current,items,walls):[];
+ const contactItem=current||items.find(f=>f.id===selected),contacts=contactItem?furnitureWallContacts(contactItem,walls):[];
  return <g data-planning-furniture-layer onContextMenu={e=>{const id=(e.target as Element).closest('[data-furniture-id]')?.getAttribute('data-furniture-id');if(id&&active)onContextMenu?.(e,id);}}>
  {measurements.map((m,i)=><g key={i} data-furniture-distance pointerEvents="none" fill="#8d1730" stroke="#8d1730" strokeWidth={unit*.07}><line x1={m.a[0]} y1={m.a[1]} x2={m.b[0]} y2={m.b[1]} strokeDasharray={unit*.3+' '+unit*.2}/><text x={(m.a[0]+m.b[0])/2} y={(m.a[1]+m.b[1])/2-unit*.4} fontSize={unit} textAnchor="middle" stroke="#fffdf7" strokeWidth={unit*.25} paintOrder="stroke">{m.label}</text></g>)}
  {[...items].sort((a,b)=>Number(a.kind!=='rug')-Number(b.kind!=='rug')).map(f=><g key={f.id} data-furniture-id={f.id} role="button" aria-label={f.name+': перемещать. Два клика — размеры и поворот.'} tabIndex={active?0:-1} style={{cursor:active?'move':'default',touchAction:'none'}} pointerEvents={active?'auto':'none'} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(f.id);}}} onClick={e=>{e.stopPropagation();onSelect(f.id);}} onDoubleClick={e=>{e.stopPropagation();onSelect(f.id);setEditing(f.id);}} onPointerDown={e=>begin(e,f)} onPointerMove={move} onPointerUp={e=>end(e)} onPointerCancel={e=>end(e,true)}>
@@ -60,7 +61,7 @@ export function FurnitureLayer({items,walls,selected,unit,active,onSelect,onChan
  </g>}
  </g>
  {selected===f.id&&<text x={f.position[0]} y={f.position[1]+Math.hypot(f.width,f.depth)/2+unit} fontSize={unit} textAnchor="middle" fill="#3b3832" stroke="#fffdf7" strokeWidth={unit*.2} paintOrder="stroke">{moving===f.id?Math.round(f.rotation)+'° · ':''}{f.width} × {f.depth} мм</text>}
- </g>)}</g>;
+ </g>)}{contacts.map((contact,index)=><line key={contact.wallId+index} data-furniture-wall-contact x1={contact.a[0]} y1={contact.a[1]} x2={contact.b[0]} y2={contact.b[1]} stroke="#842b39" strokeWidth="3" strokeLinecap="round" vectorEffect="non-scaling-stroke" pointerEvents="none"/>)}</g>;
 }
 
 export function FurnitureProperties({item,onChange,onDelete,onDuplicate}:{item:FurnitureItem;onChange:(patch:Partial<FurnitureItem>)=>void;onDelete:()=>void;onDuplicate:()=>void}){
