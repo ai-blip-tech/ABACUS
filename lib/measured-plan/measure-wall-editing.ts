@@ -24,3 +24,9 @@ export function resizeWall(doc:MeasureDoc,id:string,size:number):MeasureDoc{
  const next=placeWall(doc,id,w.a,[w.a[0]+(w.b[0]-w.a[0])*size/l,w.a[1]+(w.b[1]-w.a[1])*size/l]);
  return {...next,walls:next.walls.map(w=>w.id===id?{...w,lengthConfirmed:true}:w)};
 }
+export function setWallThicknessFromReference(doc:MeasureDoc,id:string,thickness:number):MeasureDoc{
+ const wall=doc.walls.find(w=>w.id===id);if(!wall||!Number.isFinite(thickness)||thickness<50||thickness>1500)throw Error('Толщина стены: от 50 до 1500 мм');
+ const next=structuredClone(doc),target=next.walls.find(w=>w.id===id)!,size=Math.hypot(wall.b[0]-wall.a[0],wall.b[1]-wall.a[1])||1,reference=wall.referenceLine||'axis';
+ if(reference!=='axis'){const direction=reference==='outside'?-1:1,shift=(thickness-wall.thickness)/2*direction,nx=-(wall.b[1]-wall.a[1])/size,ny=(wall.b[0]-wall.a[0])/size;target.a=[target.a[0]+nx*shift,target.a[1]+ny*shift];target.b=[target.b[0]+nx*shift,target.b[1]+ny*shift];}
+ target.thickness=thickness;target.thicknessConfirmed=true;next.geometryReviewed=false;next.floorConfirmed=false;return next;
+}

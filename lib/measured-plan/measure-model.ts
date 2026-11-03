@@ -6,11 +6,12 @@ import {automaticFloor} from './measure-auto-floor.ts';
 export type Point=[number,number];
 export type Column={id:string;name:string;a:Point;width:number;depth:number;height:number|null;confirmed:boolean;structuralStatus:'unknown'|'bearing';provenance:string};
 export type PlanDimension={id:string;a:Point;b:Point};
-export type Wall={id:string;name:string;a:Point;b:Point;thickness:number;thicknessConfirmed:boolean;lengthConfirmed:boolean;height:number|null;group:'outer'|'inner';provenance:string};
+export type Wall={id:string;name:string;a:Point;b:Point;thickness:number;thicknessConfirmed:boolean;lengthConfirmed:boolean;height:number|null;group:'outer'|'inner';provenance:string;referenceLine?:'outside'|'axis'|'inside';cornerMode?:'move'|'extend'};
+export type RoomLabel={id:string;name:string;anchor:Point};
 export type Opening={id:string;wallId:string;kind:'door'|'window'|'opening';offset:number;width:number;height:number|null;sill:number|null;toCeiling?:boolean;hingesSide?:'left'|'right';swingDirection?:'inward'|'outward';confirmed:boolean};
 export type Zone={id:string;name:string;polygon:Point[];elevation:number;height:number|null;confirmed:boolean};
 export type Source={name:string;mime:string;hash:string;width:number;height:number;page:number;pages:number;method:string;image:string;words:any[];ocrWarning?:string;pixelScale:number};
-export type MeasureDoc={schemaVersion:1;furniture?:FurnitureItem[];columns?:Column[];dimensions?:PlanDimension[];openingDefaults?:{commonHeight?:number|null;doorHeight?:number|null;windowHeight?:number|null;sill?:number|null};testOnly?:boolean;id:string;name:string;source:Source;walls:Wall[];openings:Opening[];floor:Point[];floorConfirmed:boolean;scaleConfirmed:boolean;calibration:{a:Point;b:Point;length:number}|null;height:number|null;heightMode:'unknown'|'uniform'|'different';zones:Zone[];geometryReviewed:boolean;drawingReviewed:boolean;conflictNotes:Record<string,string>;updatedAt:string};
+export type MeasureDoc={schemaVersion:1;furniture?:FurnitureItem[];columns?:Column[];dimensions?:PlanDimension[];roomLabels?:RoomLabel[];openingDefaults?:{commonHeight?:number|null;doorHeight?:number|null;windowHeight?:number|null;sill?:number|null};testOnly?:boolean;id:string;name:string;source:Source;walls:Wall[];openings:Opening[];floor:Point[];floorConfirmed:boolean;scaleConfirmed:boolean;calibration:{a:Point;b:Point;length:number}|null;height:number|null;heightMode:'unknown'|'uniform'|'different';zones:Zone[];geometryReviewed:boolean;drawingReviewed:boolean;conflictNotes:Record<string,string>;updatedAt:string};
 export const uuid=()=>crypto.randomUUID();
 export const length=(w:Wall)=>Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1]);
 export const polygonArea=(p:Point[])=>Math.abs(p.reduce((sum,a,i)=>{const b=p[(i+1)%p.length];return sum+a[0]*b[1]-a[1]*b[0];},0))/2;
@@ -31,6 +32,7 @@ export function fixtureDoc(source:Source):MeasureDoc{
 export function modelNodes(doc:MeasureDoc){const nodes:any={};for(const w of doc.walls)nodes[w.id]={type:'wall',start:w.a.map(x=>x/1000),end:w.b.map(x=>x/1000),thickness:w.thickness/1000};for(const o of doc.openings)nodes[o.id]={width:o.width/1000,position:[o.offset/1000]};return nodes;}
 export function dimensionChecks(doc:MeasureDoc){if(doc.source.method!=='prepared-user-bti')return[];return liveBtiChecks(modelNodes(doc)).map((c,i)=>{const source=i===8?568+1400+2691:c.source;return{...c,source,name:i===8?'Нижняя справа · цепочка 568+1400+2691':c.name,id:'chain-'+i,delta:c.model===null?null:c.model-source,wallId:['small_right','left_horizontal','left_bottom_right','south','right_vertical','entry_right','east','right_horizontal','south','right_vertical','right_vertical'][i]};});}
 export function setWallLength(doc:MeasureDoc,id:string,mm:number){if(!Number.isFinite(mm)||mm<100||mm>50000)throw Error('Длина стены: от 100 до 50 000 мм');const next=structuredClone(doc),w=next.walls.find(w=>w.id===id)!;const before=length(w);if(Math.abs(before-mm)<.001){w.lengthConfirmed=true;return next;}
+ if(w.cornerMode==='extend'){const dx=w.b[0]-w.a[0],dy=w.b[1]-w.a[1];w.b=[w.a[0]+dx/before*mm,w.a[1]+dy/before*mm];w.lengthConfirmed=true;next.openings=next.openings.map(o=>o.wallId===id?{...o,confirmed:false}:o);next.geometryReviewed=false;next.floorConfirmed=false;return next;}
  const old=[...w.b] as Point,dx=w.b[0]-w.a[0],dy=w.b[1]-w.a[1];const target:Point=[w.a[0]+dx/before*mm,w.a[1]+dy/before*mm];
  // Move the entire shared orthogonal grid line, preserving joined endpoints.
  const horizontal=Math.abs(dy)<1,vertical=Math.abs(dx)<1;
