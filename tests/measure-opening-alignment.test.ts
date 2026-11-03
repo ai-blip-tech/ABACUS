@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {alignOpening} from '../lib/measured-plan/measure-opening-alignment.ts';
+import {blankDoc,type Wall,type Opening,type Point} from '../lib/measured-plan/measure-model.ts';
+const wall=(id:string,a:Point,b:Point):Wall=>({id,name:id,a,b,thickness:100,height:2800,group:'inner',lengthConfirmed:true,thicknessConfirmed:true,provenance:'test'});
+function sample(){const d=blankDoc({name:'',mime:'image/png',hash:'',width:1,height:1,page:1,pages:1,method:'test',image:'',words:[],pixelScale:1});d.walls=[wall('a',[0,0],[5000,0]),wall('b',[0,3000],[5000,3000])];d.openings=[{id:'other',wallId:'b',kind:'door',width:800,offset:2000,height:2100,sill:0,confirmed:true}];return d;}
+const opening:Opening={id:'new',wallId:'a',kind:'door',width:800,offset:2050,height:2100,sill:0,confirmed:false};
+test('opposing doors snap to the same center and show a cross-room guide without changing the source',()=>{const d=sample(),before=JSON.stringify(d),result=alignOpening(d,opening,2050,70);assert.equal(result.offset,2000);assert.deepEqual(result.guides[0].a,[2000,3000]);assert.deepEqual(result.guides[0].b,[2000,0]);assert.ok(result.guides[0].snapped);assert.equal(JSON.stringify(d),before);});
+test('edge alignment supports different widths and reversed wall directions',()=>{const d=sample();d.walls[1]=wall('b',[5000,3000],[0,3000]);d.openings[0].offset=3000;const result=alignOpening(d,{...opening,width:1000},2105,30);assert.equal(result.offset,2100);assert.equal(result.guides[0].label,'Края проёмов');});
+test('no snapping through an occupied opening or beyond host ends; Alt bypass returns no guides',()=>{const d=sample();d.openings.push({...opening,id:'occupied',offset:2000});assert.equal(alignOpening(d,opening,2050,70).offset,2050);assert.deepEqual(alignOpening(d,opening,2050,0),{offset:2050,guides:[]});d.openings=[{...d.openings[0],offset:100}];assert.equal(alignOpening(d,opening,120,50).offset,120);});
+test('oblique parallel walls align along the wall normal',()=>{const d=sample();d.walls=[wall('a',[0,0],[3000,3000]),wall('b',[-2000,2000],[1000,5000])];d.openings[0].offset=2000;const result=alignOpening(d,opening,2050,70);assert.ok(Math.abs(result.offset-2000)<.001);assert.ok(result.guides.some(g=>g.label==='Центры проёмов'));});

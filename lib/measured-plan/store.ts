@@ -1,6 +1,7 @@
 import {database} from '../server-runtime.ts';
 import type {MeasureDoc} from './measure-model';
 import {withAutomaticFloor} from './measure-auto-floor.ts';
+import {validateFloorRegions} from './measure-floor-finishes.ts';
 
 export function ensureMeasuredStore(){database.prepare(`CREATE TABLE IF NOT EXISTS measured_plans (
  project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
@@ -15,6 +16,7 @@ const point=(p:unknown)=>Array.isArray(p)&&p.length===2&&p.every(v=>finite(v));
 const draftDimension=(n:unknown)=>typeof n==='number'&&Number.isFinite(n);
 const identifier=(s:unknown)=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,140}$/.test(s);
 export function validateMeasuredDocument(value:unknown,projectId:string,options:{allowManualSource?:boolean}={}):MeasureDoc{
+ if((value as MeasureDoc)?.floorRegions!==undefined)validateFloorRegions((value as MeasureDoc).floorRegions);
  const d=value as MeasureDoc;if(!d||d.schemaVersion!==1||!identifier(d.id)||!text(d.name)||!Array.isArray(d.walls)||d.walls.length>500||!Array.isArray(d.openings)||d.openings.length>1000||!Array.isArray(d.floor)||d.floor.length>1000||!d.floor.every(point)||!Array.isArray(d.zones)||d.zones.length>100)throw Error('Некорректная структура обмерного плана');
  const dimensionIds=new Set<string>();if(d.dimensions!==undefined){if(!Array.isArray(d.dimensions)||d.dimensions.length>500)throw Error('Слишком много дополнительных размеров');for(const m of d.dimensions){if(!identifier(m.id)||dimensionIds.has(m.id)||!point(m.a)||!point(m.b)||(m.offset!==undefined&&(!Number.isFinite(m.offset)||Math.abs(m.offset)>200000))||Math.hypot(m.b[0]-m.a[0],m.b[1]-m.a[1])<1)throw Error('Некорректный дополнительный размер');dimensionIds.add(m.id);}}
  const ids=new Set<string>();for(const w of d.walls){if(!identifier(w.id)||ids.has(w.id)||!text(w.name)||!point(w.a)||!point(w.b)||!draftDimension(w.thickness)||!(w.height===null||draftDimension(w.height))||!['outer','inner'].includes(w.group)||typeof w.lengthConfirmed!=='boolean'||typeof w.thicknessConfirmed!=='boolean')throw Error('Повреждена структура данных стены');ids.add(w.id);}

@@ -12,7 +12,7 @@ test('toolbar exposes door and window placement next to measurement tools',()=>{
  assert.match(toolbar,/aria-label="Линейка"/);assert.match(toolbar,/aria-label="Дополнительный размер"/);
  assert.match(toolbar,/Добавить дверь/);assert.match(toolbar,/Добавить окно/);
  assert.match(app,/placeOpeningOnWall\(w,svgPoint\(e\)\)/);
- assert.match(app,/openingAt\(doc,w.id,p,tool,id\)/);assert.match(app,/openingInGap\(doc,p,tool,id/);
+ assert.match(app,/openingPlacementAt\(doc,p,tool,id/);
 });
 test('Delete removes selected opening through undoable document change, not its wall',()=>{
  const removal=app.slice(app.indexOf('function removeSelectedOpening'),app.indexOf('function historyStep'));

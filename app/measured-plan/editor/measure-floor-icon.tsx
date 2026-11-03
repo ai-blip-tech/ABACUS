@@ -1,0 +1,1 @@
+export function PlanFloorIcon(){return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true"><path d="m3 16 7-11h11l-7 14H3zM3 16h11M7 10h11M11 5 4 16M16 5 9 16M18 10l-4 9"/></svg>;}
