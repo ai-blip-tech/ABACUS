@@ -741,3 +741,53 @@ jobs:
             rm -rf "$snapshot_dir" "$restore_dir"
             current_step="completed"
             test "$readiness_failed" = "0"
+
+  prune-authorized-old-backups:
+    name: Remove two old backups while preserving the verified predeploy copy
+    if: ${{ inputs.confirmation == 'PRUNE_ROOM_DESIGN_OLD_BACKUPS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production-backup
+    steps:
+      - uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
+        env:
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: EXPECTED_PRODUCTION_SHA
+          command_timeout: 8m
+          script: |
+            set -eu
+            cd "$HOME/ABACUS"
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            python3 - <<'PYCODE'
+            from pathlib import Path
+            import hashlib, shutil
+            root=Path.home()/'room-design-backups'
+            protected=root/'predeploy-42697718673-1'
+            archive=protected/'room-design-production.tar.gz'
+            def verify():
+                assert 'status=PASSED' in (protected/'REPORT.txt').read_text()
+                expected=(protected/'room-design-production.tar.gz.sha256').read_text().split()[0]
+                digest=hashlib.sha256()
+                with archive.open('rb') as f:
+                    for part in iter(lambda:f.read(1024*1024),b''):digest.update(part)
+                assert digest.hexdigest()==expected
+            verify()
+            targets=[root/name for name in ['predeploy-41240632278-1','predeploy-41243304299-1']]
+            for target in targets:
+                assert target.parent==root and not target.is_symlink() and target.is_dir()
+                assert 'status=PASSED' in (target/'REPORT.txt').read_text()
+            for target in targets:
+                shutil.rmtree(target)
+                print('REMOVED_OLD_BACKUP='+target.name)
+            verify()
+            print('LATEST_VERIFIED_BACKUP_PRESERVED=yes')
+            PYCODE
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            df -Pk "$HOME"
+            echo APPLICATION_RESTARTED=no
