@@ -8,7 +8,8 @@ const workbench=await readFile(new URL('../app/templates/[slug]/template-scenari
 const css=await readFile(new URL('../app/materials-concept/materials-concept.css',import.meta.url),'utf8');
 
 test('materials concept loads and saves the authenticated project with revision protection',()=>{
- assert.match(page,/\/materials-concept'/);
+ assert.match(page,/boardEndpoint=useRef\('materials-concept'\)/);
+ assert.match(page,/boardEndpoint\.current=interior\?'interior-sandbox':'materials-concept'/);
  assert.match(page,/serverRevision\.current/);
  assert.match(page,/Проект сохранён на сервере/);
  assert.doesNotMatch(page,/Боевые проекты не изменялись/);

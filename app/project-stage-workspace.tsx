@@ -10,7 +10,7 @@ const stages=[
  {id:'installation',label:'Монтаж, демонтаж',path:'/partition-plan'},
  {id:'planning',label:'Планировочное решение',path:'/planning-plan'},
  {id:'materials',label:'Концепция и материалы',path:'/materials-concept'},
- {id:'interior',label:'Интерьер и меблировка',path:'/'},
+ {id:'interior',label:'Интерьер и меблировка',path:'/materials-concept'},
  {id:'lighting',label:'Технический свет',path:'/technical-lighting'},
  {id:'bathroom',label:'Санузел',path:null},
  {id:'porcelain',label:'Керамогранит',path:null},
@@ -37,7 +37,7 @@ export default function ProjectStageWorkspace({user,projectId,projectName,projec
  const active=stages.find(stage=>stage.id===selected)!;
  const frameUrl=(stage:typeof stages[number])=>{
   const url=new URL(stage.path!,location.origin);url.searchParams.set('project',projectId);url.searchParams.set('embeddedStage','1');
-  if(stage.id==='interior'){url.searchParams.set('studioPreview','unified');url.searchParams.set('studioMode','image');url.hash='студия';}
+  if(stage.id==='interior'){url.searchParams.set('workspace','interior');}
   return url.pathname+url.search+url.hash;
  };
  return <main className={`project-menu-preview project-stage-workspace${active.path?' has-workspace':''}`}>

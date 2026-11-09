@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {interiorEditPayload} from '../lib/material-board/interior-edit.ts';
+const scene={id:'room',scene:true,kind:'reference',title:'Room',x:0,y:0,width:600,height:400};
+test('a text sticker works without any point or selected furniture',()=>{const p=interiorEditPayload(scene,{kind:'note',text:'  Покрасить стены в оранжевый  '});assert.equal(p.globalEdit.instruction,'Покрасить стены в оранжевый');assert.equal(p.operation,'global_edit');assert.equal('referenceImage' in p,false);assert.equal('pointEdit' in p,false);});
+test('empty stickers cannot spend a generation',()=>assert.throws(()=>interiorEditPayload(scene,{kind:'note',text:'  '}),/напишите/));
+test('colour editing requires a real target but does not require furniture dimensions',()=>{assert.throws(()=>interiorEditPayload(scene,{kind:'colour',title:'Red',colour:'#f00'}),/точку/);const p=interiorEditPayload({...scene,editPoint:{x:20,y:70}},{kind:'colour',title:'Red',colour:'#f00'});assert.equal(p.operation,'material');assert.match(p.material.instruction,/#f00/);assert.equal(p.pointEdit.x,20);});
+test('invalid/outside points are rejected before a provider call',()=>assert.throws(()=>interiorEditPayload({...scene,editPoint:{x:101,y:20}},{kind:'colour',title:'Red'}),/точку/));
+test('uploaded furniture requires dimensions for replace and add',()=>{for(const editAction of ['replace','add'])assert.throws(()=>interiorEditPayload({...scene,editAction,editPoint:{x:30,y:40}},{kind:'reference',title:'Chair'}),/миллиметрах/);});
+test('only one chosen furniture item is placed; mode determines add or replace',()=>{const command={kind:'reference',title:'Chair',catalogId:'chair-1'};for(const mode of ['add','replace']){const p=interiorEditPayload({...scene,editAction:mode,editPoint:{x:30,y:40}},command);assert.equal(p.operation,mode==='add'?'place':'replace');assert.equal('furnitureCasting' in p,false);assert.equal('planRender' in p,false);}});
