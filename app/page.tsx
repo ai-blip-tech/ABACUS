@@ -7,6 +7,7 @@ import type React from "react";
 import AccountDropdown from "./account-dropdown";
 import EditorImageActions from "./editor-image-actions";
 import EditorHeader from "./editor-header";
+import ProjectStageWorkspace from "./project-stage-workspace";
 import FurnitureCatalogPage from "./furniture-catalog-page";
 import {StudioMaterialTray,type StudioTrayItem} from "./studio-material-tray";
 import FurnitureCatalogPicker from "./furniture-catalog-picker";
@@ -958,6 +959,7 @@ export default function Home() {
     </section>
     {authOpen && <AuthModal mode={authMode} onMode={setAuthMode} onClose={()=>setAuthOpen(false)} onSignedIn={(nextUser)=>{setUser(nextUser);setAuthOpen(false);navigate("account");}}/>}
   </main>;
+  if (view === "projectMenu" && process.env.NEXT_PUBLIC_PROJECT_STAGE_WORKSPACE !== "0") return <ProjectStageWorkspace key={projectId} user={user} projectId={projectId} projectName={projectName||"Новый проект"} projectType={projectType} onHome={()=>navigate("home")} onProjects={()=>navigate("account")} onBriefSaved={project=>{setProjectName(project.name);setProjectType(project.project_type);setProjectDescription(project.description||"");}}/>;
   if (view === "projectMenu") return <ProjectMenuPreview
     user={user}
     projectName={projectName || "Новый проект"}

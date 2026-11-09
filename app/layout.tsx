@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Suspense } from "react";
+import EmbeddedStageChrome from "./embedded-stage-chrome";
 import SitewideIt from "./sitewide-it";
 import "./globals.css";
 import "./concept-d.css";
@@ -88,6 +89,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={`${cormorantGaramond.variable} ${manrope.variable} antialiased`}>
+        <EmbeddedStageChrome/>
         {children}
         <Suspense fallback={null}><SitewideIt/></Suspense>
       </body>

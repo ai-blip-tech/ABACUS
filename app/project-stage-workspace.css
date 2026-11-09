@@ -1,0 +1,44 @@
+.project-stage-workspace{height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.project-stage-workspace>.project-menu-header{height:72px;min-height:72px;grid-template-columns:260px minmax(0,1fr) auto;padding:0 24px;position:relative}
+.project-stage-workspace .project-menu-wordmark{font-size:34px!important}
+.project-stage-layout{flex:1;min-height:0;display:grid;grid-template-columns:238px minmax(0,1fr)}
+.project-stage-workspace .project-menu-sidebar{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:24px 13px 18px}
+.project-stage-workspace .project-menu-summary{padding:0 10px 15px}
+.project-stage-workspace .project-menu-summary h1{font-size:27px;line-height:1.05;overflow-wrap:anywhere}
+.project-stage-workspace .project-menu-summary p{margin-bottom:12px}
+.project-stage-workspace .project-menu-edit-brief{margin-bottom:0;font-size:11px}
+.project-stage-workspace .project-menu-stages{margin-top:15px}
+.project-stage-workspace .project-menu-stages li>button{padding:14px 10px;grid-template-columns:22px minmax(0,1fr);gap:8px;min-height:54px}
+.project-stage-workspace .project-menu-stages li>button b{font-size:12px;line-height:1.45;white-space:normal}
+.project-stage-workspace .project-menu-stages li>button small{grid-column:2;font-size:10px}
+.project-stage-main{min-width:0;min-height:0;position:relative;background:#fffdfa}
+.project-stage-pane{height:100%;min-height:0;position:relative}
+.project-stage-pane[hidden]{display:none!important}
+.project-stage-pane iframe{border:0;display:block;width:100%;height:100%;background:#fffdfa}
+.project-stage-loading{position:absolute;inset:0;z-index:2;display:grid;place-content:center;background:#fffdfa;color:#887d73;font-size:14px;pointer-events:none}
+.project-stage-coming{padding:50px 40px}.project-stage-coming>span{font-size:10px;letter-spacing:.18em;color:#980d2b}.project-stage-coming h2{font:400 38px var(--font-cormorant-garamond),Georgia,serif}.project-stage-coming p{color:#887d73}
+html[data-project-stage-embed] .editor-header{display:none!important}
+html[data-project-stage-embed] .materials-concept{min-height:0}
+@media(max-width:1000px){.project-stage-layout{grid-template-columns:195px minmax(0,1fr)}.project-stage-workspace>.project-menu-header{grid-template-columns:210px minmax(0,1fr) auto}.project-stage-workspace .project-menu-summary h1{font-size:24px}}
+@media(max-width:650px){.project-stage-workspace>.project-menu-header{min-height:64px;height:64px;grid-template-columns:1fr auto;padding:0 14px}.project-stage-workspace>.project-menu-header nav{display:none}.project-stage-layout{grid-template-columns:136px minmax(0,1fr)}.project-stage-workspace .project-menu-sidebar{padding:15px 6px}.project-stage-workspace .project-menu-summary h1{font-size:20px}.project-stage-workspace .project-menu-stages li>button{padding:12px 7px;grid-template-columns:1fr;gap:3px}.project-stage-workspace .project-menu-stages li>button b{font-size:11px}.project-stage-workspace .project-menu-stages li>button small{grid-column:1}.project-stage-workspace .project-menu-edit-brief{font-size:10px}}
+/* Compact project navigation keeps the working canvas as wide as possible. */
+.project-stage-layout{grid-template-columns:188px minmax(0,1fr)}
+.project-stage-workspace .project-menu-sidebar{padding:16px 10px 12px}
+.project-stage-workspace .project-menu-summary{padding:0 6px 12px}
+.project-stage-workspace .project-menu-summary>span{font-size:8px;letter-spacing:.12em}
+.project-stage-workspace .project-menu-summary h1{margin:9px 0 5px;font-size:22px;line-height:1.08;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.project-stage-workspace .project-menu-summary p{font-size:10px;line-height:1.3;margin:0 0 9px}
+.project-stage-workspace .project-menu-edit-brief{padding:6px 9px;min-height:28px;font-size:10px;border-radius:8px;gap:4px}
+.project-stage-workspace .project-menu-stages{margin:10px 0 14px}
+.project-stage-workspace .project-menu-stages::before{left:17px;top:18px;bottom:18px}
+.project-stage-workspace .project-menu-stages li{margin-bottom:1px}
+.project-stage-workspace .project-menu-stages li>button{min-height:38px;padding:7px 6px;grid-template-columns:22px minmax(0,1fr) auto;column-gap:6px;row-gap:0;border-radius:7px}
+.project-stage-workspace .project-menu-stages li>button>span{width:22px;height:22px;font-size:8px}
+.project-stage-workspace .project-menu-stages li>button b{font-size:10.5px;line-height:1.3}
+.project-stage-workspace .project-menu-stages li>button small{grid-column:3;font-size:8px}
+.project-stage-workspace .project-menu-back{padding:9px 10px;min-height:32px;font-size:10px;border-radius:8px}
+@media(max-width:1000px){.project-stage-layout{grid-template-columns:176px minmax(0,1fr)}.project-stage-workspace .project-menu-summary h1{font-size:21px}}
+@media(max-width:650px){.project-stage-layout{grid-template-columns:136px minmax(0,1fr)}.project-stage-workspace .project-menu-sidebar{padding:12px 6px}.project-stage-workspace .project-menu-summary h1{font-size:18px}.project-stage-workspace .project-menu-stages li>button{grid-template-columns:20px minmax(0,1fr);padding:6px 4px;gap:4px;min-height:38px}.project-stage-workspace .project-menu-stages li>button>span{width:20px;height:20px;font-size:8px}.project-stage-workspace .project-menu-stages li>button b{font-size:10px}.project-stage-workspace .project-menu-stages li>button small{grid-column:2;font-size:8px}.project-stage-workspace .project-menu-stages::before{left:14px}}
+
+/* The active editor keeps its own contextual assistant; avoid a duplicate in the shell. */
+body:has(.project-stage-workspace.has-workspace) [aria-label="Оно — интеллект Room Design"]{display:none!important}
