@@ -95,6 +95,6 @@
 .concept-node.interior-scene>.concept-node-visual{pointer-events:auto}
 .concept-node.note>header>.sandbox-drag-note{opacity:1;cursor:grab}
 .concept-empty-product{cursor:grab;touch-action:none}.concept-empty-product:active{cursor:grabbing}
-.concept-node>header>.concept-image-expand{width:26px;height:26px;opacity:.65;border-radius:50%;transition:opacity .15s,background .15s}
+.concept-node>header>.concept-image-expand{width:26px;height:26px;border-radius:50%;transition:opacity .15s,background .15s}
 .concept-node>header>.concept-image-expand>svg{width:14px;height:14px}
-.concept-node>header>.concept-image-expand:hover,.concept-node>header>.concept-image-expand:focus-visible{opacity:1;background:#3e382f}
+.concept-node>header>.concept-image-expand:hover,.concept-node>header>.concept-image-expand:focus-visible{background:#3e382f}
