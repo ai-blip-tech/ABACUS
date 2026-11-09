@@ -587,3 +587,16 @@ test("technical-lighting control request disables retry and unknown outcomes nev
   assert.equal(calls, 1);
   assert.match((await unknown.json()).error, /дубликат/);
 });
+
+test('a broken furniture-provider connection has a readable error, refunds, and never resubmits automatically',async()=>{
+ const id='material-connection-reset',before=await balance();let calls=0;
+ globalThis.fetch=async()=>{calls++;throw new TypeError('fetch failed',{cause:Object.assign(new Error('socket reset'),{code:'ECONNRESET'})});};
+ const response=await POST(request(operations[0].body,id)),payload=await response.json();
+ assert.equal(response.status,502);
+ assert.match(payload.error,/соединение с сервисом генерации/);
+ assert.doesNotMatch(payload.error,/fetch failed/);
+ assert.equal(calls,1);
+ assert.equal(await balance(),before);
+ assert.deepEqual(await transactions(id),['generation','refund']);
+ assert.equal(await generationCount(id),0);
+});

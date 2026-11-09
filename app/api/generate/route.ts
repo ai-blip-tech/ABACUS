@@ -899,7 +899,9 @@ async function generateResponse(request: Request) {
     await completeAiCostLedgerEntry(operationId, "provider_failed", null, providerTimedOut(error) ? "provider_timeout" : "provider_request_failed");
     await refundReservation("Возврат после технической ошибки подготовки AI-операции");
     trace("provider_submit", "failed", { outcome: providerTimedOut(error) ? "timeout" : "request_failed", ...safeNetworkError(error) });
-    return Response.json({ error: providerTimedOut(error) ? providerTimeoutMessage : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : 400 });
+    const connectionFailed = error instanceof TypeError && /fetch|network/i.test(error.message);
+    console.error("[image-provider-submit-failed]", JSON.stringify({ requestId: operationId, operation, ...safeNetworkError(error) }));
+    return Response.json({ error: providerTimedOut(error) ? providerTimeoutMessage : connectionFailed ? "Прервалось соединение с сервисом генерации. Повторите действие." : error instanceof Error ? error.message : "Не удалось подготовить изображения." }, { status: providerTimedOut(error) ? 504 : connectionFailed ? 502 : 400 });
   }
   console.info("[generate-runtime-diagnostic]", JSON.stringify({
     requestId: operationId,
