@@ -17,7 +17,7 @@
 .project-stage-pane iframe{border:0;display:block;width:100%;height:100%;background:#fffdfa}
 .project-stage-loading{position:absolute;inset:0;z-index:2;display:grid;place-content:center;background:#fffdfa;color:#887d73;font-size:14px;pointer-events:none}
 .project-stage-coming{padding:50px 40px}.project-stage-coming>span{font-size:10px;letter-spacing:.18em;color:#980d2b}.project-stage-coming h2{font:400 38px var(--font-cormorant-garamond),Georgia,serif}.project-stage-coming p{color:#887d73}
-html[data-project-stage-embed] .editor-header{display:none!important}
+html[data-project-stage-embed] .editor-header,html[data-project-stage-embed] [aria-label="Оно — интеллект Room Design"]{display:none!important}
 html[data-project-stage-embed] .materials-concept{min-height:0}
 @media(max-width:1000px){.project-stage-layout{grid-template-columns:195px minmax(0,1fr)}.project-stage-workspace>.project-menu-header{grid-template-columns:210px minmax(0,1fr) auto}.project-stage-workspace .project-menu-summary h1{font-size:24px}}
 @media(max-width:650px){.project-stage-workspace>.project-menu-header{min-height:64px;height:64px;grid-template-columns:1fr auto;padding:0 14px}.project-stage-workspace>.project-menu-header nav{display:none}.project-stage-layout{grid-template-columns:136px minmax(0,1fr)}.project-stage-workspace .project-menu-sidebar{padding:15px 6px}.project-stage-workspace .project-menu-summary h1{font-size:20px}.project-stage-workspace .project-menu-stages li>button{padding:12px 7px;grid-template-columns:1fr;gap:3px}.project-stage-workspace .project-menu-stages li>button b{font-size:11px}.project-stage-workspace .project-menu-stages li>button small{grid-column:1}.project-stage-workspace .project-menu-edit-brief{font-size:10px}}
@@ -39,6 +39,3 @@ html[data-project-stage-embed] .materials-concept{min-height:0}
 .project-stage-workspace .project-menu-back{padding:9px 10px;min-height:32px;font-size:10px;border-radius:8px}
 @media(max-width:1000px){.project-stage-layout{grid-template-columns:176px minmax(0,1fr)}.project-stage-workspace .project-menu-summary h1{font-size:21px}}
 @media(max-width:650px){.project-stage-layout{grid-template-columns:136px minmax(0,1fr)}.project-stage-workspace .project-menu-sidebar{padding:12px 6px}.project-stage-workspace .project-menu-summary h1{font-size:18px}.project-stage-workspace .project-menu-stages li>button{grid-template-columns:20px minmax(0,1fr);padding:6px 4px;gap:4px;min-height:38px}.project-stage-workspace .project-menu-stages li>button>span{width:20px;height:20px;font-size:8px}.project-stage-workspace .project-menu-stages li>button b{font-size:10px}.project-stage-workspace .project-menu-stages li>button small{grid-column:2;font-size:8px}.project-stage-workspace .project-menu-stages::before{left:14px}}
-
-/* The active editor keeps its own contextual assistant; avoid a duplicate in the shell. */
-body:has(.project-stage-workspace.has-workspace) [aria-label="Оно — интеллект Room Design"]{display:none!important}
