@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 
 import {ensureStore,requireTenantUser,storage,tenantStoragePrefix,type AppUser} from '@/lib/auth';
+import {asWorkbook,activeSheet,type MaterialWorkbook} from '@/lib/material-board/workbook';
 import {isBoard,type MaterialBoard,type MaterialNode} from '@/lib/material-board/model';
 import {isSameOrigin} from '@/lib/measured-plan/request-origin';
 import {database} from '@/lib/server-runtime';
@@ -61,9 +62,9 @@ export async function GET(request:Request,{params}:Context){
  if(!project)return Response.json({error:'Проект не найден'},{status:404});
  ensureMaterialsStore();
  const saved=await database.prepare('SELECT document_json,revision FROM interior_sandbox_boards WHERE project_id=? AND user_id=? AND tenant_id=?').bind(id,user.id,user.tenantId).first<StoredRow>();
- let document:MaterialBoard|null=null;
- if(saved){try{const parsed=JSON.parse(saved.document_json);if(!isBoard(parsed))throw Error();document=parsed;}catch{return Response.json({error:'Не удалось прочитать сохранённый раздел'},{status:500});}}
- return Response.json({project,document,revision:saved?.revision||0},{headers:{'Cache-Control':'private, no-store'}});
+ let workbook:MaterialWorkbook|null=null;
+ if(saved){try{workbook=asWorkbook(JSON.parse(saved.document_json));if(!workbook)throw Error();}catch{return Response.json({error:'Не удалось прочитать сохранённый раздел'},{status:500});}}
+ return Response.json({project,document:workbook?activeSheet(workbook).board:null,workbook,revision:saved?.revision||0},{headers:{'Cache-Control':'private, no-store'}});
 }
 
 export async function PUT(request:Request,{params}:Context){
@@ -75,15 +76,17 @@ export async function PUT(request:Request,{params}:Context){
  try{
   const raw=await request.text();if(raw.length>35_000_000)return Response.json({error:'Проект слишком большой для сохранения'},{status:413});
   const body=JSON.parse(raw);if(!Number.isInteger(body.revision)||body.revision<0)throw Error('Не указана версия проекта');
-  const prepared=prepareBoard(body.document,id);
-  await Promise.all([...prepared.assets].map(([asset,file])=>storage().put(storageKey(user,id,asset),file.bytes,{httpMetadata:{contentType:file.contentType},customMetadata:{projectId:id,userId:user.id,tenantId:user.tenantId}})));
-  ensureMaterialsStore();const referenced=boardAssets(prepared.board,id),now=new Date().toISOString();
+  const incoming=asWorkbook(body.workbook||body.document);if(!incoming)throw Error('Повреждена структура листов песочницы');
+  const assets=new Map<string,{bytes:Uint8Array;contentType:string}>();
+  const workbook:MaterialWorkbook={...incoming,sheets:incoming.sheets.map(sheet=>{const prepared=prepareBoard(sheet.board,id);for(const [key,file] of prepared.assets)assets.set(key,file);return{...sheet,board:prepared.board};})};
+  await Promise.all([...assets].map(([asset,file])=>storage().put(storageKey(user,id,asset),file.bytes,{httpMetadata:{contentType:file.contentType},customMetadata:{projectId:id,userId:user.id,tenantId:user.tenantId}})));
+  ensureMaterialsStore();const referenced=new Set(workbook.sheets.flatMap(sheet=>[...boardAssets(sheet.board,id)])),now=new Date().toISOString();
   const result=database.transaction(db=>{
    const old=db.prepare('SELECT revision FROM interior_sandbox_boards WHERE project_id=? AND user_id=? AND tenant_id=?').get(id,user.id,user.tenantId) as {revision:number}|undefined;
    if((old?.revision||0)!==body.revision)return null;
    const previous=(db.prepare('SELECT asset FROM interior_sandbox_assets WHERE project_id=?').all(id) as {asset:string}[]).map(row=>row.asset);
    const revision=body.revision+1;
-   db.prepare('INSERT INTO interior_sandbox_boards(project_id,user_id,tenant_id,revision,document_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET revision=excluded.revision,document_json=excluded.document_json,updated_at=excluded.updated_at').run(id,user.id,user.tenantId,revision,JSON.stringify(prepared.board),now);
+   db.prepare('INSERT INTO interior_sandbox_boards(project_id,user_id,tenant_id,revision,document_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET revision=excluded.revision,document_json=excluded.document_json,updated_at=excluded.updated_at').run(id,user.id,user.tenantId,revision,JSON.stringify(workbook),now);
    db.prepare('DELETE FROM interior_sandbox_assets WHERE project_id=?').run(id);
    const insert=db.prepare('INSERT INTO interior_sandbox_assets(project_id,asset) VALUES(?,?)');
    for(const asset of referenced)insert.run(id,asset);
@@ -92,6 +95,6 @@ export async function PUT(request:Request,{params}:Context){
   });
   if(!result)return Response.json({error:'Проект изменён в другой вкладке. Обновите страницу; сохранение остановлено.'},{status:409});
   await Promise.allSettled(result.stale.map(asset=>storage().delete(storageKey(user,id,asset))));
-  return Response.json({document:prepared.board,revision:result.revision},{headers:{'Cache-Control':'no-store'}});
+  return Response.json({document:activeSheet(workbook).board,workbook,revision:result.revision},{headers:{'Cache-Control':'no-store'}});
  }catch(error){return Response.json({error:error instanceof Error?error.message:'Не удалось сохранить раздел'},{status:400});}
 }
