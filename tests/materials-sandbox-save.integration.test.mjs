@@ -1,0 +1,49 @@
+import test,{after} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {registerHooks} from 'node:module';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+const root=await mkdtemp(join(tmpdir(),'room-materials-save-'));process.env.ROOM_DESIGN_DATA_DIR=root;
+registerHooks({resolve(s,c,next){return next(s.startsWith('@/')?pathToFileURL(join(process.cwd(),s.slice(2)+'.ts')).href:s,c);}});
+const auth=await import('../lib/auth.ts'),{database}=await import('../lib/server-runtime.ts');
+const {GET,PUT}=await import('../app/api/projects/[id]/materials-concept/route.ts');
+const {emptyBoard}=await import('../lib/material-board/model.ts');
+const {asWorkbook,appendSheet}=await import('../lib/material-board/workbook.ts');
+await auth.ensureStore();
+const user={id:'sandbox-user',email:'sandbox@example.test',role:'user',tenantId:'tenant_norrmobler',tenantSlug:'norrmobler',tenantRole:'member',firstName:'Test',lastName:'',phone:'',companyRole:''},now=new Date().toISOString();
+await database.prepare("INSERT INTO users(id,email,password_hash,password_salt,password_algorithm,password_iterations,global_role,created_at) VALUES(?,?,'x','x','google-only',600000,'user',?)").bind(user.id,user.email,now).run();
+await database.prepare("INSERT INTO tenant_memberships(tenant_id,user_id,role,created_at) VALUES(?,?,'member',?)").bind(user.tenantId,user.id,now).run();
+await database.prepare('INSERT INTO projects(id,user_id,tenant_id,name,state_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind('sandbox-project',user.id,user.tenantId,'Test',JSON.stringify({planItems:[{id:'existing-chair'}],technicalLighting:{keep:true}}),now,now).run();
+const session=await auth.createSession(user),url='https://roomdesign.com.ru/api/projects/sandbox-project/materials-concept',context={params:Promise.resolve({id:'sandbox-project'})};
+const request=(body,authenticated=true)=>new Request(url,{method:body?'PUT':'GET',headers:{...(authenticated?{Cookie:'room_session='+session}:{}),'Content-Type':'application/json',Origin:'https://roomdesign.com.ru'},...(body?{body:JSON.stringify(body)}:{})});
+after(()=>rm(root,{recursive:true,force:true}));
+const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl4bAAAAABJRU5ErkJggg==';
+let saved;
+test('existing materials board migrates without changing its contents or revision',async()=>{
+ const legacy={...emptyBoard(),nodes:[{id:'legacy',kind:'reference',title:'Existing image',image:'/api/projects/sandbox-project/assets/source',x:20,y:30,width:200,height:200}]};
+ await GET(request(),context);
+ await database.prepare('INSERT INTO material_boards(project_id,user_id,tenant_id,revision,document_json,updated_at) VALUES(?,?,?,?,?,?)').bind('sandbox-project',user.id,user.tenantId,4,JSON.stringify(legacy),now).run();
+ await database.prepare('INSERT INTO material_board_assets(project_id,asset) VALUES(?,?)').bind('sandbox-project','source').run();
+ await auth.storage().put(auth.tenantStoragePrefix(user)+'/projects/sandbox-project/source',new Uint8Array([1,2,3]));
+ const response=await(await GET(request(),context)).json();assert.equal(response.revision,4);assert.deepEqual(response.document,legacy);assert.deepEqual(response.workbook.sheets[0].board,legacy);
+ const savedLegacy=await PUT(request({revision:4,workbook:appendSheet(response.workbook,'legacy-extra')}),context);assert.equal(savedLegacy.status,200);assert.ok(await auth.storage().get(auth.tenantStoragePrefix(user)+'/projects/sandbox-project/source'));
+ await database.prepare('DELETE FROM material_boards WHERE project_id=?').bind('sandbox-project').run();
+});
+
+test('only the authenticated owner can read or save sandbox sheets',async()=>{assert.equal((await GET(request(null,false),context)).status,401);assert.equal((await PUT(request({revision:0,document:emptyBoard()},false),context)).status,401);assert.equal((await GET(request(),{params:Promise.resolve({id:'other-project'})})).status,404);});
+test('all sheets and inactive image assets survive save/reopen without changing other stages',async()=>{
+ const first={...emptyBoard(),nodes:[{id:'scene',kind:'reference',scene:true,title:'Room',image:png,originalImage:png,x:0,y:0,width:300,height:200}]};
+ const workbook=appendSheet(asWorkbook(first),'second');workbook.sheets[1].name='Ткани';workbook.sheets[1].board.furniturePosition={x:600,y:400};
+ const response=await PUT(request({revision:0,workbook}),context);assert.equal(response.status,200);saved=await response.json();assert.equal(saved.revision,1);assert.equal(saved.workbook.sheets.length,2);const image=saved.workbook.sheets[0].board.nodes[0].image;assert.match(image,/\/assets\/material-/);
+ const asset=image.split('/').at(-1),file=await auth.storage().get(auth.tenantStoragePrefix(user)+'/projects/sandbox-project/'+asset);assert.ok(file);
+ saved=await(await PUT(request({revision:1,workbook:saved.workbook}),context)).json();const reopened=await(await GET(request(),context)).json();assert.deepEqual(reopened.workbook,saved.workbook);assert.equal(reopened.workbook.sheets[1].name,'Ткани');assert.deepEqual(reopened.workbook.sheets[1].board.furniturePosition,{x:600,y:400});assert.ok(await auth.storage().get(auth.tenantStoragePrefix(user)+'/projects/sandbox-project/'+asset));
+ assert.deepEqual(JSON.parse((await database.prepare('SELECT state_json FROM projects WHERE id=?').bind('sandbox-project').first()).state_json),{planItems:[{id:'existing-chair'}],technicalLighting:{keep:true}});
+});
+test('stale revisions and cross-project assets cannot overwrite the saved workbook',async()=>{
+ assert.equal((await PUT(request({revision:0,workbook:saved.workbook}),context)).status,409);
+ const invalid=structuredClone(saved.workbook);invalid.sheets[0].board.nodes[0].image='/api/projects/other-project/assets/material-123';assert.equal((await PUT(request({revision:saved.revision,workbook:invalid}),context)).status,400);
+ assert.deepEqual((await(await GET(request(),context)).json()).workbook,saved.workbook);
+});
+test('legacy single-board requests remain readable as sheet 1',async()=>{const r=await PUT(request({revision:saved.revision,document:emptyBoard()}),context);assert.equal(r.status,200);const data=await r.json();assert.equal(data.workbook.sheets[0].name,'Лист 1');assert.deepEqual(data.document,emptyBoard());});
