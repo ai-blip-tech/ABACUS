@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/project-menu-preview.css", import.meta.url), "utf8");
 const materialsThumbnail = await readFile(new URL("../app/materials-concept/stage-thumbnail.tsx", import.meta.url), "utf8");
 
 test("project menu is part of the preview route without changing the legacy studio flow", () => {
-  assert.match(page, /type AppView = "home" \| "account" \| "newProject" \| "projectMenu" \| "studio"/);
+  assert.match(page, /import type \{AppView\} from "@\/lib\/app-entry"/);
   assert.match(page, /navigate\(unifiedStudioPreview\?"projectMenu":"studio",project\.id\)/);
   assert.match(page, /navigate\(unifiedStudioPreview \? "projectMenu" : "studio", newProjectId\)/);
   assert.match(page, /#меню-проекта/);

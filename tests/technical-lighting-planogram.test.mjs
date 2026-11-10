@@ -5,7 +5,7 @@ import test from "node:test";
 const source = await readFile(new URL("../app/technical-lighting/page.tsx", import.meta.url), "utf8");
 const generationRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
 const catalogRoute = await readFile(new URL("../app/api/lighting/catalog/route.ts", import.meta.url), "utf8");
-const homeSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const homeSource = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const imageActionsSource = await readFile(new URL("../app/editor-image-actions.tsx", import.meta.url), "utf8");
 const projectLightingRoute = await readFile(new URL("../app/api/projects/[id]/technical-lighting/route.ts", import.meta.url), "utf8");
 

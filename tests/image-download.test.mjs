@@ -6,7 +6,7 @@ import { jpegDownloadName } from "../lib/client-image-download.ts";
 
 const [downloadSource, pageSource] = await Promise.all([
   readFile(new URL("../lib/client-image-download.ts", import.meta.url), "utf8"),
-  readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8"),
 ]);
 
 test("generation downloads use safe JPEG filenames", () => {

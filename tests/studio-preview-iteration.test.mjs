@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 const [page, layout, styles, accountStyles, homeOverride] = await Promise.all([
-  readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/studio-preview-iteration.css", import.meta.url), "utf8"),
   readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8"),

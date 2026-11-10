@@ -741,3 +741,65 @@ jobs:
             rm -rf "$snapshot_dir" "$restore_dir"
             current_step="completed"
             test "$readiness_failed" = "0"
+
+  retain-five-backups:
+    name: Retain the five latest verified production backups
+    if: ${{ inputs.confirmation == 'KEEP_FIVE_VERIFIED_ROOM_DESIGN_BACKUPS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-backup
+    steps:
+      - name: Verify retained archives and remove only older backup directories
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
+        env:
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: EXPECTED_PRODUCTION_SHA
+          command_timeout: 12m
+          script: |
+            set -eu
+            cd "$HOME/ABACUS"
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            python3 - "$HOME/room-design-backups" <<'PY'
+            import json, re, shutil, subprocess, sys
+            from pathlib import Path
+            root=Path(sys.argv[1]).resolve()
+            candidates=[]
+            for path in root.iterdir():
+                if not re.fullmatch(r'predeploy-\d+-\d+',path.name):
+                    continue
+                if path.is_symlink() or not path.is_dir() or path.resolve().parent!=root:
+                    raise SystemExit('Refusing unsafe backup path')
+                report=path/'REPORT.txt'
+                fields=dict(line.split('=',1) for line in report.read_text().splitlines() if '=' in line) if report.is_file() else {}
+                candidates.append((path,fields,report.stat().st_mtime if report.is_file() else path.stat().st_mtime))
+            verified=sorted([item for item in candidates if item[1].get('status')=='PASSED'],key=lambda item:item[2],reverse=True)
+            if len(verified)<5:
+                raise SystemExit('Refusing cleanup: fewer than five verified backups exist')
+            keep={item[0] for item in verified[:5]}
+            for path in keep:
+                manifest=path/'room-design-production.tar.gz.sha256'
+                if not manifest.is_file():
+                    raise SystemExit('Retained backup checksum missing: '+path.name)
+                subprocess.run(['sha256sum','--check','--status',manifest.name],cwd=path,check=True)
+                release_manifest=path/'release-files.sha256'
+                if release_manifest.is_file():
+                    subprocess.run(['sha256sum','--check','--status',release_manifest.name],cwd=path,check=True)
+            print('RETAINED_BACKUPS='+json.dumps(sorted(path.name for path in keep)),flush=True)
+            removed=[]
+            for path,fields,mtime in candidates:
+                if path in keep:
+                    continue
+                shutil.rmtree(path)
+                removed.append(path.name)
+            print('REMOVED_BACKUPS='+json.dumps(sorted(removed)),flush=True)
+            print('VERIFIED_BACKUPS_REMAINING='+str(len(keep)),flush=True)
+            print('BACKUP_RETENTION_STATUS=PASSED',flush=True)
+            PY
+            test "$(git rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            df -h "$HOME/room-design-backups"

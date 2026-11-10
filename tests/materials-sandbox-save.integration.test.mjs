@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 const root=await mkdtemp(join(tmpdir(),'room-materials-save-'));process.env.ROOM_DESIGN_DATA_DIR=root;
-registerHooks({resolve(s,c,next){return next(s.startsWith('@/')?pathToFileURL(join(process.cwd(),s.slice(2)+'.ts')).href:s,c);}});
+registerHooks({resolve(s,c,next){if(s.startsWith('@/'))return next(pathToFileURL(join(process.cwd(),s.slice(2)+'.ts')).href,c);try{return next(s,c);}catch(error){if(s.startsWith('.')&&!/\.[a-z]+$/i.test(s))return next(s+'.ts',c);throw error;}}});
 const auth=await import('../lib/auth.ts'),{database}=await import('../lib/server-runtime.ts');
 const {GET,PUT}=await import('../app/api/projects/[id]/materials-concept/route.ts');
 const {emptyBoard}=await import('../lib/material-board/model.ts');
@@ -47,3 +47,16 @@ test('stale revisions and cross-project assets cannot overwrite the saved workbo
  assert.deepEqual((await(await GET(request(),context)).json()).workbook,saved.workbook);
 });
 test('legacy single-board requests remain readable as sheet 1',async()=>{const r=await PUT(request({revision:saved.revision,document:emptyBoard()}),context);assert.equal(r.status,200);const data=await r.json();assert.equal(data.workbook.sheets[0].name,'Лист 1');assert.deepEqual(data.document,emptyBoard());});
+
+test('stage shell loads metadata without parsing or sending full editor history',async()=>{
+ const {GET:getProject}=await import('../app/api/projects/[id]/route.ts');
+ const body=JSON.stringify({prompt:'history '.repeat(3000),planItems:[]});
+ await database.prepare('UPDATE projects SET state_json=? WHERE id=?').bind(body,'sandbox-project').run();
+ const headers={Cookie:'room_session='+session};
+ const summary=await getProject(new Request('https://roomdesign.com.ru/api/projects/sandbox-project?summary=1',{headers}),context);
+ assert.equal(summary.status,200);const payload=await summary.json();assert.equal(payload.project.name,'Test');assert.equal('state' in payload,false);assert.equal('state_json' in payload.project,false);
+ const full=await getProject(new Request('https://roomdesign.com.ru/api/projects/sandbox-project',{headers}),context);assert.equal(full.status,200);assert.equal((await full.json()).state.prompt,'history '.repeat(3000));
+ assert.equal((await getProject(new Request('https://roomdesign.com.ru/api/projects/sandbox-project?summary=1'),context)).status,401);
+ await database.prepare('UPDATE projects SET state_json=? WHERE id=?').bind('{broken-history','sandbox-project').run();
+ assert.equal((await getProject(new Request('https://roomdesign.com.ru/api/projects/sandbox-project?summary=1',{headers}),context)).status,200);
+});

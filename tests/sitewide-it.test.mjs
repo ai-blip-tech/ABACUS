@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
-const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const home = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const sitewide = await readFile(new URL("../app/sitewide-it.tsx", import.meta.url), "utf8");
 const itOrb = await readFile(new URL("../app/it-orb.tsx", import.meta.url), "utf8");
 const templatesHome = await readFile(new URL("../app/templates-home.tsx", import.meta.url), "utf8");

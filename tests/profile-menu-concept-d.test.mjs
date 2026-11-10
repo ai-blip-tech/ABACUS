@@ -5,7 +5,7 @@ import test from "node:test";
 
 const dropdown = await readFile(new URL("../app/account-dropdown.tsx", import.meta.url), "utf8");
 const dropdownCss = await readFile(new URL("../app/account-dropdown.css", import.meta.url), "utf8");
-const dashboard = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const dashboard = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const account = await readFile(new URL("../app/account/page.tsx", import.meta.url), "utf8");
 const dashboardCss = await readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8");
 const hero = await readFile(new URL("../public/images/room-design/room-design-projects-dashboard-hero-reference.avif", import.meta.url));

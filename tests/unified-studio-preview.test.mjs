@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const page = (await Promise.all(["../app/page.tsx", "../app/furniture-catalog-page.tsx", "../app/furniture-catalog-picker.tsx", "../app/interior-furniture-choices.tsx", "../app/studio-material-tray.tsx"].map(path=>readFile(new URL(path, import.meta.url), "utf8")))).join("\n");
+const page = (await Promise.all(["../app/room-design-app.tsx", "../app/furniture-catalog-page.tsx", "../app/furniture-catalog-picker.tsx", "../app/interior-furniture-choices.tsx", "../app/studio-material-tray.tsx"].map(path=>readFile(new URL(path, import.meta.url), "utf8")))).join("\n");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/unified-studio-preview.css", import.meta.url), "utf8");
 const generateRoute = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");

@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { proposalImageFormat } from "../lib/proposal-image.ts";
 
-const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const globalCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const dashboardCss = await readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8");
 const proposalRoute = await readFile(new URL("../app/api/proposal/route.ts", import.meta.url), "utf8");

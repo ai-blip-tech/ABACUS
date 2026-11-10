@@ -76,7 +76,7 @@ test("global admin overview uses the shared real-data aggregator", async () => {
 });
 
 test("planogram keeps menus readable, rugs below furniture, and supports bedside tables", async () => {
-  const pageSource = (await Promise.all(["../app/page.tsx","../lib/furniture-catalog-options.ts","../lib/interior-furniture-templates.ts"].map(path=>readFile(new URL(path,import.meta.url),"utf8")))).join("\n");
+  const pageSource = (await Promise.all(["../app/room-design-app.tsx","../lib/furniture-catalog-options.ts","../lib/interior-furniture-templates.ts"].map(path=>readFile(new URL(path,import.meta.url),"utf8")))).join("\n");
   const controlsSource = await readFile(new URL("../app/planogram-controls.ts", import.meta.url), "utf8");
   const catalogSource = await readFile(new URL("../app/api/catalog/route.ts", import.meta.url), "utf8");
   const catalogFilterSource = await readFile(new URL("../lib/catalog-filter.ts", import.meta.url), "utf8");
@@ -106,7 +106,7 @@ test("planogram keeps menus readable, rugs below furniture, and supports bedside
 });
 
 test("planogram keeps a remembered render instruction separate from immediate image editing", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const pageSource = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
   const generateSource = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const projectSource = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
 
@@ -118,7 +118,7 @@ test("planogram keeps a remembered render instruction separate from immediate im
 });
 
 test("studio distinguishes an existing-project loader from a new-project upload prompt", async () => {
-  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const pageSource = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
   const stylesSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
   assert.match(pageSource, /project-loading-blueprint\.png/);

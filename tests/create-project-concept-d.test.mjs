@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../app/create-project.css", import.meta.url), "utf8");
 const tokens = readFileSync(new URL("../app/concept-d.css", import.meta.url), "utf8");
 

@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { normalizePlanReferenceImages } from "../lib/plan-render.ts";
 
-const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const pageSource = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const projectRouteSource = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
 
 test("saved project reference assets are converted before a planogram render", async () => {

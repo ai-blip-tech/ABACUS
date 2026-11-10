@@ -9,7 +9,7 @@ const [styles, home, templatesHeader, account, admin, proposal, studio] = await 
   readFile(new URL("../app/account/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/admin/admin-client.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/proposal/[projectId]/proposal-editor.tsx", import.meta.url), "utf8"),
-  readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8"),
 ]);
 
 test("all product mastheads use the homepage Room Design wordmark", () => {

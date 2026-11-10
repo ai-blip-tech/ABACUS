@@ -7,7 +7,7 @@ const dashboardCss = await readFile(new URL("../app/account-dashboard-concept-d.
 const dropdownCss = await readFile(new URL("../app/account-dropdown.css", import.meta.url), "utf8");
 const conceptCss = await readFile(new URL("../app/concept-d.css", import.meta.url), "utf8");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
-const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 
 test("keeps a vh fallback before dynamic viewport units", () => {
   assert.match(createProjectCss, /min-height:\s*100vh;\s*min-height:\s*100dvh;/);

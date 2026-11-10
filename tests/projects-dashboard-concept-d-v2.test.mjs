@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const source = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/account-dashboard-concept-d.css", import.meta.url), "utf8");
 const overviewRoute = await readFile(new URL("../app/api/account/overview/route.ts", import.meta.url), "utf8");
 const projectRoute = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");

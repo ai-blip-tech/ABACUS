@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/create-project.css", import.meta.url), "utf8");
 
 test("unified preview replaces the generic project form with the eight-part brief", () => {

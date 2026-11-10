@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const homeSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const homeSource = await readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8");
 const accountSource = await readFile(new URL("../app/account/page.tsx", import.meta.url), "utf8");
 const dropdownSource = await readFile(new URL("../app/account-dropdown.tsx", import.meta.url), "utf8");
 const dropdownCss = await readFile(new URL("../app/account-dropdown.css", import.meta.url), "utf8");

@@ -24,7 +24,7 @@ test("a pending product survives login navigation for at most 24 hours", () => {
 });
 
 test("the Room Design entry flow preselects but never auto-submits the product", async () => {
-  const source = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../app/page.tsx", import.meta.url), "utf8"));
+  const source = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../app/room-design-app.tsx", import.meta.url), "utf8"));
   const handoffEffect = source.match(/const fromUrl=norrProductIdFromSearch[\s\S]*?return\(\)=>controller\.abort\(\);/)?.[0] || "";
   assert.match(handoffEffect, /fetch\(`\/api\/catalog\?ids=/);
   assert.match(handoffEffect, /setReferenceImage\(product\.image\)/);
