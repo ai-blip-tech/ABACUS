@@ -1,0 +1,110 @@
+name: Configure Room Design static compression
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type CONFIGURE_ROOM_DESIGN_STATIC_COMPRESSION"
+        required: true
+        type: string
+      expected_production_sha:
+        description: "Full SHA that must already be running in production"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roomdesign-production
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: ${{ inputs.confirmation == 'CONFIGURE_ROOM_DESIGN_STATIC_COMPRESSION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-backup
+    steps:
+      - name: Configure Nginx compression atomically
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+          CONFIGURATION_RUN_ID: ${{ github.run_id }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 12m
+          envs: EXPECTED_PRODUCTION_SHA,CONFIGURATION_RUN_ID
+          script: |
+            set -eu
+            umask 077
+
+            app_dir="$HOME/ABACUS"
+            target="/etc/nginx/conf.d/roomdesign-compression.conf"
+            backup_dir="$HOME/room-design-server-backups/static-compression-${CONFIGURATION_RUN_ID}"
+            previous="absent"
+            committed="0"
+
+            rollback() {
+              result=$?
+              trap - EXIT INT TERM
+              if [ "$committed" != "1" ]; then
+                if [ "$previous" = "present" ]; then
+                  sudo install -m 0644 "$backup_dir/roomdesign-compression.conf" "$target"
+                else
+                  sudo rm -f "$target"
+                fi
+                sudo nginx -t
+                sudo systemctl reload nginx
+                echo "ROLLBACK=nginx-compression-restored"
+              fi
+              exit "$result"
+            }
+            trap rollback EXIT INT TERM
+
+            sudo -n true
+            test "$(git -C "$app_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/api/health >/dev/null
+            mkdir -p "$backup_dir"
+            if sudo test -f "$target"; then
+              sudo cp "$target" "$backup_dir/roomdesign-compression.conf"
+              sudo chown "$(id -u):$(id -g)" "$backup_dir/roomdesign-compression.conf"
+              previous="present"
+            fi
+
+            config_file="$(mktemp)"
+            cat > "$config_file" <<'EOF'
+            # Room Design static asset compression. Included inside nginx http {}.
+            gzip_vary on;
+            gzip_proxied any;
+            gzip_comp_level 6;
+            gzip_min_length 1024;
+            gzip_types text/plain text/css application/json application/javascript application/x-javascript text/xml application/xml application/xml+rss image/svg+xml text/javascript;
+            EOF
+            sudo install -m 0644 "$config_file" "$target"
+            rm -f "$config_file"
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            curl --fail --silent --show-error --max-time 20 https://roomdesign.norrmobler.ru/api/health >/dev/null
+            html="$(curl --fail --silent --show-error --max-time 20 https://roomdesign.norrmobler.ru/)"
+            asset="$(printf '%s' "$html" | grep -oE '/_next/static/[^\" ]+\.js' | head -n 1)"
+            test -n "$asset"
+            curl --fail --silent --show-error --max-time 30 --compressed --dump-header /tmp/roomdesign-compression-headers.txt --output /dev/null "https://roomdesign.norrmobler.ru${asset}"
+            grep -qi '^content-encoding: gzip' /tmp/roomdesign-compression-headers.txt
+            test "$(git -C "$app_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
+
+            committed="1"
+            trap - EXIT INT TERM
+            {
+              echo "status=PASSED"
+              echo "production_sha=$EXPECTED_PRODUCTION_SHA"
+              echo "nginx_config=$target"
+              echo "content_encoding=gzip"
+              echo "application_restarted=no"
+              echo "application_data_modified=no"
+            } > "$backup_dir/REPORT.txt"
+            echo "STATIC_COMPRESSION_STATUS=PASSED"
+            echo "SERVER_CONFIGURATION_REPORT=$backup_dir/REPORT.txt"
