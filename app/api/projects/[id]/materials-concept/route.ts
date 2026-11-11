@@ -42,7 +42,7 @@ function prepareBoard(value:unknown,projectId:string):PreparedBoard{
   }
   return image;
  };
- const nodes=value.nodes.map((node:MaterialNode)=>({...node,image:prepareImage(node.image),originalImage:prepareImage(node.originalImage)}));
+ const nodes=value.nodes.map((node:MaterialNode)=>({...node,image:prepareImage(node.image),originalImage:prepareImage(node.originalImage),...(node.interior?{interior:{...node.interior,floorReference:node.interior.floorReference?{...node.interior.floorReference,image:prepareImage(node.interior.floorReference.image)!}:null,wallReference:node.interior.wallReference?{...node.interior.wallReference,image:prepareImage(node.interior.wallReference.image)!}:null,items:node.interior.items.map(item=>({...item,referenceImage:prepareImage(item.referenceImage),referenceImages:item.referenceImages?.map(image=>prepareImage(image)!)}))}}:{})}));
  const board={...value,nodes};
  if(!isBoard(board))throw Error('Не удалось подготовить раздел к сохранению');
  return{board,assets};
@@ -51,7 +51,7 @@ function prepareBoard(value:unknown,projectId:string):PreparedBoard{
 const storageKey=(user:AppUser,projectId:string,asset:string)=>tenantStoragePrefix(user)+'/projects/'+projectId+'/'+asset;
 const boardAssets=(board:MaterialBoard,projectId:string)=>{
  const pattern=assetPattern(projectId),assets=new Set<string>();
- for(const node of board.nodes)for(const image of [node.image,node.originalImage]){const match=image&&pattern.exec(image);if(match&&match[1].startsWith('material-'))assets.add(match[1]);}
+ for(const node of board.nodes)for(const image of [node.image,node.originalImage,node.interior?.floorReference?.image,node.interior?.wallReference?.image,...(node.interior?.items.flatMap(item=>[item.referenceImage,...(item.referenceImages||[])])||[])]){const match=image&&pattern.exec(image);if(match&&match[1].startsWith('material-'))assets.add(match[1]);}
  return assets;
 };
 

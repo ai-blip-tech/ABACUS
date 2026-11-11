@@ -18,4 +18,4 @@ export const interiorFurnitureTemplates = [
  {kind:'nightstand',name:'Прикроватная тумба',width:500,depth:400},
  {kind:'tv_stand',name:'TV-тумба',width:1600,depth:450},
 ] as const;
-export type InteriorFurnitureTemplate = (typeof interiorFurnitureTemplates)[number];
+export type InteriorFurnitureTemplate = {kind:'sofa'|'table'|'chair'|'stool'|'rug'|'bed'|'cabinet'|'lamp'|'decor'|'plant'|'dresser'|'nightstand'|'tv_stand';name:string;width:number;depth:number;rugShape?:'rectangular'|'round'};
