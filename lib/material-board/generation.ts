@@ -11,6 +11,18 @@ export function materialTransferInstruction(product:MaterialNode,material:Materi
  'The result is a product photograph, not a moodboard. Do not add labels, swatches, new furniture, text, logos, marks, borders, people, split views or before/after panels.',
  'Return one complete image. Use the material sample only as visual guidance; do not reproduce its card or create an additional object.',
 ].join('\n');}
+export function materialCompositionInstruction(product:MaterialNode,materials:MaterialNode[],notes:MaterialNode[]){
+ const references=materials.map((material,index)=>`REFERENCE ${index+2}: ${JSON.stringify(material.title)}${material.kind==='colour'&&material.colour?` (${material.colour})`:''}.`).join('\n');
+ const userInstruction=notes.map(note=>note.text?.trim()).filter(Boolean).join('\n');
+ return[
+  materials.length?'PRODUCT_BASE is image 1: the original product photograph. The following images are material and colour references, never objects to insert.':'PRODUCT_BASE is image 1: the original product photograph. No additional visual reference is supplied; follow the text instruction only.',
+  references,
+  materials.length?`Task: edit only the single existing product (${JSON.stringify(product.title)}) using the supplied references.`:`Task: edit only the single existing product (${JSON.stringify(product.title)}) according to the text instruction.`,
+  userInstruction?`USER MAPPING INSTRUCTION (follow it exactly):\n${userInstruction}`:'Apply the supplied references coherently to the product surfaces. If several references are supplied, keep every reference distinguishable and do not mix them into an unrelated new material.',
+  'Preserve the exact product identity, silhouette, proportions, geometry, seams, camera, framing, background and contact shadows. Change only the surfaces explicitly described by the user instruction.',
+  'Return one complete product photograph. Do not add labels, swatches, material cards, new furniture, text, logos, people, split views or before/after panels.',
+ ].filter(Boolean).join('\n');
+}
 export function blobImage(blob:Blob):Promise<string>{return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(Error('Не удалось прочитать изображение.'));reader.readAsDataURL(blob);});}
 async function normalizedImage(blob:Blob){
  if(!blob.type.startsWith('image/')||!blob.size||blob.size>20_000_000)throw Error('Источник не вернул поддерживаемое изображение.');
@@ -70,12 +82,18 @@ export async function generatePlanogram3D(planImage:string,references:MaterialNo
 }
 /** Uses the existing authenticated Room Design generation/billing pipeline. */
 export async function generateMaterialTransfer(product:MaterialNode,material:MaterialNode,operationId:string,signal:AbortSignal){
- const [roomImage,referenceImage]=await Promise.all([sourceImage(product),materialReference(material)]);
+ return generateMaterialComposition(product,[material],[],operationId,signal);
+}
+export async function generateMaterialComposition(product:MaterialNode,materials:MaterialNode[],notes:MaterialNode[],operationId:string,signal:AbortSignal){
+ if(!materials.length&&!notes.some(note=>note.text?.trim()))throw Error('Свяжите товар хотя бы с одним материалом, цветом или заполненным стикером.');
+ if(materials.length>10)throw Error('Для одного рендера можно использовать не более 10 материалов.');
+ const [roomImage,referenceImages]=await Promise.all([sourceImage(product),Promise.all(materials.map(materialReference))]);
  const base=await createImageBitmap(await(await fetch(roomImage)).blob()),ratio=base.width/base.height; base.close();
  const outputSize=ratio>1.2?'1536x1024':ratio<.8?'1024x1536':'1024x1024';
- const instruction=materialTransferInstruction(product,material);
+ const instruction=materials.length===1&&!notes.some(note=>note.text?.trim())?materialTransferInstruction(product,materials[0]):materialCompositionInstruction(product,materials,notes);
  const localPreview=['127.0.0.1','localhost','::1'].includes(location.hostname),endpoint=localPreview?'/api/material-board/generate-preview':'/api/generate';
- const response=await fetch(endpoint,{method:'POST',signal,headers:{'Content-Type':'application/json','Idempotency-Key':operationId,'X-Disable-Generation-Retry':'1'},body:JSON.stringify({operation:'global_edit',prompt:instruction,roomImage,templateEdit:{templateId:'material-board-transfer',instructions:instruction,referenceImages:[referenceImage],outputLabel:'Товар · '+material.title},outputSize})});
+ const outputSources=[...materials.map(material=>material.title),...notes.map(note=>note.text?.trim().slice(0,80)).filter(Boolean)];
+ const response=await fetch(endpoint,{method:'POST',signal,headers:{'Content-Type':'application/json','Idempotency-Key':operationId,'X-Disable-Generation-Retry':'1'},body:JSON.stringify({operation:'global_edit',prompt:instruction,roomImage,templateEdit:{templateId:'material-board-transfer',instructions:instruction,referenceImages,outputLabel:'Товар · '+outputSources.join(' + ')},outputSize})});
  if(!response.ok){const payload=await response.json().catch(()=>({}));throw Error(payload.error||(response.status===401?'Для генерации войдите в Room Design.':'Не удалось изменить материал товара.'));}
  const image=await response.blob();if(!image.type.startsWith('image/')||!image.size)throw Error('Сервис не вернул изображение. Исходный товар сохранён.');
  return blobImage(image);

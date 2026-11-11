@@ -12,6 +12,18 @@ export function connectNodes(board:MaterialBoard,from:string,to:string,id:string
  if(from===to||![from,to].every(id=>board.nodes.some(n=>n.id===id))||board.links.some(l=>l.from===from&&l.to===to||l.from===to&&l.to===from))return board;
  return{...board,links:[...board.links,{id,from,to}]};
 }
+export function linkedNodeIds(board:MaterialBoard,startId:string):string[]{
+ if(!board.nodes.some(node=>node.id===startId))return[];
+ const visited=new Set([startId]),queue=[startId];
+ while(queue.length){
+  const current=queue.shift()!;
+  for(const link of board.links){
+   const next=link.from===current?link.to:link.to===current?link.from:null;
+   if(next&&!visited.has(next)){visited.add(next);queue.push(next);}
+  }
+ }
+ return[...visited];
+}
 export function removeNodes(board:MaterialBoard,ids:string[]):MaterialBoard{const removed=new Set(ids);return{...board,nodes:board.nodes.filter(n=>!removed.has(n.id)).map(n=>removed.has(n.materialId||'')?{...n,materialId:undefined}:n),links:board.links.filter(l=>!removed.has(l.from)&&!removed.has(l.to)),groups:board.groups.map(g=>({...g,members:g.members.filter(id=>!removed.has(id))})).filter(g=>g.members.length>1)};}
 export function nodeBounds(nodes:MaterialNode[],padding=0){if(!nodes.length)return null;const x=Math.min(...nodes.map(n=>n.x))-padding,y=Math.min(...nodes.map(n=>n.y))-padding;return{x,y,width:Math.max(...nodes.map(n=>n.x+n.width))-x+padding,height:Math.max(...nodes.map(n=>n.y+n.height))-y+padding};}
 export function fitBoard(nodes:MaterialNode[],width:number,height:number):BoardView{const box=nodeBounds(nodes,70);if(!box)return{x:0,y:0,scale:1};const scale=Math.min(1.2,Math.max(.25,Math.min(width/box.width,height/box.height)));return{x:(width-box.width*scale)/2-box.x*scale,y:(height-box.height*scale)/2-box.y*scale,scale};}

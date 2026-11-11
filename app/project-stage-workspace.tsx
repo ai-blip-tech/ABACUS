@@ -10,12 +10,13 @@ export default function ProjectStageWorkspace({user,projectId,projectName,projec
  const [selected,setSelected]=useState('sources');
  const [opened,setOpened]=useState<string[]>([]);
  const [loaded,setLoaded]=useState<string[]>([]);
+ const [fullscreenStage,setFullscreenStage]=useState<string|null>(null);
  const frames=useRef(new Map<string,HTMLIFrameElement>());
- useEffect(()=>{const ready=(event:MessageEvent)=>{if(event.origin!==location.origin||event.data?.type!=='roomdesign:stage-ready')return;const entry=[...frames.current].find(([,frame])=>frame.contentWindow===event.source);if(entry)setLoaded(current=>current.includes(entry[0])?current:[...current,entry[0]]);};window.addEventListener('message',ready);return()=>window.removeEventListener('message',ready);},[]);
+ useEffect(()=>{const message=(event:MessageEvent)=>{if(event.origin!==location.origin)return;const entry=[...frames.current].find(([,frame])=>frame.contentWindow===event.source);if(!entry)return;if(event.data?.type==='roomdesign:stage-ready')setLoaded(current=>current.includes(entry[0])?current:[...current,entry[0]]);if(event.data?.type==='roomdesign:stage-fullscreen')setFullscreenStage(event.data.expanded?entry[0]:current=>current===entry[0]?null:current);};window.addEventListener('message',message);return()=>window.removeEventListener('message',message);},[]);
  const [brief,setBrief]=useState(false);
  const select=(id:string,push=true)=>{
   if(!stages.some(stage=>stage.id===id))return;
-  setSelected(id);setOpened(current=>current.includes(id)?current:[...current,id]);
+  setSelected(id);setFullscreenStage(null);setOpened(current=>current.includes(id)?current:[...current,id]);
   const url=new URL(location.href);url.searchParams.set('stage',id);url.hash='меню-проекта';
   if(push)history.pushState({projectId,norrView:'projectMenu'},'',url);
   try{localStorage.setItem(`roomdesign:last-stage:${projectId}`,id);}catch{/* Navigation still works without local storage. */}
@@ -28,7 +29,7 @@ export default function ProjectStageWorkspace({user,projectId,projectName,projec
  },[projectId]);
  const active=stages.find(stage=>stage.id===selected)!;
  const frameUrl=(stage:typeof stages[number])=>projectStageFrameUrl(stage.id,projectId)!;
- return <main className={`project-menu-preview project-stage-workspace${active.path?' has-workspace':''}`}>
+ return <main className={`project-menu-preview project-stage-workspace${active.path?' has-workspace':''}${fullscreenStage===selected?' is-stage-fullscreen':''}`}>
   <header className="project-menu-header">
    <button className="project-menu-wordmark room-design-wordmark" type="button" onClick={onHome}>ROOM DESIGN</button>
    <nav aria-label="Путь проекта"><button onClick={onProjects}>Проекты</button><span>›</span><b>{projectName}</b><span>›</span><em>{active.label}</em></nav>

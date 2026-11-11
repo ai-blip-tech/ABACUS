@@ -16,6 +16,9 @@
 .project-stage-pane[hidden]{display:none!important}
 .project-stage-pane iframe{border:0;display:block;width:100%;height:100%;background:#fffdfa}
 .project-stage-loading{position:absolute;inset:0;z-index:2;display:grid;place-content:center;background:#fffdfa;color:#887d73;font-size:14px;pointer-events:none}
+.project-stage-workspace.is-stage-fullscreen>.project-menu-header,.project-stage-workspace.is-stage-fullscreen .project-menu-sidebar{display:none!important}
+.project-stage-workspace.is-stage-fullscreen .project-stage-layout{display:block;flex:1;min-height:0}
+.project-stage-workspace.is-stage-fullscreen .project-stage-main{width:100%;height:100%}
 .project-stage-coming{padding:50px 40px}.project-stage-coming>span{font-size:10px;letter-spacing:.18em;color:#980d2b}.project-stage-coming h2{font:400 38px var(--font-cormorant-garamond),Georgia,serif}.project-stage-coming p{color:#887d73}
 html[data-project-stage-embed] .editor-header,html[data-project-stage-embed] [aria-label="Оно — интеллект Room Design"]{display:none!important}
 html[data-project-stage-embed] .materials-concept{min-height:0}

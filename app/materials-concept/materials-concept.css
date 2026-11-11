@@ -40,6 +40,10 @@
 .concept-resize-handle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round}
 .concept-generation-spinner{position:absolute;z-index:3;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border:3px solid #fff8;border-top-color:var(--concept-red);border-radius:50%;box-shadow:0 0 0 999px #1e1b1666;animation:concept-spin .8s linear infinite}
 .concept-node.is-generating{cursor:progress}
+.concept-node.render-ready::before{content:'';position:absolute;z-index:11;left:0;right:0;bottom:-12px;height:14px}
+.concept-node-render{position:absolute;z-index:12;left:50%;bottom:-32px;display:inline-flex;align-items:center;justify-content:center;min-width:142px;width:max-content;max-width:none;height:32px;padding:0 18px;border:1px solid #8fc3a0;border-radius:999px!important;background:#315b45;color:#f4fff7;font-size:9px;font-weight:700;line-height:1;letter-spacing:.02em;white-space:nowrap;box-shadow:0 8px 22px #0006;opacity:0;pointer-events:none;transform:translate(-50%,6px);transition:opacity .16s,transform .16s,background .16s}
+.concept-node.render-ready:hover>.concept-node-render,.concept-node.render-ready:focus-within>.concept-node-render,.concept-node.render-ready.selected>.concept-node-render{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+.concept-node-render:hover:not(:disabled){background:#244b36}.concept-node-render:disabled{opacity:.75!important;cursor:progress}
 .concept-generation-error{border-color:#b73a51;background:#fff0f2;color:#7e1730}
 .concept-generation-error button{background:#f1cdd5}
 @keyframes concept-spin{to{transform:rotate(360deg)}}
@@ -151,17 +155,17 @@
 /* The plan is part of the sheet, not a card placed on top of it. */
 .concept-interior-area{border:0;border-radius:0;background:transparent;box-shadow:none;overflow:visible;color:#e6e3d7;pointer-events:auto}
 .concept-interior-area .sandbox-interior-workspace{pointer-events:auto}
-.sandbox-interior-workspace{grid-template-columns:minmax(0,1fr) 270px;gap:16px;overflow:visible}
+.sandbox-interior-workspace{position:relative;display:block;width:100%;height:100%;overflow:visible}
 .sandbox-interior-workspace .planogram-toolbar,.sandbox-interior-workspace .planogram-footer{display:none!important}
-.sandbox-interior-main{overflow:visible;display:flex;align-items:center}
+.sandbox-interior-main{width:100%;height:100%;overflow:visible;display:flex;align-items:center}
 .sandbox-interior-workspace .planogram-workspace{overflow:visible!important;width:100%!important;flex:1 1 auto!important}
 .sandbox-interior-workspace .planogram-editor-scroll{overflow:visible;padding:0!important;background:transparent!important;width:100%!important;flex:1 1 auto!important}
 .sandbox-interior-workspace .planogram-editor-board{background:transparent!important;border:1px solid #e6e3d780!important;box-shadow:none!important}
-.sandbox-interior-settings{align-self:start;max-height:none;padding:4px 0 14px 8px;border:0;background:transparent;box-shadow:none;overflow:visible}
+.sandbox-interior-settings{position:absolute;left:calc(100% + 14px);top:0;width:270px;max-height:none;padding:4px 0 14px;border:0;background:transparent;box-shadow:none;overflow:visible}
 .sandbox-area-move,.sandbox-area-remove{position:absolute;top:-29px;width:25px;height:25px;display:grid;place-items:center;padding:0;border:1px solid #ffffff28;border-radius:50%;background:#343630e8;color:#e6e3d7;opacity:0;pointer-events:none;transition:opacity .18s,background .18s,transform .18s;z-index:16;cursor:pointer}
-.sandbox-area-move{left:0;top:-34px;width:30px;height:30px;cursor:grab;opacity:.88;pointer-events:auto;touch-action:none}.sandbox-area-move:hover{opacity:1;background:#3f4039;transform:scale(1.05)}.sandbox-area-move:active{cursor:grabbing}.sandbox-area-remove{right:286px}.sandbox-area-move svg,.sandbox-area-remove svg{width:14px;height:14px}
+.sandbox-area-move{left:0;top:-34px;width:30px;height:30px;cursor:grab;opacity:.88;pointer-events:auto;touch-action:none}.sandbox-area-move:hover{opacity:1;background:#3f4039;transform:scale(1.05)}.sandbox-area-move:active{cursor:grabbing}.sandbox-area-remove{right:0}.sandbox-area-move svg,.sandbox-area-remove svg{width:14px;height:14px}
 .concept-interior-area:hover>.sandbox-area-move,.concept-interior-area:hover>.sandbox-area-remove,.concept-interior-area:focus-within>.sandbox-area-move,.concept-interior-area:focus-within>.sandbox-area-remove{opacity:1;pointer-events:auto}
-.sandbox-area-resize{right:286px;bottom:2px;opacity:.72;z-index:16}
+.sandbox-area-resize{right:2px;bottom:2px;opacity:.72;z-index:16}
 .sandbox-interior-workspace .plan-render-button{right:10px!important;bottom:10px!important}
 
 /* Only the room outline is drawn on the sandbox: no second canvas or grid. */

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {emptyBoard,worldPoint,zoomAt,connectNodes,removeNodes,moveNodes,duplicateNodes,fitBoard,findOverlappingNode,isMaterialTransferTarget,isBoard} from '../lib/material-board/model.ts';
+import {emptyBoard,worldPoint,zoomAt,connectNodes,linkedNodeIds,removeNodes,moveNodes,duplicateNodes,fitBoard,findOverlappingNode,isMaterialTransferTarget,isBoard} from '../lib/material-board/model.ts';
+import {materialCompositionInstruction} from '../lib/material-board/generation.ts';
 import {emptyInterior,rectangleBetween,bindReferenceToPlanItem,bindInstructionToInterior,bindFloorReferenceToInterior,interiorSourceIsBound,detachReferenceFromPlanItem} from '../lib/material-board/interior-workspace.ts';
 const node=(id,x=0)=>({id,kind:'material',x,y:10,width:220,height:240,title:id});
 test('material workspace starts empty and validates stored board',()=>{assert.deepEqual(emptyBoard(),{version:1,nodes:[],links:[],groups:[]});assert.ok(isBoard(emptyBoard()));assert.equal(isBoard({version:1,nodes:[],links:null,groups:[]}),false);assert.equal(isBoard({...emptyBoard(),nodes:[{...node('a'),image:'javascript:alert(1)'}]}),false);assert.ok(isBoard({...emptyBoard(),nodes:[{...node('a'),image:'/api/projects/123e4567-e89b-12d3-a456-426614174000/assets/material-abc'}]}));assert.equal(isBoard({...emptyBoard(),nodes:[{...node('a'),image:'/api/projects/bad/path'}]}),false);});
@@ -44,6 +45,21 @@ test('stickers and free images become persisted plan commands without starting a
 });
 test('zoom keeps the pointer anchored in world coordinates and clamps range',()=>{const v={x:75,y:-30,scale:.75},p={x:200,y:100};assert.deepEqual(worldPoint(p,zoomAt(v,p,1.5)),worldPoint(p,v));assert.equal(zoomAt(v,p,20).scale,2.5);assert.equal(zoomAt(v,p,.01).scale,.25);});
 test('connections reject self, missing and duplicate links',()=>{let b={...emptyBoard(),nodes:[node('a'),node('b',300)]};b=connectNodes(b,'a','b','one');assert.equal(b.links.length,1);assert.equal(connectNodes(b,'b','a','two'),b);assert.equal(connectNodes(b,'a','a','three'),b);assert.equal(connectNodes(b,'a','missing','four'),b);});
+test('a product render bundle includes transitively linked materials and a sticker instruction',()=>{
+ const product={...node('table'),kind:'product',title:'Стол'},white={...node('white'),title:'Белый камень'},wood={...node('wood'),title:'Орех'},note={...node('note'),kind:'note',title:'Инструкция',text:'Белый — столешница, коричневый — основание'};
+ const board={...emptyBoard(),nodes:[product,white,wood,note],links:[{id:'one',from:'table',to:'white'},{id:'two',from:'white',to:'wood'},{id:'three',from:'wood',to:'note'}]};
+ assert.deepEqual(new Set(linkedNodeIds(board,'table')),new Set(['table','white','wood','note']));
+ const prompt=materialCompositionInstruction(product,[white,wood],[note]);
+ assert.match(prompt,/Белый — столешница, коричневый — основание/);
+ assert.match(prompt,/REFERENCE 2: "Белый камень"/);
+ assert.match(prompt,/REFERENCE 3: "Орех"/);
+});
+test('a filled sticker can generate a text-only product edit without a material image',()=>{
+ const product={...node('chair'),kind:'product',title:'Кресло'},note={...node('note'),kind:'note',title:'Инструкция',text:'Убери подлокотники и сохрани остальную форму'};
+ const prompt=materialCompositionInstruction(product,[],[note]);
+ assert.match(prompt,/No additional visual reference is supplied/);
+ assert.match(prompt,/Убери подлокотники и сохрани остальную форму/);
+});
 test('removal cleans links, room groups and assigned materials',()=>{const b={...emptyBoard(),nodes:[node('a'),{...node('b',300),kind:'product',materialId:'a'}],links:[{id:'l',from:'a',to:'b'}],groups:[{id:'g',title:'Спальня',members:['a','b']}]};const next=removeNodes(b,['a']);assert.equal(next.links.length,0);assert.equal(next.groups.length,0);assert.equal(next.nodes[0].materialId,undefined);assert.equal(b.nodes.length,2);});
 test('group moving preserves relative geometry; duplicates get fresh identities',()=>{const b={...emptyBoard(),nodes:[node('a'),node('b',300)],links:[{id:'l',from:'a',to:'b'}]};const moved=moveNodes(b,['a','b'],50,-20);assert.equal(moved.nodes[1].x-moved.nodes[0].x,300);let n=0;const copy=duplicateNodes(moved,['a','b'],()=>String(++n));assert.equal(copy.board.nodes.length,4);assert.equal(copy.board.links.length,2);assert.ok(copy.board.links.at(-1).from!==b.links[0].from);assert.ok(isBoard(copy.board));});
 test('fit can return a far-away table into the viewport',()=>{const nodes=[node('a',100000),node('b',100300)],v=fitBoard(nodes,1200,700);for(const n of nodes){assert.ok(n.x*v.scale+v.x>=0);assert.ok((n.x+n.width)*v.scale+v.x<=1200);}assert.deepEqual(fitBoard([],1200,700),{x:0,y:0,scale:1});});
