@@ -157,7 +157,7 @@
 .sandbox-interior-workspace .planogram-workspace{overflow:visible!important;width:100%!important;flex:1 1 auto!important}
 .sandbox-interior-workspace .planogram-editor-scroll{overflow:visible;padding:0!important;background:transparent!important;width:100%!important;flex:1 1 auto!important}
 .sandbox-interior-workspace .planogram-editor-board{background:transparent!important;border:1px solid #e6e3d780!important;box-shadow:none!important}
-.sandbox-interior-settings{align-self:center;max-height:100%;padding:4px 0 14px 8px;border:0;background:transparent;box-shadow:none;overflow-y:auto;overflow-x:hidden}
+.sandbox-interior-settings{align-self:start;max-height:none;padding:4px 0 14px 8px;border:0;background:transparent;box-shadow:none;overflow:visible}
 .sandbox-area-move,.sandbox-area-remove{position:absolute;top:-29px;width:25px;height:25px;display:grid;place-items:center;padding:0;border:1px solid #ffffff28;border-radius:50%;background:#343630e8;color:#e6e3d7;opacity:0;pointer-events:none;transition:opacity .18s,background .18s,transform .18s;z-index:16;cursor:pointer}
 .sandbox-area-move{left:0;top:-34px;width:30px;height:30px;cursor:grab;opacity:.88;pointer-events:auto;touch-action:none}.sandbox-area-move:hover{opacity:1;background:#3f4039;transform:scale(1.05)}.sandbox-area-move:active{cursor:grabbing}.sandbox-area-remove{right:286px}.sandbox-area-move svg,.sandbox-area-remove svg{width:14px;height:14px}
 .concept-interior-area:hover>.sandbox-area-move,.concept-interior-area:hover>.sandbox-area-remove,.concept-interior-area:focus-within>.sandbox-area-move,.concept-interior-area:focus-within>.sandbox-area-remove{opacity:1;pointer-events:auto}
@@ -191,3 +191,16 @@
 .sandbox-interior-workspace .planogram-furniture.reference-bound.hovered .plan-bound-preview,.sandbox-interior-workspace .planogram-furniture.reference-bound:hover .plan-bound-preview,.sandbox-interior-workspace .planogram-furniture.reference-bound:focus-within .plan-bound-preview,.sandbox-interior-workspace .planogram-furniture.reference-bound:focus-visible .plan-bound-preview{width:84px;min-height:76px;padding:5px;box-shadow:0 10px 24px #0008}
 .sandbox-interior-workspace .planogram-furniture.reference-bound.hovered .plan-bound-preview img,.sandbox-interior-workspace .planogram-furniture.reference-bound:hover .plan-bound-preview img,.sandbox-interior-workspace .planogram-furniture.reference-bound:focus-within .plan-bound-preview img,.sandbox-interior-workspace .planogram-furniture.reference-bound:focus-visible .plan-bound-preview img{height:54px}
 .sandbox-interior-workspace .planogram-furniture.reference-bound.hovered .plan-bound-preview small,.sandbox-interior-workspace .planogram-furniture.reference-bound:hover .plan-bound-preview small,.sandbox-interior-workspace .planogram-furniture.reference-bound:focus-within .plan-bound-preview small,.sandbox-interior-workspace .planogram-furniture.reference-bound:focus-visible .plan-bound-preview small{display:block}
+
+/* The selected product is a compact sandbox summary, not the legacy form editor. */
+.sandbox-selected-product{display:flex;flex-direction:column;gap:8px;margin-top:12px;padding:10px;border:1px solid #ffffff24;border-radius:12px;background:#ffffff0a;color:#e6e3d7;box-shadow:none}
+.sandbox-selected-product>small{font:600 8px/1.2 var(--font-manrope),Arial,sans-serif;letter-spacing:.1em;color:#e6e3d78c}
+.sandbox-selected-product-image{width:100%;height:116px;display:grid;place-items:center;overflow:hidden;border:1px solid #ffffff18;border-radius:9px;background:#ffffff0b}
+.sandbox-selected-product-image img{display:block;width:100%;height:100%;object-fit:contain;background:#f7f5ef}
+.sandbox-selected-product-image>span{display:grid;place-items:center;width:54px;height:54px;border:1px solid #ffffff22;border-radius:50%;color:#e6e3d780;font:500 22px/1 var(--font-cormorant),Georgia,serif}
+.sandbox-selected-product>div:last-child{display:flex;flex-direction:column;gap:3px;min-width:0}.sandbox-selected-product b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 12px/1.25 var(--font-cormorant),Georgia,serif;color:#f0eadf}.sandbox-selected-product span{font:500 8px/1.2 var(--font-manrope),Arial,sans-serif;color:#e6e3d780}
+
+/* A note or image dropped onto the plan becomes a persisted render command. */
+.concept-node.interior-command-bound{border-color:#79bd91!important;box-shadow:0 0 0 3px #4e9d6b3d,0 12px 34px #0004!important}
+.concept-node.note.interior-command-bound{background:#315b45!important;--note:#315b45!important}
+.concept-node.interior-command-bound::after{content:'ГОТОВО К РЕНДЕРУ';position:absolute;left:8px;bottom:7px;z-index:8;padding:3px 6px;border:1px solid #8bd0a3;border-radius:999px;background:#244b36e8;color:#dff1e5;font:700 6px/1 var(--font-manrope),Arial,sans-serif;letter-spacing:.08em;pointer-events:none}

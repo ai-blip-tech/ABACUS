@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {emptyBoard,worldPoint,zoomAt,connectNodes,removeNodes,moveNodes,duplicateNodes,fitBoard,findOverlappingNode,isMaterialTransferTarget,isBoard} from '../lib/material-board/model.ts';
-import {emptyInterior,rectangleBetween,bindReferenceToPlanItem,detachReferenceFromPlanItem} from '../lib/material-board/interior-workspace.ts';
+import {emptyInterior,rectangleBetween,bindReferenceToPlanItem,bindInstructionToInterior,bindFloorReferenceToInterior,interiorSourceIsBound,detachReferenceFromPlanItem} from '../lib/material-board/interior-workspace.ts';
 const node=(id,x=0)=>({id,kind:'material',x,y:10,width:220,height:240,title:id});
 test('material workspace starts empty and validates stored board',()=>{assert.deepEqual(emptyBoard(),{version:1,nodes:[],links:[],groups:[]});assert.ok(isBoard(emptyBoard()));assert.equal(isBoard({version:1,nodes:[],links:null,groups:[]}),false);assert.equal(isBoard({...emptyBoard(),nodes:[{...node('a'),image:'javascript:alert(1)'}]}),false);assert.ok(isBoard({...emptyBoard(),nodes:[{...node('a'),image:'/api/projects/123e4567-e89b-12d3-a456-426614174000/assets/material-abc'}]}));assert.equal(isBoard({...emptyBoard(),nodes:[{...node('a'),image:'/api/projects/bad/path'}]}),false);});
 
@@ -30,6 +30,17 @@ test('the first delete detaches a product and restores the original plan item',(
  assert.equal(detached.referenceImage,undefined);
  assert.equal(detached.referenceProductId,undefined);
  assert.equal(detached.referenceBase,undefined);
+});
+test('stickers and free images become persisted plan commands without starting a render',()=>{
+ const base=emptyInterior(700,600),withSticker=bindInstructionToInterior(base,'note-1'),withDuplicate=bindInstructionToInterior(withSticker,'note-1');
+ assert.deepEqual(withSticker.commandSourceIds,['note-1']);
+ assert.equal(withDuplicate,withSticker);
+ const withFloor=bindFloorReferenceToInterior(withSticker,{id:'floor-1',title:'Дуб натуральный',image:'data:image/png;base64,AAAA'});
+ assert.deepEqual(withFloor.floorReference,{sourceId:'floor-1',name:'Дуб натуральный',image:'data:image/png;base64,AAAA'});
+ assert.equal(interiorSourceIsBound(withFloor,'note-1'),true);
+ assert.equal(interiorSourceIsBound(withFloor,'floor-1'),true);
+ assert.equal(interiorSourceIsBound(withFloor,'other'),false);
+ assert.equal(isBoard({...emptyBoard(),nodes:[{...node('interior'),width:700,height:600,interior:withFloor}]}),true);
 });
 test('zoom keeps the pointer anchored in world coordinates and clamps range',()=>{const v={x:75,y:-30,scale:.75},p={x:200,y:100};assert.deepEqual(worldPoint(p,zoomAt(v,p,1.5)),worldPoint(p,v));assert.equal(zoomAt(v,p,20).scale,2.5);assert.equal(zoomAt(v,p,.01).scale,.25);});
 test('connections reject self, missing and duplicate links',()=>{let b={...emptyBoard(),nodes:[node('a'),node('b',300)]};b=connectNodes(b,'a','b','one');assert.equal(b.links.length,1);assert.equal(connectNodes(b,'b','a','two'),b);assert.equal(connectNodes(b,'a','a','three'),b);assert.equal(connectNodes(b,'a','missing','four'),b);});

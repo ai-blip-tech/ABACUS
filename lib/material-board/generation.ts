@@ -12,14 +12,22 @@ export function materialTransferInstruction(product:MaterialNode,material:Materi
  'Return one complete image. Use the material sample only as visual guidance; do not reproduce its card or create an additional object.',
 ].join('\n');}
 export function blobImage(blob:Blob):Promise<string>{return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(Error('Не удалось прочитать изображение.'));reader.readAsDataURL(blob);});}
+async function normalizedImage(blob:Blob){
+ if(!blob.type.startsWith('image/')||!blob.size||blob.size>20_000_000)throw Error('Источник не вернул поддерживаемое изображение.');
+ let bitmap:ImageBitmap;
+ try{bitmap=await createImageBitmap(blob);}catch{throw Error('Не удалось распознать изображение товара. Выберите другое фото.');}
+ const longest=Math.max(bitmap.width,bitmap.height);if(!longest){bitmap.close();throw Error('Изображение товара не содержит пикселей.');}
+ const scale=Math.min(1,2048/longest),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+ const context=canvas.getContext('2d');if(!context){bitmap.close();throw Error('Не удалось подготовить изображение товара.');}
+ context.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
+ const webp=canvas.toDataURL('image/webp',.92),result=webp.startsWith('data:image/webp;base64,')?webp:canvas.toDataURL('image/png');if(!/^data:image\/(?:webp|png);base64,/.test(result))throw Error('Не удалось подготовить изображение товара.');return result;
+}
 export async function sourceImage(node:MaterialNode){
  const image=node.originalImage||node.image;if(!image)throw Error('Сначала загрузите изображение товара.');
- if(image.startsWith('data:image/'))return image;
  const url=node.catalogId?'/api/material-board/catalog-image?id='+encodeURIComponent(node.catalogId):image;
  const response=await fetch(url,{credentials:url.startsWith('/')?'same-origin':'omit'});
  if(!response.ok)throw Error('Не удалось подготовить изображение из каталога. Загрузите фото товара с компьютера.');
- const blob=await response.blob();if(!blob.type.startsWith('image/')||!blob.size||blob.size>20_000_000)throw Error('Источник не вернул поддерживаемое изображение.');
- return blobImage(blob);
+ return normalizedImage(await response.blob());
 }
 export async function materialReference(node:MaterialNode){
  if(node.image)return sourceImage(node);
