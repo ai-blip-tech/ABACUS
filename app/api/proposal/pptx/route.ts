@@ -19,8 +19,8 @@ type ProposalDocument = {
   leadTime?: string; delivery?: string; payment?: string; managerRole?: string; managerPhone?: string; managerEmail?: string;
 };
 type ProposalBody = {
-  projectId?: string; projectName?: string; coverImage?: string; coverBrandAsset?: string; managerBrandAsset?: string; withPrices?: boolean;
-  products?: ProposalProduct[]; document?: ProposalDocument; managerName?: string;
+  source?:"studio"|"materials";previewTenant?:"norrmobler";projectId?: string; projectName?: string; coverImage?: string; coverBrandAsset?: string; managerBrandAsset?: string; withPrices?: boolean;
+  products?: ProposalProduct[]; document?: ProposalDocument; managerName?: string;additionalVisualizations?:Array<{title?:string;image?:string;steps?:Array<{id?:string;role?:string;title?:string;image?:string}>}>;
 };
 type PreparedImage = { data: string; width: number; height: number };
 
@@ -90,11 +90,14 @@ export async function POST(request: Request) {
     const project = await database.prepare("SELECT state_json FROM projects WHERE id = ? AND tenant_id = ? AND user_id = ?")
       .bind(body.projectId, user.tenantId, user.id).first<{ state_json: string | null }>();
     if (!project?.state_json) return Response.json({ error: "Сохранённый проект не найден." }, { status: 404 });
-    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }>; proposalItems?: Array<{ id?: string }>; proposalHistoryId?: string | null; historyVersions?: Array<{ id?: string; proposalItems?: Array<{ id?: string }> }> };
+    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }>; proposalItems?: Array<{ id?: string }>;materialsProposalItems?:Array<{id?:string}>; proposalHistoryId?: string | null; historyVersions?: Array<{ id?: string; proposalItems?: Array<{ id?: string }> }> };
+    const materialsSource=body.source==='materials';
+    const previewTenant=process.env.NODE_ENV!=='production'&&body.previewTenant==='norrmobler';
+    if(materialsSource&&user.tenantSlug!=='norrmobler'&&!previewTenant)return Response.json({error:'Коммерческое предложение Norrmobler недоступно для этого тенанта.'},{status:403});
     const selectedHistoryItems = savedState.proposalHistoryId
       ? savedState.historyVersions?.find((version) => version.id === savedState.proposalHistoryId)?.proposalItems || []
       : null;
-    const allowedIds = new Set((selectedHistoryItems || [...(savedState.planItems || []), ...(savedState.proposalItems || [])]).map((item) => item.id).filter((id): id is string => Boolean(id)));
+    const allowedIds = new Set((materialsSource?savedState.materialsProposalItems||[]:selectedHistoryItems || [...(savedState.planItems || []), ...(savedState.proposalItems || [])]).map((item) => item.id).filter((id): id is string => Boolean(id)));
     if (products.some((product) => !product.objectIds?.length || product.objectIds.some((id) => !allowedIds.has(id)))) {
       return Response.json({ error: "Состав коммерческого предложения не соответствует проекту." }, { status: 403 });
     }
@@ -107,6 +110,11 @@ export async function POST(request: Request) {
       ...products.map((product) => prepareImage(product.referenceImage || product.image, product.source === "reference" ? "reference" : "catalog")),
     ]);
     if (!visual || !coverBrand || !managerBrand) throw new Error("Не удалось подготовить изображения для PPTX.");
+    const additionalVisualizations=(await Promise.all((Array.isArray(body.additionalVisualizations)?body.additionalVisualizations.slice(0,19):[]).map(async item=>({
+      title:asText(item.title,'Результат концепции'),
+      image:await prepareImage(item.image,'visualization'),
+      steps:(await Promise.all((Array.isArray(item.steps)?item.steps.slice(0,6):[]).map(async step=>({title:asText(step.title,'Референс'),role:asText(step.role,''),image:await prepareImage(step.image,'visualization')})))).filter((step)=>Boolean(step.image)),
+    })))).filter((item)=>Boolean(item.image||item.steps.length));
 
     const pptx = new PptxGenJS();
     pptx.defineLayout({ name: "A4_LANDSCAPE", width: W, height: H });
@@ -144,10 +152,12 @@ export async function POST(request: Request) {
     addLabelValue(selection, "Принцип", asText(proposal.principle), 6.08, 4.65, 4.55, 11);
     addLabelValue(selection, "Город / объект", asText(proposal.cityObject), 6.08, 5.55, 4.55, 11);
 
+    additionalVisualizations.forEach((item,index)=>{const slide=pptx.addSlide();slide.background={color:WHITE};addChrome(pptx,slide,String(index+2).padStart(2,'0'),'Результат концепции');addText(slide,item.title,.5,.82,10.6,.48,{fontFace:'Georgia',fontSize:25});if(item.steps.length){const gap=.22,areaX=.62,areaWidth=10.45,boxWidth=(areaWidth-gap*(item.steps.length-1))/item.steps.length;item.steps.forEach((step,stepIndex)=>{if(!step.image)return;const x=areaX+stepIndex*(boxWidth+gap);addText(slide,step.title.toUpperCase(),x,1.5,boxWidth,.3,{fontSize:7,bold:true,color:BURGUNDY,charSpacing:1.2});slide.addImage({...contain(step.image,{x,y:1.92,w:boxWidth,h:5.15})});if(stepIndex<item.steps.length-1)addText(slide,'›',x+boxWidth+.03,4,.15,.4,{fontFace:'Georgia',fontSize:24,color:BURGUNDY});});}else if(item.image)slide.addImage({...contain(item.image,{x:.62,y:1.5,w:10.45,h:6.05})});});
+
     products.forEach((product, index) => {
       const slide = pptx.addSlide();
       slide.background = { color: WHITE };
-      addChrome(pptx, slide, String(index + 2).padStart(2, "0"), "");
+      addChrome(pptx, slide, String(index + 2 + additionalVisualizations.length).padStart(2, "0"), "");
       const category = asText(product.category || product.referenceCategory, "Предмет интерьера").toUpperCase();
       addText(slide, category, 4.55, .33, 2.6, .22, { fontSize: 7, bold: true, color: MUTED, charSpacing: 1.8, align: "center" });
       addText(slide, asText(product.name || product.referenceName, "Товар"), .5, .8, 10.65, .58, { fontFace: "Georgia", fontSize: 26 });
@@ -179,7 +189,7 @@ export async function POST(request: Request) {
       const finalPage = pageIndex === specificationPages.length - 1;
       const slide = pptx.addSlide();
       slide.background = { color: WHITE };
-      addChrome(pptx, slide, String(products.length + 2 + pageIndex).padStart(2, "0"), finalPage ? "Итог и условия" : "Спецификация");
+      addChrome(pptx, slide, String(products.length + 2 + additionalVisualizations.length + pageIndex).padStart(2, "0"), finalPage ? "Итог и условия" : "Спецификация");
       addText(slide, pageIndex ? "Спецификация — продолжение" : "Спецификация", .5, .82, 7.5, .48, { fontFace: "Georgia", fontSize: 27 });
       const header = ["№", "ПОЗИЦИЯ", "АРТИКУЛ", "КОЛ-ВО", "ЦЕНА", "СУММА"].map((text) => ({ text, options: { bold: true, color: WHITE, fill: { color: INK } } }));
       const rows = pageProducts.map((product, index) => [
@@ -202,7 +212,7 @@ export async function POST(request: Request) {
 
     const about = pptx.addSlide();
     about.background = { color: WHITE };
-    addChrome(pptx, about, String(products.length + 2 + specificationPages.length).padStart(2, "0"), PROPOSAL_BRAND.aboutTitle);
+    addChrome(pptx, about, String(products.length + 2 + additionalVisualizations.length + specificationPages.length).padStart(2, "0"), PROPOSAL_BRAND.aboutTitle);
     addText(about, "Европейский дизайн. Индивидуальный сценарий.", .58, .82, 10.55, .55, { fontFace: "Georgia", fontSize: 26 });
     about.addImage({ ...contain(visual, { x: .62, y: 1.65, w: 5.23, h: 2.85 }) });
     about.addShape(pptx.ShapeType.rect, { x: 5.85, y: 1.65, w: 5.34, h: 2.85, line: { color: INK }, fill: { color: INK } });
@@ -215,7 +225,7 @@ export async function POST(request: Request) {
 
     const manager = pptx.addSlide();
     manager.background = { color: IVORY };
-    addMarker(pptx, manager, String(products.length + 3 + specificationPages.length).padStart(2, "0"), "Ваш персональный менеджер");
+    addMarker(pptx, manager, String(products.length + 3 + additionalVisualizations.length + specificationPages.length).padStart(2, "0"), "Ваш персональный менеджер");
     manager.addImage({ ...contain(managerBrand, { x: .82, y: 1.02, w: 4.92, h: 4.25 }) });
     addText(manager, "СЛЕДУЮЩИЙ ШАГ", .58, 5.52, 3.8, .22, { fontSize: 7, bold: true, color: BURGUNDY, charSpacing: 1.8 });
     addText(manager, "Подтвердите выбранные позиции или пришлите правки. Менеджер обновит конфигурации, стоимость и сценарий поставки.", .58, 5.92, 4.85, .75, { fontSize: 10 });

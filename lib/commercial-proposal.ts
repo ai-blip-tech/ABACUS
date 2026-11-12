@@ -14,6 +14,7 @@ export type ProposalPlanItem = {
   id: string; kind?: string; name: string; width: number; depth: number;
   referenceImage?: string; referenceImages?: string[]; referenceName?: string;
   referenceProductId?: string; referenceArticle?: string; referenceUrl?: string;
+  referenceBrand?: string;
   referencePrice?: number; referenceOldPrice?: number; referenceCategory?: string;
   referenceSubtype?: string; referenceColor?: string; referenceMaterial?: string;
   referenceHeightMm?: number | null; referenceDescription?: string;
@@ -41,6 +42,7 @@ export function proposalItemsForSelection(state?: ProposalSelectionState) {
 
 export type ProposalCatalogProduct = {
   id: string; name: string; article?: string; image?: string; images?: string[]; url?: string;
+  brand?: string;
   price?: number; oldPrice?: number; category?: string; subtype?: string; color?: string; material?: string;
   widthMm?: number | null; depthMm?: number | null; heightMm?: number | null;
   description?: string; parameters?: Array<{ name: string; value: string }>;
@@ -97,7 +99,7 @@ export function buildProposalProducts(items: ProposalPlanItem[], catalog: Map<st
     const item = group[0];
     const product = item.referenceProductId ? catalog.get(item.referenceProductId) : undefined;
     const override = item.proposalOverride || {};
-    const image = product?.image || item.referenceImage || "";
+    const image = item.referenceImage || product?.image || "";
     const parameters = product?.parameters || item.referenceParameters || [];
     const productIdentity = `${product?.category || item.referenceCategory || ""} ${product?.name || item.referenceName || item.name || ""}`;
     const defaultBrand = /свет|ламп|торшер/i.test(productIdentity)
@@ -120,7 +122,7 @@ export function buildProposalProducts(items: ProposalPlanItem[], catalog: Map<st
       notes: override.notes ?? "Финальная стоимость зависит от ткани, отделки и выбранной конфигурации.",
       category: override.category ?? product?.category ?? item.referenceCategory ?? "Предмет интерьера",
       brand: override.brand && !(override.brand === "NORR MÖBLER SELECTION" && defaultBrand !== "NORR MÖBLER SELECTION")
-        ? override.brand : defaultBrand,
+        ? override.brand : product?.brand || item.referenceBrand || defaultBrand,
       configuration: override.configuration ?? "Выбранная конфигурация",
       option: override.option ?? product?.material ?? item.referenceMaterial ?? "Подтверждается по образцу",
       characteristics: [...(override.characteristics ?? defaults), "", "", "", ""].slice(0, 4),

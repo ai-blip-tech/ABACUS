@@ -10,12 +10,16 @@ import {
 import { PROPOSAL_BRAND, isLegacyNorrBrand } from "@/lib/proposal-brand";
 
 type User = { firstName?: string; lastName?: string; email?: string; phone?: string; companyRole?: string };
+type MaterialProposalStep={id:string;role:'source'|'reference'|'result';title:string;image:string};
+type MaterialProposalVisualization={id:string;title:string;image:string;resultType?:string;steps?:MaterialProposalStep[]};
 type ProjectPayload = {
   project?: { name?: string; project_type?: string };
   state?: {
     planItems?: ProposalPlanItem[]; proposalItems?: ProposalPlanItem[]; proposalShowPrices?: boolean; proposalVisualization?: string;
     proposalHistoryId?: string | null; historyVersions?: Array<{ id: string; proposalItems?: ProposalPlanItem[] }>;
     generatedImage?: string; interiorImage?: string; proposalDocument?: Partial<ProposalDocument>;
+    materialsProposalItems?:ProposalPlanItem[];materialsProposalVisualizations?:MaterialProposalVisualization[];
+    materialsProposalShowPrices?:boolean;materialsProposalDocument?:Partial<ProposalDocument>;
   };
 };
 
@@ -61,6 +65,8 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
   const [products, setProducts] = useState<ProposalProduct[]>([]);
   const [document, setDocument] = useState<ProposalDocument>(() => defaultProposalDocument("", 0));
   const [showPrices, setShowPrices] = useState(true);
+  const [proposalSource,setProposalSource]=useState<"studio"|"materials">("studio");
+  const [proposalPreviewTenant,setProposalPreviewTenant]=useState(false);
   const [status, setStatus] = useState("Загружаем проект…");
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState<"pdf" | "pptx" | "">("");
@@ -78,7 +84,9 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         const payload = await response.json() as ProjectPayload & { error?: string };
         const auth = await authResponse.json().catch(() => ({ user: {} })) as { user?: User };
         if (!response.ok) throw new Error(payload.error || "Не удалось открыть проект.");
-        const items = proposalItemsForSelection(payload.state);
+        const query=new URLSearchParams(window.location.search),source=query.get('source')==='materials'?'materials':'studio';
+        const previewTenant=process.env.NODE_ENV!=='production'&&query.get('previewTenant')==='norrmobler';
+        const items = source==='materials'?(payload.state?.materialsProposalItems||[]):proposalItemsForSelection(payload.state);
         const ids = [...new Set(items.map((item) => item.referenceProductId).filter((id): id is string => Boolean(id)))];
         let catalog = new Map<string, ProposalCatalogProduct>();
         if (ids.length) {
@@ -96,10 +104,10 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         defaults.managerPhone = profile.phone || "";
         defaults.managerEmail = profile.email || "";
         defaults.managerRole = profile.companyRole || defaults.managerRole;
-        setProject(payload); setUser(profile); setProducts(mapped);
-        setDocument(mergeProposalDocument(payload.state?.proposalDocument, defaults));
-        setShowPrices(payload.state?.proposalShowPrices !== false);
-        setStatus(mapped.length ? "Все изменения сохраняются автоматически" : "Можно скачать визуализацию в PDF или PowerPoint без товаров");
+        setProject(payload); setUser(profile); setProducts(mapped);setProposalSource(source);setProposalPreviewTenant(previewTenant);
+        setDocument(mergeProposalDocument(source==='materials'?payload.state?.materialsProposalDocument:payload.state?.proposalDocument, defaults));
+        setShowPrices(source==='materials'?payload.state?.materialsProposalShowPrices!==false:payload.state?.proposalShowPrices !== false);
+        setStatus(mapped.length ? `В спецификацию добавлено позиций: ${mapped.length}. Все изменения сохраняются автоматически` : "Можно скачать визуализацию в PDF или PowerPoint без товаров");
         loaded.current = true;
       } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : "Не удалось открыть редактор."); }
     })();
@@ -111,12 +119,12 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
     const items = nextProducts.flatMap((product) => product.objectIds.map((id) => ({ id, proposalOverride: proposalOverrideFor(product) })));
     const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/proposal`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ showPrices: nextShowPrices, items, document: nextDocument }),
+      body: JSON.stringify({ source:proposalSource,previewTenant:proposalPreviewTenant?'norrmobler':undefined,showPrices: nextShowPrices, items, document: nextDocument }),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || "Не удалось сохранить коммерческое предложение.");
     setStatus("Изменения сохранены");
-  }, [projectId]);
+  }, [projectId,proposalSource,proposalPreviewTenant]);
 
   const queueSave = useCallback((nextProducts: ProposalProduct[], nextShowPrices: boolean, nextDocument: ProposalDocument) => {
     if (!loaded.current) return;
@@ -136,7 +144,12 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
   const setPriceVisibility = (checked: boolean) => { setShowPrices(checked); queueSave(products, checked, document); };
   const total = useMemo(() => proposalTotal(products), [products]);
   const specificationPages = useMemo(() => paginateProposalSpecification(products), [products]);
-  const visual = project?.state?.proposalVisualization || project?.state?.generatedImage || project?.state?.interiorImage || "";
+  const materialVisualizations=project?.state?.materialsProposalVisualizations||[];
+  const materialHero=materialVisualizations.findLast(item=>item.resultType==='interior-render')||materialVisualizations.at(-1);
+  const visual = proposalSource==='materials'?(materialHero?.image||""):(project?.state?.proposalVisualization || project?.state?.generatedImage || project?.state?.interiorImage || "");
+  // A product transformation stays on one page: source, optional material
+  // references and result. Text stickers intentionally do not enter the КП.
+  const extraVisualizations=proposalSource==='materials'?materialVisualizations:[];
   const managerName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Имя Фамилия";
 
   const download = async (format: "pdf" | "pptx") => {
@@ -155,9 +168,10 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         pdfImage("/fonts/Georgia.ttf"), pdfImage("/fonts/Georgia-Italic.ttf"), pdfImage("/fonts/Georgia-Bold.ttf"),
         Promise.all(products.map(async (product) => ({ ...product, referenceImage: await pdfImage(product.image) }))),
       ]);
+      const additionalVisualizations=await Promise.all(extraVisualizations.map(async item=>({title:item.title,image:await pdfImage(item.image),steps:item.steps?await Promise.all(item.steps.map(async step=>({...step,image:await pdfImage(step.image)}))):undefined})));
       const response = await fetch(format === "pdf" ? "/api/proposal" : "/api/proposal/pptx", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, projectName: document.projectName, coverImage, coverBrandAsset, managerBrandAsset, fontData, fontBoldData, serifFontData, serifItalicFontData, serifBoldFontData, withPrices: showPrices, products: preparedProducts, document, managerName }),
+        body: JSON.stringify({ source:proposalSource,previewTenant:proposalPreviewTenant?'norrmobler':undefined,projectId, projectName: document.projectName, coverImage,additionalVisualizations, coverBrandAsset, managerBrandAsset, fontData, fontBoldData, serifFontData, serifItalicFontData, serifBoldFontData, withPrices: showPrices, products: preparedProducts, document, managerName }),
       });
       if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || `Не удалось создать ${format === "pdf" ? "PDF" : "PPTX"}.`); }
       const blob = await response.blob(); const href = URL.createObjectURL(blob); const link = window.document.createElement("a");
@@ -171,14 +185,14 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
   return <main className="proposal-editor-shell">
     <header className="proposal-editor-header">
       <Link className="room-design-wordmark" href="/">ROOM DESIGN</Link>
-      <div><small>РЕДАКТОР КОММЕРЧЕСКОГО ПРЕДЛОЖЕНИЯ</small><b>{document.projectName || "Проект"}</b></div>
+      <div><small>{proposalSource==='materials'?'КОНЦЕПЦИЯ И МАТЕРИАЛЫ · КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ':'РЕДАКТОР КОММЕРЧЕСКОГО ПРЕДЛОЖЕНИЯ'}</small><b>{document.projectName || "Проект"}</b></div>
       <div className="proposal-editor-actions">
         <label><input type="checkbox" checked={showPrices} onChange={(event) => setPriceVisibility(event.target.checked)}/> Показывать цены</label>
         <button type="button" onClick={() => void download("pdf")} disabled={Boolean(downloading) || !visual} title={!visual ? "Сначала добавьте визуализацию в проект" : undefined}>{downloading === "pdf" ? "Готовим PDF…" : "Скачать PDF"}</button>
         <button type="button" onClick={() => void download("pptx")} disabled={Boolean(downloading) || !visual} title={!visual ? "Сначала добавьте визуализацию в проект" : undefined}>{downloading === "pptx" ? "Готовим PPT…" : "Скачать PPT"}</button>
       </div>
     </header>
-    <section className="proposal-editor-toolbar"><Link href="/">← Вернуться в проект</Link><span>{status}</span>{error && <strong role="alert">{error}</strong>}</section>
+    <section className="proposal-editor-toolbar"><Link href={proposalSource==='materials'?`/?project=${encodeURIComponent(projectId)}&stage=materials#меню-проекта`:'/'}>← Вернуться в проект</Link><span>{status}</span>{error && <strong role="alert">{error}</strong>}</section>
     <section className="proposal-document" aria-label="Предпросмотр коммерческого предложения">
       <article className="proposal-page proposal-cover-page">
         <div className="proposal-cover-brand" aria-label={`${PROPOSAL_BRAND.officialName} — коммерческое предложение`}/>
@@ -194,18 +208,20 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
       <article className="proposal-page proposal-selection-page">
         <ProposalHeader number="01" title="Подборка для вашего пространства"/><h2>Собрано в единую интерьерную историю</h2>
         <p>Мы объединили мебель, свет и фактуры так, чтобы каждая позиция работала не отдельно, а на общий сценарий пространства.</p>
-        <div className="proposal-selection-body"><img src={visual} alt="Выбранная визуализация проекта"/><aside><small>ВАША ПОДБОРКА</small>
+        <div className="proposal-selection-body">{visual?<img src={visual} alt="Выбранная визуализация проекта"/>:<div className="proposal-image-placeholder"/>}<aside><small>ВАША ПОДБОРКА</small>
           <Field label="Количество предметов" value={document.selectionCount} onChange={(selectionCount) => updateDocument({ selectionCount })}/>
           <Field label="Категории" value={document.categories} multiline onChange={(categories) => updateDocument({ categories })}/>
           <Field label="Принцип" value={document.principle} multiline onChange={(principle) => updateDocument({ principle })}/>
           <Field label="Город / объект" value={document.cityObject} onChange={(cityObject) => updateDocument({ cityObject })}/></aside></div><ProposalFooter/>
       </article>
 
+      {extraVisualizations.map((item,index)=><article className={'proposal-page proposal-material-visual-page'+(item.steps?.length?' has-lineage':'')} key={item.id}><ProposalHeader number={String(index+2).padStart(2,'0')} title="Результат концепции"/><h2>{item.title}</h2>{item.steps?.length?<div className="proposal-lineage">{item.steps.map((step,stepIndex)=><div className={'proposal-lineage-step '+step.role} key={step.id}><small>{step.title}</small><img src={step.image} alt={step.title}/>{stepIndex<item.steps!.length-1&&<i aria-hidden="true">→</i>}</div>)}</div>:<img src={item.image} alt={item.title}/>}<ProposalFooter/></article>)}
+
       {products.map((product, index) => {
         const isLamp = /свет|ламп|торшер/i.test(`${product.category} ${product.name}`);
         const isRug = /ковр|фактур|шкур/i.test(`${product.category} ${product.name}`);
         return <article className={`proposal-page proposal-product-page ${isLamp ? "proposal-product-lamp" : isRug ? "proposal-product-rug" : "proposal-product-furniture"}`} key={product.key}>
-        <ProductHeader number={String(index + 2).padStart(2, "0")} category={product.category}/>
+        <ProductHeader number={String(index + 2 + extraVisualizations.length).padStart(2, "0")} category={product.category}/>
         <Field label="Наименование" className="proposal-product-title" value={product.name} onChange={(name) => updateProduct(product.key, { name })}/>
         {!isLegacyNorrBrand(product.brand) && <Field label="Бренд" className="proposal-product-brand" value={product.brand} onChange={(brand) => updateProduct(product.key, { brand })}/>}
         <div className="proposal-product-body"><img src={product.image} alt={product.name}/><aside>
@@ -223,7 +239,7 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
       {specificationPages.map((pageProducts, pageIndex) => {
         const finalPage = pageIndex === specificationPages.length - 1;
         const previousRows = specificationPages.slice(0, pageIndex).reduce((count, page) => count + page.length, 0);
-        const pageNumber = products.length + 2 + pageIndex;
+        const pageNumber = products.length + 2 + extraVisualizations.length + pageIndex;
         return <article className={`proposal-page proposal-summary-page ${finalPage ? "has-final-summary" : "is-continuation"}`} key={`summary-${pageIndex}`}><ProposalHeader number={String(pageNumber).padStart(2, "0")} title={finalPage ? "Итог и условия" : "Спецификация"}/><h2>{pageIndex ? "Спецификация — продолжение" : "Спецификация"}</h2>
           <div className="proposal-summary-table"><div className="proposal-summary-head"><b>№</b><b>Позиция</b><b>Артикул</b><b>Кол-во</b><b>Цена</b><b>Сумма</b></div>
             {pageProducts.map((product, index) => <div key={product.key}><span>{String(previousRows + index + 1).padStart(2, "0")}</span><span>{product.name}</span><span>{product.article || "—"}</span><span>{product.quantity}</span><span>{showPrices ? proposalPriceLabel(product.priceText, product.price) : "по запросу"}</span><span>{showPrices && product.price ? money(product.price * product.quantity) : "по запросу"}</span></div>)}</div>
@@ -232,9 +248,9 @@ export default function ProposalEditor({ projectId }: { projectId: string }) {
         </article>;
       })}
 
-      <article className="proposal-page proposal-about-page"><ProposalHeader number={String(products.length + 2 + specificationPages.length).padStart(2, "0")} title={PROPOSAL_BRAND.aboutTitle}/><h2>Европейский дизайн. Индивидуальный сценарий.</h2><div className="proposal-about-hero"><img src={visual} alt="Интерьер проекта"/><blockquote><small>{PROPOSAL_BRAND.aboutLabel}</small><b>Интерьер начинается не с отдельного предмета, а с ощущения, которое вы хотите сохранить.</b><p>Мы соединяем мебель, свет и фактуры в цельный сценарий — спокойный, точный и персональный.</p></blockquote></div><h3>Сервис вокруг вашего проекта</h3><div className="proposal-benefits">{[["01","Персональная конфигурация","Размеры, модули, ткани и отделки подбираются под ваш интерьер."],["02","Дизайнерская поддержка","Профессиональная консультация, 3D-модели и визуализация помогают принять решение."],["03","Единый сервис","Согласование, заказ, доставка и сборка сопровождаются одним менеджером."],["04","Материалы вживую","Финальный выбор можно подтвердить в шоуруме по реальным образцам."]].map(([number,title,text]) => <div key={number}><small>{number}</small><b>{title}</b><p>{text}</p></div>)}</div><ProposalFooter/></article>
+      <article className="proposal-page proposal-about-page"><ProposalHeader number={String(products.length + 2 + extraVisualizations.length + specificationPages.length).padStart(2, "0")} title={PROPOSAL_BRAND.aboutTitle}/><h2>Европейский дизайн. Индивидуальный сценарий.</h2><div className="proposal-about-hero">{visual?<img src={visual} alt="Интерьер проекта"/>:<div className="proposal-image-placeholder"/>}<blockquote><small>{PROPOSAL_BRAND.aboutLabel}</small><b>Интерьер начинается не с отдельного предмета, а с ощущения, которое вы хотите сохранить.</b><p>Мы соединяем мебель, свет и фактуры в цельный сценарий — спокойный, точный и персональный.</p></blockquote></div><h3>Сервис вокруг вашего проекта</h3><div className="proposal-benefits">{[["01","Персональная конфигурация","Размеры, модули, ткани и отделки подбираются под ваш интерьер."],["02","Дизайнерская поддержка","Профессиональная консультация, 3D-модели и визуализация помогают принять решение."],["03","Единый сервис","Согласование, заказ, доставка и сборка сопровождаются одним менеджером."],["04","Материалы вживую","Финальный выбор можно подтвердить в шоуруме по реальным образцам."]].map(([number,title,text]) => <div key={number}><small>{number}</small><b>{title}</b><p>{text}</p></div>)}</div><ProposalFooter/></article>
 
-      <article className="proposal-page proposal-manager-page"><ProposalHeader number={String(products.length + 3 + specificationPages.length).padStart(2, "0")} title="Ваш персональный менеджер"/><div className="proposal-manager-body"><div className="proposal-manager-left"><img src={PROPOSAL_BRAND.circleAsset} alt={PROPOSAL_BRAND.officialName}/><i/><h3>СЛЕДУЮЩИЙ ШАГ</h3><p>Подтвердите выбранные позиции или пришлите правки. Менеджер обновит конфигурации, стоимость и сценарий поставки в одной версии предложения.</p><em>Мебель, свет и декор для интерьеров, в которых хочется жить.</em></div><aside><div className="proposal-manager-person"><div className="proposal-avatar">{initials(managerName)}</div><div><h2>{managerName}</h2><Field label="Должность" value={document.managerRole} onChange={(managerRole) => updateDocument({ managerRole })}/></div></div><Field label="Телефон" value={document.managerPhone} onChange={(managerPhone) => updateDocument({ managerPhone })}/><Field label="Email" value={document.managerEmail} onChange={(managerEmail) => updateDocument({ managerEmail })}/><div className="proposal-site"><span>САЙТ</span><b>{PROPOSAL_BRAND.contactDomain}</b></div><p>Я помогу уточнить конфигурации, проверить образцы и довести заказ до установки.</p><strong>{PROPOSAL_BRAND.managerThanks}</strong></aside></div></article>
+      <article className="proposal-page proposal-manager-page"><ProposalHeader number={String(products.length + 3 + extraVisualizations.length + specificationPages.length).padStart(2, "0")} title="Ваш персональный менеджер"/><div className="proposal-manager-body"><div className="proposal-manager-left"><img src={PROPOSAL_BRAND.circleAsset} alt={PROPOSAL_BRAND.officialName}/><i/><h3>СЛЕДУЮЩИЙ ШАГ</h3><p>Подтвердите выбранные позиции или пришлите правки. Менеджер обновит конфигурации, стоимость и сценарий поставки в одной версии предложения.</p><em>Мебель, свет и декор для интерьеров, в которых хочется жить.</em></div><aside><div className="proposal-manager-person"><div className="proposal-avatar">{initials(managerName)}</div><div><h2>{managerName}</h2><Field label="Должность" value={document.managerRole} onChange={(managerRole) => updateDocument({ managerRole })}/></div></div><Field label="Телефон" value={document.managerPhone} onChange={(managerPhone) => updateDocument({ managerPhone })}/><Field label="Email" value={document.managerEmail} onChange={(managerEmail) => updateDocument({ managerEmail })}/><div className="proposal-site"><span>САЙТ</span><b>{PROPOSAL_BRAND.contactDomain}</b></div><p>Я помогу уточнить конфигурации, проверить образцы и довести заказ до установки.</p><strong>{PROPOSAL_BRAND.managerThanks}</strong></aside></div></article>
       {!products.length && project && <article className="proposal-empty"><h2>Нет товаров для предложения</h2><p>Добавьте в планограмму товары из каталога или предметы с собственными референсами и сохраните проект.</p></article>}
     </section>
   </main>;

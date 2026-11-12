@@ -50,6 +50,8 @@ type ProposalDocument = {
 };
 
 type ProposalBody = {
+  source?: "studio"|"materials";
+  previewTenant?: "norrmobler";
   projectId?: string;
   projectName?: string;
   proposalCoverImage?: string;
@@ -65,6 +67,7 @@ type ProposalBody = {
   products?: ProposalProduct[];
   document?: ProposalDocument;
   managerName?: string;
+  additionalVisualizations?:Array<{title?:string;image?:string;steps?:Array<{id?:string;role?:string;title?:string;image?:string}>}>;
 };
 
 const PAGE_WIDTH = 841.89;
@@ -188,11 +191,14 @@ export async function POST(request: Request) {
       .bind(body.projectId, user.tenantId, user.id)
       .first<{ state_json: string | null }>();
     if (!project?.state_json) return Response.json({ error: "Сохранённый проект не найден." }, { status: 404 });
-    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }>; proposalItems?: Array<{ id?: string }>; proposalHistoryId?: string | null; historyVersions?: Array<{ id?: string; proposalItems?: Array<{ id?: string }> }> };
+    const savedState = JSON.parse(project.state_json) as { planItems?: Array<{ id?: string }>; proposalItems?: Array<{ id?: string }>; materialsProposalItems?:Array<{id?:string}>; proposalHistoryId?: string | null; historyVersions?: Array<{ id?: string; proposalItems?: Array<{ id?: string }> }> };
+    const materialsSource=body.source==='materials';
+    const previewTenant=process.env.NODE_ENV!=='production'&&body.previewTenant==='norrmobler';
+    if(materialsSource&&user.tenantSlug!=='norrmobler'&&!previewTenant)return Response.json({error:'Коммерческое предложение Norrmobler недоступно для этого тенанта.'},{status:403});
     const selectedHistoryItems = savedState.proposalHistoryId
       ? savedState.historyVersions?.find((version) => version.id === savedState.proposalHistoryId)?.proposalItems || []
       : null;
-    const allowedObjectIds = new Set((selectedHistoryItems || [...(savedState.planItems || []), ...(savedState.proposalItems || [])]).map((item) => item.id).filter((id): id is string => Boolean(id)));
+    const allowedObjectIds = new Set((materialsSource?savedState.materialsProposalItems||[]:selectedHistoryItems || [...(savedState.planItems || []), ...(savedState.proposalItems || [])]).map((item) => item.id).filter((id): id is string => Boolean(id)));
     if (products.some((product) => !product.objectIds?.length || product.objectIds.some((id) => !allowedObjectIds.has(id)))) {
       return Response.json({ error: "Состав коммерческого предложения не соответствует проекту." }, { status: 403 });
     }
@@ -218,6 +224,11 @@ export async function POST(request: Request) {
     if (!coverBrand) throw new Error("Не удалось подготовить утверждённую композицию обложки для PDF.");
     const managerBrand = await embedImage(document, body.managerBrandAsset, "cover");
     if (!managerBrand) throw new Error("Не удалось подготовить официальный знак NORR MØBLER для PDF.");
+    const additionalVisualizations=await Promise.all((Array.isArray(body.additionalVisualizations)?body.additionalVisualizations.slice(0,19):[]).map(async(item)=>({
+      title:textValue(item.title,'Результат концепции'),
+      image:await embedImage(document,item.image,'visualization'),
+      steps:await Promise.all((Array.isArray(item.steps)?item.steps.slice(0,6):[]).map(async step=>({title:textValue(step.title,'Референс'),role:textValue(step.role),image:await embedImage(document,step.image,'visualization')}))),
+    })));
 
     const firstPage = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     const coverSplit = 477.5;
@@ -248,6 +259,16 @@ export async function POST(request: Request) {
     drawLabelValue(visualisationPage, font, "Принцип", textValue(proposal.principle), selectionPanelX, 318, 330, 9);
     drawLabelValue(visualisationPage, font, "Город / объект", textValue(proposal.cityObject), selectionPanelX, 246, 330, 9);
 
+    for(let index=0;index<additionalVisualizations.length;index+=1){
+      const item=additionalVisualizations[index],steps=item.steps.filter((step)=>Boolean(step.image));if(!item.image&&!steps.length)continue;
+      const page=document.addPage([PAGE_WIDTH,PAGE_HEIGHT]);drawPageChrome(page,font,String(index+2).padStart(2,'0'),'Результат концепции');
+      page.drawText(item.title,{x:36,y:520,font:serif,size:25,color:BROWN});
+      if(steps.length){
+        const gap=18,areaX=44,areaWidth=754,boxWidth=(areaWidth-gap*(steps.length-1))/steps.length;
+        steps.forEach((step,stepIndex)=>{const x=areaX+stepIndex*(boxWidth+gap);page.drawText(step.title.toUpperCase(),{x,y:462,font:fontBold,size:6.5,color:BURGUNDY,maxWidth:boxWidth});if(step.image)drawImageContain(page,step.image,{x,y:95,width:boxWidth,height:345});if(stepIndex<steps.length-1)page.drawText('>',{x:x+boxWidth+5,y:265,font:serifBold,size:18,color:BURGUNDY});});
+      }else if(item.image)drawImageContain(page,item.image,{x:44,y:55,width:754,height:420});
+    }
+
     const embeddedProductImages = await Promise.all(products.map(async (product) => {
       const images = [product.referenceImage, ...(product.referenceImages || []).filter((source) => source && source !== product.referenceImage)];
       const role: ProposalImageRole = product.source === "reference" ? "reference" : "catalog";
@@ -257,7 +278,7 @@ export async function POST(request: Request) {
     for (let index = 0; index < products.length; index += 1) {
       const product = products[index];
       const page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      drawPageChrome(page, font, String(index + 2).padStart(2, "0"), "");
+      drawPageChrome(page, font, String(index + 2 + additionalVisualizations.length).padStart(2, "0"), "");
       const category = textValue(product.category || product.referenceCategory, "Предмет интерьера").toUpperCase();
       page.drawText(category, { x: (PAGE_WIDTH - font.widthOfTextAtSize(category, 7)) / 2, y: 563, font, size: 7, color: MUTED });
       const name = asText(product.referenceName || product.name || "Товар");
@@ -303,7 +324,7 @@ export async function POST(request: Request) {
     specificationPages.forEach((pageProducts, pageIndex) => {
       const finalPage = pageIndex === specificationPages.length - 1;
       const summary = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      drawPageChrome(summary, font, String(products.length + 2 + pageIndex).padStart(2, "0"), finalPage ? "Итог и условия" : "Спецификация");
+      drawPageChrome(summary, font, String(products.length + 2 + additionalVisualizations.length + pageIndex).padStart(2, "0"), finalPage ? "Итог и условия" : "Спецификация");
       summary.drawText(pageIndex ? "Спецификация — продолжение" : "Спецификация", { x: 36, y: 520, font: serif, size: 27, color: BROWN });
       const columns = [42, 72, 370, 490, 555, 660];
       summary.drawRectangle({ x: 36, y: 468, width: 764, height: 28, color: INK });
@@ -335,7 +356,7 @@ export async function POST(request: Request) {
     });
 
     const about = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawPageChrome(about, font, String(products.length + 2 + specificationPages.length).padStart(2, "0"), PROPOSAL_BRAND.aboutTitle);
+    drawPageChrome(about, font, String(products.length + 2 + additionalVisualizations.length + specificationPages.length).padStart(2, "0"), PROPOSAL_BRAND.aboutTitle);
     about.drawText("Европейский дизайн. Индивидуальный сценарий.", { x: 42, y: 516, font: serif, size: 25, color: BROWN });
     drawImageContain(about, visualisation, { x: 44.5, y: 300, width: 376.5, height: 205 });
     about.drawRectangle({ x: 421, y: 300, width: 385, height: 205, color: INK });
@@ -358,7 +379,7 @@ export async function POST(request: Request) {
     });
     const manager = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     manager.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: IVORY });
-    drawMarker(manager, font, String(products.length + 3 + specificationPages.length).padStart(2, "0"), "Ваш персональный менеджер");
+    drawMarker(manager, font, String(products.length + 3 + additionalVisualizations.length + specificationPages.length).padStart(2, "0"), "Ваш персональный менеджер");
     drawImageContain(manager, managerBrand, { x: 60, y: 245, width: 355, height: 305 });
     manager.drawLine({ start: { x: 42, y: 159 }, end: { x: 63, y: 159 }, thickness: 1, color: BURGUNDY });
     manager.drawText("СЛЕДУЮЩИЙ ШАГ", { x: 42, y: 140, font: fontBold, size: 7, color: BURGUNDY });

@@ -63,6 +63,12 @@ type SavedState = {
   proposalVisualizationVersion?: string;
   proposalHistoryId?: string | null;
   proposalDocument?: Record<string, string>;
+  materialsProposalItems?: SavedPlanItem[];
+  materialsProposalVisualizations?: Array<{id:string;title:string;image:string;resultType?:string;steps?:Array<{id:string;role:'source'|'reference'|'result';title:string;image:string}>}>;
+  materialsProposalSelectionIds?: string[];
+  materialsProposalSourceRevision?: number;
+  materialsProposalShowPrices?: boolean;
+  materialsProposalDocument?: Record<string,string>;
   technicalLighting?: unknown;
 };
 
@@ -90,6 +96,10 @@ function hydrateState(projectId: string, state: SavedState) {
       referenceImage: referenceAsset ? assetUrl(projectId, referenceAsset) : item.referenceImage,
     })),
     proposalItems: (state.proposalItems || []).map(({ referenceAsset, ...item }) => ({
+      ...item,
+      referenceImage: referenceAsset ? assetUrl(projectId, referenceAsset) : item.referenceImage,
+    })),
+    materialsProposalItems: (state.materialsProposalItems || []).map(({ referenceAsset, ...item }) => ({
       ...item,
       referenceImage: referenceAsset ? assetUrl(projectId, referenceAsset) : item.referenceImage,
     })),
@@ -230,16 +240,28 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   let persistedProposalVisualizationVersion: string | undefined;
   let persistedProposalHistoryId: string | null | undefined;
   let persistedProposalDocument: Record<string, string> | undefined;
+  let persistedMaterialsProposalItems: SavedPlanItem[] | undefined;
+  let persistedMaterialsProposalVisualizations: SavedState['materialsProposalVisualizations'];
+  let persistedMaterialsProposalSourceRevision: number | undefined;
+  let persistedMaterialsProposalSelectionIds: string[] | undefined;
+  let persistedMaterialsProposalShowPrices = true;
+  let persistedMaterialsProposalDocument: Record<string,string> | undefined;
   let persistedTechnicalLighting: unknown;
   const persistedOverrides = new Map<string, unknown>();
   if (existingProject?.state_json) {
     try {
-      const persisted = JSON.parse(existingProject.state_json) as { proposalShowPrices?: boolean; proposalVisualizationAsset?: string; proposalVisualizationVersion?: string; proposalHistoryId?: string | null; proposalDocument?: Record<string, string>; technicalLighting?: unknown; planItems?: Array<{ id?: string; proposalOverride?: unknown }>; proposalItems?: Array<{ id?: string; proposalOverride?: unknown }> };
+      const persisted = JSON.parse(existingProject.state_json) as SavedState;
       persistedShowPrices = persisted.proposalShowPrices !== false;
       persistedProposalVisualizationAsset = persisted.proposalVisualizationAsset;
       persistedProposalVisualizationVersion = persisted.proposalVisualizationVersion;
       persistedProposalHistoryId = persisted.proposalHistoryId;
       persistedProposalDocument = persisted.proposalDocument;
+      persistedMaterialsProposalItems=persisted.materialsProposalItems;
+      persistedMaterialsProposalVisualizations=persisted.materialsProposalVisualizations;
+      persistedMaterialsProposalSourceRevision=persisted.materialsProposalSourceRevision;
+      persistedMaterialsProposalSelectionIds=persisted.materialsProposalSelectionIds;
+      persistedMaterialsProposalShowPrices=persisted.materialsProposalShowPrices!==false;
+      persistedMaterialsProposalDocument=persisted.materialsProposalDocument;
       persistedTechnicalLighting = persisted.technicalLighting;
       for (const item of persisted.planItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
       for (const item of persisted.proposalItems || []) if (item.id && item.proposalOverride) persistedOverrides.set(item.id, item.proposalOverride);
@@ -375,6 +397,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     proposalVisualizationVersion: persistedProposalVisualizationVersion,
     proposalHistoryId: persistedProposalHistoryId,
     proposalDocument: persistedProposalDocument,
+    materialsProposalItems:persistedMaterialsProposalItems,
+    materialsProposalVisualizations:persistedMaterialsProposalVisualizations,
+    materialsProposalSourceRevision:persistedMaterialsProposalSourceRevision,
+    materialsProposalSelectionIds:persistedMaterialsProposalSelectionIds,
+    materialsProposalShowPrices:persistedMaterialsProposalShowPrices,
+    materialsProposalDocument:persistedMaterialsProposalDocument,
     technicalLighting: persistedTechnicalLighting,
   };
   const now = new Date().toISOString();

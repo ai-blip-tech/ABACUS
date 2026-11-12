@@ -11,6 +11,7 @@ export default function ProjectStageWorkspace({user,projectId,projectName,projec
  const [opened,setOpened]=useState<string[]>([]);
  const [loaded,setLoaded]=useState<string[]>([]);
  const [fullscreenStage,setFullscreenStage]=useState<string|null>(null);
+ const [previewTenant,setPreviewTenant]=useState('');
  const frames=useRef(new Map<string,HTMLIFrameElement>());
  useEffect(()=>{const message=(event:MessageEvent)=>{if(event.origin!==location.origin)return;const entry=[...frames.current].find(([,frame])=>frame.contentWindow===event.source);if(!entry)return;if(event.data?.type==='roomdesign:stage-ready')setLoaded(current=>current.includes(entry[0])?current:[...current,entry[0]]);if(event.data?.type==='roomdesign:stage-fullscreen')setFullscreenStage(event.data.expanded?entry[0]:current=>current===entry[0]?null:current);};window.addEventListener('message',message);return()=>window.removeEventListener('message',message);},[]);
  const [brief,setBrief]=useState(false);
@@ -22,13 +23,16 @@ export default function ProjectStageWorkspace({user,projectId,projectName,projec
   try{localStorage.setItem(`roomdesign:last-stage:${projectId}`,id);}catch{/* Navigation still works without local storage. */}
  };
  useEffect(()=>{
+  if(process.env.NODE_ENV!=='production')setPreviewTenant(new URLSearchParams(location.search).get('previewTenant')||'');
+ },[]);
+ useEffect(()=>{
   const restore=()=>{let saved='sources';try{saved=localStorage.getItem(`roomdesign:last-stage:${projectId}`)||saved;}catch{}
    const requested=new URLSearchParams(location.search).get('stage')||saved;
    select(stages.some(stage=>stage.id===requested)?requested:'sources',false);};
   restore();window.addEventListener('popstate',restore);return()=>window.removeEventListener('popstate',restore);
  },[projectId]);
  const active=stages.find(stage=>stage.id===selected)!;
- const frameUrl=(stage:typeof stages[number])=>projectStageFrameUrl(stage.id,projectId)!;
+ const frameUrl=(stage:typeof stages[number])=>{const source=projectStageFrameUrl(stage.id,projectId)!;if(!previewTenant)return source;const url=new URL(source,location.origin);url.searchParams.set('previewTenant',previewTenant);return `${url.pathname}${url.search}`;};
  return <main className={`project-menu-preview project-stage-workspace${active.path?' has-workspace':''}${fullscreenStage===selected?' is-stage-fullscreen':''}`}>
   <header className="project-menu-header">
    <button className="project-menu-wordmark room-design-wordmark" type="button" onClick={onHome}>ROOM DESIGN</button>
