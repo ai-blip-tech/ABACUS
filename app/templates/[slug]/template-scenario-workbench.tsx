@@ -2,7 +2,7 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions -- horizontal histories are keyboard-scrollable */
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type WheelEvent } from "react";
 
 import { downloadImageAsJpeg } from "@/lib/client-image-download";
 import { getTemplateWorkbenchScenario } from "@/lib/templates/workbench";
@@ -14,17 +14,14 @@ type GenerationItem = TemplateGenerationItem;
 type LightboxState = { items: GenerationItem[]; index: number };
 type User = { id: string; email: string };
 type Phase = "idle" | "processing" | "failed";
-type SurfaceZone = { x: number; y: number; width: number; height: number; displayX: number; displayY: number; displayWidth: number; displayHeight: number };
-type SurfaceZoneAnchor = { materialId: string; pointerId: number; x: number; y: number; displayX: number; displayY: number };
-type SurfaceZoneSelection = { materialId: string; zoneIndex: number };
-type SurfaceZoneResize = { materialId: string; zoneIndex: number; pointerId: number; corner: "nw" | "ne" | "sw" | "se"; original: SurfaceZone };
-type SurfaceAssignment = { id: string; prefix: string; label: string; target: string; color: string; colorName: string; file: UploadedFile; kind: "facade" | "countertop" | "plinth" };
+type SurfacePoint = { x: number; y: number; displayX: number; displayY: number };
+type FacadeAssignment = { id: string; prefix: string; label: string; color: string; colorName: string; file: UploadedFile };
 type MoodboardMode = "room" | "compose";
 
 const isValueSlot = (slot: TemplateInputSlot) => slot.kind === "choice" || slot.kind === "short_text" || slot.kind === "range";
 const isImage = (file: UploadedFile) => file.type.startsWith("image/");
-const surfaceZoneColors = ["#2f8f5b", "#2f69b0", "#c47b22", "#8b4da5", "#d35b35", "#168b8b"];
-const surfaceZoneColorNames = ["зелёного", "синего", "янтарного", "фиолетового", "красного", "бирюзового"];
+const surfacePointColors = ["#2f8f5b", "#2f69b0", "#c47b22", "#8b4da5"];
+const surfacePointColorNames = ["зелёные", "синие", "янтарные", "фиолетовые"];
 const moodboardMaterialSlot: TemplateInputSlot = {
   id: "moodboardMaterials",
   kind: "reference_image",
@@ -72,7 +69,7 @@ const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   reader.readAsDataURL(blob);
 });
 
-const createFacadeZoneMap = (source: string, assignments: SurfaceAssignment[], zones: Record<string, SurfaceZone[]>) => new Promise<string>((resolve, reject) => {
+const createFacadePointMap = (source: string, assignments: FacadeAssignment[], points: Record<string, SurfacePoint[]>) => new Promise<string>((resolve, reject) => {
   const image = new Image();
   image.onload = () => {
     const scale = Math.min(1, 1800 / Math.max(image.naturalWidth, image.naturalHeight));
@@ -80,29 +77,40 @@ const createFacadeZoneMap = (source: string, assignments: SurfaceAssignment[], z
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
     canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
     const context = canvas.getContext("2d");
-    if (!context) return reject(new Error("Не удалось подготовить карту фасадных зон."));
+    if (!context) return reject(new Error("Не удалось подготовить карту фасадных точек."));
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    context.font = `700 ${Math.max(16, Math.round(canvas.width * .018))}px Arial`;
-    context.textBaseline = "top";
-    assignments.forEach((assignment) => (zones[assignment.id] || []).forEach((zone, zoneIndex) => {
-      const color = assignment.color;
-      const x = zone.x / 100 * canvas.width, y = zone.y / 100 * canvas.height;
-      const width = zone.width / 100 * canvas.width, height = zone.height / 100 * canvas.height;
-      context.fillStyle = `${color}45`;
-      context.fillRect(x, y, width, height);
-      context.lineWidth = Math.max(4, canvas.width * .004);
-      context.strokeStyle = color;
-      context.strokeRect(x, y, width, height);
-      const label = `${assignment.prefix}.${zoneIndex + 1}`;
-      const labelWidth = context.measureText(label).width + 18;
-      context.fillStyle = color;
-      context.fillRect(x, y, labelWidth, Math.max(25, canvas.width * .028));
+    const radius = Math.max(10, Math.round(canvas.width * .009));
+    context.font = `700 ${Math.max(15, Math.round(canvas.width * .016))}px Arial`;
+    context.textBaseline = "middle";
+    assignments.forEach((assignment) => (points[assignment.id] || []).forEach((point, pointIndex) => {
+      const x = point.x / 100 * canvas.width, y = point.y / 100 * canvas.height;
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.fillStyle = assignment.color;
+      context.fill();
+      context.lineWidth = Math.max(3, canvas.width * .0025);
+      context.strokeStyle = "#fff";
+      context.stroke();
+      context.beginPath();
+      context.moveTo(x - radius * 1.55, y);
+      context.lineTo(x + radius * 1.55, y);
+      context.moveTo(x, y - radius * 1.55);
+      context.lineTo(x, y + radius * 1.55);
+      context.strokeStyle = assignment.color;
+      context.stroke();
+      const label = `${assignment.prefix}.${pointIndex + 1}`;
+      const labelWidth = context.measureText(label).width + 16;
+      const labelHeight = Math.max(23, radius * 1.45);
+      const labelX = Math.min(canvas.width - labelWidth, x + radius * .9);
+      const labelY = Math.max(labelHeight / 2, y - radius * 1.4);
+      context.fillStyle = assignment.color;
+      context.fillRect(labelX, labelY - labelHeight / 2, labelWidth, labelHeight);
       context.fillStyle = "#fff";
-      context.fillText(label, x + 9, y + 5);
+      context.fillText(label, labelX + 8, labelY);
     }));
     resolve(canvas.toDataURL("image/png"));
   };
-  image.onerror = () => reject(new Error("Не удалось подготовить карту фасадных зон."));
+  image.onerror = () => reject(new Error("Не удалось подготовить карту фасадных точек."));
   image.src = source;
 });
 
@@ -259,23 +267,20 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
   const [generationConfigured, setGenerationConfigured] = useState(false);
   const [draggedAssetId, setDraggedAssetId] = useState("");
   const [dropTargetSlotId, setDropTargetSlotId] = useState("");
-  const [surfaceZones, setSurfaceZones] = useState<Record<string, SurfaceZone[]>>({});
-  const [surfaceZoneAnchor, setSurfaceZoneAnchor] = useState<SurfaceZoneAnchor | null>(null);
-  const [surfaceZoneDraft, setSurfaceZoneDraft] = useState<SurfaceZone | null>(null);
+  const [surfacePoints, setSurfacePoints] = useState<Record<string, SurfacePoint[]>>({});
   const [activeSurfaceMaterialId, setActiveSurfaceMaterialId] = useState("");
-  const [selectedSurfaceZone, setSelectedSurfaceZone] = useState<SurfaceZoneSelection | null>(null);
-  const [surfaceZoneResize, setSurfaceZoneResize] = useState<SurfaceZoneResize | null>(null);
   const [comparisonPosition, setComparisonPosition] = useState(50);
 
   const usesFacadePointMapping = template.slug === "kitchen-cad-to-photo";
   const facadeMaterials = uploads.facadeMaterials || [];
-  const countertopMaterial = uploads.countertopMaterial?.[0];
-  const plinthMaterial = uploads.plinthMaterial?.[0];
-  const surfaceAssignments: SurfaceAssignment[] = [
-    ...facadeMaterials.map((file, index) => ({ id: `facade:${file.id}`, prefix: `F${index + 1}`, label: `Фактура фасадов ${index + 1}`, target: "фасад", color: surfaceZoneColors[index], colorName: surfaceZoneColorNames[index], file, kind: "facade" as const })),
-    ...(countertopMaterial ? [{ id: `countertop:${countertopMaterial.id}`, prefix: "C", label: "Фактура столешницы", target: "столешницу", color: surfaceZoneColors[4], colorName: surfaceZoneColorNames[4], file: countertopMaterial, kind: "countertop" as const }] : []),
-    ...(plinthMaterial ? [{ id: `plinth:${plinthMaterial.id}`, prefix: "P", label: "Фактура цоколя", target: "цоколь", color: surfaceZoneColors[5], colorName: surfaceZoneColorNames[5], file: plinthMaterial, kind: "plinth" as const }] : []),
-  ];
+  const facadeAssignments: FacadeAssignment[] = facadeMaterials.map((file, index) => ({
+    id: `facade:${file.id}`,
+    prefix: `F${index + 1}`,
+    label: `Фактура фасадов ${index + 1}`,
+    color: surfacePointColors[index],
+    colorName: surfacePointColorNames[index],
+    file,
+  }));
 
   useEffect(() => {
     let active = true;
@@ -370,11 +375,11 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
     const primary = uploads[primarySlot?.id]?.[0];
     if (primary && !isImage(primary)) issues.push("Для запуска генерации первым материалом должно быть изображение.");
     if (usesFacadePointMapping) {
-      for (const assignment of surfaceAssignments) {
-        if (!surfaceZones[assignment.id]?.length) issues.push(`${assignment.label}: обведите хотя бы одну зону ${assignment.colorName} цвета на CAD-виде.`);
+      for (const assignment of facadeAssignments) {
+        if (!surfacePoints[assignment.id]?.length) issues.push(`${assignment.label}: поставьте хотя бы одну ${assignment.colorName} точку на нужный фасад.`);
       }
       const referenceCount = activeInputSlots.filter((slot) => !isValueSlot(slot) && slot.id !== primarySlot?.id).reduce((total, slot) => total + (uploads[slot.id]?.length || 0), 0);
-      if (referenceCount > 9) issues.push("Для одной генерации можно использовать до 9 изображений материалов и техники: десятым изображением будет карта фасадных зон.");
+      if (referenceCount > 9) issues.push("Для одной генерации можно использовать до 9 изображений материалов и техники: десятым изображением будет карта точек фасадов.");
     }
     if (template.safetyPolicy === "geometry-lock" && hasGeometryLockConflict(values.additionalPrompt || "")) {
       issues.push("Дополнительный prompt просит изменить геометрию кухни. В режиме Geometry Lock можно менять только окружение, свет и визуальную подачу.");
@@ -388,7 +393,7 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
   const ready = validationErrors.length === 0 && Boolean(user) && generationConfigured && phase !== "processing";
   const primaryFiles = uploads[primarySlot?.id] || [];
   const stageImage = latestResults[0]?.dataUrl || primaryFiles.find(isImage)?.dataUrl;
-  const activeSurfaceAssignment = surfaceAssignments.find((assignment) => assignment.id === activeSurfaceMaterialId);
+  const activeFacadeAssignment = facadeAssignments.find((assignment) => assignment.id === activeSurfaceMaterialId);
   const planogramOutputSize = (() => {
     if (!isPlanogram3D) return isMoodboardComposition ? "1024x1536" : "1536x1024";
     if (values.resultFormat === "Квадратный") return "1024x1024";
@@ -428,141 +433,28 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
     return { x, y, displayX, displayY };
   };
 
-  const surfaceCoordinate = (event: ReactPointerEvent<HTMLButtonElement>) => surfaceCoordinateAt(event.currentTarget, event.clientX, event.clientY);
-
-  const beginSurfaceZone = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const addSurfacePoint = (event: ReactMouseEvent<HTMLButtonElement>) => {
     if (!usesFacadePointMapping || !activeSurfaceMaterialId || latestResults.length || phase === "processing") return;
-    const coordinate = surfaceCoordinate(event);
+    const coordinate = surfaceCoordinateAt(event.currentTarget, event.clientX, event.clientY);
     if (!coordinate) return;
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setSurfaceZoneAnchor({ materialId: activeSurfaceMaterialId, pointerId: event.pointerId, ...coordinate });
-    setSurfaceZoneDraft({ ...coordinate, width: 0, height: 0, displayWidth: 0, displayHeight: 0 });
-  };
-
-  const moveSurfaceZone = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!surfaceZoneAnchor || surfaceZoneAnchor.pointerId !== event.pointerId) return;
-    const coordinate = surfaceCoordinate(event);
-    if (!coordinate) return;
-    setSurfaceZoneDraft({
-      x: Math.min(surfaceZoneAnchor.x, coordinate.x), y: Math.min(surfaceZoneAnchor.y, coordinate.y),
-      width: Math.abs(coordinate.x - surfaceZoneAnchor.x), height: Math.abs(coordinate.y - surfaceZoneAnchor.y),
-      displayX: Math.min(surfaceZoneAnchor.displayX, coordinate.displayX), displayY: Math.min(surfaceZoneAnchor.displayY, coordinate.displayY),
-      displayWidth: Math.abs(coordinate.displayX - surfaceZoneAnchor.displayX), displayHeight: Math.abs(coordinate.displayY - surfaceZoneAnchor.displayY),
-    });
-  };
-
-  const finishSurfaceZone = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!surfaceZoneAnchor || surfaceZoneAnchor.pointerId !== event.pointerId) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    const draft = surfaceZoneDraft;
-    if (draft) {
-      const isQuickClick = draft.width < 2 || draft.height < 2;
-      const quickSize = 12;
-      const completed = isQuickClick ? {
-        x: Math.max(0, Math.min(100 - quickSize, surfaceZoneAnchor.x - quickSize / 2)),
-        y: Math.max(0, Math.min(100 - quickSize, surfaceZoneAnchor.y - quickSize / 2)),
-        width: quickSize,
-        height: quickSize,
-        displayX: Math.max(0, Math.min(100 - quickSize, surfaceZoneAnchor.displayX - quickSize / 2)),
-        displayY: Math.max(0, Math.min(100 - quickSize, surfaceZoneAnchor.displayY - quickSize / 2)),
-        displayWidth: quickSize,
-        displayHeight: quickSize,
-      } : draft;
-      const zone = Object.fromEntries(Object.entries(completed).map(([key, value]) => [key, Math.round(value * 10) / 10])) as SurfaceZone;
-      setSurfaceZones((current) => {
-        const zones = current[surfaceZoneAnchor.materialId] || [];
-        setSelectedSurfaceZone({ materialId: surfaceZoneAnchor.materialId, zoneIndex: zones.length });
-        return { ...current, [surfaceZoneAnchor.materialId]: [...zones, zone] };
-      });
-      setError("");
-    }
-    setSurfaceZoneAnchor(null);
-    setSurfaceZoneDraft(null);
-    setLatestResults([]);
-  };
-
-  const cancelSurfaceZone = () => { setSurfaceZoneAnchor(null); setSurfaceZoneDraft(null); };
-
-  const undoSurfaceZone = (materialId: string) => {
-    setSurfaceZones((current) => ({ ...current, [materialId]: (current[materialId] || []).slice(0, -1) }));
-    setSelectedSurfaceZone((current) => current?.materialId === materialId ? null : current);
+    const point = Object.fromEntries(Object.entries(coordinate).map(([key, value]) => [key, Math.round(value * 10) / 10])) as SurfacePoint;
+    setSurfacePoints((current) => ({ ...current, [activeSurfaceMaterialId]: [...(current[activeSurfaceMaterialId] || []), point] }));
     setLatestResults([]);
     setError("");
   };
 
-  const clearSurfaceZones = (materialId: string) => {
-    setSurfaceZones((current) => ({ ...current, [materialId]: [] }));
-    setSelectedSurfaceZone((current) => current?.materialId === materialId ? null : current);
+  const undoSurfacePoint = (materialId: string) => {
+    setSurfacePoints((current) => ({ ...current, [materialId]: (current[materialId] || []).slice(0, -1) }));
     setLatestResults([]);
     setError("");
   };
 
-  const deleteSurfaceZone = (materialId: string, zoneIndex: number) => {
-    setSurfaceZones((current) => ({ ...current, [materialId]: (current[materialId] || []).filter((_, index) => index !== zoneIndex) }));
-    setSelectedSurfaceZone(null);
-    setSurfaceZoneResize(null);
+  const clearSurfacePoints = (materialId: string) => {
+    setSurfacePoints((current) => ({ ...current, [materialId]: [] }));
     setLatestResults([]);
     setError("");
   };
-
-  const beginSurfaceZoneResize = (event: ReactPointerEvent<HTMLElement>, materialId: string, zoneIndex: number, corner: SurfaceZoneResize["corner"]) => {
-    const zone = surfaceZones[materialId]?.[zoneIndex];
-    if (!zone) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setActiveSurfaceMaterialId(materialId);
-    setSelectedSurfaceZone({ materialId, zoneIndex });
-    setSurfaceZoneResize({ materialId, zoneIndex, pointerId: event.pointerId, corner, original: zone });
-  };
-
-  const moveSurfaceZoneResize = (event: ReactPointerEvent<HTMLElement>) => {
-    if (!surfaceZoneResize || surfaceZoneResize.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const stage = event.currentTarget.closest("button");
-    if (!(stage instanceof HTMLButtonElement)) return;
-    const coordinate = surfaceCoordinateAt(stage, event.clientX, event.clientY);
-    if (!coordinate) return;
-    const { original, corner, materialId, zoneIndex } = surfaceZoneResize;
-    const resizeAxis = (start: number, size: number, point: number, fromStart: boolean) => {
-      const opposite = fromStart ? start + size : start;
-      const edge = fromStart ? Math.min(point, opposite - 2) : Math.max(point, opposite + 2);
-      return { start: Math.min(edge, opposite), size: Math.abs(opposite - edge) };
-    };
-    const horizontal = resizeAxis(original.x, original.width, coordinate.x, corner.endsWith("w"));
-    const vertical = resizeAxis(original.y, original.height, coordinate.y, corner.startsWith("n"));
-    const displayHorizontal = resizeAxis(original.displayX, original.displayWidth, coordinate.displayX, corner.endsWith("w"));
-    const displayVertical = resizeAxis(original.displayY, original.displayHeight, coordinate.displayY, corner.startsWith("n"));
-    const resized: SurfaceZone = {
-      x: horizontal.start, y: vertical.start, width: horizontal.size, height: vertical.size,
-      displayX: displayHorizontal.start, displayY: displayVertical.start, displayWidth: displayHorizontal.size, displayHeight: displayVertical.size,
-    };
-    setSurfaceZones((current) => ({ ...current, [materialId]: (current[materialId] || []).map((zone, index) => index === zoneIndex ? resized : zone) }));
-  };
-
-  const finishSurfaceZoneResize = (event: ReactPointerEvent<HTMLElement>) => {
-    if (!surfaceZoneResize || surfaceZoneResize.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    setSurfaceZoneResize(null);
-    setLatestResults([]);
-  };
-
-  useEffect(() => {
-    if (!selectedSurfaceZone || lightbox) return;
-    const removeSelected = (event: KeyboardEvent) => {
-      if (event.key !== "Delete" && event.key !== "Backspace") return;
-      const target = event.target;
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable)) return;
-      event.preventDefault();
-      deleteSurfaceZone(selectedSurfaceZone.materialId, selectedSurfaceZone.zoneIndex);
-    };
-    window.addEventListener("keydown", removeSelected);
-    return () => window.removeEventListener("keydown", removeSelected);
-  }, [lightbox, selectedSurfaceZone]);
 
   const setInputValue = (slotId: string, value: string) => {
     setValues((current) => {
@@ -590,9 +482,8 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
       const keepInMaterialHistory = slot.id !== primarySlot?.id || primarySlot?.kind !== "room_image";
       const savedFiles = await Promise.all(localFiles.map(async (file) => user && isImage(file) && keepInMaterialHistory ? persistImage(template.slug, file) : file));
       setUploads((current) => ({ ...current, [slot.id]: [...(current[slot.id] || []), ...savedFiles].slice(0, slot.maxCount) }));
-      if (usesFacadePointMapping && ["countertopMaterial", "plinthMaterial"].includes(slot.id)) setActiveSurfaceMaterialId(savedFiles[0] ? `${slot.id === "countertopMaterial" ? "countertop" : "plinth"}:${savedFiles[0].id}` : "");
-      else if (usesFacadePointMapping && slot.id === "facadeMaterials") setActiveSurfaceMaterialId((current) => current || (savedFiles[0] ? `facade:${savedFiles[0].id}` : ""));
-      if (usesFacadePointMapping && slot.id === primarySlot?.id) { setSurfaceZones({}); setSelectedSurfaceZone(null); }
+      if (usesFacadePointMapping && slot.id === "facadeMaterials") setActiveSurfaceMaterialId((current) => current || (savedFiles[0] ? `facade:${savedFiles[0].id}` : ""));
+      if (usesFacadePointMapping && slot.id === primarySlot?.id) setSurfacePoints({});
       if (keepInMaterialHistory) setAssetHistory((current) => [...savedFiles.filter(isImage), ...current.filter((item) => !savedFiles.some((file) => file.id === item.id))]);
       setLatestResults([]);
     } catch (reason) {
@@ -602,13 +493,12 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
 
   const removeFile = (slotId: string, id: string) => {
     setUploads((current) => ({ ...current, [slotId]: (current[slotId] || []).filter((file) => file.id !== id) }));
-    if (usesFacadePointMapping && ["facadeMaterials", "countertopMaterial", "plinthMaterial"].includes(slotId)) {
-      const removedAssignmentIds = surfaceAssignments.filter((assignment) => assignment.file.id === id).map((assignment) => assignment.id);
-      setSurfaceZones((current) => { const next = { ...current }; removedAssignmentIds.forEach((assignmentId) => delete next[assignmentId]); return next; });
-      setSelectedSurfaceZone((current) => current && removedAssignmentIds.includes(current.materialId) ? null : current);
-      if (removedAssignmentIds.includes(activeSurfaceMaterialId)) setActiveSurfaceMaterialId(surfaceAssignments.find((assignment) => !removedAssignmentIds.includes(assignment.id))?.id || "");
+    if (usesFacadePointMapping && slotId === "facadeMaterials") {
+      const removedAssignmentId = `facade:${id}`;
+      setSurfacePoints((current) => { const next = { ...current }; delete next[removedAssignmentId]; return next; });
+      if (removedAssignmentId === activeSurfaceMaterialId) setActiveSurfaceMaterialId(facadeAssignments.find((assignment) => assignment.id !== removedAssignmentId)?.id || "");
     }
-    if (usesFacadePointMapping && slotId === primarySlot?.id) { setSurfaceZones({}); setSelectedSurfaceZone(null); }
+    if (usesFacadePointMapping && slotId === primarySlot?.id) setSurfacePoints({});
     setLatestResults([]);
     setError("");
   };
@@ -624,8 +514,7 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
   const addHistoryToSlot = (file: UploadedFile, slot: TemplateInputSlot) => {
     if (!canAddHistoryToSlot(file, slot)) return setError(`${slot.label}: материал нельзя добавить в этот слот.`);
     setUploads((current) => ({ ...current, [slot.id]: [...(current[slot.id] || []), file] }));
-    if (usesFacadePointMapping && ["countertopMaterial", "plinthMaterial"].includes(slot.id)) setActiveSurfaceMaterialId(`${slot.id === "countertopMaterial" ? "countertop" : "plinth"}:${file.id}`);
-    else if (usesFacadePointMapping && slot.id === "facadeMaterials") setActiveSurfaceMaterialId((current) => current || `facade:${file.id}`);
+    if (usesFacadePointMapping && slot.id === "facadeMaterials") setActiveSurfaceMaterialId((current) => current || `facade:${file.id}`);
     setLatestResults([]);
     setError("");
   };
@@ -659,8 +548,8 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
       const primaryDataUrl = await resolveDataUrl(primary);
       const allImages = activeInputSlots.flatMap((slot) => uploads[slot.id] || []).filter((file) => file.id !== primary.id && isImage(file));
       const referenceImages = await Promise.all(allImages.slice(0, isMoodboardComposition ? 15 : usesFacadePointMapping ? 9 : 10).map(resolveDataUrl));
-      const facadeZoneMap = usesFacadePointMapping ? await createFacadeZoneMap(primaryDataUrl, surfaceAssignments, surfaceZones) : "";
-      const providerReferenceImages = facadeZoneMap ? [facadeZoneMap, ...referenceImages] : referenceImages;
+      const facadePointMap = usesFacadePointMapping ? await createFacadePointMap(primaryDataUrl, facadeAssignments, surfacePoints) : "";
+      const providerReferenceImages = facadePointMap ? [facadePointMap, ...referenceImages] : referenceImages;
       const fieldBrief = activeInputSlots.map((slot) => {
         if (isValueSlot(slot)) return values[slot.id]?.trim() ? `${slot.label}: ${values[slot.id].trim()}` : "";
         if (usesFacadePointMapping) return "";
@@ -679,25 +568,25 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
         `MANDATORY WALL MODE: ${values.wallMode || "Определить автоматически"}${values.wallDimensions ? `; dimensions: ${values.wallDimensions}` : ""}.`,
         `MANDATORY ENVIRONMENT: ${values.environment || "Нейтральный фон"}.`,
       ].join("\n") : "";
-      const surfaceAssignmentBrief = usesFacadePointMapping ? surfaceAssignments.map((assignment) => {
-        const referenceIndex = allImages.findIndex((file) => file.id === assignment.id);
-        const zones = surfaceZones[assignment.id] || [];
-        const coordinates = zones.map((zone, zoneIndex) => `${assignment.prefix}.${zoneIndex + 1}=(${zone.x}%, ${zone.y}%, ${zone.width}%, ${zone.height}%)`).join(", ");
-        if (assignment.kind === "countertop") return `Supporting Image ${referenceIndex + 3} is COUNTERTOP_MATERIAL. Apply its exact colour, grain, veining, reflectivity and realistic scale exclusively to the existing horizontal countertop/worktop surfaces inside ${coordinates} on SURFACE_ZONE_MAP. The countertop material change is mandatory and must remain visibly recognisable. Never apply it to fronts, doors, drawers, plinth, backsplash, walls, floor or appliances.`;
-        if (assignment.kind === "plinth") return `Supporting Image ${referenceIndex + 3} is PLINTH_MATERIAL. Apply it exclusively to the recessed base/plinth strips beneath the lower cabinets inside ${coordinates} on SURFACE_ZONE_MAP. Never apply it to fronts, countertop, backsplash, walls, floor or appliances.`;
-        return `Supporting Image ${referenceIndex + 3} is FACADE_MATERIAL_${assignment.prefix}. Apply its colour, grain, reflectivity and scale exclusively to cabinet door/drawer fronts inside ${coordinates} on SURFACE_ZONE_MAP. Never use FACADE_MATERIAL_${assignment.prefix} for the countertop, backsplash, wall, floor, appliances, handles or unassigned fronts.`;
+      const surfaceAssignmentBrief = usesFacadePointMapping ? facadeAssignments.map((assignment) => {
+        const referenceIndex = allImages.findIndex((file) => file.id === assignment.file.id);
+        const points = surfacePoints[assignment.id] || [];
+        const coordinates = points.map((point, pointIndex) => `${assignment.prefix}.${pointIndex + 1}=(${point.x}%, ${point.y}%)`).join(", ");
+        return `Supporting Image ${referenceIndex + 3} is FACADE_MATERIAL_${assignment.prefix}. On FACADE_POINT_MAP, markers ${coordinates} sit inside the exact cabinet door or drawer fronts assigned to this material. For every marker, identify the complete bounded front panel containing the marker and apply the material to that whole panel up to its visible seams. Multiple markers mean multiple separate front panels. Preserve panel boundaries, gaps, handles and geometry. Never use FACADE_MATERIAL_${assignment.prefix} for countertops, backsplash, plinth, walls, floor, appliances, handles or any unmarked front.`;
       }).join("\n") : "";
       const kitchenReferenceManifest = usesFacadePointMapping ? activeInputSlots.flatMap((slot) => {
-        if (isValueSlot(slot) || slot.id === primarySlot?.id || ["facadeMaterials", "countertopMaterial", "plinthMaterial"].includes(slot.id)) return [];
+        if (isValueSlot(slot) || slot.id === primarySlot?.id || slot.id === "facadeMaterials") return [];
         return (uploads[slot.id] || []).filter(isImage).map((file, fileIndex) => {
           const imageNumber = allImages.findIndex((candidate) => candidate.id === file.id) + 3;
+          if (slot.id === "countertopMaterial") return `Supporting Image ${imageNumber} is COUNTERTOP_MATERIAL. Detect the existing horizontal kitchen worktop/countertop surfaces from the base image and apply this exact material to all of those surfaces. Preserve their outline, thickness, edge profile, cut-outs and geometry. Keep it off fronts, backsplash, plinth, walls, floor and appliances.`;
           if (slot.id === "backsplashMaterial") return `Supporting Image ${imageNumber} is BACKSPLASH_MATERIAL. Apply it exclusively to the wall backsplash between the countertop and upper cabinets. Never apply it to cabinet fronts, countertop, plinth, floor or appliances.`;
+          if (slot.id === "plinthMaterial") return `Supporting Image ${imageNumber} is PLINTH_MATERIAL. Detect the existing recessed base/plinth strips directly beneath the lower cabinets and apply this material only there. Preserve their height, recess and geometry. Keep it off fronts, countertop, backsplash, walls, floor and appliances.`;
           if (slot.id === "appliances") return `Supporting Image ${imageNumber} is APPLIANCE_REFERENCE_${fileIndex + 1}. Use it only for the matching appliance named in the brief; do not derive any finish for furniture surfaces from it.`;
           if (slot.id === "extraObjects") return `Supporting Image ${imageNumber} is OPTIONAL_ITEM_REFERENCE_${fileIndex + 1}. Use it only for the explicitly matching accessory; do not derive cabinet, countertop or backsplash materials from it.`;
           return `Supporting Image ${imageNumber} is ${slot.id.toUpperCase()}_REFERENCE_${fileIndex + 1}. Use it only for that named role and never as a cabinet-front or countertop material.`;
         });
       }).join("\n") : "";
-      const facadeZoneControlBrief = usesFacadePointMapping ? "REFERENCE MANIFEST — roles are immutable and mutually exclusive. Image 1 is KITCHEN_BASE and is authoritative for camera, geometry, module boundaries, seams, handles, appliances and lighting. Supporting Image 2 is SURFACE_ZONE_MAP: translucent labelled rectangles are the only surface-material assignments and are a control overlay that must not appear in the result. F labels identify cabinet fronts, C labels identify countertop surfaces, and P labels identify plinth strips. Change every assigned surface and only that surface. Leave every unmarked surface unchanged. Ignore all small dots, handles, annotations and CAD markers in KITCHEN_BASE; they are never material instructions. Before rendering, verify that countertop and plinth materials are visibly applied to their assigned zones and never appear on cabinet doors or drawers.\n" : "";
+      const facadePointControlBrief = usesFacadePointMapping ? "REFERENCE MANIFEST — roles are immutable and mutually exclusive. Image 1 is KITCHEN_BASE and is authoritative for camera, geometry, module boundaries, seams, handles, appliances and lighting. Supporting Image 2 is FACADE_POINT_MAP: labelled coloured dots are control markers, not design elements, and must never appear in the result. Each F marker identifies the complete individual cabinet-front panel underneath its centre. Change every marked front and only those fronts. Countertop, backsplash and plinth are recognised semantically from KITCHEN_BASE and their named material references; they do not use point markers. Leave every unassigned surface unchanged. Ignore original CAD handles, dots and annotations unless explicitly named as references. Before rendering, verify facade materials against every marker and verify that countertop, backsplash and plinth materials remain restricted to their own architectural surface types.\n" : "";
       const count = generationCount(template, scenario.outputLabels, uploads);
       const labels = scenario.outputLabels.slice(0, count);
       const batchId = crypto.randomUUID();
@@ -715,7 +604,7 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
               templateId: isMoodboardComposition ? "moodboard-builder" : template.slug,
               outputLabel: label,
               referenceImages: providerReferenceImages,
-              instructions: `${scenario.generationBrief}\n${fieldBrief}\n${planogramControlBrief}\n${facadeZoneControlBrief}${surfaceAssignmentBrief}\n${kitchenReferenceManifest}\nCreate only the result «${label}».`,
+              instructions: `${scenario.generationBrief}\n${fieldBrief}\n${planogramControlBrief}\n${facadePointControlBrief}${surfaceAssignmentBrief}\n${kitchenReferenceManifest}\nCreate only the result «${label}».`,
             },
             outputSize: planogramOutputSize,
           }),
@@ -748,7 +637,7 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
           <span>GEOMETRY LOCK · ВКЛЮЧЁН</span>
           <h3>Проект кухни остаётся неизменным</h3>
           <p>Фиксируем камеру, модули, фасады, столешницу, ручки и расположение техники. Меняются только материалы, свет, окружение и качество изображения.</p>
-          <small>PREVIEW · назначение поверхностей подтверждается вручную</small>
+          <small>PREVIEW · фасады отмечаются точками, остальные поверхности распознаются автоматически</small>
         </aside>}
         {activeInputSlots.map((slot, index) => <section className="editorial-source-panel editorial-dynamic-panel" key={slot.id}>
           <header><span>{index + 1}.</span><div><h3>{slot.label}{!isValueSlot(slot) && <b> ({uploads[slot.id]?.length || 0}/{slot.maxCount})</b>}</h3><p>{slot.helper || (slot.required ? "Обязательный материал" : "Необязательно")}</p></div></header>
@@ -757,21 +646,17 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
               {(uploads[slot.id] || []).map((file) => <FileCard key={file.id} file={file} onRemove={() => removeFile(slot.id, file.id)} />)}
               {(uploads[slot.id]?.length || 0) < slot.maxCount && <label className="editorial-dynamic-add"><input type="file" multiple={slot.maxCount > 1} accept={acceptedFileTypes(slot)} aria-label={slot.label} onChange={(event) => void uploadFiles(slot, event)} /><b>+</b><span>{uploads[slot.id]?.length ? "Добавить ещё" : "Добавить файл"}</span></label>}
             </div>
-            {usesFacadePointMapping && ["facadeMaterials", "countertopMaterial", "plinthMaterial"].includes(slot.id) && (() => {
-              const slotAssignments = surfaceAssignments.filter((assignment) => slot.id === "facadeMaterials" ? assignment.kind === "facade" : slot.id === "countertopMaterial" ? assignment.kind === "countertop" : assignment.kind === "plinth");
-              if (!slotAssignments.length) return null;
-              const activeSlotAssignment = slotAssignments.find((assignment) => assignment.id === activeSurfaceMaterialId);
-              return <div className="editorial-surface-materials" aria-label={`Назначение: ${slot.label}`}>
-              {slotAssignments.map((assignment) => {
-                const zones = surfaceZones[assignment.id] || [];
+            {usesFacadePointMapping && slot.id === "facadeMaterials" && facadeAssignments.length > 0 && <div className="editorial-surface-materials" aria-label="Назначение фактур фасадов">
+              {facadeAssignments.map((assignment) => {
+                const points = surfacePoints[assignment.id] || [];
                 const active = activeSurfaceMaterialId === assignment.id;
                 return <article className={active ? "is-active" : ""} style={{ "--surface-point-color": assignment.color } as CSSProperties} key={assignment.id}>
-                  <button className="editorial-surface-select" type="button" aria-pressed={active} onClick={() => { setActiveSurfaceMaterialId(assignment.id); setSelectedSurfaceZone(null); setLatestResults([]); setError(""); }}><i /><span><b>{assignment.label}</b><small>зоны {assignment.colorName} цвета · {zones.length}</small></span></button>
-                  <div><button type="button" disabled={selectedSurfaceZone?.materialId !== assignment.id} onClick={() => selectedSurfaceZone && deleteSurfaceZone(selectedSurfaceZone.materialId, selectedSurfaceZone.zoneIndex)}>Удалить выбранную</button><button type="button" disabled={!zones.length} onClick={() => undoSurfaceZone(assignment.id)}>Отменить последнюю</button><button type="button" disabled={!zones.length} onClick={() => clearSurfaceZones(assignment.id)}>Очистить</button></div>
+                  <button className="editorial-surface-select" type="button" aria-pressed={active} onClick={() => { setActiveSurfaceMaterialId(assignment.id); setLatestResults([]); setError(""); }}><i /><span><b>{assignment.label}</b><small>{assignment.colorName} точки · {points.length}</small></span></button>
+                  <div><button type="button" disabled={!points.length} onClick={() => undoSurfacePoint(assignment.id)}>Отменить точку</button><button type="button" disabled={!points.length} onClick={() => clearSurfacePoints(assignment.id)}>Очистить</button></div>
                 </article>;
               })}
-              <p>{activeSlotAssignment ? `${activeSlotAssignment.label}: кликните по нужной поверхности для быстрой зоны или протяните мышью точную рамку ${activeSlotAssignment.colorName} цвета.` : `Нажмите «${slotAssignments[0].label}» и отметьте соответствующую поверхность на изображении справа.`}</p>
-            </div>})()}
+              <p>{activeFacadeAssignment ? `${activeFacadeAssignment.label}: поставьте по одной ${activeFacadeAssignment.colorName} точке внутрь каждого фасада, которому назначен этот материал.` : "Выберите фактуру, затем отметьте точками нужные фасады на изображении справа."}</p>
+            </div>}
             {slot.consent && slot.consent !== "none" && Boolean(uploads[slot.id]?.length) && <label className="editorial-consent"><input type="checkbox" checked={Boolean(consents[slot.id])} onChange={(event) => setConsents((current) => ({ ...current, [slot.id]: event.target.checked }))} /><span>{slot.consent === "people" ? "У меня есть согласие людей на использование фотографий" : slot.consent === "audio" ? "У меня есть право использовать этот аудиофрагмент" : "Владелец материала подтвердил участие"}</span></label>}
           </>}
         </section>)}
@@ -792,10 +677,7 @@ export default function TemplateScenarioWorkbench({ template, onGenerated }: { t
             <b className="is-before">Исходный план</b><b className="is-after">Планограмма 3D</b>
             <input type="range" min="0" max="100" value={comparisonPosition} aria-label="Сравнить исходный план и результат" onChange={(event) => setComparisonPosition(Number(event.target.value))} />
             <button type="button" onClick={() => openLightbox(latestResults, latestResults[0].id)}>Открыть результат ↗</button>
-          </div> : latestResults.length > 1 ? <div className={`editorial-result-collection count-${Math.min(latestResults.length, 4)}`}>{latestResults.map((item) => <button type="button" key={item.id} onClick={() => openLightbox(latestResults, item.id)}><img src={item.dataUrl} alt={item.label} /><span>{item.label}</span></button>)}</div> : stageImage ? <button type="button" onClick={latestResults[0] ? () => openLightbox(latestResults, latestResults[0].id) : undefined} onPointerDown={latestResults[0] ? undefined : beginSurfaceZone} onPointerMove={latestResults[0] ? undefined : moveSurfaceZone} onPointerUp={latestResults[0] ? undefined : finishSurfaceZone} onPointerCancel={latestResults[0] ? undefined : cancelSurfaceZone} aria-label={latestResults[0] ? "Открыть результат" : activeSurfaceAssignment ? `Обвести ${activeSurfaceAssignment.target} рамкой ${activeSurfaceAssignment.colorName} цвета` : "Основное изображение"}><img src={stageImage} alt={latestResults[0]?.label || "Основное изображение"} />{usesFacadePointMapping && !latestResults.length && surfaceAssignments.flatMap((assignment) => (surfaceZones[assignment.id] || []).map((zone, zoneIndex) => {
-            const selected = selectedSurfaceZone?.materialId === assignment.id && selectedSurfaceZone.zoneIndex === zoneIndex;
-            return <span className={`editorial-surface-zone${selected ? " is-selected" : ""}`} style={{ left: `${zone.displayX}%`, top: `${zone.displayY}%`, width: `${zone.displayWidth}%`, height: `${zone.displayHeight}%`, "--surface-point-color": assignment.color } as CSSProperties} key={`${assignment.id}-${zoneIndex}`} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setActiveSurfaceMaterialId(assignment.id); setSelectedSurfaceZone({ materialId: assignment.id, zoneIndex }); }}><b>{assignment.prefix}.{zoneIndex + 1}</b>{selected && (["nw", "ne", "sw", "se"] as const).map((corner) => <i className={`editorial-surface-handle is-${corner}`} key={corner} onPointerDown={(event) => beginSurfaceZoneResize(event, assignment.id, zoneIndex, corner)} onPointerMove={moveSurfaceZoneResize} onPointerUp={finishSurfaceZoneResize} onPointerCancel={finishSurfaceZoneResize} />)}</span>;
-          }))}{usesFacadePointMapping && surfaceZoneDraft && surfaceZoneAnchor && activeSurfaceAssignment && <span className="editorial-surface-zone is-draft" style={{ left: `${surfaceZoneDraft.displayX}%`, top: `${surfaceZoneDraft.displayY}%`, width: `${surfaceZoneDraft.displayWidth}%`, height: `${surfaceZoneDraft.displayHeight}%`, "--surface-point-color": activeSurfaceAssignment.color } as CSSProperties} />}</button> : <div className="editorial-result-empty"><b>ROOM DESIGN</b><p>Добавьте исходные материалы — здесь появится результат сценария.</p></div>}
+          </div> : latestResults.length > 1 ? <div className={`editorial-result-collection count-${Math.min(latestResults.length, 4)}`}>{latestResults.map((item) => <button type="button" key={item.id} onClick={() => openLightbox(latestResults, item.id)}><img src={item.dataUrl} alt={item.label} /><span>{item.label}</span></button>)}</div> : stageImage ? <button type="button" onClick={latestResults[0] ? () => openLightbox(latestResults, latestResults[0].id) : addSurfacePoint} aria-label={latestResults[0] ? "Открыть результат" : activeFacadeAssignment ? `Поставить ${activeFacadeAssignment.colorName} точку на фасад` : "Основное изображение"}><img src={stageImage} alt={latestResults[0]?.label || "Основное изображение"} />{usesFacadePointMapping && !latestResults.length && facadeAssignments.flatMap((assignment) => (surfacePoints[assignment.id] || []).map((point, pointIndex) => <span className="editorial-surface-point" style={{ left: `${point.displayX}%`, top: `${point.displayY}%`, "--surface-point-color": assignment.color } as CSSProperties} key={`${assignment.id}-${pointIndex}`}>{assignment.prefix}.{pointIndex + 1}</span>))}</button> : <div className="editorial-result-empty"><b>ROOM DESIGN</b><p>Добавьте исходные материалы — здесь появится результат сценария.</p></div>}
           {phase === "processing" && <div className="editorial-result-progress" role="status"><i /><b>{isPlanogram3D ? "Строим планограмму 3D" : isMoodboardComposition ? "Собираем мудборд" : `Создаём ${scenario.outputLabels.length > 1 ? "варианты" : "результат"}`} · {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, "0")}</b><p>{isPlanogram3D ? "Сверяем контур, комнаты, стены, окна и двери с исходным планом." : isMoodboardComposition ? "Сохраняем реальные цвета, рисунки и фактуры всех выбранных материалов." : "Все варианты создаются из одного набора исходных материалов."}</p></div>}
           {phase === "failed" && <div className="editorial-result-error" role="alert"><b>Результат не создан</b><p>{error || "Попробуйте запустить сценарий ещё раз."}</p></div>}
         </div>
