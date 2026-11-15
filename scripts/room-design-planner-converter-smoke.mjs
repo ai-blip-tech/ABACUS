@@ -9,7 +9,7 @@ import {crc32} from 'node:zlib';
 
 const exec = promisify(execFile);
 const tools = resolve('.next/room-design-planner-tools');
-const packaged = join(tools, 'archive/usr/bin/bsdtar');
+const packaged = join(tools, 'archive/bsdtar');
 const archiveTool = existsSync(packaged) ? packaged : '/usr/bin/bsdtar';
 const converter = join(tools, 'catalog-model-convert.mjs');
 const fixture = Buffer.from('o Cube\nv 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 0 1\nf 1 3 2\nf 1 2 4\nf 1 4 3\nf 2 3 4\n');

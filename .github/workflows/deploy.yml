@@ -272,6 +272,10 @@ jobs:
             cp "$env_file" "$release_dir/.env"
 
             cd "$release_dir"
+            sh scripts/room-design-planner-archive-tool.sh
+            if [ -d .next/room-design-planner-tools/archive ]; then
+              mv .next/room-design-planner-tools/archive .planner-archive-candidate
+            fi
             npm ci
             ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-unit-data" npm run test:unit
             ROOM_DWG_CONVERTER="$converter_dir/dwg2dxf" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/cad/converter-server-smoke.mjs "$HOME/room-dwg-preflight-j9Iklx/libredwg-0.14/test/test-data/2004/Line.dwg"
@@ -281,7 +285,9 @@ jobs:
             ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-build-data" timeout --signal=TERM --kill-after=30s 12m npm run build -- --webpack
             sh scripts/install-room-design-planner-build.sh "$release_sha"
             unset PLANNER_BUILD_TOKEN
-            sh scripts/room-design-planner-archive-tool.sh
+            if [ -d .planner-archive-candidate ]; then
+              mv .planner-archive-candidate .next/room-design-planner-tools/archive
+            fi
             node scripts/room-design-planner-converter-smoke.mjs
             test -f .next/BUILD_ID
 

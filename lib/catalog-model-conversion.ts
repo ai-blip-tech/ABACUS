@@ -29,7 +29,7 @@ export async function prepareCatalogModel(product:any, options:ArchiveOptions = 
    await writeFile(input, await download(product.model3dUrl));
    const toolsDir = join(process.cwd(), '.next', 'room-design-planner-tools');
    const script = process.env.ROOM_DESIGN_MODEL_CONVERTER || join(toolsDir, 'catalog-model-convert.mjs');
-   const packagedArchiveTool = join(toolsDir, 'archive', 'usr', 'bin', 'bsdtar');
+   const packagedArchiveTool = join(toolsDir, 'archive', 'bsdtar');
    const archiveTool = process.env.ROOM_DESIGN_ARCHIVE_TOOL || await stat(packagedArchiveTool).then(() => packagedArchiveTool, () => '/usr/bin/bsdtar');
    const {stdout} = await exec(process.execPath, [
     '--max-old-space-size=768', script, input, converted, JSON.stringify(dimensions),
