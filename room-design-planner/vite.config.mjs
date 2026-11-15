@@ -12,7 +12,11 @@ export default defineConfig({
   plugins: [editorAdaptations(), itemHitPlugin(), react(), tailwindcss()],
   define: {'process.env': {}},
   resolve: {
-    alias: {'next/image': path('./next-image.tsx'), 'next/link': path('./next-link.tsx')},
+    alias: {
+      'next/image': path('./next-image.tsx'),
+      'next/link': path('./next-link.tsx'),
+      'polygon-clipping': fileURLToPath(import.meta.resolve('polygon-clipping')),
+    },
     dedupe: ['react', 'react-dom', 'three', '@pascal-app/core', '@pascal-app/viewer'],
   },
   build: {
