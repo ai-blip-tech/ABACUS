@@ -18,6 +18,8 @@ export const matchesCatalogType = (product: CatalogFilterProduct, type: string, 
   if (product.source === "gomoon") return false;
   const text = normalizeCatalogText(`${product.name} ${product.subtype} ${product.category} ${categoryTrail}`);
   const categoryText = normalizeCatalogText(`${product.category} ${categoryTrail}`);
+  if(type==='porcelain')return /керамогранит|керамическ.{0,10}плит|плитка|мозаика/.test(text);
+  if(type==='sanitary')return /(?:^|[^а-я])(унитаз|раковин|умывальник|смесител|биде|ванн[аыу]|душев|санфаянс|сантехник)/.test(text);
   if (type === "sofa") return /диван|модул|кушет/.test(text);
   if (type === "armchair") return /кресл/.test(text);
   if (type === "chair") return /стул/.test(text);

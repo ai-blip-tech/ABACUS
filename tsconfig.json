@@ -38,6 +38,6 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules", "room-design-planner"
   ]
 }

@@ -35,3 +35,4 @@ test('parquet axis and origin serialize independently of finish and reject inval
  assert.throws(()=>validateFloorRegions([{...placed,angle:NaN}]));
  assert.throws(()=>validateFloorRegions([{...placed,origin:[Infinity,0]}]));
 });
+test('overlapping later coverings are excluded from visible area and purchase quantities',()=>{const d=doc(),a={...region,id:'base'},b={...region,id:'new',polygon:[[1000,1000],[2000,1000],[2000,2000],[1000,2000]] as [number,number][]};d.floorRegions=[a,b];assert.ok(Math.abs(floorRegionGeometry(d,a).squareMetres-9.64)<1e-8);assert.equal(floorRegionGeometry(d,b).squareMetres,1);assert.deepEqual(floorPlacement({...region,material:'tile',layout:null}).origin,[0,0]);});

@@ -1,3 +1,4 @@
+import { catalogHasModel3D, catalogModelUrl } from "@/lib/catalog-model3d";
 import { matchesCatalogType } from "@/lib/catalog-filter";
 import { FURNITURE_CATALOG_SOURCES } from "@/lib/furniture-catalog";
 import { loadStudioCatalog } from "@/lib/studio-catalog";
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
     const { products, unavailableSources } = await loadStudioCatalog();
     const navigation = furnitureCatalogNavigation(products,{type,brands:selectedSources,query});
     const matched = products.filter((product) => {
+      if (search.get("model3d") === "1" && !catalogHasModel3D(product)) return false;
       if (ids.size) return ids.has(product.id) || (product.source === "norrmobler" && ids.has(product.sourceId));
       // Global search deliberately bypasses sidebar filters; clearing it restores them.
       if (query) return matchesCatalogSearch(product,query);
@@ -56,6 +58,7 @@ export async function GET(request: Request) {
       if (heightMaxMm && (!product.heightMm || product.heightMm > heightMaxMm)) return false;
       return true;
     });
+    if(sort==="model3d_first")matched.sort((a,b)=>Number(Boolean(catalogModelUrl(b)))*2+Number(catalogHasModel3D(b))-Number(Boolean(catalogModelUrl(a)))*2-Number(catalogHasModel3D(a)));
     if (sort === "price_asc") matched.sort((left, right) => (left.price || Number.POSITIVE_INFINITY) - (right.price || Number.POSITIVE_INFINITY));
     if (sort === "price_desc") matched.sort((left, right) => (right.price || 0) - (left.price || 0));
     if (sort === "discount_desc") matched.sort((left,right)=>catalogDiscount(right)-catalogDiscount(left));

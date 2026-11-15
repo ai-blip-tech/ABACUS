@@ -7,4 +7,5 @@ export const furnitureCatalogCategories = [
   {type:"light",name:"Светильник",icon:"lamp"}, {type:"technical_light",name:"Технический свет",icon:"lamp"}, {type:"decor",name:"Декор для дома",icon:"decor"},
   {type:"cabinet",name:"Шкаф",icon:"cabinet"}, {type:"dresser",name:"Комод",icon:"dresser"}, {type:"nightstand",name:"Прикроватная тумба",icon:"nightstand"}, {type:"tv_stand",name:"TV-тумба",icon:"tv_stand"},
   {type:"shelving",name:"Стеллаж",icon:"cabinet"}, {type:"shelf",name:"Полка",icon:"cabinet"},
+  {type:"porcelain",name:"Керамогранит и плитка",icon:"decor"}, {type:"sanitary",name:"Сантехника",icon:"decor"},
 ] as const;

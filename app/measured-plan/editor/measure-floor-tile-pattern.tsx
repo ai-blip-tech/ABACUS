@@ -1,0 +1,3 @@
+import {floorTextureUrl} from './floor-tile-card';
+import type {FloorRegion} from '@/lib/measured-plan/measure-floor-finishes';
+export function FloorTilePattern({id,region}:{id:string;region:FloorRegion}){const t=region.tile;if(!t)return null;return <pattern id={id} width={t.widthMm+t.jointMm} height={t.heightMm+t.jointMm} patternUnits="userSpaceOnUse" patternTransform={`translate(${(region.origin||[0,0]).join(' ')}) rotate(${region.angle||0})`}><rect width={t.widthMm+t.jointMm} height={t.heightMm+t.jointMm} fill={t.grout}/><image href={floorTextureUrl(t)} width={t.widthMm} height={t.heightMm} preserveAspectRatio="none"/></pattern>;}

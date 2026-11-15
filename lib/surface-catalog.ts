@@ -1,0 +1,4 @@
+import {filterTileCatalogImages} from './tile-catalog-quality.ts';
+import {parseFurnitureCatalog,type FurnitureCatalogProduct} from './furniture-catalog.ts';
+let cached:{until:number;products:FurnitureCatalogProduct[]}|null=null,pending:Promise<FurnitureCatalogProduct[]>|null=null;
+export async function loadSurfaceCatalog(){if(cached&&cached.until>Date.now())return cached.products;if(pending)return pending;pending=(async()=>{const r=await fetch('https://norrmobler.ru/yml.php',{cache:'no-store',signal:AbortSignal.timeout(25000)});if(!r.ok)throw Error('Фид покрытий недоступен');const {products}=await filterTileCatalogImages(parseFurnitureCatalog(await r.text(),'norrmobler',{surfaceOnly:true}));cached={until:Date.now()+1800000,products};return products;})();try{return await pending;}finally{pending=null;}}

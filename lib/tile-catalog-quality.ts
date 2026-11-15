@@ -1,0 +1,4 @@
+import {matchesCatalogType} from './catalog-filter.ts';
+import {preparedCatalogTile} from './tile-texture-cache.ts';
+import type {FurnitureCatalogProduct} from './furniture-catalog.ts';
+export async function filterTileCatalogImages(products:FurnitureCatalogProduct[],inspect:typeof preparedCatalogTile=preparedCatalogTile){const result: FurnitureCatalogProduct[]=[],rejected:{id:string;reason:string}[]=[];let at=0;await Promise.all(Array.from({length:8},async()=>{for(;;){const p=products[at++];if(!p)return;if(!matchesCatalogType(p,'porcelain',p._trail||'')){result.push(p);continue;}try{const {report}=await inspect(p);if(report.status==='ready')result.push(p);else rejected.push({id:p.id,reason:report.reason});}catch{rejected.push({id:p.id,reason:'Не удалось подтвердить пригодность изображения'});}}}));const ids=new Set(result.map(p=>p.id));return{products:products.filter(p=>ids.has(p.id)),rejected};}

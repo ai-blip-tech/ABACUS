@@ -12,7 +12,8 @@ export const parquetLayouts=[
 ] as const;
 export type ParquetLayout=typeof parquetLayouts[number]['id'];
 export type FloorWood='oak'|'walnut';
-export type FloorRegion={id:string;polygon:Point[];layout:ParquetLayout|null;wood:FloorWood;origin?:Point;angle?:number};
+export type FloorTile={id:string;name:string;article?:string;brand?:string;url?:string;image:string;widthMm:number;heightMm:number;thicknessMm?:number;price?:number;priceUnit?:string;jointMm:number;grout:string;textureReviewed?:boolean};
+export type FloorRegion={tileLayoutMode?:'auto'|'manual';material?:'parquet'|'tile';tile?:FloorTile;id:string;polygon:Point[];layout:ParquetLayout|null;wood:FloorWood;origin?:Point;angle?:number};
 
 const cross=(a:Point,b:Point,c:Point)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
 const on=(a:Point,b:Point,p:Point)=>Math.abs(cross(a,b,p))<.001&&p[0]>=Math.min(a[0],b[0])&&p[0]<=Math.max(a[0],b[0])&&p[1]>=Math.min(a[1],b[1])&&p[1]<=Math.max(a[1],b[1]);
@@ -28,12 +29,14 @@ export function floorPolygon(points:Point[]):Point[]{
 }
 export function validateFloorRegions(value:unknown):FloorRegion[]{
  if(!Array.isArray(value)||value.length>100)throw Error('Можно сохранить не более 100 участков пола');
- const ids=new Set<string>();for(const region of value){if(!region||typeof region.id!=='string'||!/^[a-zA-Z0-9_-]{1,140}$/.test(region.id)||ids.has(region.id)||!['oak','walnut'].includes(region.wood)||region.layout!==null&&!parquetLayouts.some(layout=>layout.id===region.layout))throw Error('Некорректные параметры участка пола');if(region.angle!==undefined&&(!Number.isFinite(region.angle)||Math.abs(region.angle)>36000)||region.origin!==undefined&&(!Array.isArray(region.origin)||region.origin.length!==2||region.origin.some((n:number)=>!Number.isFinite(n)||Math.abs(n)>200000)))throw Error('Некорректная ось раскладки');floorPolygon(region.polygon);ids.add(region.id);}
+ const ids=new Set<string>();for(const region of value){if(!region||typeof region.id!=='string'||!/^[a-zA-Z0-9_-]{1,140}$/.test(region.id)||ids.has(region.id)||!['oak','walnut'].includes(region.wood)||region.layout!==null&&!parquetLayouts.some(layout=>layout.id===region.layout))throw Error('Некорректные параметры участка пола');if(region.angle!==undefined&&(!Number.isFinite(region.angle)||Math.abs(region.angle)>36000)||region.origin!==undefined&&(!Array.isArray(region.origin)||region.origin.length!==2||region.origin.some((n:number)=>!Number.isFinite(n)||Math.abs(n)>200000)))throw Error('Некорректная ось раскладки');if(region.tileLayoutMode!==undefined&&!['auto','manual'].includes(region.tileLayoutMode))throw Error('Неизвестный режим раскладки');if(region.material!==undefined&&!['parquet','tile'].includes(region.material))throw Error('Неизвестное покрытие пола');if(region.material==='tile'){const t=region.tile;if(!t||typeof t.id!=='string'||typeof t.name!=='string'||typeof t.image!=='string'||!/^https?:\/\/|^\/(?!\/)/.test(t.image)||![t.widthMm,t.heightMm].every(n=>Number.isFinite(n)&&n>=10&&n<=10000)||!Number.isFinite(t.jointMm)||t.jointMm<1||t.jointMm>20||!/^#[0-9a-f]{6}$/i.test(t.grout))throw Error('Проверьте формат плитки и шов');}floorPolygon(region.polygon);ids.add(region.id);}
  return structuredClone(value);
 }
 export function floorRegionGeometry(doc:MeasureDoc,region:FloorRegion){
  const polygon=floorPolygon(region.polygon),surface=doc.floor.length>=3?usablePlanArea(doc).polygons:null;
- const polygons=surface?surface.length?clipping.intersection([polygon],surface):[]:[[polygon]] as clipping.MultiPolygon;
+ let polygons=surface?surface.length?clipping.intersection([polygon],surface):[]:[[polygon]] as clipping.MultiPolygon;
+ const index=doc.floorRegions?.findIndex(r=>r.id===region.id)??-1;
+ if(index>=0)for(const covering of doc.floorRegions!.slice(index+1))if(polygons.length)polygons=clipping.difference(polygons,[floorPolygon(covering.polygon)]);
  return{polygons,squareMetres:multiArea(polygons)/1e6};
 }
 export function floorRegionPath(polygons:clipping.MultiPolygon){return polygons.flatMap(p=>p.map(r=>'M '+r.map(p=>p.join(' ')).join(' L ')+' Z')).join(' ');}
@@ -51,5 +54,5 @@ export function editFloorPolygon(polygon:Point[],kind:'move'|'vertex'|'edge',ind
 }
 export function floorPlacement(region:FloorRegion){
  const xs=region.polygon.map(p=>p[0]),ys=region.polygon.map(p=>p[1]);
- return{origin:region.origin||[(Math.min(...xs)+Math.max(...xs))/2,Math.min(...ys)+(Math.max(...ys)-Math.min(...ys))*.68] as Point,angle:region.angle??(['chevron','herringbone'].includes(region.layout||'')?90:0)};
+ return{origin:region.origin||(region.material==='tile'?[0,0]:[(Math.min(...xs)+Math.max(...xs))/2,Math.min(...ys)+(Math.max(...ys)-Math.min(...ys))*.68]) as Point,angle:region.angle??(['chevron','herringbone'].includes(region.layout||'')?90:0)};
 }

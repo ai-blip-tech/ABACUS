@@ -5,7 +5,7 @@ import {catalogFurnitureKind} from './furniture-sidebar.ts';
 import {furnitureTemplates} from './furniture.ts';
 import {dxfFurnitureKind} from './dxf-furniture-type.ts';
 /** Catalog taxonomy is more detailed than the shared 2D symbol (e.g. tables). */
-export const furnitureTypeChoices=[...furnitureCatalogCategories.map(c=>({id:c.type,name:c.name,kind:catalogFurnitureKind(c.type)!,catalogType:c.type as string})),...furnitureTemplates.filter(t=>['kitchen','fridge','bath','shower','toilet','sink','tv','plant'].includes(t.kind)).map(t=>({id:t.kind,name:t.name,kind:t.kind,catalogType:undefined}))];
+export const furnitureTypeChoices=[...furnitureCatalogCategories.filter(c=>catalogFurnitureKind(c.type)).map(c=>({id:c.type,name:c.name,kind:catalogFurnitureKind(c.type)!,catalogType:c.type as string})),...furnitureTemplates.filter(t=>['kitchen','fridge','bath','shower','toilet','sink','tv','plant'].includes(t.kind)).map(t=>({id:t.kind,name:t.name,kind:t.kind,catalogType:undefined}))];
 /** Names are usable evidence, not visual recognition. Reject implausible dimensions
  * and conflicting names; an explicit human confirmation always takes precedence. */
 export function plausibleFurnitureType(item:Pick<FurnitureItem,'kind'|'width'|'depth'|'name'>){

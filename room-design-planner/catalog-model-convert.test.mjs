@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {safeMembers} from './catalog-model-convert.mjs';
+test('archive entries reject traversal, absolute, Windows paths and excessive entries',()=>{for(const bad of ['../a.obj','/tmp/a.obj','C:/a.obj','a\\b.obj',Array.from({length:2001},(_,i)=>i+'.obj').join('\n')])assert.throws(()=>safeMembers(bad));assert.deepEqual(safeMembers('Model/Model.obj\nModel/Model.mtl\n'),['Model/Model.obj','Model/Model.mtl']);});

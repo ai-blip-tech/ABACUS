@@ -1,3 +1,5 @@
+import {matchesCatalogType} from './catalog-filter.ts';
+import {loadSurfaceCatalog} from './surface-catalog.ts';
 import { loadFurnitureCatalog, type FurnitureCatalogProduct } from "./furniture-catalog.ts";
 import { loadLightingCatalog, type LightingProduct, type LightingProductType } from "./lighting-catalog.ts";
 
@@ -16,9 +18,10 @@ export function lightingAsStudioProduct(product:LightingProduct):StudioCatalogPr
 }
 
 export async function loadStudioCatalog() {
-  const [furniture,lighting]=await Promise.allSettled([loadFurnitureCatalog(),loadLightingCatalog()]);
-  const products:StudioCatalogProduct[]=[...(furniture.status==="fulfilled"?furniture.value.products:[]),...(lighting.status==="fulfilled"?lighting.value.map(lightingAsStudioProduct):[])].filter(catalogProductHasPhoto);
-  const unavailableSources=[...(furniture.status==="fulfilled"?furniture.value.unavailableSources:["norrmobler","leve-home"]),...(lighting.status==="rejected"?["gomoon"]:[])];
+  const [furniture,lighting,surfaces]=await Promise.allSettled([loadFurnitureCatalog(),loadLightingCatalog(),loadSurfaceCatalog()]);
+  const qualifiedTiles=new Set(surfaces.status==='fulfilled'?surfaces.value.map(p=>p.id):[]);
+  const products:StudioCatalogProduct[]=[...(furniture.status==="fulfilled"?furniture.value.products:[]),...(lighting.status==="fulfilled"?lighting.value.map(lightingAsStudioProduct):[]),...(surfaces.status==="fulfilled"?surfaces.value:[])].filter(catalogProductHasPhoto).filter(p=>!matchesCatalogType(p,'porcelain',p._trail||'')||qualifiedTiles.has(p.id));
+  const unavailableSources=[...(surfaces.status==="rejected"?["NORR Ceramic"]:[]),...(furniture.status==="fulfilled"?furniture.value.unavailableSources:["norrmobler","leve-home"]),...(lighting.status==="rejected"?["gomoon"]:[])];
   if(!products.length)throw new Error("Каталоги временно недоступны.");
-  return {products,unavailableSources};
+  return {products:[...new Map(products.map(p=>[p.id,p])).values()],unavailableSources};
 }

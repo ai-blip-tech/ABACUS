@@ -1,3 +1,4 @@
+import type {PlannerWallFinish} from '../planning-plan/wall-finishes';
 import type {FurnitureItem} from '../planning-plan/furniture';
 import {furnitureCorners} from '../planning-plan/furniture.ts';
 import {buildBtiScene,liveBtiChecks} from './bti-scene.ts';
@@ -8,7 +9,7 @@ import type {FloorRegion} from './measure-floor-finishes';
 export type Point=[number,number];
 export type Column={id:string;name:string;a:Point;width:number;depth:number;height:number|null;confirmed:boolean;structuralStatus:'unknown'|'bearing';provenance:string};
 export type PlanDimension={id:string;a:Point;b:Point;offset?:number};
-export type Wall={id:string;name:string;a:Point;b:Point;thickness:number;thicknessConfirmed:boolean;lengthConfirmed:boolean;height:number|null;group:'outer'|'inner';provenance:string;referenceLine?:'outside'|'axis'|'inside';cornerMode?:'move'|'extend'};
+export type Wall={plannerFinish?:PlannerWallFinish;id:string;name:string;a:Point;b:Point;thickness:number;thicknessConfirmed:boolean;lengthConfirmed:boolean;height:number|null;group:'outer'|'inner';provenance:string;referenceLine?:'outside'|'axis'|'inside';cornerMode?:'move'|'extend'};
 export type RoomLabel={id:string;name:string;anchor:Point};
 export type Opening={id:string;wallId:string;kind:'door'|'window'|'opening';offset:number;width:number;height:number|null;sill:number|null;toCeiling?:boolean;hingesSide?:'left'|'right';swingDirection?:'inward'|'outward';confirmed:boolean};
 export type Zone={id:string;name:string;polygon:Point[];elevation:number;height:number|null;confirmed:boolean};

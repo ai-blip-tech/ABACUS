@@ -265,6 +265,10 @@ jobs:
             free -h || true
             df -h . || true
             ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-build-data" timeout --signal=TERM --kill-after=30s 12m npm run build -- --webpack
+            npx --yes pnpm@11.25.0 --dir room-design-planner install --frozen-lockfile
+            timeout --signal=TERM --kill-after=30s 6m node scripts/build-room-design-planner.mjs
+            sh scripts/room-design-planner-archive-tool.sh
+            node scripts/room-design-planner-converter-smoke.mjs
             test -f .next/BUILD_ID
 
             candidate_port=3901
@@ -278,6 +282,7 @@ jobs:
             MEASURE_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/partition-plan-local-smoke.mjs
             PLANNING_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/planning-plan-local-smoke.mjs
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/planning-plan" >/dev/null
+            node scripts/room-design-planner-http-smoke.mjs "http://127.0.0.1:${candidate_port}"
             cleanup_candidate
 
             cd "$live_dir"
@@ -306,6 +311,10 @@ jobs:
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/partition-plan/print)" = "401"
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/measured-plan)" = "401"
             curl --fail --silent --show-error http://127.0.0.1:3000/api/it/config | grep -q '"enabled":true'
+
+            node scripts/room-design-planner-http-smoke.mjs http://127.0.0.1:3000
+
+            node scripts/room-design-planner-http-smoke.mjs https://roomdesign.com.ru
 
             production_html="$(curl --fail --silent --show-error http://127.0.0.1:3000/)"
             production_css="$(printf '%s' "$production_html" | grep -oE '/_next/static/[^\" ]+\.css' | sort -u | while IFS= read -r asset; do curl --fail --silent --show-error "http://127.0.0.1:3000${asset}"; done)"

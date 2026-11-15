@@ -40,3 +40,4 @@ test("новые категории текущей версии сохраняю
   assert.equal(matchesCatalogType(product({ name: "Пуф Juno", category: "Пуфы" }), "ottoman", "Мебель / Пуфы"), true);
   assert.equal(matchesCatalogType(product({ name: "Стеллаж Line", category: "Стеллажи" }), "shelving", "Мебель / Стеллажи"), true);
 });
+test('sanitary category does not mistake extruded terracotta for a bathtub',()=>{assert.equal(matchesCatalogType(product({name:'Экструдированная терракота ROBERTA',category:'Плитка'}),'sanitary','Отделочные материалы'),false);assert.equal(matchesCatalogType(product({name:'Унитаз подвесной',category:'Сантехника'}),'sanitary',''),true);assert.equal(matchesCatalogType(product({name:'Керамогранит MYTOS',category:'Плитка'}),'porcelain',''),true);});

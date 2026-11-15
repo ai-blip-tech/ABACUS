@@ -86,6 +86,12 @@ jobs:
             npm ci
             ROOM_DESIGN_DATA_DIR="$preflight_dir/unit-data" npm run test:unit
             ROOM_DESIGN_DATA_DIR="$preflight_dir/smoke-data" timeout --signal=TERM --kill-after=30s 12m npm run build -- --webpack
+            if [ -f scripts/build-room-design-planner.mjs ]; then
+              npx --yes pnpm@11.25.0 --dir room-design-planner install --frozen-lockfile
+              timeout --signal=TERM --kill-after=30s 6m node scripts/build-room-design-planner.mjs
+              sh scripts/room-design-planner-archive-tool.sh
+              node scripts/room-design-planner-converter-smoke.mjs
+            fi
             ROOM_DESIGN_DATA_DIR="$preflight_dir/smoke-data" PORT=3902 ./node_modules/.bin/next start >candidate.log 2>&1 &
             candidate_pid=$!
             curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:3902/api/health >/dev/null
@@ -93,6 +99,7 @@ jobs:
             MEASURE_SMOKE_BASE=http://127.0.0.1:3902 node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/partition-plan-local-smoke.mjs
             curl --fail --silent --show-error http://127.0.0.1:3902/account >/dev/null
             curl --fail --silent --show-error http://127.0.0.1:3902/technical-lighting >/dev/null
+            if [ -f scripts/room-design-planner-http-smoke.mjs ]; then node scripts/room-design-planner-http-smoke.mjs "http://127.0.0.1:3902"; fi
   install-poppler:
     name: Install and verify PDF dependency without deploying the application
     if: ${{ inputs.confirmation == 'INSTALL_ROOM_DESIGN_POPPLER' }}

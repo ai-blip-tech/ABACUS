@@ -1,3 +1,4 @@
+import {catalogHasModel3D,catalogModelUrl} from '../catalog-model3d.ts';
 import {newFurniture,type FurnitureItem,type FurnitureKind} from './furniture.ts';
 import type {InteriorFurnitureTemplate} from '../interior-furniture-templates';
 import type {CatalogProduct} from '../furniture-catalog-product';
@@ -35,7 +36,7 @@ export function catalogProductType(p:CatalogProduct,fallbackType:string):string{
  const type=order.find(type=>matchesCatalogType(p,type,p.category));
  return type||fallbackType;
 }
-export function catalogProductKind(p:CatalogProduct,fallbackType:string):FurnitureKind|null{return catalogFurnitureKind(catalogProductType(p,fallbackType));}
+export function catalogProductKind(p:CatalogProduct,fallbackType:string):FurnitureKind|null{const name=p.name.toLowerCase();if(/(?:^|[^а-я])(унитаз|toilet)/.test(name))return 'toilet';if(/раковин|умывальник|sink/.test(name))return 'sink';if(/(?:^|[^а-я])(ванна|bathtub)/.test(name))return 'bath';if(/душев/.test(name))return 'shower';return catalogFurnitureKind(catalogProductType(p,fallbackType));}
 /** Catalog dimensions stay in mm; missing dimensions retain the explicitly labelled template. */
 export function furnitureFromCatalog(p:CatalogProduct,kind:FurnitureKind,category?:string):FurnitureItem{
  const f=newFurniture(kind,[0,0]);
@@ -44,5 +45,6 @@ export function furnitureFromCatalog(p:CatalogProduct,kind:FurnitureKind,categor
  if(valid(p.widthMm))f.width=p.widthMm;if(valid(p.depthMm))f.depth=p.depthMm;if(valid(p.heightMm))f.height=p.heightMm;
  f.dimensionsSource=valid(p.widthMm)&&valid(p.depthMm)&&valid(p.heightMm)?'catalog':'template';
  f.name=p.name.slice(0,240);f.catalog={id:p.id,name:f.name,source:p.source||p.brand||'catalog',url:/^https?:\/\//i.test(p.url)?p.url:'',image:/^(https?:\/\/|\/(?!\/))/i.test(p.image)?p.image:'',brand:p.brand.slice(0,240),article:p.article.slice(0,240)};
+ if(catalogHasModel3D(p))f.model3D={productId:p.id,...(catalogModelUrl(p)?{url:catalogModelUrl(p)}:{})};
  return f;
 }

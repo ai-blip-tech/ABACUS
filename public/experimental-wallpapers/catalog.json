@@ -1,0 +1,342 @@
+[
+  {
+    "id": "sbs-abstract-01",
+    "name": "Мятные штрихи",
+    "base": "SBS 01",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-01.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_1.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "fc3e389c97805c5d66e6e06b84e2c9c8a750f0de9ae47e6b23976442e94680d0"
+  },
+  {
+    "id": "sbs-abstract-02",
+    "name": "Цветная волна",
+    "base": "SBS 02",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-02.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_2.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "6f888049b0cf62172d6419b28dbc79a933433c1b0433123353012ad9479a3b06"
+  },
+  {
+    "id": "sbs-abstract-04",
+    "name": "Красно-бирюзовая абстракция",
+    "base": "SBS 04",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-04.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_4.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "00e83b19642a15f75c4ded7b390ccce4d8ce323348fb8909a616ff386cc3c6d4"
+  },
+  {
+    "id": "sbs-abstract-05",
+    "name": "Хвойная диагональ",
+    "base": "SBS 05",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-05.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_5.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "5252cc766804ef42e1a84feb5be812bd6d62a6b6c4ea0f94cc4a86767b55955f"
+  },
+  {
+    "id": "sbs-abstract-08",
+    "name": "Пастельный поток",
+    "base": "SBS 08",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-08.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_8.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "328f0adb1eddd6fd780351fe90d7838ab50106e2f9d3b5a0e9e957fd4734d954"
+  },
+  {
+    "id": "sbs-abstract-09",
+    "name": "Радужный крап",
+    "base": "SBS 09",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-09.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_9.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "1f206001e1bff90f274b2419e0d1d3e8deeabcd4b855926b23ce670fd6bdc255"
+  },
+  {
+    "id": "sbs-abstract-12",
+    "name": "Голубая дымка",
+    "base": "SBS 12",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-12.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_12.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "b49f7b26b96dd5d842af8a2b1c95d5224eb836e43f23b23e703168734abecf1b"
+  },
+  {
+    "id": "sbs-abstract-13",
+    "name": "Фиолетовые ленты",
+    "base": "SBS 13",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-13.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_13.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "c1969044ccca2164c6bd35d7b9d21782f1d7de4c90d491bd1e20305aa8a30ca8"
+  },
+  {
+    "id": "sbs-abstract-18",
+    "name": "Синие волны",
+    "base": "SBS 18",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-18.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_18.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "0dd308d753cdc2d83126123e1d686110cc01a5ba0b064d809ba13a83b6b91a90"
+  },
+  {
+    "id": "sbs-abstract-19",
+    "name": "Цветные полосы",
+    "base": "SBS 19",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-19.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_19.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "436d89684fce861884c517f0775c294a6226b1b25ea4bf3bb2e9ef99b9fe14cb"
+  },
+  {
+    "id": "sbs-abstract-21",
+    "name": "Лиловые волны",
+    "base": "SBS 21",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-21.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_21.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "ddfa9651062b89274ebdada88a0d619e3aeb64ca071bacc2e64110b2df90bc6a"
+  },
+  {
+    "id": "sbs-abstract-22",
+    "name": "Синие полосы",
+    "base": "SBS 22",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-22.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_22.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "f0dcfd185393d21eedccc519ab413008965bff3ce4e210abb66955d8ddc5d430"
+  },
+  {
+    "id": "sbs-abstract-23",
+    "name": "Серая геометрия",
+    "base": "SBS 23",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-23.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_23.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "07bb06b4a2325fa987cd766c311aab899b86fcf4a2cdd3d2f96a0d6dc18d37e4"
+  },
+  {
+    "id": "sbs-abstract-24",
+    "name": "Светлые штрихи",
+    "base": "SBS 24",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-24.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_24.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "28a23ff1d6c6e9f0a545dd03533af4e7704c33e43fe29084b5ef780ecd4ccf20"
+  },
+  {
+    "id": "sbs-abstract-27",
+    "name": "Изумрудные грани",
+    "base": "SBS 27",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-27.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_27.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "c734426cfafd0aa5ccefbd8234202789f8d1e5e257c9715a4de5611166d21849"
+  },
+  {
+    "id": "sbs-abstract-29",
+    "name": "Мятная мозаика",
+    "base": "SBS 29",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-29.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_29.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "5e6cb9599a6c536590702ab2a92ed4996c5410283665420902e4d10e16214d0c"
+  },
+  {
+    "id": "sbs-abstract-34",
+    "name": "Синие квадраты",
+    "base": "SBS 34",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-34.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_34.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "0ffb9e4676556b5c915f16745bd4cec8b8ea2e6f55f52f532aa179e8256310e0"
+  },
+  {
+    "id": "sbs-abstract-39",
+    "name": "Лиловые грани",
+    "base": "SBS 39",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-39.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_39.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "fb8f3d14c10fc24b7b2880b6e27d5199b0fe4787019691b7450146827517c474"
+  },
+  {
+    "id": "sbs-abstract-46",
+    "name": "Голубая геометрия",
+    "base": "SBS 46",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-46.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_46.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "7568050aace2f2e79f93d5c5c4d7b62aab920cfdb0ee2168e308e2913b416708"
+  },
+  {
+    "id": "sbs-abstract-49",
+    "name": "Розово-синие полосы",
+    "base": "SBS 49",
+    "tint": null,
+    "variant": false,
+    "image": "/experimental-wallpapers/abstract-49.png",
+    "source": "https://opengameart.org/content/seamless-abstract-pack",
+    "license": "CC0-1.0",
+    "author": "Screaming Brain Studios",
+    "originalFile": "Texture_512x512_49.png",
+    "resolution": [
+      512,
+      512
+    ],
+    "sha256": "1e6e186351b3aedb5068980799089c86f117823252c1bcf53d58a4d9e173d80f"
+  }
+]

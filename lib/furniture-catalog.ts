@@ -3,7 +3,7 @@ export type FurnitureCatalogSource = "norrmobler" | "leve-home";
 type Category = { id: string; parentId: string; name: string };
 
 export type FurnitureCatalogProduct = {
-  id: string; sourceId: string; source: FurnitureCatalogSource; name: string; article: string;
+  hasModel3D?: boolean; model3dUrl?: string; id: string; sourceId: string; source: FurnitureCatalogSource; name: string; article: string;
   image: string; images: string[]; url: string; price: number; oldPrice: number; available: boolean;
   category: string; subtype: string; color: string; material: string; brand: string;
   widthMm: number | null; depthMm: number | null; heightMm: number | null; description: string;
@@ -40,7 +40,7 @@ const primaryProductImage = (images: string[]) => images.find((image) => /\/main
 const centimetersToMillimeters = (value?: string) => { const number = Number(String(value || "").replace(",", ".").replace(/[^\d.]/g, "")); return Number.isFinite(number) && number > 0 ? Math.round(number * 10) : null; };
 const dimensionFromSlashValue = (value: string, index: number) => centimetersToMillimeters(value.split("/")[index]);
 
-export function parseFurnitureCatalog(xml: string, source: FurnitureCatalogSource): FurnitureCatalogProduct[] {
+export function parseFurnitureCatalog(xml: string, source: FurnitureCatalogSource,options:{surfaceOnly?:boolean}={}): FurnitureCatalogProduct[] {
   const sourceConfig = FURNITURE_CATALOG_SOURCES.find((item) => item.id === source)!;
   const categories = new Map<string, Category>();
   for (const match of xml.matchAll(/<category\b([^>]*)>([\s\S]*?)<\/category>/gi)) {
@@ -56,8 +56,9 @@ export function parseFurnitureCatalog(xml: string, source: FurnitureCatalogSourc
     const available = feedAvailable && (source !== "leve-home" || (Number.isFinite(stock) && Number(stock) > 0));
     const params: Record<string, string> = {};
     for (const param of body.matchAll(/<param\b([^>]*)>([\s\S]*?)<\/param>/gi)) { const key = attribute(param[1], "name"); const value = decodeCatalogXml(param[2]); if (key && value && !params[key]) params[key] = value; }
+    const surfaceProduct=/(?:^|[^а-я])(керамогранит|плитка|керамическ.{0,10}плит|унитаз|раковин|умывальник|смесител|биде|ванн[аыу]|душев|сантехник)/i.test((params['Тип']||'')+' '+tag(body,'name'));if(options.surfaceOnly&&!surfaceProduct)continue;
     const sourceBrand = source === "norrmobler"
-      ? norrAllowedBrandByKey.get(normalizeBrand(params["Бренд"] || params["Производитель"] || ""))
+      ? norrAllowedBrandByKey.get(normalizeBrand(params["Бренд"] || params["Производитель"] || ""))||(options.surfaceOnly&&surfaceProduct?(params['Бренд']||params['Производитель']||'NORR Ceramic'):undefined)
       : sourceConfig.name;
     if (!sourceBrand) continue;
     const brand = furnitureBrandForDisplay(sourceBrand);
@@ -66,6 +67,7 @@ export function parseFurnitureCatalog(xml: string, source: FurnitureCatalogSourc
     products.push({
       id: source === "norrmobler" ? sourceId : `${source}:${sourceId}`, sourceId, source, name,
       article: params["Артикул"] || tag(body, "vendorCode") || tag(body, "barcode") || sourceId,
+      hasModel3D: /^(да|yes|true|1)$/i.test(params["Есть 3д модель"] || params["Есть 3D модель"] || ""), model3dUrl: tag(body, "model3dUrl") || tag(body, "Model3D") || undefined,
       image, images, url: tag(body, "url"), price: Number(tag(body, "price")) || 0, oldPrice: Number(tag(body, "oldprice")) || 0, available,
       category: categories.get(categoryId)?.name || "Каталог", subtype: rawType || categories.get(categoryId)?.name || "",
       color: params["Цвет"] || params["Цвет корпуса"] || params["Ткань Цвет"] || params["Цвет столешницы"] || "",

@@ -1,0 +1,6 @@
+import {MYTOS} from './wall-tile-math.mjs';
+export const tileProducts=[MYTOS,{id:'norrmobler:34339',article:'NCR03366',name:'LINE BLACK',brand:'NADIS DESIGN',widthMm:150,heightMm:150,thicknessMm:10,image:'/experimental-tiles/NCR03366.jpg',url:'https://norrmobler.ru/catalog/product/keramicheskaya-plitka-line-black-chernyy-15x15x10-ncr03366/'}];
+export function registerTileProduct(value){if(!value||typeof value.id!=='string'||![value.widthMm,value.heightMm].every(n=>Number.isFinite(n)&&n>=10&&n<=10000)||typeof value.image!=='string')throw Error('Некорректный товар плитки');const p={...value,id:value.id.includes(':')?value.id:'norrmobler:'+value.id};const i=tileProducts.findIndex(x=>x.id===p.id);if(i>=0)tileProducts[i]=p;else tileProducts.push(p);try{localStorage.setItem('roomdesign-wall-tile-products',JSON.stringify(tileProducts.filter(x=>x.catalogImported)));}catch{}return p;}
+try{for(const p of JSON.parse(localStorage.getItem('roomdesign-wall-tile-products')||'[]'))registerTileProduct(p);}catch{}
+export const tileProduct=id=>tileProducts.find(p=>p.id===id)||MYTOS;
+export function pieceSize(p){const t=tileProduct(p.productId),w=t.widthMm/1000,h=t.heightMm/1000;return p.angle%180===90?[h,w]:[w,h];}

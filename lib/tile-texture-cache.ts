@@ -1,0 +1,11 @@
+import {createHash,randomUUID} from 'node:crypto';import {readFile,mkdir,writeFile,rename} from 'node:fs/promises';import path from 'node:path';
+import {prepareTileTexture,type TileTextureReport} from './tile-texture-processing.ts';
+import {floorTileFromProduct} from './floor-tile-product.ts';
+const directory=()=>path.join(process.env.ROOM_DESIGN_DATA_DIR||path.join(process.cwd(),'data'),'catalog-tile-textures-v2');
+const allowed=(u:URL)=>u.protocol==='https:'&&!u.username&&!u.password&&(!u.port||u.port==='443')&&u.hostname==='norrmobler.ru';
+const pending=new Map<string,Promise<{report:TileTextureReport;imagePath:string}>>();
+export async function preparedCatalogTile(product:any){const tile=floorTileFromProduct(product),key=createHash('sha256').update(JSON.stringify([product.image,tile.widthMm,tile.heightMm,'v2'])).digest('hex'),dir=directory(),reportPath=path.join(dir,key+'.json'),imagePath=path.join(dir,key+'.jpg');
+ try{return{report:JSON.parse(await readFile(reportPath,'utf8')) as TileTextureReport,imagePath};}catch{}
+ if(pending.has(key))return pending.get(key)!;
+ const work=(async()=>{let url=new URL(product.image),response:Response|undefined;const signal=AbortSignal.timeout(20000);for(let i=0;i<4;i++){if(!allowed(url))throw Error('Недопустимый источник фото плитки');response=await fetch(url,{redirect:'manual',signal});if([301,302,303,307,308].includes(response.status)){const next=response.headers.get('location');await response.body?.cancel();if(!next)throw Error('Пустое перенаправление');url=new URL(next,url);continue;}break;}if(!response?.ok||!response.body)throw Error('Фото плитки недоступно');const chunks:Uint8Array[]=[];let count=0;for await(const chunk of response.body as any){count+=chunk.length;if(count>20_000_000)throw Error('Фото превышает 20 МБ');chunks.push(chunk);}const result=await prepareTileTexture(Buffer.concat(chunks),tile.widthMm,tile.heightMm);await mkdir(dir,{recursive:true});if(result.bytes){const temp=imagePath+'.'+randomUUID()+'.tmp';await writeFile(temp,result.bytes);await rename(temp,imagePath);}const temp=reportPath+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(result.report));await rename(temp,reportPath);return{report:result.report,imagePath};})();pending.set(key,work);try{return await work;}finally{pending.delete(key);}
+}
