@@ -1,4 +1,4 @@
-import {validatePlannerWallFinish} from '../planning-plan/wall-finishes';
+import {validatePlannerWallFinish} from '../planning-plan/wall-finishes.ts';
 import {database} from '../server-runtime.ts';
 import type {MeasureDoc} from './measure-model';
 import {withAutomaticFloor} from './measure-auto-floor.ts';

@@ -30,7 +30,7 @@ try {
 
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', error => errors.push(error.stack || error.message));
   await page.addInitScript(() => {
     window.addEventListener('message', event => {
       if (event.origin === location.origin && typeof event.data?.type === 'string' && event.data.type.startsWith('pascal:')) {

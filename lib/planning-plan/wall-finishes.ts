@@ -1,6 +1,6 @@
 export const wallFinishFields = [
   'roomDesignFinishes', 'roomDesignMouldings', 'roomDesignTiles',
-  'roomDesignTileSettings', 'roomDesignTileFillReport', 'roomDesignTileRegions',
+  'roomDesignTileSettings', 'roomDesignTileFillReport', 'roomDesignTileRegions', 'roomDesignTileProducts',
 ] as const;
 
 export type PlannerWallFinish = Partial<Record<(typeof wallFinishFields)[number], unknown>>;

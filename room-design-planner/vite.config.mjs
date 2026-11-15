@@ -20,6 +20,14 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'esnext',
     license: {fileName: 'THIRD-PARTY-LICENSES.md'},
-    rollupOptions: {input: path('./planning-bridge.html'), output: {inlineDynamicImports: true}},
+        rollupOptions: {
+      input: path('./planning-bridge.html'),
+      output: {
+        onlyExplicitManualChunks: true,
+        manualChunks(id) {
+          if (/[/]@pascal-app[/](?:core|viewer|nodes|geometry-script)[/]/.test(id)) return 'planner-engine';
+        },
+      },
+    },
   },
 });

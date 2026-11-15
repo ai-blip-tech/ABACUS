@@ -1,3 +1,4 @@
+import {registerTileProduct,tileProducts} from './tile-products.mjs';
 const catalogModelJobs=new Map<string,{resolve:(x:any)=>void;reject:(e:Error)=>void;timer:any}>();
 import {FurnitureSurfaceMenu} from './furniture-surface-editor.tsx';
 import {WallRegionIndicator} from './wall-region-indicator.tsx';
@@ -20,6 +21,19 @@ import './planning-bridge.css';
 const bootstrap=loadPlugin(builtinPlugin),params=new URLSearchParams(location.search),session=params.get('session'),parentOrigin=params.get('parentOrigin')||'';
 const allowed=new Set([location.origin]);
 const send=(data:any)=>{if(allowed.has(parentOrigin))window.parent.postMessage({...data,session},parentOrigin);};
+function sceneSnapshot() {
+ const state = useScene.getState();
+ const scene = structuredClone({nodes:state.nodes,rootNodeIds:state.rootNodeIds});
+ for (const node of Object.values(scene.nodes) as any[]) {
+  if (node.type !== 'wall') continue;
+  const metadata = node.metadata || {};
+  const ids = new Set([...(metadata.roomDesignTiles || []), ...(metadata.roomDesignTileRegions || []), metadata.roomDesignTileSettings].filter(Boolean).map(piece => piece.productId));
+  const products = tileProducts.filter(product => ids.has(product.id));
+  if (products.length) metadata.roomDesignTileProducts = products;
+  else delete metadata.roomDesignTileProducts;
+ }
+ return scene;
+}
 function requestCatalogModel(productId:string,options:{textureId?:string;surfaceEditing?:true}={}) {
  return new Promise<any>((resolve,reject)=>{
   const requestId=crypto.randomUUID();
@@ -41,13 +55,18 @@ function App(){const [viewMode,setViewMode]=useState<'3d'|'eye'>('3d'),[document
   if(data.type==='roomdesign:editor-command'){window.dispatchEvent(new CustomEvent('roomdesign:editor-command',{detail:{command:data.command}}));return;}
   if(data.type==='roomdesign:walk-key'){if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(data.key))window.dispatchEvent(new CustomEvent('roomdesign:walk-key',{detail:{key:data.key,pressed:data.pressed===true}}));return;}
   if(data.type==='roomdesign:view'){setViewMode(data.mode==='eye'?'eye':'3d');return;}
-  if(data.type==='roomdesign:snapshot'){if(opening.current||!loaded.current){send({type:'pascal:snapshot',requestId:data.requestId,error:'Дождитесь открытия 3D'});return;}send({type:'pascal:snapshot',requestId:data.requestId,scene:structuredClone({nodes:useScene.getState().nodes,rootNodeIds:useScene.getState().rootNodeIds}),baseline:baseline.current});return;}
+  if(data.type==='roomdesign:snapshot'){if(opening.current||!loaded.current){send({type:'pascal:snapshot',requestId:data.requestId,error:'Дождитесь открытия 3D'});return;}send({type:'pascal:snapshot',requestId:data.requestId,scene:sceneSnapshot(),baseline:baseline.current});return;}
   if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;const doc=data.document;setDocument(doc);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
    const result=planningToPlanner(doc,{wallHeightMm:2800,doorHeightMm:2100,windowHeightMm:1400,windowSillMm:900,furnitureHeightsMm:overrides,assetFor:(kind:string)=>`${import.meta.env.BASE_URL}models/${kind}.glb`});
    for(const node of Object.values(result.scene.nodes) as any[]) {
     if (node.type !== 'wall') continue;
     const saved = doc.walls.find((wall:any) => wall.id === node.metadata?.roomDesignId)?.plannerFinish;
-    if (saved) Object.assign(node.metadata, saved);
+    if (saved) {
+     Object.assign(node.metadata, saved);
+     for (const product of saved.roomDesignTileProducts || []) {
+      try { registerTileProduct(product); } catch { /* Legacy catalog entries may be unavailable. */ }
+     }
+    }
    }
    // Keep 3D appearance, while every position and dimension comes from this 2D sheet.
    for(const node of Object.values(result.scene.nodes) as any[]){if(node.type!=='item'||node.metadata?.column)continue;const old=Object.values(data.previousScene?.nodes||{}).find((n:any)=>n.type==='item'&&n.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;if(old?.asset&&old.metadata?.roomDesignModelAsset&&old.metadata?.roomDesignFurniture?.catalog?.id===node.metadata?.roomDesignFurniture?.catalog?.id&&old.metadata?.catalogTextureId===doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId)?.model3D?.textureId){try{const url=await loadAssetUrl(old.metadata.roomDesignModelAsset);if(url){node.asset={...old.asset,src:url};node.scale=node.scale.map((n:number,i:number)=>n/node.asset.dimensions[i]);node.metadata={...old.metadata,...node.metadata,roomDesignModelAsset:old.metadata.roomDesignModelAsset};if(old.metadata.representation==='catalog-converted')newModelFocus.current=node.id;}}catch{}}
