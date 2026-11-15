@@ -27,6 +27,14 @@ try {
   assert.ok(dxf.ok(), await dxf.text());
   const imported = await api.put(endpoint, {data:{action:'workspace-import-dxf',revision,...await dxf.json()}});
   assert.ok(imported.ok(), await imported.text());
+  const importedPlan = await imported.json();
+  const plan = importedPlan.document.variants.manual.plan;
+  plan.furniture = [...plan.furniture || [], {
+    id:'release-chair', kind:'chair', name:'Стул', position:[1000,1000], width:450, depth:500, height:850,
+    rotation:0, dimensionsSource:'template',
+  }];
+  const saved = await api.put(endpoint, {data:{action:'workspace-save',revision:importedPlan.revision,plan}});
+  assert.ok(saved.ok(), await saved.text());
 
   const page = await context.newPage();
   const errors = [];
@@ -39,11 +47,14 @@ try {
     });
   });
   await page.goto(base+'/planning-plan?project='+project.id);
+  const chair = page.waitForResponse(response => response.url().endsWith('/models/chair.glb') && response.ok(), {timeout:90_000});
   await page.getByRole('tab',{name:'3D',exact:true}).click();
   const iframe = page.frameLocator('iframe[title*="Room Design Planner"]');
   await iframe.locator('canvas').waitFor({timeout:90_000});
   await page.locator('body[data-planner-loaded="yes"]').waitFor({timeout:90_000});
   assert.equal(await iframe.getByText('Plugins', {exact:true}).count(),0);
+  assert.doesNotMatch(await iframe.locator('body').innerText(), /Pascal/i);
+  await chair;
   await page.getByRole('tab',{name:'Вид из глаз',exact:true}).click();
   await iframe.locator('.is-walkthrough').waitFor();
   await page.getByRole('tab',{name:'2D',exact:true}).click();

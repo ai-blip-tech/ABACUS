@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 
 const base = process.argv[2];
 const root = '/_next/static/room-design-planner/';
-const html = await fetch(base + root + 'planning-bridge.html');
+const html = await fetch(base + '/room-design-planner/view');
 assert.equal(html.status, 200);
+assert.equal(html.headers.get("cache-control"), "no-store");
 assert.match(html.headers.get('content-type'), /text\/html/);
 const markup = await html.text();
 assert.match(markup, /<title>Room Design Planner<\/title>/);

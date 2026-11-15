@@ -57,7 +57,7 @@ function App(){const [viewMode,setViewMode]=useState<'3d'|'eye'>('3d'),[document
   if(data.type==='roomdesign:view'){setViewMode(data.mode==='eye'?'eye':'3d');return;}
   if(data.type==='roomdesign:snapshot'){if(opening.current||!loaded.current){send({type:'pascal:snapshot',requestId:data.requestId,error:'Дождитесь открытия 3D'});return;}send({type:'pascal:snapshot',requestId:data.requestId,scene:sceneSnapshot(),baseline:baseline.current});return;}
   if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;const doc=data.document;setDocument(doc);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
-   const result=planningToPlanner(doc,{wallHeightMm:2800,doorHeightMm:2100,windowHeightMm:1400,windowSillMm:900,furnitureHeightsMm:overrides,assetFor:(kind:string)=>`${import.meta.env.BASE_URL}models/${kind}.glb`});
+   const result=planningToPlanner(doc,{wallHeightMm:2800,doorHeightMm:2100,windowHeightMm:1400,windowSillMm:900,furnitureHeightsMm:overrides,assetFor:(kind:string)=>new URL(`${import.meta.env.BASE_URL}models/${kind}.glb`, location.origin).href});
    for(const node of Object.values(result.scene.nodes) as any[]) {
     if (node.type !== 'wall') continue;
     const saved = doc.walls.find((wall:any) => wall.id === node.metadata?.roomDesignId)?.plannerFinish;

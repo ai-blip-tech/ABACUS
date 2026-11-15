@@ -88,7 +88,7 @@ jobs:
             ROOM_DESIGN_DATA_DIR="$preflight_dir/smoke-data" timeout --signal=TERM --kill-after=30s 12m npm run build -- --webpack
             if [ -f scripts/build-room-design-planner.mjs ]; then
               npx --yes pnpm@11.25.0 --dir room-design-planner install --frozen-lockfile
-              timeout --signal=TERM --kill-after=30s 6m node --max-old-space-size=3584 scripts/build-room-design-planner.mjs
+              timeout --signal=TERM --kill-after=30s 6m node --max-old-space-size=2240 scripts/build-room-design-planner.mjs
               sh scripts/room-design-planner-archive-tool.sh
               node scripts/room-design-planner-converter-smoke.mjs
             fi

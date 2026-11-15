@@ -8,7 +8,7 @@ export type PlannerSnapshot={scene:PlannerScene;baseline:PlannerScene};
 export type PlannerViewControl={wallTile:(product:any)=>void;floor:(plan:MeasureDoc)=>void;floorEditing:(active:boolean)=>void;focus:()=>void;snapshot:()=>Promise<PlannerSnapshot>;capture:()=>Promise<any>};
 export const plannerEntry = process.env.NODE_ENV === 'development'
   ? 'http://localhost:4198/planning-bridge.html'
-  : '/_next/static/room-design-planner/planning-bridge.html';
+  : '/room-design-planner/view';
 export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectId:string;projectName:string;disabled?:boolean;mode:'3d'|'eye';floorEditing?:boolean;onWallTileCatalog?:()=>void;onFloorSelect?:(id:string)=>void;onFloorSync?:(regions:NonNullable<MeasureDoc["floorRegions"]>)=>void;onDirty:()=>void}>(({plan,projectId,projectName,onDirty,disabled,mode,onFloorSelect,floorEditing,onFloorSync,onWallTileCatalog},control)=>{
  const frame=useRef<HTMLIFrameElement>(null),[session]=useState(()=>crypto.randomUUID()),[ready,setReady]=useState(false),[editingTextures,setEditingTextures]=useState(false),[error,setError]=useState(''),pending=useRef(new Map<string,{resolve:(s:PlannerSnapshot)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>());
  const origin = plannerEntry?.startsWith('http:') ? new URL(plannerEntry).origin : typeof window !== 'undefined' ? window.location.origin : '';
