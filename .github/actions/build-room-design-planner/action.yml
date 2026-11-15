@@ -1,0 +1,35 @@
+name: Build Room Design Planner on Linux
+description: Package and verify the browser editor and catalog converter
+outputs:
+  artifact-id:
+    description: ID of the verified planner package
+    value: ${{ steps.upload.outputs.artifact-id }}
+  digest:
+    description: SHA-256 of the planner package
+    value: ${{ steps.package.outputs.digest }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+    - shell: bash
+      run: |
+        npx --yes pnpm@11.25.0 --dir room-design-planner install --frozen-lockfile
+        node --max-old-space-size=4096 scripts/build-room-design-planner.mjs
+        sh scripts/room-design-planner-archive-tool.sh
+        node scripts/room-design-planner-converter-smoke.mjs
+    - id: package
+      shell: bash
+      run: |
+        git rev-parse HEAD > .next/room-design-planner-tools/SOURCE_SHA
+        tar -C .next -czf planner-build.tar.gz static/room-design-planner room-design-planner-tools/catalog-model-convert.mjs room-design-planner-tools/SOURCE_SHA
+        echo "digest=$(sha256sum planner-build.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+    - id: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: room-design-planner-${{ github.run_id }}-${{ github.run_attempt }}
+        path: planner-build.tar.gz
+        retention-days: 3
+        if-no-files-found: error
+        compression-level: 0

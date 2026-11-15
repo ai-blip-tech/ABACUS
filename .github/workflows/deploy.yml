@@ -9,17 +9,31 @@ concurrency:
   group: roomdesign-production
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: planner
+        uses: ./.github/actions/build-room-design-planner
       - name: Build candidate and deploy atomically
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          PLANNER_BUILD_ID: ${{ steps.planner.outputs.artifact-id }}
+          PLANNER_BUILD_DIGEST: ${{ steps.planner.outputs.digest }}
+          PLANNER_BUILD_TOKEN: ${{ github.token }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: PLANNER_BUILD_ID,PLANNER_BUILD_DIGEST,PLANNER_BUILD_TOKEN
           command_timeout: 18m
           script: |
             set -eu
@@ -265,8 +279,8 @@ jobs:
             free -h || true
             df -h . || true
             ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-build-data" timeout --signal=TERM --kill-after=30s 12m npm run build -- --webpack
-            npx --yes pnpm@11.25.0 --dir room-design-planner install --frozen-lockfile
-            timeout --signal=TERM --kill-after=30s 6m node --max-old-space-size=2240 scripts/build-room-design-planner.mjs
+            sh scripts/install-room-design-planner-build.sh "$release_sha"
+            unset PLANNER_BUILD_TOKEN
             sh scripts/room-design-planner-archive-tool.sh
             node scripts/room-design-planner-converter-smoke.mjs
             test -f .next/BUILD_ID
