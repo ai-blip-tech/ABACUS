@@ -6,6 +6,7 @@ if [ -x /usr/bin/bsdtar ] && /usr/bin/bsdtar --version; then
 fi
 
 destination="$(pwd)/.next/room-design-planner-tools/archive"
+mkdir -p "$destination"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 cd "$work"
