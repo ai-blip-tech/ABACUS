@@ -5,17 +5,13 @@ import {asWorkbook,activeSheet,type MaterialWorkbook} from '@/lib/material-board
 import {isBoard,type MaterialBoard,type MaterialNode} from '@/lib/material-board/model';
 import {isSameOrigin} from '@/lib/measured-plan/request-origin';
 import {database} from '@/lib/server-runtime';
+import {ensureMaterialsStore} from '@/lib/material-board/server-store';
 
 export const runtime='nodejs';
 type Context={params:Promise<{id:string}>};
 type StoredRow={document_json:string;revision:number};
 type PreparedBoard={board:MaterialBoard;assets:Map<string,{bytes:Uint8Array;contentType:string}>};
 const assetPattern=(projectId:string)=>new RegExp('^/api/projects/'+projectId+'/assets/([a-zA-Z0-9-]{1,100})$');
-
-function ensureMaterialsStore(){
- database.prepare('CREATE TABLE IF NOT EXISTS material_boards(project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,user_id TEXT NOT NULL,tenant_id TEXT NOT NULL,revision INTEGER NOT NULL,document_json TEXT NOT NULL,updated_at TEXT NOT NULL)').execute();
- database.prepare('CREATE TABLE IF NOT EXISTS material_board_assets(project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,asset TEXT NOT NULL,PRIMARY KEY(project_id,asset))').execute();
-}
 
 function decodeImage(value:string){
  const match=/^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/=]+)$/.exec(value);

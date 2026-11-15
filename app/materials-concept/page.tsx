@@ -59,7 +59,7 @@ export default function MaterialsConceptPage(){
  const [expanded,setExpanded]=useState(false),[generating,setGenerating]=useState<string[]>([]),[generationError,setGenerationError]=useState(''),[referencePreview,setReferencePreview]=useState<string|null>(null),[moodboardSelection,setMoodboardSelection]=useState<string[]>([]),[moodboardBusy,setMoodboardBusy]=useState(false),[printSelection,setPrintSelection]=useState<string[]>([]),[proposalSelecting,setProposalSelecting]=useState(false),[preparingProposal,setPreparingProposal]=useState(false),[proposalPreviewTenant,setProposalPreviewTenant]=useState(false);
  const [planogramDoc,setPlanogramDoc]=useState<MeasureDoc|null>(()=>fixtureDoc({name:'Демонстрационная планировка',mime:'image/png',hash:'materials-concept-demo',width:1600,height:1200,page:1,pages:1,method:'demo',image:'/measured-plan-reference.png',words:[],pixelScale:1})),[projectPlanogramDoc,setProjectPlanogramDoc]=useState<MeasureDoc|null>(null),[planogramImage,setPlanogramImage]=useState(''),[planogramName,setPlanogramName]=useState('Демонстрационная планировка'),[planogramOrigin,setPlanogramOrigin]=useState('ДЕМО'),[planogramReferences,setPlanogramReferences]=useState<string[]>([]),[planogramBusy,setPlanogramBusy]=useState(false);
  const [planogramValues,setPlanogramValues]=useState<Planogram3DValues>({designBrief:'',style:'Современный',furnishing:'Умеренно',existingFurniture:'Использовать как подсказку',lighting:'Смешанное',atmosphere:'Мягкий дневной свет',peopleCount:'Без людей',peopleBehavior:'Автоматически',detail:'Высокая',wallMode:'Определить автоматически',wallDimensions:'',environment:'Нейтральный фон',resultFormat:'Как исходник'});
- const updateBoard=useCallback((next:MaterialBoard)=>{boardRef.current=next;setBoardState(next);if(sheetBookRef.current){const book=withActiveBoard(sheetBookRef.current,next);sheetBookRef.current=book;setSheetBook(book);}setDirty(true);},[]);
+ const updateBoard=useCallback((next:MaterialBoard,edited=true)=>{boardRef.current=next;setBoardState(next);if(sheetBookRef.current){const book=withActiveBoard(sheetBookRef.current,next);sheetBookRef.current=book;setSheetBook(book);}if(edited)setDirty(true);},[]);
  const updateView=(next:BoardView)=>{viewRef.current=next;setViewState(next);};
  const remember=useCallback((before:MaterialBoard)=>{history.current=[...history.current.slice(-29),before];future.current=[];setHistoryVersion(v=>v+1);},[]);
  const commit=useCallback((next:MaterialBoard)=>{if(next===boardRef.current)return;remember(boardRef.current);updateBoard(next);},[remember,updateBoard]);
@@ -79,6 +79,26 @@ export default function MaterialsConceptPage(){
    if(!disposed&&selected){const normalized=normalize(selected);if(sandboxMode){const book=loadedBook?withActiveBoard(loadedBook,normalized):asWorkbook(normalized)!;sheetBookRef.current=book;setSheetBook(book);}boardRef.current=normalized;setBoardState(normalized);}
   })().catch(()=>{if(!disposed)setNotice('Не удалось загрузить проект. Открыт локальный резервный черновик.');}).finally(()=>{if(!disposed)setReady(true);});
   return()=>{disposed=true;};},[]);
+ useEffect(()=>{
+  const id=projectId.current;
+  if(!ready||!id||interiorMode||typeof BroadcastChannel==='undefined')return;
+  const controller=new AbortController(),channel=new BroadcastChannel('roomdesign:planner-render:'+id);
+  channel.onmessage=async()=>{
+   if(dirty){setNotice('Рендер сохранён в проекте. На экране открыт несохранённый черновик.');return;}
+   try{
+    const current=boardRef.current;
+    const response=await fetch('/api/projects/'+encodeURIComponent(id)+'/materials-concept',{cache:'no-store',signal:controller.signal});
+    if(!response.ok)return;
+    const payload=await response.json(),book=asWorkbook(payload.workbook);
+    if(!book||controller.signal.aborted||current!==boardRef.current||saveBusy.current||switchingSheetRef.current||payload.revision<=serverRevision.current)return;
+    serverRevision.current=payload.revision;sheetBookRef.current=book;setSheetBook(book);
+    boardRef.current=activeSheet(book).board;setBoardState(boardRef.current);
+    history.current=[];future.current=[];setHistoryVersion(v=>v+1);
+    await saveWorkbook(storageKey.current,book,{revision:payload.revision,dirty:false});
+   }catch{/* The saved reference will load from the project on reopen. */}
+  };
+  return()=>{controller.abort();channel.close();};
+ },[ready,dirty,interiorMode]);
  useEffect(()=>{if(modal!=='plan'||projectPlanogramLoaded.current)return;const id=new URLSearchParams(location.search).get('project');if(!id)return;projectPlanogramLoaded.current=true;const controller=new AbortController();fetch('/api/projects/'+encodeURIComponent(id)+'/planning-plan',{cache:'no-store',signal:controller.signal}).then(async response=>{const data=await response.json();if(!response.ok)throw Error(data.error||'Не удалось загрузить планировочное решение');return data as {document:PlanningAlbum|null;bases?:{measured?:{plan?:MeasureDoc}|null}};}).then(data=>{if(controller.signal.aborted)return;const album=data.document,plan=album?.selected?album.variants[album.selected.variantId]?.plan:album?.variants[album.activeVariantId]?.plan||album?.variants.manual?.plan||data.bases?.measured?.plan;if(plan){setProjectPlanogramDoc(plan);setPlanogramDoc(plan);setPlanogramName(plan.name||'Планировочное решение проекта');setPlanogramOrigin('ИЗ ПРОЕКТА');}}).catch(()=>{/* The demo source remains available in an empty or unauthenticated local draft. */});return()=>controller.abort();},[modal]);
  useEffect(()=>{if(!stage.current)return;const observer=new ResizeObserver(([entry])=>setSize({width:entry.contentRect.width,height:entry.contentRect.height}));observer.observe(stage.current);return()=>observer.disconnect();},[]);
  useEffect(()=>{const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){if(referencePreview){setReferencePreview(null);return;}if(proposalSelecting){setProposalSelecting(false);setPrintSelection([]);setNotice('Выбор для коммерческого предложения отменён.');return;}if(!document.querySelector('dialog[open]'))setExpanded(false);}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[referencePreview,proposalSelecting]);
@@ -335,7 +355,7 @@ export default function MaterialsConceptPage(){
   const current=boardRef.current,visible=current.nodes.filter(n=>!n.trayOnly),home={x:75,y:140,width:235,height:300};
   const overlap=visible.some(n=>n.x<home.x+home.width&&n.x+n.width>home.x&&n.y<home.y+home.height&&n.y+n.height>home.y);
   const position={x:overlap?Math.min(...visible.map(n=>n.x))-280:home.x,y:home.y};
-  updateBoard({...current,furniturePosition:position});
+  updateBoard({...current,furniturePosition:position},false);
   updateView(frameWorkspace([...visible,{...home,...position}],size.width,size.height));
  },[ready,sheetBook?.activeSheetId]);
  const showWholeTable=()=>updateView(frameWorkspace([...canvasNodes,furnitureSlot],size.width,size.height));

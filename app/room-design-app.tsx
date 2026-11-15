@@ -10,7 +10,6 @@ import EditorHeader from "./editor-header";
 import ProjectStageWorkspace from "./project-stage-workspace";
 import FurnitureCatalogPage from "./furniture-catalog-page";
 import {StudioMaterialTray,type StudioTrayItem} from "./studio-material-tray";
-import VisualizationStagePreview from "./visualizations/stage-preview";
 import FurnitureCatalogPicker from "./furniture-catalog-picker";
 import {InteriorFurnitureChoices} from "./interior-furniture-choices";
 import MeasuredStagePreview from "./measured-plan/stage-preview";
@@ -1061,7 +1060,7 @@ export default function RoomDesignApp({initialView="home",initialProjectId=""}:{
   </main>;
 }
 
-type ProjectMenuStageId = "sources" | "installation" | "planning" | "interior" | "materials" | "visualizations" | "bathroom" | "lighting" | "documentation";
+type ProjectMenuStageId = "sources" | "installation" | "planning" | "interior" | "materials" | "porcelain" | "bathroom" | "lighting" | "documentation";
 
 const PROJECT_MENU_STAGES: Array<{ id: ProjectMenuStageId; label: string; available: boolean }> = [
   { id: "sources", label: "Обмерный план", available: true },
@@ -1071,7 +1070,7 @@ const PROJECT_MENU_STAGES: Array<{ id: ProjectMenuStageId; label: string; availa
   { id: "interior", label: "Интерьер и меблировка", available: true },
   { id: "lighting", label: "Технический свет", available: true },
   { id: "bathroom", label: "Санузел", available: false },
-  { id: "visualizations", label: "Визуализации", available: true },
+  { id: "porcelain", label: "Керамогранит", available: false },
   { id: "documentation", label: "Документация", available: false },
 ];
 
@@ -1122,9 +1121,7 @@ function ProjectMenuPreview({
   const isInstallation = selectedStage === "installation";
   const isPlanning = selectedStage === "planning";
   const isMaterials = selectedStage === "materials";
-  const isVisualizations = selectedStage === "visualizations";
   const openSelectedStage = () => {
-    if (isVisualizations) window.location.assign(`/visualizations?project=${encodeURIComponent(projectId)}`);
     if (isPlanning) window.location.assign(`/planning-plan?project=${encodeURIComponent(projectId)}`);
     if (isInstallation) window.location.assign(`/partition-plan?project=${encodeURIComponent(projectId)}`);
     if (isMeasured) window.location.assign(`/measured-plan?project=${encodeURIComponent(projectId)}`);
@@ -1138,7 +1135,6 @@ function ProjectMenuPreview({
       setUnavailableStage(nextStage.label);
       return;
     }
-    if (nextStage.id === "visualizations") setSelectedStage("visualizations");
     if (nextStage.id === "planning") setSelectedStage("planning");
     if (nextStage.id === "installation") setSelectedStage('installation');
     if (nextStage.id === "materials") setSelectedStage('materials');
@@ -1183,7 +1179,7 @@ function ProjectMenuPreview({
       </aside>
       {editingBrief&&<ProjectBriefEditor projectId={projectId} onClose={()=>setEditingBrief(false)} onSaved={project=>{onBriefSaved(project);setBriefSaved(true);}}/>}
       <section className="project-menu-content" aria-live="polite">
-        {isVisualizations?<VisualizationStagePreview projectId={projectId}/>:isPlanning?<PlanningStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:isMeasured?<MeasuredStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:isInstallation?<PartitionStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:<>
+        {isPlanning?<PlanningStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:isMeasured?<MeasuredStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:isInstallation?<PartitionStagePreview projectId={projectId} onContinue={openSelectedStage} nextLabel={nextStage?.label||"Следующий этап"} onNext={openNextStage}/>:<>
           <div className="project-menu-title-row">
             <div><span>РАЗДЕЛ ПРОЕКТА</span><h2>{stage.label}</h2><p>{stageDescription}</p></div>
             <mark>{isLoading?"Загрузка…":projectSaved?"Сохранено":"Можно начать"}</mark>

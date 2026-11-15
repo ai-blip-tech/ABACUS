@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test, { after } from "node:test";
 
@@ -10,7 +10,7 @@ const root = await mkdtemp(join(tmpdir(), "room-design-generate-safety-"));
 process.env.ROOM_DESIGN_DATA_DIR = root;
 process.env.OPENAI_API_KEY = "integration-test-placeholder";
 registerHooks({ resolve(specifier, context, nextResolve) {
-  if (specifier.startsWith("@/")) return nextResolve(pathToFileURL(join(process.cwd(), `${specifier.slice(2)}.ts`)).href, context);
+  if (specifier.startsWith("@/")) return nextResolve(pathToFileURL(join(process.cwd(), specifier.slice(2) + (extname(specifier) ? "" : ".ts"))).href, context);
   return nextResolve(specifier, context);
 } });
 const auth = await import("../lib/auth.ts");
@@ -232,6 +232,61 @@ test("moodboard builder accepts sixteen equal image references in one provider r
   assert.equal(calls, 1);
   assert.equal(await generationCount(id), 1);
   assert.equal(await balance(), before - (await billing.quoteAiOperation("global_edit")).tokenCost);
+});
+
+test("planner camera adds a single generated reference to the materials tray", async () => {
+  const { GET: listVisualizations, POST: takePhoto } = await import("../app/api/projects/[id]/visualizations/route.ts");
+  const {GET: readMaterials, PUT: saveMaterials} = await import("../app/api/projects/[id]/materials-concept/route.ts");
+  const projectId = "camera-project";
+  const photoId = "ae1fdcd2-f895-4d8f-98fd-3afa9e78bce1";
+  const endPoint = `https://roomdesign.com.ru/api/projects/${projectId}/visualizations`;
+  const materials = endPoint.replace(/visualizations$/, "materials-concept");
+  const headers = { Cookie: `room_session=${session}`, "Content-Type": "application/json" };
+  const context = { params: Promise.resolve({ id: projectId }) };
+  await database.prepare("INSERT INTO projects (id, user_id, tenant_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").bind(projectId, user.id, user.tenantId, "Camera test", now, now).run();
+  const older = { id: "existing-reference", kind: "reference", title: "Существующий референс", x: 0, y: 0, width: 300, height: 300 };
+  const saved = await saveMaterials(new Request(materials, {
+    method: "PUT", headers,
+    body: JSON.stringify({ revision: 0, document: { version: 1, nodes: [older], links: [], groups: [] } }),
+  }), context);
+  assert.equal(saved.status, 200);
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    calls += 1;
+    assert.equal(url, "https://api.openai.com/v1/images/edits");
+    assert.match(String(options.body.get("prompt")), /CAMERA AND GEOMETRY LOCK/);
+    assert.match(String(options.body.get("prompt")), /"sheet":2/);
+    assert.equal(options.body.getAll("image[]").length, 2);
+    return Response.json({ data: [{ b64_json: png.split(",")[1] }] });
+  };
+  const capture = () => new Request(endPoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ id: photoId, image: png, manifest: { sheet: 2, samples: [] }, references: [png] }),
+  });
+  const response = await takePhoto(capture(), context);
+  assert.equal(response.status, 200, await response.clone().text());
+  const result = await response.json();
+  assert.equal(result.status, "ready");
+  assert.equal(calls, 1);
+  const listed = await listVisualizations(new Request(endPoint, { headers }), context);
+  const { items } = await listed.json();
+  assert.equal(items.length, 1);
+  assert.equal(items[0].id, photoId);
+  assert.equal(items[0].image, result.image);
+  assert.match(items[0].source, /\/assets\/visual-source-/);
+  assert.equal((await takePhoto(capture(), context)).status, 200);
+  assert.equal(calls, 1);
+  const board = await (await readMaterials(new Request(materials, { headers }), context)).json();
+  assert.equal(board.revision, 2);
+  const [latest, preserved] = board.document.nodes;
+  assert.equal(board.document.nodes.length, 2);
+  assert.equal(latest.kind, "reference");
+  assert.equal(latest.generated, true);
+  assert.equal(latest.trayOnly, true);
+  assert.equal(latest.image, result.image);
+  assert.equal(latest.originalImage, result.image);
+  assert.deepEqual(preserved, older);
 });
 
 test("moodboard builder rejects a seventeenth input before reserve or provider", async () => {

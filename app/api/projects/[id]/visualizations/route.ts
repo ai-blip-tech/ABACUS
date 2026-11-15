@@ -5,6 +5,8 @@ import {isSameOrigin} from '@/lib/measured-plan/request-origin';
 import {POST as generatePreview} from '@/app/api/material-board/generate-preview/route';
 import {POST as generateProduction} from '@/app/api/generate/route';
 import {cameraRenderPrompt} from '@/lib/visualizations/brief.mjs';
+import {addPlannerRender} from '@/lib/material-board/planner-render';
+import {ensureMaterialsStore} from '@/lib/material-board/server-store';
 export const runtime='nodejs';export const maxDuration=240;
 type Context={params:Promise<{id:string}>};
 function store(){database.prepare('CREATE TABLE IF NOT EXISTS project_visualizations(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,user_id TEXT NOT NULL,tenant_id TEXT NOT NULL,status TEXT NOT NULL,source_asset TEXT NOT NULL,render_asset TEXT,manifest_json TEXT NOT NULL,created_at TEXT NOT NULL,error TEXT)').execute();database.prepare('CREATE TABLE IF NOT EXISTS deleted_project_visualizations(id TEXT PRIMARY KEY REFERENCES project_visualizations(id) ON DELETE CASCADE,deleted_at TEXT NOT NULL)').execute();}
@@ -15,4 +17,73 @@ async function changeVisibility(request:Request,context:Context,remove:boolean){
 export async function DELETE(request:Request,context:Context){return changeVisibility(request,context,true);}
 export async function PATCH(request:Request,context:Context){return changeVisibility(request,context,false);}
 
-export async function POST(request:Request,{params}:Context){if(!isSameOrigin(request))return Response.json({error:'Недопустимый источник'},{status:403});const{id}=await params,u=await owner(request,id);if(!u)return Response.json({error:'Проект не найден или требуется вход'},{status:404});store();let job='';try{const body=await request.json();if(!/^[a-f0-9-]{36}$/.test(body.id||''))throw Error('Не указан идентификатор снимка');job=body.id;const old:any=await database.prepare('SELECT status FROM project_visualizations WHERE id=? AND project_id=? AND user_id=? AND tenant_id=?').bind(job,id,u.id,u.tenantId).first();if(old)return Response.json({id:job,status:old.status},{status:old.status==='ready'?200:202});if(!body.manifest||JSON.stringify(body.manifest).length>1_000_000||!Array.isArray(body.references)||body.references.length>10)throw Error('Некорректные материалы сцены');const source=decode(body.image);for(const ref of body.references)decode(ref);const sourceAsset='visual-source-'+randomUUID(),key=(asset:string)=>`${tenantStoragePrefix(u)}/projects/${id}/${asset}`;await storage().put(key(sourceAsset),source.bytes,{httpMetadata:{contentType:source.type}});await database.prepare('INSERT INTO project_visualizations(id,project_id,user_id,tenant_id,status,source_asset,manifest_json,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(job,id,u.id,u.tenantId,'rendering',sourceAsset,JSON.stringify(body.manifest),new Date().toISOString()).run();const prompt=cameraRenderPrompt(body.manifest),local=process.env.NODE_ENV!=='production'&&['localhost','127.0.0.1'].includes(new URL(request.url).hostname),headers=new Headers(request.headers);headers.set('Content-Type','application/json');headers.set('Idempotency-Key',job);headers.set('X-Disable-Generation-Retry','1');headers.delete('content-length');const generated=await (local?generatePreview:generateProduction)(new Request(new URL(local?'/api/material-board/generate-preview':'/api/generate',request.url),{method:'POST',headers,body:JSON.stringify({projectId:id,operation:'global_edit',roomImage:body.image,templateEdit:{templateId:'room-design-planner-camera',instructions:prompt,referenceImages:body.references,outputLabel:'Визуализация Room Design Planner'},outputSize:body.outputSize||'1536x1024'})}));if(!generated.ok){const error=await generated.json().catch(()=>({}));throw Error(error.error||'Не удалось создать рендер');}const bytes=new Uint8Array(await generated.arrayBuffer()),asset='visual-render-'+randomUUID();if(!bytes.length)throw Error('Сервис вернул пустое изображение');await storage().put(key(asset),bytes,{httpMetadata:{contentType:generated.headers.get('content-type')||'image/webp'}});await database.prepare("UPDATE project_visualizations SET status='ready',render_asset=? WHERE id=? AND project_id=? AND user_id=?").bind(asset,job,id,u.id).run();return Response.json({id:job,status:'ready',image:`/api/projects/${id}/assets/${asset}`});}catch(e){const message=(e as Error).message;if(job)await database.prepare("UPDATE project_visualizations SET status='error',error=? WHERE id=? AND project_id=? AND user_id=?").bind(message.slice(0,500),job,id,u.id).run();return Response.json({error:message},{status:400});}}
+export async function POST(request:Request,{params}:Context){
+ if(!isSameOrigin(request))return Response.json({error:'Недопустимый источник'},{status:403});
+ const {id}=await params,user=await owner(request,id);
+ if(!user)return Response.json({error:'Проект не найден или требуется вход'},{status:404});
+ store();
+ let claimedJob:string|undefined;
+ const key=(asset:string)=>`${tenantStoragePrefix(user)}/projects/${id}/${asset}`;
+ const getJob=(job:string)=>database.prepare('SELECT status,error FROM project_visualizations WHERE id=? AND project_id=? AND user_id=? AND tenant_id=?')
+  .bind(job,id,user.id,user.tenantId).first<{status:string;error:string|null}>();
+ const respondToExisting=(job:string,existing:{status:string;error:string|null})=>existing.status==='error'
+  ? Response.json({error:existing.error||'Не удалось создать рендер'},{status:400})
+  : Response.json({id:job,status:existing.status},{status:existing.status==='ready'?200:202});
+ try{
+  const body=await request.json(),job=body.id;
+  if(typeof job!=='string'||!/^[a-f0-9-]{36}$/.test(job))throw Error('Не указан идентификатор снимка');
+  const existing=await getJob(job);
+  if(existing)return respondToExisting(job,existing);
+  if(!body.manifest||JSON.stringify(body.manifest).length>1_000_000||!Array.isArray(body.references)||body.references.length>10)throw Error('Некорректные материалы сцены');
+  const source=decode(body.image);
+  for(const ref of body.references)decode(ref);
+  const sourceAsset='visual-source-'+randomUUID();
+  await storage().put(key(sourceAsset),source.bytes,{httpMetadata:{contentType:source.type}});
+  const inserted=await database.prepare(`INSERT INTO project_visualizations(id,project_id,user_id,tenant_id,status,source_asset,manifest_json,created_at)
+   VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`)
+   .bind(job,id,user.id,user.tenantId,'rendering',sourceAsset,JSON.stringify(body.manifest),new Date().toISOString()).run();
+  if(!inserted.meta.changes){
+   await storage().delete(key(sourceAsset));
+   const duplicate=await getJob(job);
+   if(duplicate)return respondToExisting(job,duplicate);
+   return Response.json({error:'Идентификатор снимка уже используется'},{status:409});
+  }
+  claimedJob=job;
+  const prompt=cameraRenderPrompt(body.manifest);
+  const local=process.env.NODE_ENV!=='production'&&['localhost','127.0.0.1'].includes(new URL(request.url).hostname);
+  const headers=new Headers(request.headers);
+  headers.set('Content-Type','application/json');
+  headers.set('Idempotency-Key',job);
+  headers.set('X-Disable-Generation-Retry','1');
+  headers.delete('content-length');
+  const outputSize=body.outputSize==='1024x1536'?'1024x1536':'1536x1024';
+  const generated=await (local?generatePreview:generateProduction)(
+   new Request(new URL(local?'/api/material-board/generate-preview':'/api/generate',request.url),{
+    method:'POST',headers,body:JSON.stringify({
+     projectId:id,operation:'global_edit',prompt,roomImage:body.image,outputSize,
+     templateEdit:{templateId:'room-design-planner-camera',instructions:prompt,referenceImages:body.references,outputLabel:'Визуализация Room Design Planner'},
+    }),
+   }),
+  );
+  if(!generated.ok){
+   const error=await generated.json().catch(()=>({}));
+   throw Error(error.error||'Не удалось создать рендер');
+  }
+  const bytes=new Uint8Array(await generated.arrayBuffer()),asset='visual-render-'+randomUUID();
+  if(!bytes.length)throw Error('Сервис вернул пустое изображение');
+  await storage().put(key(asset),bytes,{httpMetadata:{contentType:generated.headers.get('content-type')||'image/webp'}});
+  const image=`/api/projects/${id}/assets/${asset}`;
+  ensureMaterialsStore();
+  database.transaction(db=>{
+   addPlannerRender(db,user,id,job,image,outputSize==='1024x1536');
+   db.prepare("UPDATE project_visualizations SET status='ready',render_asset=? WHERE id=? AND project_id=? AND user_id=? AND tenant_id=?")
+    .run(asset,job,id,user.id,user.tenantId);
+  });
+  return Response.json({id:job,status:'ready',image});
+ }catch(error){
+  const message=(error as Error).message;
+  if(claimedJob)await database.prepare("UPDATE project_visualizations SET status='error',error=? WHERE id=? AND project_id=? AND user_id=? AND tenant_id=?")
+   .bind(message.slice(0,500),claimedJob,id,user.id,user.tenantId).run();
+  return Response.json({error:message},{status:400});
+ }
+}
