@@ -290,7 +290,8 @@
       "thumbnail": "5164-catalog.png",
       "sourcePdfPage": 6,
       "sourcePrintedPage": 11,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "6561",
@@ -430,7 +431,8 @@
       "thumbnail": "10162-catalog.png",
       "sourcePdfPage": 8,
       "sourcePrintedPage": 14,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "13061",
@@ -490,7 +492,8 @@
       "thumbnail": "3186-catalog.png",
       "sourcePdfPage": 9,
       "sourcePrintedPage": 17,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "4186",
@@ -500,7 +503,8 @@
       "thumbnail": "4186-catalog.png",
       "sourcePdfPage": 9,
       "sourcePrintedPage": 17,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "5081",
@@ -600,7 +604,8 @@
       "thumbnail": "5186-catalog.png",
       "sourcePdfPage": 10,
       "sourcePrintedPage": 19,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "6183",
@@ -610,7 +615,8 @@
       "thumbnail": "6183-catalog.png",
       "sourcePdfPage": 11,
       "sourcePrintedPage": 21,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "6581",
@@ -850,7 +856,8 @@
       "thumbnail": "41101-catalog.png",
       "sourcePdfPage": 13,
       "sourcePrintedPage": 25,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "50101",
@@ -880,7 +887,8 @@
       "thumbnail": "51101-catalog.png",
       "sourcePdfPage": 14,
       "sourcePrintedPage": 26,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "60102",
@@ -900,7 +908,8 @@
       "thumbnail": "61101-catalog.png",
       "sourcePdfPage": 14,
       "sourcePrintedPage": 27,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "65101",
@@ -940,7 +949,8 @@
       "thumbnail": "101101-catalog.png",
       "sourcePdfPage": 15,
       "sourcePrintedPage": 28,
-      "available3D": false
+      "available3D": false,
+      "fixedFront": "transparent-glass"
     },
     {
       "id": "130101",
@@ -1201,6 +1211,98 @@
       "kind": "ceramic",
       "slabWidthMm": 3200,
       "slabHeightMm": 1600
+    }
+  ],
+  "supports": [
+    {
+      "id": "BS",
+      "label": "База",
+      "heightMm": 35,
+      "kind": "base",
+      "thumbnail": "support-BS.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 46
+    },
+    {
+      "id": "S13",
+      "label": "Spike 13",
+      "heightMm": 130,
+      "kind": "feet",
+      "thumbnail": "support-S13.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 46
+    },
+    {
+      "id": "S20",
+      "label": "Spike 20",
+      "heightMm": 200,
+      "kind": "feet",
+      "thumbnail": "support-S20.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 46
+    },
+    {
+      "id": "PLN",
+      "label": "Plain",
+      "heightMm": 130,
+      "kind": "feet",
+      "thumbnail": "support-PLN.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 46
+    },
+    {
+      "id": "TBE",
+      "label": "Tube",
+      "heightMm": 130,
+      "kind": "feet",
+      "thumbnail": "support-TBE.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 46
+    },
+    {
+      "id": "CRB",
+      "label": "Crab",
+      "heightMm": 130,
+      "kind": "feet",
+      "thumbnail": "support-CRB.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 47
+    },
+    {
+      "id": "WL",
+      "label": "Подвес",
+      "heightMm": 0,
+      "kind": "wall",
+      "thumbnail": "support-WL.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 47
+    },
+    {
+      "id": "CG2",
+      "label": "Cage 20",
+      "heightMm": 200,
+      "kind": "frame",
+      "thumbnail": "support-CG2.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 47
+    },
+    {
+      "id": "CG4",
+      "label": "Cage 40",
+      "heightMm": 400,
+      "kind": "frame",
+      "thumbnail": "support-CG4.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 47
+    },
+    {
+      "id": "GPLN",
+      "label": "Glass Plain",
+      "heightMm": 160,
+      "kind": "frame",
+      "thumbnail": "support-GPLN.png",
+      "sourcePdfPage": 24,
+      "sourcePrintedPage": 47
     }
   ]
 }

@@ -119,6 +119,19 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
   setCabinetConfiguration({...configuration,modules:configuration.modules.map(module=>
    module.id===activeModule||allModules?{...module,...patch}:module)});
  }
+ function chooseFrontType(type:'ceramic'|'glass'){
+  if(fixedTransparentFront)return;
+  const next={...configuration,frontType:type};
+  if(type==='ceramic'&&cabinetData){
+   const width=cabinetWidthMm(configuration,cabinetData);
+   const current=cabinetData.samples.find(sample=>sample.id===configuration.front);
+   if(!current?.slabWidthMm||current.slabWidthMm<width){
+    const suitable=cabinetData.samples.find(sample=>sample.kind==='ceramic'&&(sample.slabWidthMm||0)>=width);
+    if(suitable)next.front=suitable.id;
+   }
+  }
+  setCabinetConfiguration(next);
+ }
  function changeGlass(patch:{sample?:string;finish?:'gloss'|'matte'}){
   if(cabinetPart==='top'){
    setCabinetConfiguration({...configuration,top:{...configuration.top!,...patch}});
@@ -137,6 +150,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
   if(setCabinetConfiguration(next)){setActiveModule(module.id);setAllModules(false);}
  }
  const activeCabinet=configuration.modules.find(module=>module.id===activeModule);
+ const fixedTransparentFront=cabinetData?.models.find(item=>item.id===activeCabinet?.model)?.fixedFront==='transparent-glass';
  function materialFor(sampleId:string) {
   const cached=materials.current.get(sampleId);
   if(cached)return cached;
@@ -157,8 +171,11 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
 
  function applySample(sampleId:string) {
   if(cabinet){
-   if(pending||assembling)return;
-   if(cabinetPart==='front')changeModule({front:sampleId});else changeGlass({sample:sampleId});
+   if(pending||assembling||cabinetPart==='front'&&fixedTransparentFront)return;
+   if(cabinetPart==='front'){
+    if(configuration.frontType==='glass')setCabinetConfiguration({...configuration,frontGlass:{...configuration.frontGlass!,sample:sampleId}});
+    else changeModule({front:sampleId});
+   }else changeGlass({sample:sampleId});
    return;
   }
   if (!selection.length || pending) return;
@@ -238,12 +255,14 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  const aspect=cabinet&&model?cabinetBounds(model).dimensions:node?.scale||[1.4,.55,.4];
  const selectedGlass=cabinetPart==='top'?configuration.top!:activeCabinet?.surfaces?.[cabinetPart as GlassPart]||{sample:activeCabinet?.glass,finish:activeCabinet?.finish};
  const glassSelected=['body','top','left','right'].includes(cabinetPart);
- const visibleSamples=cabinet?samples.filter(sample=>(sample as any).kind===(cabinetPart==='front'?'ceramic':'glass')):samples;
+ const frontIsGlass=configuration.frontType==='glass';
+ const frontGlassSelected=cabinetPart==='front'&&frontIsGlass;
+ const visibleSamples=cabinet&&cabinetPart==='front'&&fixedTransparentFront?[]:cabinet?samples.filter(sample=>(sample as any).kind===(cabinetPart==='front'&&!frontIsGlass?'ceramic':'glass')):samples;
  const catalogueModels=cabinetData?.models.filter(item=>!item.id.startsWith('base'))||[];
  const heights=[...new Set(catalogueModels.map(item=>item.heightMm))].sort((a,b)=>a-b);
  const depths=[...new Set(catalogueModels.filter(item=>item.heightMm===catalogHeight).map(item=>item.depthMm))].sort((a,b)=>a-b);
  const widths=[...new Set(catalogueModels.filter(item=>item.heightMm===catalogHeight&&item.depthMm===catalogDepth).map(item=>item.widthMm))].sort((a,b)=>a-b);
- const shownModels=catalogueModels.filter(item=>item.heightMm===catalogHeight&&item.depthMm===catalogDepth&&(catalogWidth==='all'||item.widthMm===Number(catalogWidth))).sort((a,b)=>a.widthMm-b.widthMm||a.id.localeCompare(b.id,undefined,{numeric:true}));
+ const shownModels=catalogueModels.filter(item=>item.heightMm===catalogHeight&&item.depthMm===catalogDepth&&(catalogWidth==='all'||item.widthMm===Number(catalogWidth))).sort((a,b)=>Number(a.available3D===false)-Number(b.available3D===false)||a.widthMm-b.widthMm||a.id.localeCompare(b.id,undefined,{numeric:true}));
  const max=Math.max(...aspect);
  return <dialog ref={dialog} className={'rd-furniture-surface-editor'+(cabinet?' rd-cabinet-editor':'')} aria-label="Редактор текстур мебели" onCancel={event=>{event.preventDefault();if(!pending)onClose();}}>
   <header><button type="button" disabled={pending} onClick={onClose}>Назад к плану</button><h2>{node?.name||'TETRA'}</h2><button type="button" disabled={!model||pending||assembling} onClick={()=>void confirm()}>ОК</button></header>
@@ -272,39 +291,46 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
    </div>
    <div className="rd-cabinet-model-cards">
     {shownModels.map(item=>{
-     const tooWide=moduleAction==='add'&&cabinetWidthMm(configuration,cabinetData)+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,cabinetData.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM);
+     const tooWide=moduleAction==='add'&&cabinetWidthMm(configuration,cabinetData)+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,frontIsGlass?MAX_CABINET_WIDTH_MM:cabinetData.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM);
      const incompatible=configuration.modules.some(module=>{
       if(moduleAction==='replace'&&module.id===activeModule)return false;
       const existing=cabinetData?.models.find(model=>model.id===module.model);
       return existing&&(existing.heightMm!==item.heightMm||existing.depthMm!==item.depthMm);
      });
      const missing=item.available3D===false;
-     return <button type="button" key={item.id} disabled={pending||tooWide||incompatible||missing} aria-label={(moduleAction==='add'?'Добавить':'Заменить на')+' модуль '+item.id} title={missing?'Ожидается 3D-модель по этой схеме':incompatible?'Высота и глубина должны совпадать с композицией':tooWide?'Достигнута максимальная ширина композиции':undefined} onClick={()=>moduleAction==='add'?addModule(item.id):changeModule({model:item.id})}>
+     return <button type="button" key={item.id} className={missing?undefined:'rd-cabinet-model-ready'} disabled={pending||tooWide||incompatible||missing} aria-label={(moduleAction==='add'?'Добавить':'Заменить на')+' модуль '+item.id} title={missing?'Ожидается 3D-модель по этой схеме':incompatible?'Высота и глубина должны совпадать с композицией':tooWide?'Достигнута максимальная ширина композиции':undefined} onClick={()=>moduleAction==='add'?addModule(item.id):changeModule({model:item.id})}>
       <img src={cabinetURL(item.thumbnail||item.id+'-preview.svg')} alt={'Комод '+item.widthMm/10+' × '+item.heightMm/10+' × '+item.depthMm/10+' см'}/>
-      <span>Модуль {item.widthMm/10} см</span><span className="rd-cabinet-card-dimensions">{item.widthMm/10} × {item.heightMm/10} × {item.depthMm/10} см</span><small>Артикул {item.id}</small>{missing&&<em>Ожидается 3D</em>}
+      <span>Модуль {item.widthMm/10} см</span><span className="rd-cabinet-card-dimensions">{item.widthMm/10} × {item.heightMm/10} × {item.depthMm/10} см</span><small>Артикул {item.id}</small>{item.fixedFront==='transparent-glass'&&<span className="rd-cabinet-transparent-badge">Прозрачная дверца</span>}{missing?<em>Ожидается 3D</em>:<b className="rd-cabinet-3d-badge">3D</b>}
      </button>;
     })}
    </div>
    <div className="rd-cabinet-settings">
-    {([['front','Фасад · керамогранит'],['body','Корпус · стекло'],['legs','Опора']] as const).map(([part,label])=><button type="button" key={part} aria-pressed={part==='body'?glassSelected:cabinetPart===part} onClick={()=>setCabinetPart(part)}>{label}</button>)}
+    {([['front','Фасад'],['body','Корпус · стекло'],['legs','Опора']] as const).map(([part,label])=><button type="button" key={part} aria-pressed={part==='body'?glassSelected:cabinetPart===part} onClick={()=>setCabinetPart(part)}>{label}</button>)}
+    {cabinetPart==='front'&&fixedTransparentFront&&<p className="rd-cabinet-fixed-front">Прозрачное стекло · заводской фасад</p>}
+    {cabinetPart==='front'&&!fixedTransparentFront&&<div className="rd-cabinet-front-material">
+     <button type="button" aria-pressed={!frontIsGlass} onClick={()=>chooseFrontType('ceramic')}>Керамогранит</button>
+     <button type="button" aria-pressed={frontIsGlass} onClick={()=>chooseFrontType('glass')}>Стекло</button>
+     {frontGlassSelected&&<><button type="button" aria-pressed={configuration.frontGlass?.finish==='gloss'} onClick={()=>setCabinetConfiguration({...configuration,frontGlass:{...configuration.frontGlass!,finish:'gloss'}})}>Глянцевое</button><button type="button" aria-pressed={configuration.frontGlass?.finish==='matte'} onClick={()=>setCabinetConfiguration({...configuration,frontGlass:{...configuration.frontGlass!,finish:'matte'}})}>Матовое</button></>}
+    </div>}
     {glassSelected&&<><select aria-label="Часть стеклянного корпуса" value={cabinetPart} onChange={event=>setCabinetPart(event.target.value as GlassPart)}><option value="body">Весь корпус</option><option value="top">Общая столешница</option><option value="left">Левая боковина</option><option value="right">Правая боковина</option></select><button type="button" aria-pressed={selectedGlass.finish==='gloss'} onClick={()=>changeGlass({finish:'gloss'})}>Глянцевое</button><button type="button" aria-pressed={selectedGlass.finish==='matte'} onClick={()=>changeGlass({finish:'matte'})}>Матовое</button></>}
     {cabinetPart==='legs'&&<div className="rd-cabinet-support">
-     <button type="button" className="rd-cabinet-support-card" aria-pressed={configuration.support?.kind==='base'} onClick={()=>setCabinetConfiguration({...configuration,support:{kind:'base'}})}>
-      <img src={cabinetURL('base01-preview.svg')} alt="Общая база высотой 35 мм"/><b>База · 35 мм</b><span><i style={{background:'#45464a'}}/>Тёмно-серая</span>
-     </button>
-     {cabinetData?.legs?.length?cabinetData.legs.map(leg=><button type="button" key={leg.id} className="rd-cabinet-support-card" aria-pressed={configuration.support?.kind==='legs'&&configuration.support?.legId===leg.id} onClick={()=>setCabinetConfiguration({...configuration,support:{kind:'legs',legId:leg.id,color:configuration.support?.color||'#45464a'}})}>
-      <img src={cabinetURL(leg.id+'-preview.svg')} alt={leg.label}/><b>{leg.label}</b><span>Высота {leg.heightMm} мм</span>
-     </button>):<button type="button" className="rd-cabinet-support-card" disabled title="В исходной папке пока нет отдельных 3D-моделей ножек">
-      <svg viewBox="0 0 160 90" aria-hidden="true"><path d="M25 20h110M32 20v52m96-52v52M38 18l18-8h79l-7 10M54 10v48m81-48v48" fill="none" stroke="currentColor" strokeWidth="4"/></svg><b>Ножки</b><span>Ожидаем модель</span>
-     </button>}
-     <small>{aspect[0]>2?'Для этой ширины нужно 6 ножек':'Для этой ширины нужно 4 ножки'}</small>
+     {cabinetData?.supports?.map(support=>{
+      const available=support.id==='BS'||cabinetData.legs?.some(leg=>leg.id===support.id);
+      const chosen=support.id==='BS'?configuration.support?.kind==='base':configuration.support?.kind==='legs'&&configuration.support?.legId===support.id;
+      return <button type="button" key={support.id} className="rd-cabinet-support-card" disabled={!available} aria-pressed={chosen} onClick={()=>setCabinetConfiguration({...configuration,support:support.id==='BS'?{kind:'base'}:{kind:'legs',legId:support.id,color:configuration.support?.color||'#45464a'}})}>
+       <img src={cabinetURL(support.thumbnail)} alt={support.label}/><b>{support.label}</b><span>{support.heightMm? support.heightMm/10+' см':'Настенное крепление'}</span>
+       {support.id==='BS'&&<span><i style={{background:'#45464a'}}/>Тёмно-серая</span>}
+       {!available&&<small>Ожидается 3D</small>}
+      </button>;
+     })}
+     <small>{aspect[0]>2?'Отдельные ножки для этой ширины: 6 шт.':'Отдельные ножки для этой ширины: 4 шт.'}</small>
      {configuration.support?.kind==='legs'&&<label>Цвет металла <input type="color" aria-label="Цвет металла ножек" value={configuration.support.color||'#45464a'} onChange={event=>setCabinetConfiguration({...configuration,support:{...configuration.support!,color:event.target.value}})}/></label>}
     </div>}
 
    </div>
   </div>}
   <div className="rd-furniture-texture-samples"  role="group" aria-label="Текстуры из архива">
-   {(cabinet&&cabinetPart==='legs'?[]:visibleSamples).map(sample=><button key={sample.id} type="button" disabled={(!cabinet&&!selected)||pending||assembling||(cabinet&&cabinetPart==='front'&&(!(sample as any).slabWidthMm||!(sample as any).slabHeightMm))} title={cabinet&&cabinetPart==='front'&&!(sample as any).slabWidthMm?'Размер слэба не подтверждён':undefined} aria-pressed={cabinet?(cabinetPart==='front'?configuration.front:selectedGlass.sample)===sample.id:selectedSample===sample.id} onClick={()=>applySample(sample.id)}><img src={sample.image} alt=""/><span>{sample.label}{cabinet&&(sample as any).slabWidthMm?' · '+(sample as any).slabHeightMm/10+' × '+(sample as any).slabWidthMm/10+' см':''}</span></button>)}
+   {(cabinet&&cabinetPart==='legs'?[]:visibleSamples).map(sample=><button key={sample.id} type="button" disabled={(!cabinet&&!selected)||pending||assembling||(cabinet&&cabinetPart==='front'&&!frontIsGlass&&(!(sample as any).slabWidthMm||!(sample as any).slabHeightMm))} title={cabinet&&cabinetPart==='front'&&!frontIsGlass&&!(sample as any).slabWidthMm?'Размер слэба не подтверждён':undefined} aria-pressed={cabinet?(cabinetPart==='front'?(frontIsGlass?configuration.frontGlass?.sample:configuration.front):selectedGlass.sample)===sample.id:selectedSample===sample.id} onClick={()=>applySample(sample.id)}><img src={sample.image} alt=""/><span>{sample.label}{cabinet&&(sample as any).slabWidthMm?' · '+(sample as any).slabHeightMm/10+' × '+(sample as any).slabWidthMm/10+' см':''}</span></button>)}
   </div>
   <div className="rd-furniture-texture-status">
    <button type="button" aria-pressed={cabinet?allModules:wholeModel} disabled={!surfaces.length||pending} onClick={()=>cabinet?setAllModules(value=>!value):setSelected(wholeModel?null:'all')}>Выделить всё</button>

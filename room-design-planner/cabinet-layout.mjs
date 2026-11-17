@@ -35,6 +35,8 @@ export function normalizeCabinetConfig(configuration) {
   version: 3,
   support,
   front: configuration.front || first.front,
+  frontType:configuration.frontType||'ceramic',
+  frontGlass:configuration.frontGlass||{sample:first.glass,finish:first.finish},
   top: configuration.top || first.surfaces?.top || {sample:first.glass, finish:first.finish},
   base: {enabled:support.kind==='base',color:CABINET_BASE_COLOR},
  };
@@ -44,10 +46,12 @@ export function slabCut(configuration, catalog) {
  const widthMm = cabinetWidthMm(configuration, catalog);
  if (widthMm > MAX_CABINET_WIDTH_MM) throw Error('Максимальная общая ширина комодов — 260 см.');
  if (widthMm <= 0) throw Error('Добавьте хотя бы один комод.');
+ const heightMm=cabinetDimensionsMm(configuration,catalog).heightMm;
+ const transparentOnly=configuration.modules.every(module=>catalog.models.find(item=>item.id===module.model)?.fixedFront==='transparent-glass');
+ if(configuration.frontType==='glass'||transparentOnly)return {widthMm,heightMm,slabWidthMm:widthMm,slabHeightMm:heightMm,xMm:0,yMm:0};
  const sample=catalog.samples.find(item=>item.id===(configuration.front||configuration.modules[0].front));
  if(!sample?.slabWidthMm||!sample?.slabHeightMm)throw Error('Для этого декора не подтверждён размер слэба.');
  const slabWidthMm=sample.slabWidthMm,slabHeightMm=sample.slabHeightMm;
- const heightMm = cabinetDimensionsMm(configuration,catalog).heightMm;
  if(widthMm>slabWidthMm)throw Error('Длина выбранного слэба — '+slabWidthMm/10+' см. Для композиции выберите другой декор.');
  return {
   slabWidthMm,

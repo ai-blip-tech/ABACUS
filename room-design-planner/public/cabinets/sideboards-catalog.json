@@ -249,7 +249,8 @@
     "depthMm": 450,
     "thumbnail": "5164-catalog.png",
     "sourcePdfPage": 6,
-    "sourcePrintedPage": 11
+    "sourcePrintedPage": 11,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "6564",
@@ -348,7 +349,8 @@
     "depthMm": 450,
     "thumbnail": "10162-catalog.png",
     "sourcePdfPage": 8,
-    "sourcePrintedPage": 14
+    "sourcePrintedPage": 14,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "10064P",
@@ -429,7 +431,8 @@
     "depthMm": 450,
     "thumbnail": "3186-catalog.png",
     "sourcePdfPage": 9,
-    "sourcePrintedPage": 17
+    "sourcePrintedPage": 17,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "4186",
@@ -438,7 +441,8 @@
     "depthMm": 450,
     "thumbnail": "4186-catalog.png",
     "sourcePdfPage": 9,
-    "sourcePrintedPage": 17
+    "sourcePrintedPage": 17,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "5082",
@@ -528,7 +532,8 @@
     "depthMm": 450,
     "thumbnail": "5186-catalog.png",
     "sourcePdfPage": 10,
-    "sourcePrintedPage": 19
+    "sourcePrintedPage": 19,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "6183",
@@ -537,7 +542,8 @@
     "depthMm": 450,
     "thumbnail": "6183-catalog.png",
     "sourcePdfPage": 11,
-    "sourcePrintedPage": 21
+    "sourcePrintedPage": 21,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "6582",
@@ -753,7 +759,8 @@
     "depthMm": 450,
     "thumbnail": "41101-catalog.png",
     "sourcePdfPage": 13,
-    "sourcePrintedPage": 25
+    "sourcePrintedPage": 25,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "50102",
@@ -789,7 +796,8 @@
     "depthMm": 450,
     "thumbnail": "51101-catalog.png",
     "sourcePdfPage": 14,
-    "sourcePrintedPage": 26
+    "sourcePrintedPage": 26,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "61101",
@@ -798,7 +806,8 @@
     "depthMm": 450,
     "thumbnail": "61101-catalog.png",
     "sourcePdfPage": 14,
-    "sourcePrintedPage": 27
+    "sourcePrintedPage": 27,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "65101",
@@ -834,7 +843,8 @@
     "depthMm": 450,
     "thumbnail": "101101-catalog.png",
     "sourcePdfPage": 15,
-    "sourcePrintedPage": 28
+    "sourcePrintedPage": 28,
+    "fixedFront": "transparent-glass"
   },
   {
     "id": "130101",

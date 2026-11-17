@@ -7,10 +7,10 @@ export {normalizeCabinetConfig,cabinetWidthMm} from './cabinet-layout.mjs';
 export const CABINET_PRODUCT='roomdesign:modular-cabinet';
 export type GlassPart='body'|'top'|'left'|'right';
 export type CabinetModule={id:string;model:string;front:string;glass:string;finish:'gloss'|'matte';legs:boolean;metal:string;surfaces?:Partial<Record<GlassPart,{sample:string;finish:'gloss'|'matte'}>>};
-export type CabinetConfig={version?:number;modules:CabinetModule[];front?:string;top?:{sample:string;finish:'gloss'|'matte'};base?:{enabled:boolean;color:string};support?:{kind:'base'|'legs'|'none';legId?:string;color?:string}};
+export type CabinetConfig={version?:number;modules:CabinetModule[];front?:string;frontType?:'ceramic'|'glass';frontGlass?:{sample:string;finish:'gloss'|'matte'};top?:{sample:string;finish:'gloss'|'matte'};base?:{enabled:boolean;color:string};support?:{kind:'base'|'legs'|'none';legId?:string;color?:string}};
 export type CabinetSample={id:string;label:string;image:string;kind:'ceramic'|'glass'|'metal';color?:string;slabWidthMm?:number;slabHeightMm?:number};
 export type CabinetLeg={id:string;label:string;widthMm:number;heightMm:number;depthMm:number};
-export type CabinetCatalog={legs?:CabinetLeg[];models:{id:string;widthMm:number;heightMm:number;depthMm:number;thumbnail?:string;available3D?:boolean;sourcePdfPage?:number;sourcePrintedPage?:number}[];samples:CabinetSample[]};
+export type CabinetCatalog={legs?:CabinetLeg[];supports?:{id:string;label:string;heightMm:number;kind:'base'|'feet'|'frame'|'wall';thumbnail:string}[];models:{id:string;widthMm:number;heightMm:number;depthMm:number;thumbnail?:string;available3D?:boolean;sourcePdfPage?:number;sourcePrintedPage?:number;fixedFront?:'transparent-glass'}[];samples:CabinetSample[]};
 export const cabinetURL=(file:string)=>new URL((import.meta.env?.BASE_URL||'/')+'cabinets/'+file,location.origin).href;
 export const newCabinet=(model='5041'):CabinetModule=>({id:crypto.randomUUID(),model,front:'ceramic-0',glass:'WHT',finish:'gloss',legs:true,metal:'#333333'});
 export async function cabinetCatalog():Promise<CabinetCatalog>{
@@ -88,7 +88,11 @@ export async function assembleCabinets(configuration:CabinetConfig,catalog:Cabin
  const leg=config.support?.kind==='legs'?catalog.legs?.find(item=>item.id===config.support?.legId):undefined;
  if(config.support?.kind==='legs'&&!leg)throw Error('Для выбранных ножек пока не подключена 3D-модель.');
  const baseHeight=leg?leg.heightMm/1000:config.base!.enabled?CABINET_BASE_HEIGHT_MM/1000:0;
- const frontMaterial=await surface(catalog.samples.find(sample=>sample.id===config.front));
+ const glassFront=config.frontType==='glass';
+ const decoratedFrontMaterial=await surface(
+  catalog.samples.find(sample=>sample.id===(glassFront?config.frontGlass!.sample:config.front)),
+  glassFront?config.frontGlass!.finish:'matte',
+ );
  let offset=0;
  for(const module of config.modules){
   const specification=catalog.models.find(item=>item.id===module.model&&!item.id.startsWith('base'))!;
@@ -103,6 +107,9 @@ export async function assembleCabinets(configuration:CabinetConfig,catalog:Cabin
     part,await surface(catalog.samples.find(sample=>sample.id===value.sample),value.finish),
    ]),
   ));
+  const frontMaterial=specification.fixedFront==='transparent-glass'
+   ?new MeshPhysicalMaterial({color:'#ffffff',roughness:.06,transmission:1,thickness:.006,ior:1.5,transparent:true,depthWrite:false})
+   :decoratedFrontMaterial;
   const bodyGroup=splitCabinetBody(body,module,width,frontMaterial,bodyMaterial,glassMaterials,{offsetMm:offset*1000,cut});
   bodyGroup.position.set(offset+width/2,baseHeight,0);
   root.add(bodyGroup);

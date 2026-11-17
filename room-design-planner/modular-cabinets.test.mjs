@@ -89,6 +89,22 @@ test('the assembled cabinet has one glass top and one base across every module',
   const baseBox=new Box3().setFromObject(base);
   assert.ok(Math.abs(baseBox.max.y-baseBox.min.y-.035)<.00001);
   assert.ok(Math.abs(baseBox.max.x-baseBox.min.x-1.116)<.00001);
+  const glossy=await assembleCabinets({...config(['5041']),frontType:'glass',frontGlass:{sample:'WHT',finish:'gloss'}},catalog);
+  glossy.traverse(mesh=>{if(mesh.userData.cabinetPart==='front'){
+   assert.equal(mesh.material.roughness,.12);
+   assert.equal(mesh.material.clearcoat,1);
+  }});
+  const matte=await assembleCabinets({...config(['5041']),frontType:'glass',frontGlass:{sample:'WHT',finish:'matte'}},catalog);
+  matte.traverse(mesh=>{if(mesh.userData.cabinetPart==='front')assert.equal(mesh.material.roughness,.72);});
+  const fixedCatalog={...catalog,models:catalog.models.map(model=>model.id==='5041'?{...model,fixedFront:'transparent-glass'}:model)};
+  for(const frontType of ['ceramic','glass']){
+   const fixed=await assembleCabinets({...config(['5041']),frontType,frontGlass:{sample:'BRD',finish:'matte'}},fixedCatalog);
+   fixed.traverse(mesh=>{if(mesh.userData.cabinetPart==='front'){
+    assert.equal(mesh.material.transmission,1);
+    assert.equal(mesh.material.map,null);
+    assert.equal(mesh.material.roughness,.06);
+   }});
+  }
   const without=await assembleCabinets({...config(['5041','6542']),support:{kind:'none'}},catalog);
   assert.ok(Math.abs(cabinetBounds(without).dimensions[1]-.394)<.00001);
   without.traverse(mesh=>assert.ok(!(mesh.userData.cabinetCommon&&mesh.userData.cabinetPart==='legs')));
@@ -125,4 +141,20 @@ test('factory Sideboards are grouped by actual height and incompatible modules c
  const alternate={...catalog,models:[{id:'first',widthMm:500,heightMm:390,depthMm:450},{id:'second',widthMm:500,heightMm:390,depthMm:400}]};
  assert.throws(()=>cabinetDimensionsMm({modules:[{model:'first'},{model:'second'}]},alternate),/высоты и глубины/);
  assert.deepEqual(cabinetDimensionsMm({modules:[{model:'5041'},{model:'6542'}]},catalog),{widthMm:1150,heightMm:390,depthMm:450});
+});
+
+
+test('support heights and fixed transparent doors match the price-list',()=>{
+ const expected={BS:35,S13:130,S20:200,PLN:130,TBE:130,CRB:130,WL:0,CG2:200,CG4:400,GPLN:160};
+ assert.equal(catalog.supports.length,10);
+ for(const support of catalog.supports){
+  assert.equal(support.heightMm,expected[support.id]);
+  assert.ok(support.thumbnail.endsWith('.png'));
+ }
+ const transparent=catalog.models.filter(model=>model.fixedFront==='transparent-glass').map(model=>model.id).sort();
+ assert.deepEqual(transparent,['5164','10162','3186','4186','5186','6183','41101','51101','61101','101101'].sort());
+ const missingSize=catalog.samples.find(sample=>sample.kind==='ceramic'&&!sample.slabWidthMm);
+ const glass={...config(Array(5).fill('5041')),front:missingSize.id,frontType:'glass'};
+ assert.equal(slabCut(glass,catalog).widthMm,2500);
+ assert.throws(()=>slabCut({...glass,modules:Array(6).fill(null).map(()=>newCabinet('5041'))},catalog),/260/);
 });

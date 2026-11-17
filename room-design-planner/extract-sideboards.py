@@ -5,6 +5,7 @@ import pypdfium2 as pdfium
 source=Path(sys.argv[1])
 output=Path(sys.argv[2])
 output.mkdir(parents=True,exist_ok=True)
+transparent_codes={'5164','10162','3186','4186','5186','6183','41101','51101','61101','101101'}
 items=[]
 rendered=pdfium.PdfDocument(source)
 with pdfplumber.open(source) as pdf:
@@ -40,7 +41,27 @@ with pdfplumber.open(source) as pdf:
    rectangle=(max(0,round((im['x0']-padding)*4)),max(0,round((im['top']-padding)*4)),round((im['x1']+padding)*4),round((im['bottom']+padding)*4))
    rendered_page.crop(rectangle).save(output/(code['text']+'-catalog.png'))
    items.append({'id':code['text'],'widthMm':width*10,'heightMm':height*10,'depthMm':depth*10,'thumbnail':code['text']+'-catalog.png','sourcePdfPage':index+1,'sourcePrintedPage':2*index+(1 if im['x0']>page.width/2 else 0)})
+for item in items:
+ if item['id'] in transparent_codes:item['fixedFront']='transparent-glass'
 ids=[item['id'] for item in items]
 if len(ids)!=len(set(ids)):raise RuntimeError(('duplicate codes',[v for v in ids if ids.count(v)>1]))
 (output/'sideboards-catalog.json').write_text(json.dumps(items,ensure_ascii=False,indent=2)+'\n')
 print(json.dumps({'count':len(items),'heights':sorted(set(item['heightMm'] for item in items)),'depths':sorted(set(item['depthMm'] for item in items)),'four':[item for item in items if item['id'] in ['5041','5042','6541','6542']]},ensure_ascii=False))
+
+
+# The price-list shows clipped images inside the ten equal-height support rows.
+page=rendered[23].render(scale=4).to_pil()
+definitions=[
+ ('BS','База',35,'base',0,0),('S13','Spike 13',130,'feet',0,1),
+ ('S20','Spike 20',200,'feet',0,2),('PLN','Plain',130,'feet',0,3),
+ ('TBE','Tube',130,'feet',0,4),('CRB','Crab',130,'feet',1,0),
+ ('WL','Подвес',0,'wall',1,1),('CG2','Cage 20',200,'frame',1,2),
+ ('CG4','Cage 40',400,'frame',1,3),('GPLN','Glass Plain',160,'frame',1,4),
+]
+supports=[]
+for code,label,height,kind,side,row in definitions:
+ x0,x1=(64.5,221) if side==0 else (690,833.5)
+ y0=165+row*130.4
+ page.crop((round(x0*4),round(y0*4),round(x1*4),round((y0+130.4)*4))).save(output/('support-'+code+'.png'))
+ supports.append({'id':code,'label':label,'heightMm':height,'kind':kind,'thumbnail':'support-'+code+'.png','sourcePdfPage':24,'sourcePrintedPage':46+side})
+(output/'supports-catalog.json').write_text(json.dumps(supports,ensure_ascii=False,indent=2)+'\n')

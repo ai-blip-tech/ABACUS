@@ -54,5 +54,6 @@ const factory=JSON.parse(await readFile(join(out,'sideboards-catalog.json'),'utf
 const preparedIds=new Set(models.map(item=>item.id));
 models=[...factory.map(item=>({...item,available3D:preparedIds.has(item.id)})),...models.filter(item=>item.id.startsWith('base'))];
 models.sort((a,b)=>a.heightMm-b.heightMm||a.widthMm-b.widthMm||a.id.localeCompare(b.id));
-await writeFile(join(out,'catalog.json'),JSON.stringify({models,samples},null,2));
+const supports=JSON.parse(await readFile(join(out,'supports-catalog.json'),'utf8'));
+await writeFile(join(out,'catalog.json'),JSON.stringify({models,samples,supports},null,2));
 console.log(JSON.stringify({models,textures:samples.length}));

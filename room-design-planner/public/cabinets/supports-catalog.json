@@ -1,0 +1,92 @@
+[
+  {
+    "id": "BS",
+    "label": "База",
+    "heightMm": 35,
+    "kind": "base",
+    "thumbnail": "support-BS.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 46
+  },
+  {
+    "id": "S13",
+    "label": "Spike 13",
+    "heightMm": 130,
+    "kind": "feet",
+    "thumbnail": "support-S13.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 46
+  },
+  {
+    "id": "S20",
+    "label": "Spike 20",
+    "heightMm": 200,
+    "kind": "feet",
+    "thumbnail": "support-S20.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 46
+  },
+  {
+    "id": "PLN",
+    "label": "Plain",
+    "heightMm": 130,
+    "kind": "feet",
+    "thumbnail": "support-PLN.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 46
+  },
+  {
+    "id": "TBE",
+    "label": "Tube",
+    "heightMm": 130,
+    "kind": "feet",
+    "thumbnail": "support-TBE.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 46
+  },
+  {
+    "id": "CRB",
+    "label": "Crab",
+    "heightMm": 130,
+    "kind": "feet",
+    "thumbnail": "support-CRB.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 47
+  },
+  {
+    "id": "WL",
+    "label": "Подвес",
+    "heightMm": 0,
+    "kind": "wall",
+    "thumbnail": "support-WL.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 47
+  },
+  {
+    "id": "CG2",
+    "label": "Cage 20",
+    "heightMm": 200,
+    "kind": "frame",
+    "thumbnail": "support-CG2.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 47
+  },
+  {
+    "id": "CG4",
+    "label": "Cage 40",
+    "heightMm": 400,
+    "kind": "frame",
+    "thumbnail": "support-CG4.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 47
+  },
+  {
+    "id": "GPLN",
+    "label": "Glass Plain",
+    "heightMm": 160,
+    "kind": "frame",
+    "thumbnail": "support-GPLN.png",
+    "sourcePdfPage": 24,
+    "sourcePrintedPage": 47
+  }
+]

@@ -117,3 +117,11 @@ html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}.linked-room-pla
 .rd-cabinet-model-cards button:disabled>span,.rd-cabinet-model-cards button:disabled>small { color:#82796f; }
 .rd-cabinet-model-cards em { font-style:normal; font-size:10px; color:#88786e; }
 .rd-cabinet-model-cards img { background:white; padding:5px; box-sizing:border-box; }
+.rd-cabinet-front-material { display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; margin:5px 0; }
+.rd-cabinet-front-material button { font-size:12px; }
+.rd-cabinet-editor .rd-cabinet-model-cards .rd-cabinet-model-ready { border:2px solid #a01432; box-shadow:0 0 0 2px #a0143210; background:#fffafa; }
+.rd-cabinet-3d-badge { display:inline-flex; align-items:center; justify-content:center; min-width:34px; padding:4px 8px; border-radius:20px; background:#a01432; color:white; font-size:11px; line-height:1; }
+.rd-cabinet-fixed-front { margin:8px 0; padding:12px; border-radius:16px; background:#f0ece7; font-size:12px; line-height:1.5; width:100%; }
+.rd-cabinet-transparent-badge { font-size:10px; color:#4b777c; }
+.rd-cabinet-support-card:disabled { opacity:1; }
+.rd-cabinet-support-card small { color:#88786e; font-size:10px; }
