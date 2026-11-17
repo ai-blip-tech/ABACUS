@@ -1,5 +1,6 @@
 'use client';
 
+import {plannerRenderTray,withPlannerRenderTray} from '@/lib/material-board/planner-render-tray';
 import {resolveWorkbookDraft,type WorkbookDraft} from '@/lib/material-board/workbook-draft';
 
 import {useCallback,useEffect,useRef,useState,type CSSProperties,type PointerEvent as ReactPointerEvent,type ReactNode} from 'react';
@@ -50,6 +51,7 @@ export default function MaterialsConceptPage(){
  const [sheetBook,setSheetBook]=useState<MaterialWorkbook|null>(null),sheetBookRef=useRef<MaterialWorkbook|null>(null),[renamingSheet,setRenamingSheet]=useState<{id:string;name:string}|null>(null),[switchingSheet,setSwitchingSheet]=useState(false),switchingSheetRef=useRef(false),[uploadCount,setUploadCount]=useState(0),uploadCountRef=useRef(0);
  const sheetRuntime=useRef(new Map<string,{view:BoardView;history:MaterialBoard[];future:MaterialBoard[];selected:string[]}>());
  const sandboxMode=true;
+ const [plannerRenders,setPlannerRenders]=useState<MaterialNode[]>([]),[hiddenPlannerRenders,setHiddenPlannerRenders]=useState<string[]>([]);
  const drawing=useRef<{pointer:number;start:BoardPoint;end:BoardPoint}|null>(null),[interiorRectangle,setInteriorRectangle]=useState<ReturnType<typeof rectangleBetween>|null>(null);
 
  const [interiorMode,setInteriorMode]=useState(false),boardEndpoint=useRef('materials-concept');
@@ -84,7 +86,7 @@ export default function MaterialsConceptPage(){
   if(!ready||!id||interiorMode||typeof BroadcastChannel==='undefined')return;
   const controller=new AbortController(),channel=new BroadcastChannel('roomdesign:planner-render:'+id);
   channel.onmessage=async()=>{
-   if(dirty){setNotice('Рендер сохранён в проекте. На экране открыт несохранённый черновик.');return;}
+   if(dirty)return;
    try{
     const current=boardRef.current;
     const response=await fetch('/api/projects/'+encodeURIComponent(id)+'/materials-concept',{cache:'no-store',signal:controller.signal});
@@ -99,6 +101,26 @@ export default function MaterialsConceptPage(){
   };
   return()=>{controller.abort();channel.close();};
  },[ready,dirty,interiorMode]);
+ useEffect(()=>{
+  const id=projectId.current;if(!ready||!id||interiorMode)return;
+  const controller=new AbortController();let pending=false;
+  const refresh=async()=>{
+   if(pending||controller.signal.aborted)return;pending=true;
+   try{
+    const response=await fetch('/api/projects/'+encodeURIComponent(id)+'/visualizations',{cache:'no-store',signal:controller.signal});
+    if(!response.ok)throw Error('Не удалось загрузить готовые рендеры проекта.');
+    const results=plannerRenderTray(await response.json(),id);if(controller.signal.aborted)return;
+    setPlannerRenders(current=>JSON.stringify(current)===JSON.stringify(results.nodes)?current:results.nodes);
+    setHiddenPlannerRenders(current=>JSON.stringify(current)===JSON.stringify(results.hidden)?current:results.hidden);
+   }catch(error){if(!controller.signal.aborted)setNotice(error instanceof Error?error.message:'Не удалось обновить рендеры.');}finally{pending=false;}
+  };
+  const visible=()=>{if(document.visibilityState==='visible')void refresh();};
+  const channel=typeof BroadcastChannel==='undefined'?null:new BroadcastChannel('roomdesign:planner-render:'+id);
+  if(channel)channel.onmessage=()=>void refresh();
+  window.addEventListener('focus',visible);document.addEventListener('visibilitychange',visible);
+  const timer=window.setInterval(visible,30000);void refresh();
+  return()=>{controller.abort();channel?.close();window.clearInterval(timer);window.removeEventListener('focus',visible);document.removeEventListener('visibilitychange',visible);};
+ },[ready,interiorMode]);
  useEffect(()=>{if(modal!=='plan'||projectPlanogramLoaded.current)return;const id=new URLSearchParams(location.search).get('project');if(!id)return;projectPlanogramLoaded.current=true;const controller=new AbortController();fetch('/api/projects/'+encodeURIComponent(id)+'/planning-plan',{cache:'no-store',signal:controller.signal}).then(async response=>{const data=await response.json();if(!response.ok)throw Error(data.error||'Не удалось загрузить планировочное решение');return data as {document:PlanningAlbum|null;bases?:{measured?:{plan?:MeasureDoc}|null}};}).then(data=>{if(controller.signal.aborted)return;const album=data.document,plan=album?.selected?album.variants[album.selected.variantId]?.plan:album?.variants[album.activeVariantId]?.plan||album?.variants.manual?.plan||data.bases?.measured?.plan;if(plan){setProjectPlanogramDoc(plan);setPlanogramDoc(plan);setPlanogramName(plan.name||'Планировочное решение проекта');setPlanogramOrigin('ИЗ ПРОЕКТА');}}).catch(()=>{/* The demo source remains available in an empty or unauthenticated local draft. */});return()=>controller.abort();},[modal]);
  useEffect(()=>{if(!stage.current)return;const observer=new ResizeObserver(([entry])=>setSize({width:entry.contentRect.width,height:entry.contentRect.height}));observer.observe(stage.current);return()=>observer.disconnect();},[]);
  useEffect(()=>{const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){if(referencePreview){setReferencePreview(null);return;}if(proposalSelecting){setProposalSelecting(false);setPrintSelection([]);setNotice('Выбор для коммерческого предложения отменён.');return;}if(!document.querySelector('dialog[open]'))setExpanded(false);}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[referencePreview,proposalSelecting]);
@@ -299,7 +321,7 @@ export default function MaterialsConceptPage(){
   const results:MaterialNode[]=accepted.map((item,index)=>({id:uuid(),kind:'reference',title:'Концепция кухни · '+new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(item.createdAt)),image:item.dataUrl,originalImage:item.dataUrl,x:0,y:0,width:400,height:300,generated:true,trayOnly:true,trayOrder:stamp-index,resultType:'kitchen-concept'}));
   commit({...current,nodes:[...results,...current.nodes]});setSelected([results[0].id]);setModal(null);setReferencePreview(results[0].id);setNotice('Концепция кухни добавлена первой слева в нижнюю ленту.');
  }
- function printableResults(source=boardRef.current){return source.nodes.filter(n=>Boolean(n.generated||n.resultType)&&Boolean(n.image||n.originalImage)).sort((a,b)=>(b.trayOrder??0)-(a.trayOrder??0));}
+ function printableResults(source=boardRef.current){return withPlannerRenderTray(source.nodes,plannerRenders,hiddenPlannerRenders).filter(n=>Boolean(n.generated||n.resultType)&&Boolean(n.image||n.originalImage)).sort((a,b)=>(b.trayOrder??0)-(a.trayOrder??0));}
  function openPrintReview(){const results=printableResults();setPrintSelection(results.map(n=>n.id));setModal('print');if(!results.length)setNotice('Сначала создайте moodboard, планограмму, концепцию кухни или новый вариант мебели.');}
  const norrProposalMode=user?.tenantSlug==='norrmobler'||proposalPreviewTenant;
  async function openProjectPrint(){
@@ -323,7 +345,7 @@ export default function MaterialsConceptPage(){
  }
  function openPrintAlbum(){
   const chosen=printableResults().filter(n=>printSelection.includes(n.id));if(!chosen.length){setNotice('Выберите хотя бы один лист для печати.');return;}
-  const params=new URLSearchParams({draft:storageKey.current,name:projectName,sheets:chosen.map(node=>node.id).join(',')}),anchor=document.createElement('a');anchor.href='/materials-concept/print?'+params.toString();anchor.target='_blank';anchor.rel='noopener';document.body.appendChild(anchor);anchor.click();anchor.remove();setModal(null);
+  const params=new URLSearchParams({draft:storageKey.current,name:projectName,sheets:chosen.map(node=>node.id).join(','),...(projectId.current?{project:projectId.current}:{})}),anchor=document.createElement('a');anchor.href='/materials-concept/print?'+params.toString();anchor.target='_blank';anchor.rel='noopener';document.body.appendChild(anchor);anchor.click();anchor.remove();setModal(null);
  }
  async function activateWorkbook(next:MaterialWorkbook){
   if(switchingSheetRef.current||saveBusy.current)return;
@@ -341,12 +363,23 @@ export default function MaterialsConceptPage(){
  function chooseSheet(id:string){const current=sheetBookRef.current;if(!current||current.activeSheetId===id)return;void activateWorkbook({...current,activeSheetId:id});}
  function newSheet(){const current=sheetBookRef.current;if(!current)return;setDirty(true);void activateWorkbook(appendSheet(current,uuid()));}
  function finishSheetName(){if(!renamingSheet)return;const current=sheetBookRef.current;if(current){const next=renameSheet(current,renamingSheet.id,renamingSheet.name);sheetBookRef.current=next;setSheetBook(next);setDirty(true);void saveWorkbook(storageKey.current,next,{revision:serverRevision.current,dirty:true}).catch(()=>setNotice('Не удалось сохранить название листа в браузере. Нажмите «Сохранить проект».'));}setRenamingSheet(null);}
- const selectedNode=board.nodes.find(n=>n.id===selected[0]),selectedLinks=selectedNode?board.links.filter(link=>link.from===selectedNode.id||link.to===selectedNode.id):[],previewNode=board.nodes.find(n=>n.id===referencePreview),canvasNodes=board.nodes.filter(n=>!n.trayOnly),catalogItems=board.nodes.filter(n=>!n.interior&&n.kind!=='note'&&n.kind!=='colour').sort((a,b)=>Number(Boolean(b.generated||b.resultType))-Number(Boolean(a.generated||a.resultType))||(b.trayOrder??0)-(a.trayOrder??0)),samples=materialSamples.filter(s=>(s.title+' '+s.detail).toLowerCase().includes(query.toLowerCase()));
+ const selectedNode=board.nodes.find(n=>n.id===selected[0]),selectedLinks=selectedNode?board.links.filter(link=>link.from===selectedNode.id||link.to===selectedNode.id):[],previewNode=withPlannerRenderTray(board.nodes,plannerRenders,hiddenPlannerRenders).find(n=>n.id===referencePreview),canvasNodes=board.nodes.filter(n=>!n.trayOnly),catalogItems=withPlannerRenderTray(board.nodes,plannerRenders,hiddenPlannerRenders).filter(n=>!n.interior&&n.kind!=='note'&&n.kind!=='colour').sort((a,b)=>Number(Boolean(b.generated||b.resultType))-Number(Boolean(a.generated||a.resultType))||(b.trayOrder??0)-(a.trayOrder??0)),samples=materialSamples.filter(s=>(s.title+' '+s.detail).toLowerCase().includes(query.toLowerCase()));
  const printItems=printableResults(board);
+ async function removeTrayItem(id:string){
+  if(id.startsWith('planner-render-')&&projectId.current){
+   try{
+    const response=await fetch('/api/projects/'+encodeURIComponent(projectId.current)+'/visualizations',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id.slice('planner-render-'.length)})});
+    if(!response.ok)throw Error('Не удалось удалить рендер.');
+    setHiddenPlannerRenders(ids=>[...new Set([...ids,id])]);setPlannerRenders(nodes=>nodes.filter(node=>node.id!==id));
+   }catch(error){setNotice((error as Error).message);return;}
+  }
+  if(boardRef.current.nodes.some(node=>node.id===id))commit(removeNodes(boardRef.current,[id]));
+  setSelected(ids=>ids.filter(value=>value!==id));if(referencePreview===id)setReferencePreview(null);
+ }
  function placeOnDesignerBoard(id:string,point?:BoardPoint){
-  const current=boardRef.current,node=current.nodes.find(item=>item.id===id);if(!node)return;
+  const current=boardRef.current,node=current.nodes.find(item=>item.id===id)||plannerRenders.find(item=>item.id===id);if(!node)return;if(!current.nodes.some(item=>item.id===id)&&current.nodes.length>=100){setNotice('На листе уже 100 карточек. Добавьте новый лист.');return;}
   const centre=point||worldPoint({x:size.width*.5,y:size.height*.46},viewRef.current),area=current.nodes.find(item=>item.interior&&centre.x>=item.x&&centre.x<=item.x+item.width&&centre.y>=item.y&&centre.y<=item.y+item.height),placed={...node,trayOnly:false,x:centre.x-node.width/2,y:centre.y-node.height/2};
-  const next={...current,nodes:current.nodes.map(item=>item.id===id?placed:area&&item.id===area.id&&area.interior&&(node.image||node.originalImage)?{...item,interior:bindFloorReferenceToInterior(area.interior,{...node,id})}:item)};
+  const next={...current,nodes:[...(current.nodes.some(item=>item.id===id)?[]:[placed]),...current.nodes.map(item=>item.id===id?placed:area&&item.id===area.id&&area.interior&&(node.image||node.originalImage)?{...item,interior:bindFloorReferenceToInterior(area.interior,{...node,id})}:item)]};
   commit(next);setSelected([id]);setReferencePreview(null);setNotice(area&&node.image?'Изображение добавлено как референс цвета и фактуры пола.':'Результат добавлен на рабочий стол и сохранён в нижней ленте.');
  }
  const furnitureSlot={x:board.furniturePosition?.x??75,y:board.furniturePosition?.y??140,width:235,height:300};
@@ -397,7 +430,7 @@ export default function MaterialsConceptPage(){
    {dropActive&&<div className="concept-drop-hint">Отпустите — карточка появится на рабочем столе</div>}
   {sandboxMode&&sheetBook&&<nav className="concept-sheet-tabs" aria-label="Листы песочницы" onPointerDown={e=>e.stopPropagation()}><div role="tablist" aria-label="Листы">{sheetBook.sheets.map(sheet=><div className={'concept-sheet-tab'+(sheet.id===sheetBook.activeSheetId?' active':'')} key={sheet.id}>{renamingSheet?.id===sheet.id?<input autoFocus aria-label="Название листа" maxLength={80} value={renamingSheet.name} onChange={e=>setRenamingSheet({...renamingSheet,name:e.target.value})} onBlur={finishSheetName} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape'){e.stopPropagation();setRenamingSheet(null);}}}/>:<><button type="button" role="tab" aria-selected={sheet.id===sheetBook.activeSheetId} disabled={switchingSheet||saving||generating.length>0||moodboardBusy||planogramBusy||uploadCount>0} onClick={()=>chooseSheet(sheet.id)} onDoubleClick={()=>setRenamingSheet({id:sheet.id,name:sheet.name})}>{sheet.name}</button>{sheet.id===sheetBook.activeSheetId&&<button className="concept-sheet-rename" title="Переименовать лист" aria-label={'Переименовать '+sheet.name} onClick={()=>setRenamingSheet({id:sheet.id,name:sheet.name})}>✎</button>}</>}</div>)}</div><button type="button" className="concept-sheet-add" aria-label="Добавить новый лист" title="Новая чистая песочница" disabled={switchingSheet||saving||generating.length>0||moodboardBusy||planogramBusy||uploadCount>0} onClick={newSheet}><Icon name="plus"/></button></nav>}
   </div>
-  <section className="concept-bottom-tray"><StudioMaterialTray items={catalogItems.map(n=>({id:n.id,image:n.image,thumbnail:n.image?undefined:<Surface node={n}/>,eyebrow:trayLabel(n),name:n.title,details:trayDetails(n),selected:proposalSelecting?printSelection.includes(n.id):selected.includes(n.id),draggable:!proposalSelecting&&Boolean(n.image||n.originalImage)}))} onSelect={id=>{const n=board.nodes.find(n=>n.id===id);if(!n)return;if(proposalSelecting){if(proposalSelectable(n))setPrintSelection(ids=>ids.includes(id)?ids.filter(value=>value!==id):[...ids,id]);return;}setSelected([id]);setReferencePreview(id);}} onDragStart={(id,event)=>{if(proposalSelecting){event.preventDefault();return;}event.dataTransfer.setData(MATERIAL_RESULT_DRAG,id);event.dataTransfer.effectAllowed='move';}} onRemove={id=>{commit(removeNodes(boardRef.current,[id]));setSelected(ids=>ids.filter(x=>x!==id));if(referencePreview===id)setReferencePreview(null);}} onUpload={()=>chooseUpload('reference')} onCatalog={()=>setCatalog('reference')} footerMessage={proposalSelecting?'Выберите товары и результаты, затем снова нажмите «Печать»':'Нажмите для просмотра или перетащите созданный результат на рабочий стол'}/></section>
+  <section className="concept-bottom-tray"><StudioMaterialTray items={catalogItems.map(n=>({id:n.id,image:n.image,thumbnail:n.image?undefined:<Surface node={n}/>,eyebrow:trayLabel(n),name:n.title,details:trayDetails(n),selected:proposalSelecting?printSelection.includes(n.id):selected.includes(n.id),draggable:!proposalSelecting&&Boolean(n.image||n.originalImage)}))} onSelect={id=>{const n=catalogItems.find(n=>n.id===id);if(!n)return;if(proposalSelecting&&!board.nodes.some(node=>node.id===id)){if(board.nodes.length>=100){setNotice('На листе уже 100 карточек. Добавьте новый лист.');return;}commit({...boardRef.current,nodes:[n,...boardRef.current.nodes]});}if(proposalSelecting){if(proposalSelectable(n))setPrintSelection(ids=>ids.includes(id)?ids.filter(value=>value!==id):[...ids,id]);return;}setSelected([id]);setReferencePreview(id);}} onDragStart={(id,event)=>{if(proposalSelecting){event.preventDefault();return;}event.dataTransfer.setData(MATERIAL_RESULT_DRAG,id);event.dataTransfer.effectAllowed='move';}} onRemove={id=>void removeTrayItem(id)} onUpload={()=>chooseUpload('reference')} onCatalog={()=>setCatalog('reference')} footerMessage={proposalSelecting?'Выберите товары и результаты, затем снова нажмите «Печать»':'Нажмите для просмотра или перетащите созданный результат на рабочий стол'}/></section>
   <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden aria-label="Загрузить изображения на материальный стол" onChange={e=>{const selectedFiles=[...(e.target.files||[])];e.target.value='';void files(selectedFiles,uploadKind.current);}}/>
   <input ref={planogramInput} type="file" accept="image/jpeg,image/png,image/webp" hidden aria-label="Загрузить собственную планировку" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void loadPlanogramFile(file);}}/>
   {previewNode&&previewNode.kind!=='note'&&<div className="concept-reference-lightbox" role="dialog" aria-modal="true" aria-label={'Просмотр '+previewNode.title} onClick={()=>setReferencePreview(null)}><button type="button" autoFocus aria-label="Закрыть полноэкранный просмотр" onClick={()=>setReferencePreview(null)}><Icon name="close"/></button><div className="concept-reference-preview-media" onClick={e=>e.stopPropagation()}><Surface node={previewNode}/></div><div className="concept-reference-preview-meta" onClick={e=>e.stopPropagation()}><b>{previewNode.title}</b><span>{trayDetails(previewNode)}</span></div></div>}

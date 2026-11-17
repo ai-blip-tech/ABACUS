@@ -1,0 +1,17 @@
+.planner-render-result{box-sizing:border-box;width:min(1400px,96vw);max-width:96vw;height:min(920px,94dvh);max-height:94dvh;margin:auto;padding:0;border:1px solid #e0d7ce;border-radius:28px;background:#fffdf9;color:#302b27;box-shadow:0 24px 90px #0005;overflow:hidden;font-family:Arial,sans-serif}
+.planner-render-result[open]{display:flex;flex-direction:column}
+.planner-render-result::backdrop{background:#171514b8;backdrop-filter:blur(5px)}
+.planner-render-result header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 24px;border-bottom:1px solid #e8e0d8}
+.planner-render-result h2{margin:0 0 5px;font:28px Georgia,serif}
+.planner-render-result header p{margin:0;font-size:14px;color:#81776d}
+.planner-render-result button{border:1px solid #ddd3c9;background:#fff;color:#302b27;min-height:42px;padding:10px 22px;border-radius:999px;font-size:14px;cursor:pointer;transition:background .15s,color .15s}
+.planner-render-result button:hover,.planner-render-result button:active{background:#92142d;color:#fff;border-color:#92142d}
+.planner-render-result button:focus-visible{outline:2px solid #92142d;outline-offset:3px}
+.planner-render-result button:disabled{opacity:.6;cursor:wait}
+.planner-render-result .planner-render-close{flex:0 0 42px;width:42px;padding:0;font-size:28px;line-height:1}
+.planner-render-image{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px;background:#f5f2ed}
+.planner-render-image img{display:block;width:100%;height:100%;object-fit:contain}
+.planner-render-result footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px;padding:14px 24px;border-top:1px solid #e8e0d8}
+.planner-render-result footer p{flex:1 1 100%;margin:0;color:#92142d;font-size:14px}
+.planner-render-result:fullscreen,.planner-render-result.is-expanded{width:100vw;max-width:none;height:100dvh;max-height:none;border:0;border-radius:0}
+@media(max-width:600px){.planner-render-result{border-radius:20px}.planner-render-result header{padding:14px 16px}.planner-render-result h2{font-size:23px}.planner-render-result footer{padding:12px;gap:8px}.planner-render-result footer button{flex:1;padding:10px 12px}}
