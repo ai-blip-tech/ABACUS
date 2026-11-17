@@ -1,15 +1,16 @@
 import {Box3,BoxGeometry,BufferGeometry,Float32BufferAttribute,Group,Mesh,MeshPhysicalMaterial,SRGBColorSpace,TextureLoader,Vector3} from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
-import {cabinetWidthMm,normalizeCabinetConfig,slabCut,slabUV,CABINET_BASE_HEIGHT_MM,CABINET_GLASS_THICKNESS_MM,CABINET_DOOR_GAP_MM} from './cabinet-layout.mjs';
+import {cabinetWidthMm,normalizeCabinetConfig,slabCut,slabUV,cabinetLegPositions,CABINET_BASE_HEIGHT_MM,CABINET_GLASS_THICKNESS_MM,CABINET_DOOR_GAP_MM} from './cabinet-layout.mjs';
 export {normalizeCabinetConfig,cabinetWidthMm} from './cabinet-layout.mjs';
 
 export const CABINET_PRODUCT='roomdesign:modular-cabinet';
 export type GlassPart='body'|'top'|'left'|'right';
 export type CabinetModule={id:string;model:string;front:string;glass:string;finish:'gloss'|'matte';legs:boolean;metal:string;surfaces?:Partial<Record<GlassPart,{sample:string;finish:'gloss'|'matte'}>>};
-export type CabinetConfig={version?:number;modules:CabinetModule[];front?:string;top?:{sample:string;finish:'gloss'|'matte'};base?:{enabled:boolean;color:string}};
+export type CabinetConfig={version?:number;modules:CabinetModule[];front?:string;top?:{sample:string;finish:'gloss'|'matte'};base?:{enabled:boolean;color:string};support?:{kind:'base'|'legs'|'none';legId?:string;color?:string}};
 export type CabinetSample={id:string;label:string;image:string;kind:'ceramic'|'glass'|'metal';color?:string;slabWidthMm?:number;slabHeightMm?:number};
-export type CabinetCatalog={models:{id:string;widthMm:number;heightMm:number;depthMm:number}[];samples:CabinetSample[]};
+export type CabinetLeg={id:string;label:string;widthMm:number;heightMm:number;depthMm:number};
+export type CabinetCatalog={legs?:CabinetLeg[];models:{id:string;widthMm:number;heightMm:number;depthMm:number}[];samples:CabinetSample[]};
 export const cabinetURL=(file:string)=>new URL((import.meta.env?.BASE_URL||'/')+'cabinets/'+file,location.origin).href;
 export const newCabinet=(model='5041'):CabinetModule=>({id:crypto.randomUUID(),model,front:'ceramic-0',glass:'WHT',finish:'gloss',legs:true,metal:'#333333'});
 export async function cabinetCatalog():Promise<CabinetCatalog>{
@@ -81,7 +82,9 @@ export async function assembleCabinets(configuration:CabinetConfig,catalog:Cabin
  const cut=slabCut(config,catalog);
  const root=new Group();
  const totalWidth=cabinetWidthMm(config,catalog)/1000;
- const baseHeight=config.base!.enabled?CABINET_BASE_HEIGHT_MM/1000:0;
+ const leg=config.support?.kind==='legs'?catalog.legs?.find(item=>item.id===config.support?.legId):undefined;
+ if(config.support?.kind==='legs'&&!leg)throw Error('Для выбранных ножек пока не подключена 3D-модель.');
+ const baseHeight=leg?leg.heightMm/1000:config.base!.enabled?CABINET_BASE_HEIGHT_MM/1000:0;
  const frontMaterial=await surface(catalog.samples.find(sample=>sample.id===config.front));
  let offset=0;
  for(const module of config.modules){
@@ -129,6 +132,22 @@ export async function assembleCabinets(configuration:CabinetConfig,catalog:Cabin
   common.scale.set((totalWidth-.034)/dimensions[0],baseHeight/dimensions[1],1);
   common.position.x=totalWidth/2;
   root.add(common);
+ }
+ if(leg){
+  const template=await source(leg.id);
+  const positions=cabinetLegPositions(totalWidth*1000,450,leg.widthMm,leg.depthMm);
+  const material=new MeshPhysicalMaterial({color:config.support?.color||'#45464a',metalness:.85,roughness:.3});
+  for(const [x,y,z] of positions){
+   const foot=template.clone(true);
+   foot.position.set(totalWidth/2+x,y,z);
+   foot.traverse(object=>{
+    if(!(object instanceof Mesh))return;
+    object.material=material;
+    object.name='Ножка';
+    object.userData={cabinetModule:config.modules[0].id,cabinetPart:'legs',cabinetCommon:true};
+   });
+   root.add(foot);
+  }
  }
  root.position.x=-totalWidth/2;
  const centered=new Group();

@@ -89,11 +89,26 @@ test('the assembled cabinet has one glass top and one base across every module',
   const baseBox=new Box3().setFromObject(base);
   assert.ok(Math.abs(baseBox.max.y-baseBox.min.y-.035)<.00001);
   assert.ok(Math.abs(baseBox.max.x-baseBox.min.x-1.116)<.00001);
-  const without=await assembleCabinets({...config(['5041','6542']),base:{enabled:false,color:'#333333'}},catalog);
+  const without=await assembleCabinets({...config(['5041','6542']),support:{kind:'none'}},catalog);
   assert.ok(Math.abs(cabinetBounds(without).dimensions[1]-.394)<.00001);
   without.traverse(mesh=>assert.ok(!(mesh.userData.cabinetCommon&&mesh.userData.cabinetPart==='legs')));
  }finally{
   globalThis.fetch=originalFetch;globalThis.location=oldLocation;globalThis.ProgressEvent=oldProgress;
   TextureLoader.prototype.loadAsync=originalLoad;
  }
+});
+
+
+test('legs use four supports through 2 m and six above 2 m, and base color is fixed',async()=>{
+ const {cabinetLegPositions,CABINET_BASE_COLOR}=await import('./cabinet-layout.mjs');
+ for(const width of [500,1150,2000])assert.equal(cabinetLegPositions(width,450,30,30).length,4);
+ for(const width of [2001,2450,2600]){
+  const feet=cabinetLegPositions(width,450,30,30);
+  assert.equal(feet.length,6);
+  assert.equal(feet.filter(foot=>foot[0]===0).length,2);
+ }
+ const normalized=normalizeCabinetConfig({...config(['5041']),base:{enabled:true,color:'#ff0000'}});
+ assert.equal(normalized.base.color,CABINET_BASE_COLOR);
+ const onLegs=normalizeCabinetConfig({...normalized,support:{kind:'legs',legId:'fixture-foot'}});
+ assert.equal(onLegs.base.enabled,false);
 });

@@ -1,5 +1,6 @@
 export const MAX_CABINET_WIDTH_MM = 2600;
 export const CABINET_BASE_HEIGHT_MM = 35;
+export const CABINET_BASE_COLOR = '#45464a';
 export const CABINET_GLASS_THICKNESS_MM = 4;
 export const CABINET_DOOR_GAP_MM = 2;
 
@@ -14,12 +15,14 @@ export function cabinetWidthMm(configuration, catalog) {
 export function normalizeCabinetConfig(configuration) {
  const first = configuration.modules[0];
  if (!first) throw Error('Добавьте хотя бы один комод.');
+ const support=configuration.support||{kind:(configuration.base?.enabled??first.legs)?'base':'none'};
  return {
   ...configuration,
-  version: 2,
+  version: 3,
+  support,
   front: configuration.front || first.front,
   top: configuration.top || first.surfaces?.top || {sample:first.glass, finish:first.finish},
-  base: configuration.base || {enabled:first.legs, color:first.metal},
+  base: {enabled:support.kind==='base',color:CABINET_BASE_COLOR},
  };
 }
 
@@ -48,4 +51,14 @@ export function slabUV(point, moduleWidthM, offsetMm, cut) {
   (cut.yMm + point.y * 1000) / cut.slabHeightMm,
   1 - (cut.xMm + offsetMm + (point.x + moduleWidthM / 2) * 1000) / cut.slabWidthMm,
  ];
+}
+
+
+export function cabinetLegPositions(widthMm, depthMm, footWidthMm, footDepthMm) {
+ const inset=35;
+ const x=widthMm/2-inset-footWidthMm/2;
+ const z=depthMm/2-inset-footDepthMm/2;
+ if(x<=0||z<=0)throw Error('Ножки не помещаются под комодом.');
+ const columns=widthMm>2000?[-x,0,x]:[-x,x];
+ return columns.flatMap(position=>[-z,z].map(depth=>[position/1000,0,depth/1000]));
 }

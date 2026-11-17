@@ -5,7 +5,7 @@ import {loadAssetUrl, saveAsset, useScene, emitter} from '@pascal-app/core';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Box3, Color, Group, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3} from 'three';
-import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,normalizeCabinetConfig,cabinetWidthMm,type CabinetConfig,type CabinetCatalog,type GlassPart} from './modular-cabinets';
+import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,cabinetURL,normalizeCabinetConfig,cabinetWidthMm,type CabinetConfig,type CabinetCatalog,type GlassPart} from './modular-cabinets';
 import {MAX_CABINET_WIDTH_MM,slabCut} from './cabinet-layout.mjs';
 import {furnitureSurfaces,updateFurnitureSurfaces} from './furniture-surface-geometry.mjs';
 
@@ -52,7 +52,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  const [cabinetPart,setCabinetPart]=useState<'front'|'body'|'top'|'left'|'right'|'legs'>('front');
  const [allModules,setAllModules]=useState(false);
  const [assembling,setAssembling]=useState(cabinet);
- const [metal,setMetal]=useState('#333333');
+ const [moduleAction,setModuleAction]=useState<'add'|'replace'>('add');
  const [samples,setSamples]=useState<Sample[]>([]);
  const [model,setModel]=useState<Group|null>(null);
  const [parts,setParts]=useState<ReturnType<typeof furnitureSurfaces>>([]);
@@ -110,12 +110,6 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  }
  function changeModule(patch:Partial<CabinetConfig['modules'][number]>){
   if(patch.front){setCabinetConfiguration({...configuration,front:patch.front});return;}
-  if(patch.legs!==undefined||patch.metal){
-   setCabinetConfiguration({...configuration,base:{
-    enabled:patch.legs??configuration.base!.enabled,color:patch.metal||configuration.base!.color,
-   }});
-   return;
-  }
   setCabinetConfiguration({...configuration,modules:configuration.modules.map(module=>
    module.id===activeModule||allModules?{...module,...patch}:module)});
  }
@@ -243,24 +237,51 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  const glassSelected=['body','top','left','right'].includes(cabinetPart);
  const visibleSamples=cabinet?samples.filter(sample=>(sample as any).kind===(cabinetPart==='front'?'ceramic':'glass')):samples;
  const max=Math.max(...aspect);
- return <dialog ref={dialog} className="rd-furniture-surface-editor" aria-label="Редактор текстур мебели" onCancel={event=>{event.preventDefault();if(!pending)onClose();}}>
+ return <dialog ref={dialog} className={'rd-furniture-surface-editor'+(cabinet?' rd-cabinet-editor':'')} aria-label="Редактор текстур мебели" onCancel={event=>{event.preventDefault();if(!pending)onClose();}}>
   <header><button type="button" disabled={pending} onClick={onClose}>Назад к плану</button><h2>{node?.name||'TETRA'}</h2><button type="button" disabled={!model||pending||assembling} onClick={()=>void confirm()}>ОК</button></header>
+  <div className={cabinet?'rd-cabinet-workspace':'rd-furniture-texture-workspace'}>
+  <aside className={cabinet?'rd-cabinet-sidebar':undefined}>
   {cabinet&&<div className="rd-cabinet-controls">
+   <div className="rd-cabinet-summary"><strong>Композиция</strong><span>{Math.round(aspect[0]*1000)} × {Math.round(aspect[1]*1000)} × {Math.round(aspect[2]*1000)} мм</span><small>Максимальная ширина 260 см</small></div>
    <div className="rd-cabinet-modules">
-    {configuration.modules.map((module,index)=><button type="button" key={module.id} aria-pressed={module.id===activeModule} onClick={()=>{setActiveModule(module.id);setAllModules(false);}}>Модуль {index+1} · {module.model}</button>)}
-    <label>Добавить рядом <select aria-label="Добавить модуль комода" value="" disabled={pending} onChange={event=>{if(!event.target.value)return;addModule(event.target.value);}}>
-     <option value="">Выберите комод</option>{cabinetData?.models.filter(item=>!item.id.startsWith('base')).map(item=><option key={item.id} value={item.id} disabled={cabinetWidthMm(configuration,cabinetData!)+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,cabinetData?.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM)}>{item.id} · {item.widthMm} × {item.heightMm} × {item.depthMm} мм</option>)}
-    </select></label>
-    {configuration.modules.length>1&&<button type="button" onClick={()=>{const next=configuration.modules.filter(module=>module.id!==activeModule);setCabinetConfiguration({...configuration,modules:next});setActiveModule(next[0].id);}}>Убрать модуль</button>}
+    {configuration.modules.map((module,index)=>{
+     const dimensions=cabinetData?.models.find(item=>item.id===module.model);
+     return <button type="button" key={module.id} aria-pressed={module.id===activeModule} onClick={()=>{setActiveModule(module.id);setAllModules(false);}}>
+      <img src={cabinetURL(module.model+'-preview.svg')} alt=""/>
+      <b>Модуль {index+1}</b><span>{dimensions?dimensions.widthMm/10+' см':''}</span>
+     </button>;
+    })}
+   </div>
+   {configuration.modules.length>1&&<button type="button" className="rd-cabinet-remove" onClick={()=>{const next=configuration.modules.filter(module=>module.id!==activeModule);setCabinetConfiguration({...configuration,modules:next});setActiveModule(next[0].id);}}>Убрать выбранный модуль</button>}
+   <div className="rd-cabinet-catalog-actions">
+    <button type="button" aria-pressed={moduleAction==='add'} onClick={()=>setModuleAction('add')}>Добавить модуль</button>
+    <button type="button" aria-pressed={moduleAction==='replace'} onClick={()=>setModuleAction('replace')}>Заменить выбранный</button>
+   </div>
+   <div className="rd-cabinet-model-cards">
+    {cabinetData?.models.filter(item=>!item.id.startsWith('base')).map(item=>{
+     const tooWide=moduleAction==='add'&&cabinetWidthMm(configuration,cabinetData)+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,cabinetData.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM);
+     return <button type="button" key={item.id} disabled={pending||tooWide} aria-label={(moduleAction==='add'?'Добавить':'Заменить на')+' модуль '+item.id} title={tooWide?'Достигнута максимальная ширина композиции':undefined} onClick={()=>moduleAction==='add'?addModule(item.id):changeModule({model:item.id})}>
+      <img src={cabinetURL(item.id+'-preview.svg')} alt={'Комод '+item.widthMm/10+' × '+item.heightMm/10+' × '+item.depthMm/10+' см'}/>
+      <span>Модуль {item.widthMm/10} см</span><small>{item.id}</small>
+     </button>;
+    })}
    </div>
    <div className="rd-cabinet-settings">
-    <label>Модель <select aria-label="Модель выбранного комода" value={activeCabinet?.model} onChange={event=>changeModule({model:event.target.value})}>
-     {cabinetData?.models.filter(item=>!item.id.startsWith('base')).map(item=><option key={item.id} value={item.id}>{item.id} · {item.widthMm} мм</option>)}
-    </select></label>
-    {([['front','Фасад · керамогранит'],['body','Корпус · стекло'],['legs','Общая база']] as const).map(([part,label])=><button type="button" key={part} aria-pressed={part==='body'?glassSelected:cabinetPart===part} onClick={()=>setCabinetPart(part)}>{label}</button>)}
+    {([['front','Фасад · керамогранит'],['body','Корпус · стекло'],['legs','Опора']] as const).map(([part,label])=><button type="button" key={part} aria-pressed={part==='body'?glassSelected:cabinetPart===part} onClick={()=>setCabinetPart(part)}>{label}</button>)}
     {glassSelected&&<><select aria-label="Часть стеклянного корпуса" value={cabinetPart} onChange={event=>setCabinetPart(event.target.value as GlassPart)}><option value="body">Весь корпус</option><option value="top">Общая столешница</option><option value="left">Левая боковина</option><option value="right">Правая боковина</option></select><button type="button" aria-pressed={selectedGlass.finish==='gloss'} onClick={()=>changeGlass({finish:'gloss'})}>Глянцевое</button><button type="button" aria-pressed={selectedGlass.finish==='matte'} onClick={()=>changeGlass({finish:'matte'})}>Матовое</button></>}
-    {cabinetPart==='legs'&&<><label><input type="checkbox" checked={!!configuration.base?.enabled} onChange={event=>changeModule({legs:event.target.checked})}/> База 35 мм</label><label>Цвет базы <input type="color" aria-label="Цвет базы" value={configuration.base?.color||metal} onChange={event=>{setMetal(event.target.value);changeModule({metal:event.target.value});}}/></label>{['#242424','#f0efeb','#9b7b46','#b8b9b9','#6d4149'].map(color=><button type="button" key={color} aria-label={'Металл '+color} style={{background:color,width:28,height:28,padding:0}} onClick={()=>changeModule({metal:color})}/>)}</>}
-    <span>{Math.round(aspect[0]*1000)} × {Math.round(aspect[1]*1000)} × {Math.round(aspect[2]*1000)} мм</span>
+    {cabinetPart==='legs'&&<div className="rd-cabinet-support">
+     <button type="button" className="rd-cabinet-support-card" aria-pressed={configuration.support?.kind==='base'} onClick={()=>setCabinetConfiguration({...configuration,support:{kind:'base'}})}>
+      <img src={cabinetURL('base01-preview.svg')} alt="Общая база высотой 35 мм"/><b>База · 35 мм</b><span><i style={{background:'#45464a'}}/>Тёмно-серая</span>
+     </button>
+     {cabinetData?.legs?.length?cabinetData.legs.map(leg=><button type="button" key={leg.id} className="rd-cabinet-support-card" aria-pressed={configuration.support?.kind==='legs'&&configuration.support?.legId===leg.id} onClick={()=>setCabinetConfiguration({...configuration,support:{kind:'legs',legId:leg.id,color:configuration.support?.color||'#45464a'}})}>
+      <img src={cabinetURL(leg.id+'-preview.svg')} alt={leg.label}/><b>{leg.label}</b><span>Высота {leg.heightMm} мм</span>
+     </button>):<button type="button" className="rd-cabinet-support-card" disabled title="В исходной папке пока нет отдельных 3D-моделей ножек">
+      <svg viewBox="0 0 160 90" aria-hidden="true"><path d="M25 20h110M32 20v52m96-52v52M38 18l18-8h79l-7 10M54 10v48m81-48v48" fill="none" stroke="currentColor" strokeWidth="4"/></svg><b>Ножки</b><span>Ожидаем модель</span>
+     </button>}
+     <small>{aspect[0]>2?'Для этой ширины нужно 6 ножек':'Для этой ширины нужно 4 ножки'}</small>
+     {configuration.support?.kind==='legs'&&<label>Цвет металла <input type="color" aria-label="Цвет металла ножек" value={configuration.support.color||'#45464a'} onChange={event=>setCabinetConfiguration({...configuration,support:{...configuration.support!,color:event.target.value}})}/></label>}
+    </div>}
+
    </div>
   </div>}
   <div className="rd-furniture-texture-samples"  role="group" aria-label="Текстуры из архива">
@@ -271,6 +292,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
    {error?<span role="alert">{error}</span>:<span role="status">{pending?'Применяем текстуры…':cabinet?(assembling?'Обновляем комоды…':allModules?'Отделка применяется ко всем модулям.':'Выберите часть комода или нажмите на неё в 3D.'):!model?'Загружаем модель и образцы…':wholeModel?'Выбрана вся модель. Нажмите на образец.':selected?'Поверхность выбрана. Нажмите на образец.':'Кликните по поверхности. Перетаскивайте модель, чтобы посмотреть с другой стороны.'}</span>}
    {!cabinet&&selection.some(surface=>draft[surface])&&<button type="button" disabled={pending} onClick={resetSelection}>{wholeModel?'Сбросить отделку модели':'Сбросить поверхность'}</button>}
   </div>
+  </aside>
   <div className="rd-furniture-texture-viewport">
    {model&&<Canvas camera={{position:[1.65,1.18,1.9],fov:33}} dpr={[1,1.5]} onPointerMissed={()=>setSelected(null)}>
     <color attach="background" args={['white']}/><ambientLight intensity={1.9}/><directionalLight position={[3,4,2]} intensity={2}/>
@@ -278,6 +300,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
     <group scale={(cabinet?[1/max,1/max,1/max]:aspect.map((axis:number)=>axis/max)) as [number,number,number]} onClick={pick}><primitive object={model}/></group>
     <OrbitControls makeDefault target={[0,aspect[1]/max/2,0]} minDistance={.65} maxDistance={5}/>
    </Canvas>}
+  </div>
   </div>
  </dialog>;
 }
