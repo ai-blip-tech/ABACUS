@@ -16,3 +16,23 @@ test('availability flag does not fabricate a download URL',()=>{const p={paramet
 test('model binding must belong to the selected catalog product',()=>{const f=fixture().furniture[0];assert.doesNotThrow(()=>validateFurniture([f]));assert.throws(()=>validateFurniture([{...f,model3D:{productId:'other'}}]),/привязка/);});
 test('floor tiles and parquet roundtrip through slab metadata with exact physical format',()=>{const d=fixture();d.floorRegions=[{id:'floor_one',polygon:[[300,300],[4300,300],[4300,3300],[300,3300]],layout:null,wood:'oak',material:'tile',tile:{id:'34339',name:'MYTOS',image:'/experimental-tiles/NCR03366.jpg',widthMm:1200,heightMm:2800,jointMm:3,grout:'#333333'},origin:[123,456],angle:90}];const base=convert(d);assert.deepEqual(base.nodes.slab_roomdesign.metadata.roomDesignFloorRegions,d.floorRegions);assert.ok(base.nodes.slab_roomdesign.metadata.roomDesignFloorGeometry[0].squareMetres>0);const scene=structuredClone(base);scene.nodes.slab_roomdesign.metadata.roomDesignFloorRegions[0].tile.jointMm=10;const next=planningFromPlanner(d,scene,base);assert.equal(next.floorRegions[0].tile.jointMm,10);assert.equal(next.floorRegions[0].tile.widthMm,1200);assert.equal(d.floorRegions[0].tile.jointMm,3);scene.nodes.slab_roomdesign.metadata.roomDesignFloorRegions=[];assert.deepEqual(planningFromPlanner(d,scene,base).floorRegions,[]);});
 test('automatic vs manual floor layout mode survives the 3D exchange boundary',()=>{const d=fixture();d.floorRegions=[{id:'floor_auto',polygon:[[300,300],[4300,300],[4300,3300],[300,3300]],layout:null,wood:'oak',material:'tile',tileLayoutMode:'manual',tile:{id:'33752',name:'Corten',image:'/api/catalog/floor-texture?id=33752',widthMm:1200,heightMm:600,jointMm:2,grout:'#cccccc'},origin:[500,700],angle:90}];const scene=convert(d),next=planningFromPlanner(d,scene,structuredClone(scene));assert.equal(next.floorRegions[0].tileLayoutMode,'manual');assert.deepEqual(next.floorRegions[0].origin,[500,700]);});
+
+const cabinetConfiguration=()=>({version:3,modules:[{id:'module_one',model:'5041',front:'ceramic-0',glass:'WHT',finish:'gloss',legs:true,metal:'#333333'}],front:'ceramic-0',frontType:'ceramic',base:{enabled:true,color:'#45464a'},support:{kind:'base'}});
+test('a configured cabinet created in 3D persists its composition through the project and back to 3D',()=>{
+ const doc=fixture(),base=convert(doc),scene=structuredClone(base),config=cabinetConfiguration();
+ const item={...newFurniture('tv_stand',[2500,2000]),id:'custom_cabinet',name:'Индивидуальная ТВ-тумба',width:500,depth:450,height:429,catalog:{id:'roomdesign:modular-cabinet',name:'Индивидуальная ТВ-тумба',url:'',source:'room-design'},modularCabinet:config};
+ scene.nodes.item_custom={...structuredClone(scene.nodes.item_chair),id:'item_custom',name:item.name,position:[2.5,0,2],scale:[.5,.429,.45],asset:{...scene.nodes.item_chair.asset,dimensions:[1,1,1],category:'tv_stand'},metadata:{kind:'tv_stand',roomDesignId:item.id,roomDesignFurniture:item,modularCabinet:config}};
+ const saved=planningFromPlanner(doc,scene,base),cabinet=saved.furniture.find(f=>f.catalog?.id==='roomdesign:modular-cabinet');
+ assert.deepEqual(cabinet.modularCabinet,config);assert.equal(cabinet.width,500);assert.equal(cabinet.depth,450);assert.doesNotThrow(()=>validateFurniture(saved.furniture));
+ const reloaded=convert(JSON.parse(JSON.stringify(saved)));
+ assert.deepEqual(reloaded.nodes['item_'+cabinet.id].metadata.roomDesignFurniture.modularCabinet,config);
+ const changed=structuredClone(reloaded);changed.nodes['item_'+cabinet.id].metadata.modularCabinet={...config,frontType:'glass'};
+ const edited=planningFromPlanner(saved,changed,reloaded);
+ assert.equal(edited.furniture.find(f=>f.id===cabinet.id).modularCabinet.frontType,'glass');
+});
+test('invalid cabinet compositions cannot be saved as project furniture',()=>{
+ const item={...fixture().furniture[0],model3D:undefined,catalog:{id:'roomdesign:modular-cabinet',name:'Комод',url:'',source:'room-design'},modularCabinet:cabinetConfiguration()};
+ assert.doesNotThrow(()=>validateFurniture([item]));
+ assert.throws(()=>validateFurniture([{...item,modularCabinet:{...item.modularCabinet,modules:[]}}]),/комода/);
+ assert.throws(()=>validateFurniture([{...item,modularCabinet:{...item.modularCabinet,modules:Array.from({length:5},(_,i)=>({...item.modularCabinet.modules[0],id:String(i),model:'6541'}))}}]),/260/);
+});

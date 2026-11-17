@@ -1,7 +1,7 @@
 import React, {useEffect,useMemo,useRef,useState} from 'react';
 import {Canvas, type ThreeEvent} from '@react-three/fiber';
 import {Environment,Lightformer,OrbitControls} from '@react-three/drei';
-import {loadAssetUrl, saveAsset, useScene, emitter} from '@pascal-app/core';
+import {loadAssetUrl, saveAsset, useScene, emitter, nodeRegistry} from '@pascal-app/core';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Box3, Color, Group, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3} from 'three';
@@ -19,7 +19,8 @@ const catalogId = (node:any) => node?.metadata?.catalogProductId || node?.metada
 export function FurnitureSurfaceMenu({requestCatalog,onOpenChange}:{requestCatalog:CatalogRequest;onOpenChange:(active:boolean)=>void}) {
  const [menu,setMenu]=useState<{id:string;x:number;y:number}|null>(null);
  const [target,setTarget]=useState<string|null>(null);
- useEffect(()=>{onOpenChange(!!target);return()=>onOpenChange(false);},[target,onOpenChange]);
+ const [createKind,setCreateKind]=useState<"dresser"|"tv_stand"|null>(null);
+ useEffect(()=>{onOpenChange(!!target||!!createKind);return()=>onOpenChange(false);},[target,createKind,onOpenChange]);
  useEffect(()=>{
   let point={x:20,y:60};
   const remember=(event:MouseEvent)=>{point={x:event.clientX,y:event.clientY};};
@@ -28,24 +29,27 @@ export function FurnitureSurfaceMenu({requestCatalog,onOpenChange}:{requestCatal
   const scene=(event:any)=>{if(![TETRA_PRODUCT,CABINET_PRODUCT].includes(catalogId(event.node)))return;event.stopPropagation?.();open(event.node.id);};
   const close=(event:PointerEvent)=>{if(event.button===0&&event.target instanceof HTMLCanvasElement)setMenu(null);};
   const configure=(event:Event)=>setTarget((event as CustomEvent).detail.id);
+  const create=(event:Event)=>{const kind=(event as CustomEvent).detail.kind;if(kind==='dresser'||kind==='tv_stand'){setTarget(null);setMenu(null);setCreateKind(kind);}};
+  window.addEventListener('roomdesign:configure-cabinet-create',create);
   window.addEventListener('roomdesign:configure-cabinet',configure);
   window.addEventListener('contextmenu',remember,true);
   window.addEventListener('roomdesign:item-interaction',native);
   window.addEventListener('pointerdown',close,true);
   emitter.on('node:context-menu',scene);
-  return()=>{window.removeEventListener('roomdesign:configure-cabinet',configure);window.removeEventListener('contextmenu',remember,true);window.removeEventListener('roomdesign:item-interaction',native);window.removeEventListener('pointerdown',close,true);emitter.off('node:context-menu',scene);};
+  return()=>{window.removeEventListener('roomdesign:configure-cabinet-create',create);window.removeEventListener('roomdesign:configure-cabinet',configure);window.removeEventListener('contextmenu',remember,true);window.removeEventListener('roomdesign:item-interaction',native);window.removeEventListener('pointerdown',close,true);emitter.off('node:context-menu',scene);};
  },[]);
  return <>
   {menu&&<div className="rd-furniture-surface-menu" style={{left:Math.min(menu.x,innerWidth-184),top:Math.min(menu.y,innerHeight-56)}}>
    <button type="button" onClick={()=>{setTarget(menu.id);setMenu(null);}}>Добавить текстуру</button>
   </div>}
+  {createKind&&<FurnitureSurfaceEditor id="new-cabinet" createKind={createKind} requestCatalog={requestCatalog} onClose={()=>setCreateKind(null)}/>}
   {target&&<FurnitureSurfaceEditor key={target} id={target} requestCatalog={requestCatalog} onClose={()=>setTarget(null)}/>}
  </>;
 }
 
-function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCatalog:CatalogRequest;onClose:()=>void}) {
+function FurnitureSurfaceEditor({id,createKind,requestCatalog,onClose}:{id:string;createKind?:"dresser"|"tv_stand";requestCatalog:CatalogRequest;onClose:()=>void}) {
  const dialog=useRef<HTMLDialogElement>(null);
- const node=useScene.getState().nodes[id as any] as any;
+ const node=(createKind?{name:createKind==='tv_stand'?'Индивидуальная ТВ-тумба':'Индивидуальный комод',metadata:{catalogProductId:CABINET_PRODUCT}}:useScene.getState().nodes[id as any]) as any;
  const cabinet=catalogId(node)===CABINET_PRODUCT;
  const [cabinetData,setCabinetData]=useState<CabinetCatalog|null>(null);
  const [configuration,setConfiguration]=useState<CabinetConfig>(()=>normalizeCabinetConfig(node?.metadata?.modularCabinet||{modules:[newCabinet()]}));
@@ -241,8 +245,24 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
    if(!(buffer instanceof ArrayBuffer))throw Error('Не удалось подготовить модель с текстурами');
    const assetRef=await saveAsset(new File([buffer],cabinet?'modular-cabinet.glb':'tetra-surface-textures.glb',{type:'model/gltf-binary'}));
    const src=await loadAssetUrl(assetRef);
-   const current=useScene.getState().nodes[id as any] as any;
-   if(!current||!src)throw Error('Не удалось применить текстуры к предмету');
+   const store=useScene.getState();
+   const current=store.nodes[id as any] as any;
+   if(!src)throw Error('Не удалось применить текстуры к предмету');
+   if(createKind&&dimensions){
+    const level=store.nodes['level_roomdesign' as any];
+    if(!level)throw Error('Сначала откройте проект планировочного решения.');
+    const polygon=(store.nodes['slab_roomdesign' as any] as any)?.polygon||[];
+    const position=polygon.length?polygon.reduce((sum:number[],p:number[])=>[sum[0]+p[0]/polygon.length,sum[1]+p[1]/polygon.length],[0,0]):[0,0];
+    const furnitureId=crypto.randomUUID(),nodeId='item_'+furnitureId;
+    const name=createKind==='tv_stand'?'Индивидуальная ТВ-тумба':'Индивидуальный комод';
+    const furniture={id:furnitureId,kind:createKind,name,position:position.map((n:number)=>n*1000),width:dimensions[0]*1000,height:dimensions[1]*1000,depth:dimensions[2]*1000,rotation:0,dimensionsSource:'user',catalogType:createKind,catalog:{id:CABINET_PRODUCT,name,url:'',source:'room-design'},modularCabinet:configuration};
+    const item={object:'node',type:'item',id:nodeId,parentId:level.id,name,visible:true,children:[],position:[position[0],0,position[1]],rotation:[0,0,0],scale:dimensions,asset:{id:nodeId,src,name,category:createKind,thumbnail:'',dimensions:[1,1,1]},metadata:{roomDesignId:furnitureId,kind:createKind,catalogProductId:CABINET_PRODUCT,roomDesignFurniture:furniture,modularCabinet:configuration,roomDesignModelAsset:assetRef,representation:'catalog-converted'}};
+    const schema=nodeRegistry.get('item')?.schema;
+    if(!schema)throw Error('Редактор мебели ещё загружается.');
+    store.createNode(schema.parse(item) as any,level.id);
+    onClose();return;
+   }
+   if(!current)throw Error('Не удалось применить текстуры к предмету');
    useScene.getState().updateNode(id as any,{
     asset:{...current.asset,src,...(cabinet?{dimensions:[1,1,1]}:{}),id:`catalog-surface-${id}-${crypto.randomUUID()}`},
     ...(dimensions?{scale:dimensions}:{}),

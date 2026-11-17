@@ -18,7 +18,7 @@ async function requestArchiveModel(id:string, options:{inspect?:boolean;textureI
 }
 
 /** The full partner catalog from Image Editor, in the native top layer (also in fullscreen). */
-export function PlanningFurnitureDialog({projectName,initialKind,initialItem,selectedIds,onClose,onAdd,replacing=false,prefer3D=false}:{projectName:string;initialKind:FurnitureKind;initialItem?:FurnitureItem;selectedIds:string[];onClose:()=>void;onAdd:(item:FurnitureItem)=>void;replacing?:boolean;prefer3D?:boolean}){
+export function PlanningFurnitureDialog({projectName,initialKind,initialItem,selectedIds,onClose,onAdd,replacing=false,prefer3D=false,onCustomCabinet}:{projectName:string;initialKind:FurnitureKind;initialItem?:FurnitureItem;selectedIds:string[];onClose:()=>void;onAdd:(item:FurnitureItem)=>void;replacing?:boolean;prefer3D?:boolean;onCustomCabinet?:(kind:"dresser"|"tv_stand")=>void}){
  const ref=useRef<HTMLDialogElement>(null),[error,setError]=useState('');
  const [choice,setChoice]=useState<{item:FurnitureItem;textures:ArchiveTexture[];selected:string}|null>(null);
  const [loading,setLoading]=useState('');
@@ -73,7 +73,7 @@ export function PlanningFurnitureDialog({projectName,initialKind,initialItem,sel
     </button>)}
    </div>
    <footer><button type="button" disabled={!!loading} onClick={()=>{setChoice(null);setError('');}}>Назад в каталог</button><button type="button" className="partition-primary" disabled={!choice.selected||!!loading} onClick={()=>void addTexturedItem()}>Добавить мебель</button></footer>
-  </section>:<div inert={!!loading}><FurnitureCatalogPage prefer3D={prefer3D} planning3D projectName={projectName} roomName="Планировочное решение" initialCategory={category} selectedIds={selectedIds} onClose={onClose} onSelect={(p,type)=>{
+  </section>:<div inert={!!loading}><FurnitureCatalogPage onCustomCabinet={onCustomCabinet} prefer3D={prefer3D} planning3D projectName={projectName} roomName="Планировочное решение" initialCategory={category} selectedIds={selectedIds} onClose={onClose} onSelect={(p,type)=>{
    if(matchesCatalogType(p,'porcelain',p.category)){setError('Керамогранит добавляется через слой «Пол» → «Плитка из каталога».');return;}
    void chooseItem(furnitureFromCatalog(p,replacing?initialKind:catalogProductKind(p,type)||initialKind,type));
   }}/></div>}

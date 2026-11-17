@@ -5,9 +5,8 @@ import {cabinetWidthMm,cabinetDimensionsMm,normalizeCabinetConfig,slabCut,slabUV
 export {normalizeCabinetConfig,cabinetWidthMm} from './cabinet-layout.mjs';
 
 export const CABINET_PRODUCT='roomdesign:modular-cabinet';
-export type GlassPart='body'|'top'|'left'|'right';
-export type CabinetModule={id:string;model:string;front:string;glass:string;finish:'gloss'|'matte';legs:boolean;metal:string;surfaces?:Partial<Record<GlassPart,{sample:string;finish:'gloss'|'matte'}>>};
-export type CabinetConfig={version?:number;modules:CabinetModule[];front?:string;frontType?:'ceramic'|'glass';frontGlass?:{sample:string;finish:'gloss'|'matte'};top?:{sample:string;finish:'gloss'|'matte'};base?:{enabled:boolean;color:string};support?:{kind:'base'|'legs'|'none';legId?:string;color?:string}};
+export type {GlassPart,CabinetModule,CabinetConfig} from '../lib/planning-plan/modular-cabinet';
+import type {GlassPart,CabinetModule,CabinetConfig} from '../lib/planning-plan/modular-cabinet';
 export type CabinetSample={id:string;label:string;image:string;kind:'ceramic'|'glass'|'metal';color?:string;slabWidthMm?:number;slabHeightMm?:number};
 export type CabinetLeg={id:string;label:string;widthMm:number;heightMm:number;depthMm:number};
 export type CabinetCatalog={legs?:CabinetLeg[];supports?:{id:string;label:string;heightMm:number;kind:'base'|'feet'|'frame'|'wall';thumbnail:string}[];models:{id:string;widthMm:number;heightMm:number;depthMm:number;thumbnail?:string;available3D?:boolean;sourcePdfPage?:number;sourcePrintedPage?:number;fixedFront?:'transparent-glass'}[];samples:CabinetSample[]};

@@ -13,7 +13,7 @@ type Filters = { type:string; brands:string[]; query:string; subtype:string; col
 const initialFilters: Filters = {type:"sofa",brands:[],query:"",subtype:"",color:"",recliner:"",sleeper:"",ottoman:"",available:false,model3d:false,sort:"",priceMin:"",priceMax:"",widthMin:"",widthMax:"",page:1};
 const brandLogos:Record<string,string> = {"brand:fuga":"/catalog-brands/fuga.png","brand:leve home":"/catalog-brands/leve-home.png","brand:norr møbler":"/catalog-brands/norr-mobler.png","brand:norr carpets":"/catalog-brands/norr-carpets.png","brand:seyvaa paris":"/catalog-brands/seyvaa.svg","brand:mobliberica":"/catalog-brands/mobliberica.webp"};
 
-export default function FurnitureCatalogPage({projectName,roomName,selectedIds,onClose,onSelect,initialCategory="sofa",planning3D=false,prefer3D=false}:{projectName:string;roomName:string;selectedIds:string[];onClose:()=>void;onSelect:(product:CatalogProduct,category:string)=>void;initialCategory?:string;planning3D?:boolean;prefer3D?:boolean}) {
+export default function FurnitureCatalogPage({projectName,roomName,selectedIds,onClose,onSelect,initialCategory="sofa",planning3D=false,prefer3D=false,onCustomCabinet}:{projectName:string;roomName:string;selectedIds:string[];onClose:()=>void;onSelect:(product:CatalogProduct,category:string)=>void;initialCategory?:string;planning3D?:boolean;prefer3D?:boolean;onCustomCabinet?:(kind:"dresser"|"tv_stand")=>void}) {
   const [filters,setFilters]=useState<Filters>(()=>({...initialFilters,sort:prefer3D?"model3d_first":"",type:furnitureCatalogCategories.some(c=>c.type===initialCategory)?initialCategory:"sofa"}));
   const [searchInput,setSearchInput]=useState("");
   const [products,setProducts]=useState<CatalogProduct[]>([]);
@@ -73,13 +73,14 @@ export default function FurnitureCatalogPage({projectName,roomName,selectedIds,o
         <label className="room-catalog-available"><input type="checkbox" role="switch" checked={filters.available} onChange={event=>update({available:event.target.checked})}/><span className="room-catalog-switch-track" aria-hidden="true"/><span>В наличии</span></label>
         {planning3D&&<label className="room-catalog-available"><input type="checkbox" role="switch" checked={filters.model3d} onChange={e=>update({model3d:e.target.checked})}/><span className="room-catalog-switch-track" aria-hidden="true"/><span>Есть 3D-модель</span></label>}
         <details className="room-catalog-types"><summary>Тип товара <span>{selectedCategory?.name}{filters.subtype?` · ${filters.subtype}`:""}</span></summary>
-          <div className="room-catalog-category-list">{furnitureCatalogCategories.filter(item=>filters.brands.length!==1||categoryCounts[item.type]===undefined||categoryCounts[item.type]>0).map(item=>{
+          <div className="room-catalog-category-list">{furnitureCatalogCategories.filter(item=>!!onCustomCabinet&&["dresser","tv_stand"].includes(item.type)||filters.brands.length!==1||categoryCounts[item.type]===undefined||categoryCounts[item.type]>0).map(item=>{
             const expanded=expandedCategory===item.type;
             return <div className="room-catalog-category" key={item.type}>
               <button type="button" className={filters.type===item.type?"active":""} aria-expanded={expanded} aria-controls={`catalog-variants-${item.type}`} onClick={()=>{setExpandedCategory(expanded?null:item.type);if(filters.type!==item.type)update({type:item.type,subtype:""});}}>{item.name}<span aria-hidden="true">{expanded?"−":"+"}</span></button>
               {expanded&&<div className="room-catalog-variants" id={`catalog-variants-${item.type}`} role="group" aria-label={`Варианты: ${item.name}`}>
                 <button type="button" className={filters.type===item.type&&!filters.subtype?"active":""} aria-pressed={filters.type===item.type&&!filters.subtype} onClick={()=>update({type:item.type,subtype:""})}>Все варианты</button>
                 {(categorySubtypes[item.type]||[]).map(value=><button type="button" key={value} className={filters.type===item.type&&filters.subtype===value?"active":""} aria-pressed={filters.type===item.type&&filters.subtype===value} onClick={()=>update({type:item.type,subtype:value})}>{value}</button>)}
+                {onCustomCabinet&&(item.type==="tv_stand"||item.type==="dresser")&&<button type="button" onClick={()=>onCustomCabinet(item.type as "dresser"|"tv_stand")}>{item.type==="tv_stand"?"Индивидуальная":"Индивидуальный вариант"}</button>}
               </div>}
             </div>;
           })}</div>
