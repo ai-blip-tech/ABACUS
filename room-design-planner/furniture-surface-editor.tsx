@@ -262,7 +262,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
      const tooWide=moduleAction==='add'&&cabinetWidthMm(configuration,cabinetData)+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,cabinetData.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM);
      return <button type="button" key={item.id} disabled={pending||tooWide} aria-label={(moduleAction==='add'?'Добавить':'Заменить на')+' модуль '+item.id} title={tooWide?'Достигнута максимальная ширина композиции':undefined} onClick={()=>moduleAction==='add'?addModule(item.id):changeModule({model:item.id})}>
       <img src={cabinetURL(item.id+'-preview.svg')} alt={'Комод '+item.widthMm/10+' × '+item.heightMm/10+' × '+item.depthMm/10+' см'}/>
-      <span>Модуль {item.widthMm/10} см</span><small>{item.id}</small>
+      <span>Модуль {item.widthMm/10} см</span><span className="rd-cabinet-card-dimensions">{item.widthMm/10} × {item.heightMm/10} × {item.depthMm/10} см</span><small>{item.id}</small>
      </button>;
     })}
    </div>
