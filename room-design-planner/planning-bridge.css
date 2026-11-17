@@ -125,3 +125,9 @@ html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}.linked-room-pla
 .rd-cabinet-transparent-badge { font-size:10px; color:#4b777c; }
 .rd-cabinet-support-card:disabled { opacity:1; }
 .rd-cabinet-support-card small { color:#88786e; font-size:10px; }
+.rd-cabinet-workspace>.rd-furniture-texture-viewport { position:relative; overflow:hidden; }
+.rd-cabinet-view-tools { position:absolute; z-index:40; top:16px; left:16px; display:flex; align-items:center; gap:12px; pointer-events:none; }
+.rd-cabinet-view-tools strong { font:600 17px Arial,sans-serif; color:#352b27; }
+.rd-cabinet-editor .rd-cabinet-ruler { width:44px; height:44px; padding:0; border:1px solid #ddd4ca; border-radius:50%; display:grid; place-items:center; pointer-events:auto; background:#fff; color:#352b27; cursor:pointer; box-shadow:0 2px 8px #352b270a; }
+.rd-cabinet-editor .rd-cabinet-ruler:hover,.rd-cabinet-editor .rd-cabinet-ruler[aria-pressed=true] { background:#98172f; border-color:#98172f; color:#fff; }
+.rd-cabinet-dimension-label { display:block; padding:4px 8px; border-radius:8px; background:#fffffff0; color:#24211f; white-space:nowrap; font:500 13px Arial,sans-serif; box-shadow:0 1px 5px #352b2710; }

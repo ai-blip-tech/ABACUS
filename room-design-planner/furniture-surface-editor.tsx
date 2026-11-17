@@ -7,6 +7,7 @@ import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Box3, Color, Group, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3} from 'three';
 import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,cabinetURL,normalizeCabinetConfig,cabinetWidthMm,type CabinetConfig,type CabinetCatalog,type GlassPart} from './modular-cabinets';
 import {MAX_CABINET_WIDTH_MM,slabCut} from './cabinet-layout.mjs';
+import {CabinetDimensions} from './cabinet-dimensions';
 import {furnitureSurfaces,updateFurnitureSurfaces} from './furniture-surface-geometry.mjs';
 
 export const TETRA_PRODUCT = 'leve-home:334625_819';
@@ -53,6 +54,8 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  const [allModules,setAllModules]=useState(false);
  const [assembling,setAssembling]=useState(cabinet);
  const [catalogHeight,setCatalogHeight]=useState(390),[catalogWidth,setCatalogWidth]=useState('all'),[catalogDepth,setCatalogDepth]=useState(450);
+ const [showDimensions,setShowDimensions]=useState(false);
+ const dimensionControls=useRef<any>(null);
  const [moduleAction,setModuleAction]=useState<'add'|'replace'>('add');
  const [samples,setSamples]=useState<Sample[]>([]);
  const [model,setModel]=useState<Group|null>(null);
@@ -264,12 +267,27 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  const widths=[...new Set(catalogueModels.filter(item=>item.heightMm===catalogHeight&&item.depthMm===catalogDepth).map(item=>item.widthMm))].sort((a,b)=>a-b);
  const shownModels=catalogueModels.filter(item=>item.heightMm===catalogHeight&&item.depthMm===catalogDepth&&(catalogWidth==='all'||item.widthMm===Number(catalogWidth))).sort((a,b)=>Number(a.available3D===false)-Number(b.available3D===false)||a.widthMm-b.widthMm||a.id.localeCompare(b.id,undefined,{numeric:true}));
  const max=Math.max(...aspect);
+ function toggleDimensions(){
+  if(!showDimensions&&dimensionControls.current){
+   const controls=dimensionControls.current,camera=controls.object;
+   const centre=new Vector3(0,aspect[1]/max/2,0);
+   const direction=camera.position.clone().sub(controls.target).normalize();
+   const vertical=camera.fov*Math.PI/180;
+   const horizontal=2*Math.atan(Math.tan(vertical/2)*camera.aspect);
+   const radius=Math.hypot(...aspect.map((value:number)=>value/max))/2+.25;
+   const distance=radius/Math.sin(Math.min(vertical,horizontal)/2);
+   camera.position.copy(centre).add(direction.multiplyScalar(distance));
+   controls.target.copy(centre);
+   controls.update();
+  }
+  setShowDimensions(value=>!value);
+ }
  return <dialog ref={dialog} className={'rd-furniture-surface-editor'+(cabinet?' rd-cabinet-editor':'')} aria-label="Редактор текстур мебели" onCancel={event=>{event.preventDefault();if(!pending)onClose();}}>
   <header><button type="button" disabled={pending} onClick={onClose}>Назад к плану</button><h2>{node?.name||'TETRA'}</h2><button type="button" disabled={!model||pending||assembling} onClick={()=>void confirm()}>ОК</button></header>
   <div className={cabinet?'rd-cabinet-workspace':'rd-furniture-texture-workspace'}>
   <aside className={cabinet?'rd-cabinet-sidebar':undefined}>
   {cabinet&&<div className="rd-cabinet-controls">
-   <div className="rd-cabinet-summary"><strong>Композиция</strong><span>{Math.round(aspect[0]*1000)} × {Math.round(aspect[1]*1000)} × {Math.round(aspect[2]*1000)} мм</span><small>Максимальная ширина 260 см</small></div>
+   <div className="rd-cabinet-summary"><small>Максимальная ширина 260 см</small></div>
    <div className="rd-cabinet-modules">
     {configuration.modules.map((module,index)=>{
      const dimensions=cabinetData?.models.find(item=>item.id===module.model);
@@ -339,11 +357,17 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
   </div>
   </aside>
   <div className="rd-furniture-texture-viewport">
+   {cabinet&&<div className="rd-cabinet-view-tools">
+    <button type="button" className="rd-cabinet-ruler" aria-label={showDimensions?'Скрыть размеры комода':'Показать размеры комода'} title={showDimensions?'Скрыть размеры':'Показать размеры'} aria-pressed={showDimensions} disabled={!model} onClick={toggleDimensions}>
+     <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 16 13-13 5 5L8 21zM7 12l2 2m2-6 2 2m2-6 2 2"/></svg>
+    </button>
+    <strong>Композиция</strong>
+   </div>}
    {model&&<Canvas camera={{position:[1.65,1.18,1.9],fov:33}} dpr={[1,1.5]} onPointerMissed={()=>setSelected(null)}>
     <color attach="background" args={['white']}/><ambientLight intensity={1.9}/><directionalLight position={[3,4,2]} intensity={2}/>
     {cabinet&&<Environment resolution={128}><Lightformer intensity={2} position={[0,3,1]} rotation={[Math.PI/2,0,0]} scale={[4,3,1]}/><Lightformer intensity={1.2} position={[-3,1,2]} rotation={[0,Math.PI/2,0]} scale={[2,3,1]}/></Environment>}
-    <group scale={(cabinet?[1/max,1/max,1/max]:aspect.map((axis:number)=>axis/max)) as [number,number,number]} onClick={pick}><primitive object={model}/></group>
-    <OrbitControls makeDefault target={[0,aspect[1]/max/2,0]} minDistance={.65} maxDistance={5}/>
+    <group scale={(cabinet?[1/max,1/max,1/max]:aspect.map((axis:number)=>axis/max)) as [number,number,number]} onClick={pick}><primitive object={model}/>{cabinet&&showDimensions&&<CabinetDimensions dimensions={aspect as [number,number,number]}/>}</group>
+    <OrbitControls ref={dimensionControls} makeDefault target={[0,aspect[1]/max/2,0]} minDistance={.65} maxDistance={5}/>
    </Canvas>}
   </div>
   </div>
