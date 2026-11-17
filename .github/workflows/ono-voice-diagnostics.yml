@@ -1,10 +1,10 @@
-name: Diagnose Ono production voice
+name: Diagnose materials render delivery
 
 on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type DIAGNOSE_ONO_VOICE"
+        description: "Type DIAGNOSE_MATERIALS_TRAY"
         required: true
         type: string
 
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   diagnose:
-    name: Read-only voice diagnostics
+    name: Read-only materials tray diagnostics
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: production-backup
@@ -26,9 +26,9 @@ jobs:
         shell: bash
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
-        run: test "$CONFIRMATION" = "DIAGNOSE_ONO_VOICE"
+        run: test "$CONFIRMATION" = "DIAGNOSE_MATERIALS_TRAY"
 
-      - name: Inspect voice provider failures without changing production
+      - name: Inspect aggregate render delivery health
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -44,17 +44,18 @@ jobs:
 
             echo "PRODUCTION_SHA=$(git rev-parse HEAD)"
             echo "SITE_HEALTH=$(curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null && echo ok)"
-            if grep -q '^OPENAI_TRANSCRIBE_MODEL=' .env; then
-              sed -n 's/^OPENAI_TRANSCRIBE_MODEL=/TRANSCRIBE_MODEL=/p' .env
-            else
-              echo "TRANSCRIBE_MODEL=gpt-4o-mini-transcribe (application default)"
-            fi
-            grep -q '^OPENAI_API_KEY=.' .env && echo "OPENAI_API_KEY_PRESENT=yes" || echo "OPENAI_API_KEY_PRESENT=no"
-
-            echo "VOICE_FAILURE_LOGS_BEGIN"
-            pm2 logs roomdesign --nostream --lines 1000 2>&1 \
-              | grep -E '\[It\] Audio transcription failed|status:|code:|type:|param:|message:' \
-              | tail -n 80 \
-              | sed -E 's/(sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]*/\1[REDACTED]/g' || true
-            echo "VOICE_FAILURE_LOGS_END"
-            echo "PRODUCTION_MODIFIED=no"
+            python3 - <<'PY_DIAG'
+            import sqlite3,json
+            from pathlib import Path
+            db=sqlite3.connect('file:data/room-design.sqlite?mode=ro',uri=True)
+            db.row_factory=sqlite3.Row
+            rows=db.execute("SELECT id,project_id,user_id,tenant_id,status,render_asset FROM project_visualizations ORDER BY created_at DESC LIMIT 3").fetchall()
+            reports=[]
+            for row in rows:
+                board=db.execute('SELECT document_json FROM material_boards WHERE project_id=? AND user_id=? AND tenant_id=?',(row['project_id'],row['user_id'],row['tenant_id'])).fetchone()
+                doc=json.loads(board['document_json']) if board else None
+                sheets=(doc.get('sheets') or [{'board':doc}]) if doc else []
+                reports.append({'status':row['status'],'renderFilePresent':bool(row['render_asset'] and next(Path('data/storage').glob('**/'+row['render_asset']),None)),'materialsBoardExists':bool(board),'renderReferencePresent':any(n['id']=='planner-render-'+row['id'] for s in sheets for n in s['board']['nodes'])})
+            print('DELIVERY_HEALTH='+json.dumps(reports))
+            PY_DIAG
+            echo 'PRODUCTION_MODIFIED=no'
