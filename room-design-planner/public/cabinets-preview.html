@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru"><meta charset="utf-8"/><title>Room Design Planner · комоды</title><style>html,body{margin:0;height:100%;font:14px Arial;background:#faf8f5}iframe{width:100%;height:100%;border:0}#status{position:fixed;top:16px;left:18px;z-index:2;color:#74695e}</style>
+<div id="status">Открываем тестовый проект с комодами…</div><iframe title="Room Design Planner"></iframe>
+<script>
+const frame=document.querySelector('iframe'),session='cabinet-preview',base=location.pathname.replace(/cabinets-preview.html$/,'');
+const storage='roomdesign:cabinets-preview-v1';
+const plan={name:'Комоды · тест материалов',height:2800,floor:[[0,0],[5000,0],[5000,4500],[0,4500]],zones:[],columns:[],walls:[],openings:[],furniture:[{id:'cabinet-demo',kind:'dresser',name:'Модульный комод',position:[2500,2200],width:500,depth:450,height:425,rotation:0,dimensionsSource:'catalog',catalog:{id:'roomdesign:modular-cabinet',image:''}}]};
+const send=data=>frame.contentWindow.postMessage({...data,session},location.origin);
+window.addEventListener('message',event=>{
+ if(event.source!==frame.contentWindow||event.origin!==location.origin||event.data?.session!==session)return;
+ const data=event.data;
+ if(data.type==='pascal:ready'){
+  let previousScene=null;try{previousScene=JSON.parse(localStorage.getItem(storage)||'null');}catch{}
+  send({type:'roomdesign:open',document:plan,previousScene,mode:'3d'});
+ }
+ if(data.type==='pascal:loaded')document.querySelector('#status').remove();
+ if(data.type==='pascal:changed')localStorage.setItem(storage,JSON.stringify(data.scene));
+ if(data.type==='pascal:error')document.querySelector('#status').textContent=data.error;
+});
+frame.src=base+'planning-bridge.html?cabinets=1&session='+session+'&parentOrigin='+encodeURIComponent(location.origin);
+</script></html>

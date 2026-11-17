@@ -1,3 +1,6 @@
+import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds} from './modular-cabinets';
+import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+import {Group} from 'three';
 import {registerTileProduct,tileProducts} from './tile-products.mjs';
 const catalogModelJobs=new Map<string,{resolve:(x:any)=>void;reject:(e:Error)=>void;timer:any}>();
 import {FurnitureSurfaceMenu} from './furniture-surface-editor.tsx';
@@ -69,11 +72,24 @@ function App(){const [viewMode,setViewMode]=useState<'3d'|'eye'>('3d'),[document
     }
    }
    // Keep 3D appearance, while every position and dimension comes from this 2D sheet.
-   for(const node of Object.values(result.scene.nodes) as any[]){if(node.type!=='item'||node.metadata?.column)continue;const old=Object.values(data.previousScene?.nodes||{}).find((n:any)=>n.type==='item'&&n.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;if(old?.asset&&old.metadata?.roomDesignModelAsset&&old.metadata?.roomDesignFurniture?.catalog?.id===node.metadata?.roomDesignFurniture?.catalog?.id&&old.metadata?.catalogTextureId===doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId)?.model3D?.textureId){try{const url=await loadAssetUrl(old.metadata.roomDesignModelAsset);if(url){node.asset={...old.asset,src:url};node.scale=node.scale.map((n:number,i:number)=>n/node.asset.dimensions[i]);node.metadata={...old.metadata,...node.metadata,roomDesignModelAsset:old.metadata.roomDesignModelAsset};if(old.metadata.representation==='catalog-converted')newModelFocus.current=node.id;}}catch{}}
+   for(const node of Object.values(result.scene.nodes) as any[]){if(node.type!=='item'||node.metadata?.column)continue;const old=Object.values(data.previousScene?.nodes||{}).find((n:any)=>n.type==='item'&&n.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;if(old?.asset&&old.metadata?.roomDesignModelAsset&&old.metadata?.roomDesignFurniture?.catalog?.id===node.metadata?.roomDesignFurniture?.catalog?.id&&old.metadata?.catalogTextureId===doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId)?.model3D?.textureId){try{const url=await loadAssetUrl(old.metadata.roomDesignModelAsset);if(url){node.asset={...old.asset,src:url};node.scale=old.metadata.modularCabinet?old.scale:node.scale.map((n:number,i:number)=>n/node.asset.dimensions[i]);node.metadata={...old.metadata,...node.metadata,roomDesignModelAsset:old.metadata.roomDesignModelAsset};if(old.metadata.representation==='catalog-converted')newModelFocus.current=node.id;}}catch{}}
    }
    for(const node of Object.values(result.scene.nodes) as any[]){
     if(node.type!=='item'||node.metadata?.column||node.metadata?.roomDesignModelAsset)continue;
     const f=doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId),binding=f?.model3D;
+    if(f?.catalog?.id===CABINET_PRODUCT){
+     const configuration={modules:[newCabinet(f.cabinetModel||'5041')]};
+     const assembled=await assembleCabinets(configuration,await cabinetCatalog());
+     const dimensions=cabinetBounds(assembled).dimensions;
+     const unit=new Group();unit.add(assembled);unit.scale.set(1/dimensions[0],1/dimensions[1],1/dimensions[2]);
+     const bytes=await new GLTFExporter().parseAsync(unit,{binary:true});
+     const assetRef=await saveAsset(new File([bytes as ArrayBuffer],'modular-cabinet.glb',{type:'model/gltf-binary'}));
+     node.asset={...node.asset,id:'modular-'+f.id,src:await loadAssetUrl(assetRef)};
+     node.scale=dimensions;
+     node.metadata={...node.metadata,roomDesignModelAsset:assetRef,representation:'catalog-converted',catalogProductId:CABINET_PRODUCT,modularCabinet:configuration};
+     newModelFocus.current=node.id;
+     continue;
+    }
     if(!binding)continue;
     if (!binding.url) {
       result.warnings.push(`${f.name}: ссылка на 3D-модель ещё недоступна; показано условное обозначение`);
@@ -99,6 +115,11 @@ function App(){const [viewMode,setViewMode]=useState<'3d'|'eye'>('3d'),[document
  const onLoad=useCallback(async()=>structuredClone(scene),[scene]);
  const onSave=useCallback(async(next:any)=>{if(!loaded.current)return;const text=JSON.stringify(next.nodes);if(text===lastChange.current)return;lastChange.current=text;send({type:'pascal:changed',scene:next,baseline:baseline.current});},[]);
  const ready=useCallback((show:boolean)=>{if(show||!scene)return;useEditor.getState().setViewLayout(sceneLayout('3d'));loaded.current=true;lastChange.current=JSON.stringify(useScene.getState().nodes);send({type:'pascal:loaded'});if(newModelFocus.current){const n:any=useScene.getState().nodes[newModelFocus.current];newModelFocus.current=null;if(n){const [x,y,z]=n.position,[w,h,d]=n.scale;emitter.emit('camera-controls:frame',{bounds:{min:[x-w/2,y,z-d/2],max:[x+w/2,y+h,z+d/2]},pose:{position:[x+1.8,y+1.3,z+1.8],target:[x,y+h/2,z]}});return;}}const walls=Object.values(scene.nodes).filter((n:any)=>n.type==='wall') as any[],points=walls.flatMap(w=>[w.start,w.end]);if(points.length){const xs=points.map(p=>p[0]),zs=points.map(p=>p[1]),x=(Math.min(...xs)+Math.max(...xs))/2,z=(Math.min(...zs)+Math.max(...zs))/2,r=Math.max(Math.max(...xs)-Math.min(...xs),Math.max(...zs)-Math.min(...zs),4);emitter.emit('camera-controls:frame',{bounds:{min:[Math.min(...xs),0,Math.min(...zs)],max:[Math.max(...xs),3,Math.max(...zs)]},pose:{position:[x+r,r*1.25,z+r],target:[x,.5,z]}});}},[scene]);
- return <div className={`linked-room-planner ${viewMode==='eye'?'is-walkthrough':''}`}>{warnings.length>0&&<details className="linked-room-planner-assumptions"><summary>Особенности 3D · {warnings.length}</summary>{warnings.map((w,i)=><p key={i}>{w}</p>)}<p>Исходные размеры в 2D сохраняются. Временное значение станет размером плана только при его изменении в 3D.</p></details>}{error&&<p role="alert">{error}</p>}{scene?<><FurnitureSurfaceMenu requestCatalog={requestCatalogModel} onOpenChange={textureEditorChanged}/><EditorShortcuts/><DragControls keyboard={viewMode==='3d'}/>{viewMode==='eye'&&<WalkHud/>}<WallRegionIndicator/><WallFinishPanel active={viewMode==='eye'}/><MouldingPaintBadge active={viewMode==='eye'}/><Editor viewerSceneSlot={<><CameraCapture/><FloorSurfaces/>{viewMode==='3d'&&<WallProximity/>}<WallFinishScene active={viewMode==='eye'}/><WalkCamera active={viewMode==='eye'} plan={document} onError={setError}/></>} key={key} viewBar={false} layoutVersion="v2" projectId={'linked:'+session} onLoad={onLoad} onSave={onSave} onLoaderChange={ready} actionMenuPlacement="top"/></>:!error&&<p className="linked-room-planner-wait">Подготавливаем текущий лист…</p>}</div>;
+ const demo=params.get('cabinets')==='1';
+ function openCabinet(){
+  const node=Object.values(useScene.getState().nodes).find((node:any)=>node.metadata?.catalogProductId===CABINET_PRODUCT) as any;
+  if(node)window.dispatchEvent(new CustomEvent('roomdesign:configure-cabinet',{detail:{id:node.id}}));
+ }
+ return <div className={`linked-room-planner ${viewMode==='eye'?'is-walkthrough':''}`}>{demo&&scene&&<div className="rd-cabinet-preview-tools"><button type="button" onClick={openCabinet}>Настроить комоды</button></div>}{warnings.length>0&&<details className="linked-room-planner-assumptions"><summary>Особенности 3D · {warnings.length}</summary>{warnings.map((w,i)=><p key={i}>{w}</p>)}<p>Исходные размеры в 2D сохраняются. Временное значение станет размером плана только при его изменении в 3D.</p></details>}{error&&<p role="alert">{error}</p>}{scene?<><FurnitureSurfaceMenu requestCatalog={requestCatalogModel} onOpenChange={textureEditorChanged}/><EditorShortcuts/><DragControls keyboard={viewMode==='3d'}/>{viewMode==='eye'&&<WalkHud/>}<WallRegionIndicator/><WallFinishPanel active={viewMode==='eye'}/><MouldingPaintBadge active={viewMode==='eye'}/><Editor viewerSceneSlot={<><CameraCapture/><FloorSurfaces/>{viewMode==='3d'&&<WallProximity/>}<WallFinishScene active={viewMode==='eye'}/><WalkCamera active={viewMode==='eye'} plan={document} onError={setError}/></>} key={key} viewBar={false} layoutVersion="v2" projectId={'linked:'+session} onLoad={onLoad} onSave={onSave} onLoaderChange={ready} actionMenuPlacement="top"/></>:!error&&<p className="linked-room-planner-wait">Подготавливаем текущий лист…</p>}</div>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

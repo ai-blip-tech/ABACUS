@@ -60,3 +60,12 @@ html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}.linked-room-pla
 
 .rd-furniture-texture-status { flex-wrap: wrap; }
 .rd-furniture-texture-status button[aria-pressed='true'] { border-color: #92132f; background: #92132f; color: white; }
+.rd-cabinet-controls { padding: 12px 16px 0; font: 13px Arial,sans-serif; }
+.rd-cabinet-modules,.rd-cabinet-settings { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px; }
+.rd-cabinet-controls label { display:flex; align-items:center; gap:6px; }
+.rd-cabinet-controls select { padding:8px 12px; border:1px solid #e4dcd3; border-radius:18px; background:white; color:#352b27; }
+.rd-furniture-surface-editor .rd-cabinet-controls button,.rd-furniture-surface-editor:has(.rd-cabinet-controls) button { border-radius:22px; }
+.rd-cabinet-controls button[aria-pressed=true] { background:#92132f; color:white; border-color:#92132f; }
+.rd-cabinet-settings>span { margin-left:auto; color:#887d74; }
+.rd-cabinet-preview-tools { position:fixed; top:16px; left:16px; z-index:80; display:flex; gap:8px; }
+.rd-cabinet-preview-tools button { cursor:pointer; background:#92132f; color:white; border:0; border-radius:24px; padding:12px 18px; font:14px Arial,sans-serif; }
