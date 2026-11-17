@@ -46,5 +46,9 @@ async function decors(folder){
  }
 }
 await decors(dir);
+const slabSizes=JSON.parse(await readFile(new URL('./cabinet-slab-sizes.json',import.meta.url),'utf8'));
+for(const sample of samples){
+ if(sample.kind==='ceramic')Object.assign(sample,slabSizes[sample.label.split(' · ').at(-1)]||{});
+}
 await writeFile(join(out,'catalog.json'),JSON.stringify({models,samples},null,2));
 console.log(JSON.stringify({models,textures:samples.length}));

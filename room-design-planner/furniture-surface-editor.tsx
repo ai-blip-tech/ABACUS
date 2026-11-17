@@ -5,7 +5,8 @@ import {loadAssetUrl, saveAsset, useScene, emitter} from '@pascal-app/core';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Box3, Color, Group, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3} from 'three';
-import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,type CabinetConfig,type CabinetCatalog,type GlassPart} from './modular-cabinets';
+import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,normalizeCabinetConfig,cabinetWidthMm,type CabinetConfig,type CabinetCatalog,type GlassPart} from './modular-cabinets';
+import {MAX_CABINET_WIDTH_MM,slabCut} from './cabinet-layout.mjs';
 import {furnitureSurfaces,updateFurnitureSurfaces} from './furniture-surface-geometry.mjs';
 
 export const TETRA_PRODUCT = 'leve-home:334625_819';
@@ -46,7 +47,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  const node=useScene.getState().nodes[id as any] as any;
  const cabinet=catalogId(node)===CABINET_PRODUCT;
  const [cabinetData,setCabinetData]=useState<CabinetCatalog|null>(null);
- const [configuration,setConfiguration]=useState<CabinetConfig>(()=>node?.metadata?.modularCabinet||{modules:[newCabinet()]});
+ const [configuration,setConfiguration]=useState<CabinetConfig>(()=>normalizeCabinetConfig(node?.metadata?.modularCabinet||{modules:[newCabinet()]}));
  const [activeModule,setActiveModule]=useState(configuration.modules[0]?.id);
  const [cabinetPart,setCabinetPart]=useState<'front'|'body'|'top'|'left'|'right'|'legs'>('front');
  const [allModules,setAllModules]=useState(false);
@@ -100,16 +101,43 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
   return()=>{active=false;};
  },[cabinet,cabinetData,configuration]);
 
+ function setCabinetConfiguration(next:CabinetConfig){
+  try{
+   if(cabinetData)slabCut(next,cabinetData);
+   setConfiguration(next);
+   setError('');
+  }catch(reason){setError((reason as Error).message);}
+ }
  function changeModule(patch:Partial<CabinetConfig['modules'][number]>){
-  setConfiguration(current=>({...current,modules:current.modules.map(module=>module.id===activeModule||allModules?{...module,...patch}:module)}));
+  if(patch.front){setCabinetConfiguration({...configuration,front:patch.front});return;}
+  if(patch.legs!==undefined||patch.metal){
+   setCabinetConfiguration({...configuration,base:{
+    enabled:patch.legs??configuration.base!.enabled,color:patch.metal||configuration.base!.color,
+   }});
+   return;
+  }
+  setCabinetConfiguration({...configuration,modules:configuration.modules.map(module=>
+   module.id===activeModule||allModules?{...module,...patch}:module)});
  }
  function changeGlass(patch:{sample?:string;finish?:'gloss'|'matte'}){
-  setConfiguration(current=>({...current,modules:current.modules.map(module=>{
+  if(cabinetPart==='top'){
+   setCabinetConfiguration({...configuration,top:{...configuration.top!,...patch}});
+   return;
+  }
+  setCabinetConfiguration({...configuration,modules:configuration.modules.map(module=>{
    if(module.id!==activeModule&&!allModules)return module;
    if(cabinetPart==='body')return {...module,...(patch.sample?{glass:patch.sample}:{}),...(patch.finish?{finish:patch.finish}:{}),surfaces:{}};
    const part=cabinetPart as GlassPart,previous=module.surfaces?.[part]||{sample:module.glass,finish:module.finish};
    return {...module,surfaces:{...module.surfaces,[part]:{...previous,...patch}}};
-  })}));
+  })});
+ }
+ function addModule(model:string){
+  const module=newCabinet(model);
+  const next={...configuration,modules:[...configuration.modules,module]};
+  try{
+   if(cabinetData)slabCut(next,cabinetData);
+   setCabinetConfiguration(next);setActiveModule(module.id);setAllModules(false);
+  }catch(reason){setError((reason as Error).message);}
  }
  const activeCabinet=configuration.modules.find(module=>module.id===activeModule);
  function materialFor(sampleId:string) {
@@ -211,7 +239,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  }
 
  const aspect=cabinet&&model?cabinetBounds(model).dimensions:node?.scale||[1.4,.55,.4];
- const selectedGlass=activeCabinet?.surfaces?.[cabinetPart as GlassPart]||{sample:activeCabinet?.glass,finish:activeCabinet?.finish};
+ const selectedGlass=cabinetPart==='top'?configuration.top!:activeCabinet?.surfaces?.[cabinetPart as GlassPart]||{sample:activeCabinet?.glass,finish:activeCabinet?.finish};
  const glassSelected=['body','top','left','right'].includes(cabinetPart);
  const visibleSamples=cabinet?samples.filter(sample=>(sample as any).kind===(cabinetPart==='front'?'ceramic':'glass')):samples;
  const max=Math.max(...aspect);
@@ -220,23 +248,23 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
   {cabinet&&<div className="rd-cabinet-controls">
    <div className="rd-cabinet-modules">
     {configuration.modules.map((module,index)=><button type="button" key={module.id} aria-pressed={module.id===activeModule} onClick={()=>{setActiveModule(module.id);setAllModules(false);}}>Модуль {index+1} · {module.model}</button>)}
-    <label>Добавить рядом <select aria-label="Добавить модуль комода" value="" disabled={configuration.modules.length>=8||pending} onChange={event=>{if(!event.target.value)return;const module=newCabinet(event.target.value);setConfiguration(current=>({modules:[...current.modules,module]}));setActiveModule(module.id);setAllModules(false);}}>
-     <option value="">Выберите комод</option>{cabinetData?.models.filter(item=>!item.id.startsWith('base')).map(item=><option key={item.id} value={item.id}>{item.id} · {item.widthMm} × {item.heightMm} × {item.depthMm} мм</option>)}
+    <label>Добавить рядом <select aria-label="Добавить модуль комода" value="" disabled={pending} onChange={event=>{if(!event.target.value)return;addModule(event.target.value);}}>
+     <option value="">Выберите комод</option>{cabinetData?.models.filter(item=>!item.id.startsWith('base')).map(item=><option key={item.id} value={item.id} disabled={cabinetWidthMm(configuration,cabinetData!)+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,cabinetData?.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM)}>{item.id} · {item.widthMm} × {item.heightMm} × {item.depthMm} мм</option>)}
     </select></label>
-    {configuration.modules.length>1&&<button type="button" onClick={()=>{const next=configuration.modules.filter(module=>module.id!==activeModule);setConfiguration({modules:next});setActiveModule(next[0].id);}}>Убрать модуль</button>}
+    {configuration.modules.length>1&&<button type="button" onClick={()=>{const next=configuration.modules.filter(module=>module.id!==activeModule);setCabinetConfiguration({...configuration,modules:next});setActiveModule(next[0].id);}}>Убрать модуль</button>}
    </div>
    <div className="rd-cabinet-settings">
     <label>Модель <select aria-label="Модель выбранного комода" value={activeCabinet?.model} onChange={event=>changeModule({model:event.target.value})}>
      {cabinetData?.models.filter(item=>!item.id.startsWith('base')).map(item=><option key={item.id} value={item.id}>{item.id} · {item.widthMm} мм</option>)}
     </select></label>
-    {([['front','Фасад · керамогранит'],['body','Корпус · стекло'],['legs','Ножки · металл']] as const).map(([part,label])=><button type="button" key={part} aria-pressed={part==='body'?glassSelected:cabinetPart===part} onClick={()=>setCabinetPart(part)}>{label}</button>)}
-    {glassSelected&&<><select aria-label="Часть стеклянного корпуса" value={cabinetPart} onChange={event=>setCabinetPart(event.target.value as GlassPart)}><option value="body">Весь корпус</option><option value="top">Столешница</option><option value="left">Левая боковина</option><option value="right">Правая боковина</option></select><button type="button" aria-pressed={selectedGlass.finish==='gloss'} onClick={()=>changeGlass({finish:'gloss'})}>Глянцевое</button><button type="button" aria-pressed={selectedGlass.finish==='matte'} onClick={()=>changeGlass({finish:'matte'})}>Матовое</button></>}
-    {cabinetPart==='legs'&&<><label><input type="checkbox" checked={!!activeCabinet?.legs} onChange={event=>changeModule({legs:event.target.checked})}/> С ножками</label><label>Цвет металла <input type="color" aria-label="Цвет ножек" value={activeCabinet?.metal||metal} onChange={event=>{setMetal(event.target.value);changeModule({metal:event.target.value});}}/></label>{['#242424','#f0efeb','#9b7b46','#b8b9b9','#6d4149'].map(color=><button type="button" key={color} aria-label={'Металл '+color} style={{background:color,width:28,height:28,padding:0}} onClick={()=>changeModule({metal:color})}/>)}</>}
+    {([['front','Фасад · керамогранит'],['body','Корпус · стекло'],['legs','Общая база']] as const).map(([part,label])=><button type="button" key={part} aria-pressed={part==='body'?glassSelected:cabinetPart===part} onClick={()=>setCabinetPart(part)}>{label}</button>)}
+    {glassSelected&&<><select aria-label="Часть стеклянного корпуса" value={cabinetPart} onChange={event=>setCabinetPart(event.target.value as GlassPart)}><option value="body">Весь корпус</option><option value="top">Общая столешница</option><option value="left">Левая боковина</option><option value="right">Правая боковина</option></select><button type="button" aria-pressed={selectedGlass.finish==='gloss'} onClick={()=>changeGlass({finish:'gloss'})}>Глянцевое</button><button type="button" aria-pressed={selectedGlass.finish==='matte'} onClick={()=>changeGlass({finish:'matte'})}>Матовое</button></>}
+    {cabinetPart==='legs'&&<><label><input type="checkbox" checked={!!configuration.base?.enabled} onChange={event=>changeModule({legs:event.target.checked})}/> База 35 мм</label><label>Цвет базы <input type="color" aria-label="Цвет базы" value={configuration.base?.color||metal} onChange={event=>{setMetal(event.target.value);changeModule({metal:event.target.value});}}/></label>{['#242424','#f0efeb','#9b7b46','#b8b9b9','#6d4149'].map(color=><button type="button" key={color} aria-label={'Металл '+color} style={{background:color,width:28,height:28,padding:0}} onClick={()=>changeModule({metal:color})}/>)}</>}
     <span>{Math.round(aspect[0]*1000)} × {Math.round(aspect[1]*1000)} × {Math.round(aspect[2]*1000)} мм</span>
    </div>
   </div>}
   <div className="rd-furniture-texture-samples"  role="group" aria-label="Текстуры из архива">
-   {(cabinet&&cabinetPart==='legs'?[]:visibleSamples).map(sample=><button key={sample.id} type="button" disabled={(!cabinet&&!selected)||pending||assembling} aria-pressed={cabinet?(cabinetPart==='front'?activeCabinet?.front:selectedGlass.sample)===sample.id:selectedSample===sample.id} onClick={()=>applySample(sample.id)}><img src={sample.image} alt=""/><span>{sample.label}</span></button>)}
+   {(cabinet&&cabinetPart==='legs'?[]:visibleSamples).map(sample=><button key={sample.id} type="button" disabled={(!cabinet&&!selected)||pending||assembling||(cabinet&&cabinetPart==='front'&&(!(sample as any).slabWidthMm||!(sample as any).slabHeightMm))} title={cabinet&&cabinetPart==='front'&&!(sample as any).slabWidthMm?'Размер слэба не подтверждён':undefined} aria-pressed={cabinet?(cabinetPart==='front'?configuration.front:selectedGlass.sample)===sample.id:selectedSample===sample.id} onClick={()=>applySample(sample.id)}><img src={sample.image} alt=""/><span>{sample.label}{cabinet&&(sample as any).slabWidthMm?' · '+(sample as any).slabHeightMm/10+' × '+(sample as any).slabWidthMm/10+' см':''}</span></button>)}
   </div>
   <div className="rd-furniture-texture-status">
    <button type="button" aria-pressed={cabinet?allModules:wholeModel} disabled={!surfaces.length||pending} onClick={()=>cabinet?setAllModules(value=>!value):setSelected(wholeModel?null:'all')}>Выделить всё</button>

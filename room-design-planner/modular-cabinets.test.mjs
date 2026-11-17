@@ -26,3 +26,74 @@ test('all supplied cabinet variants retain real dimensions and separate front fr
   assert.deepEqual(cabinetBounds(split).dimensions,physical);
  }
 });
+
+const {normalizeCabinetConfig,slabCut,slabUV,cabinetWidthMm,CABINET_BASE_HEIGHT_MM}=await import('./cabinet-layout.mjs');
+const sample=catalog.samples.find(item=>item.slabWidthMm===3200);
+const config=(models)=>normalizeCabinetConfig({front:sample.id,modules:models.map(newCabinet)});
+test('one slab keeps its real scale, crop and direction across joined doors',()=>{
+ const book=config(['5041','6541']);
+ const cut=slabCut(book,catalog);
+ assert.equal(cabinetWidthMm(book,catalog),1150);
+ assert.deepEqual(slabCut(book,catalog),cut);
+ assert.equal(cut.xMm,(3200-1150)/2);
+ assert.equal(cut.yMm,(1600-390)/2);
+ const middle=slabUV({x:0,y:.195},1.15,0,cut);
+ assert.deepEqual(middle,[.5,.5]);
+ const left=slabUV({x:.249,y:.15},.5,0,cut);
+ const right=slabUV({x:-.324,y:.15},.65,500,cut);
+ assert.ok(Math.abs(left[0]-right[0])<1e-12);
+ assert.ok(Math.abs((left[1]-right[1])-2/3200)<1e-12);
+ const shifted=slabUV({x:.149,y:.15},.5,0,cut);
+ assert.ok(Math.abs(shifted[1]-left[1]-100/3200)<1e-12);
+ assert.equal(CABINET_BASE_HEIGHT_MM,35);
+});
+test('the 260 cm composition limit permits four wide or five narrow modules',()=>{
+ assert.equal(slabCut(config(['6541','6542','6541','6542']),catalog).widthMm,2600);
+ assert.equal(slabCut(config(Array(5).fill('5041')),catalog).widthMm,2500);
+ assert.throws(()=>slabCut(config(Array(6).fill('5041')),catalog),/260/);
+ const short=catalog.samples.find(item=>item.slabWidthMm===2400);
+ assert.throws(()=>slabCut({...config(Array(5).fill('5041')),front:short.id},catalog),/240/);
+});
+test('the assembled cabinet has one glass top and one base across every module',async()=>{
+ const {Texture,TextureLoader}=await import('three');
+ const {assembleCabinets}=await import('./modular-cabinets.ts');
+ const originalFetch=globalThis.fetch,originalLoad=TextureLoader.prototype.loadAsync;
+ const oldLocation=globalThis.location,oldProgress=globalThis.ProgressEvent;
+ globalThis.location={origin:'http://cabinet.test'};
+ globalThis.ProgressEvent=class{constructor(type,options){Object.assign(this,{type},options);}};
+ TextureLoader.prototype.loadAsync=async()=>new Texture();
+ globalThis.fetch=async request=>{
+  const url=new URL(typeof request==='string'?request:request.url);
+  const file=url.pathname.split('/').pop();
+  const bytes=await readFile(new URL('./public/cabinets/'+file,import.meta.url));
+  return new Response(bytes,{headers:{'Content-Length':String(bytes.length)}});
+ };
+ try{
+  const assembly=await assembleCabinets(config(['5041','6542']),catalog);
+  const common=[];
+  assembly.traverse(mesh=>{if(mesh.userData.cabinetCommon)common.push(mesh);});
+  assert.equal(common.filter(mesh=>mesh.userData.cabinetPart==='top').length,1);
+  assert.equal(common.filter(mesh=>mesh.userData.cabinetPart==='legs').length,1);
+  const [width,height,depth]=cabinetBounds(assembly).dimensions;
+  assert.ok(Math.abs(width-1.15)<.00001);
+  assert.ok(Math.abs(height-.429)<.00001);
+  assert.ok(Math.abs(depth-.45)<.00001);
+  const {furnitureSurfaces,updateFurnitureSurfaces}=await import('./furniture-surface-geometry.mjs');
+  const surfaces=furnitureSurfaces(assembly);
+  updateFurnitureSurfaces(surfaces,{},null,null);
+  for(const part of surfaces)for(const group of part.mesh.geometry.groups){
+   assert.ok(part.mesh.material[group.materialIndex],part.mesh.name+' has a missing face material');
+  }
+  const base=common.find(mesh=>mesh.userData.cabinetPart==='legs');
+  assembly.updateMatrixWorld(true);
+  const baseBox=new Box3().setFromObject(base);
+  assert.ok(Math.abs(baseBox.max.y-baseBox.min.y-.035)<.00001);
+  assert.ok(Math.abs(baseBox.max.x-baseBox.min.x-1.116)<.00001);
+  const without=await assembleCabinets({...config(['5041','6542']),base:{enabled:false,color:'#333333'}},catalog);
+  assert.ok(Math.abs(cabinetBounds(without).dimensions[1]-.394)<.00001);
+  without.traverse(mesh=>assert.ok(!(mesh.userData.cabinetCommon&&mesh.userData.cabinetPart==='legs')));
+ }finally{
+  globalThis.fetch=originalFetch;globalThis.location=oldLocation;globalThis.ProgressEvent=oldProgress;
+  TextureLoader.prototype.loadAsync=originalLoad;
+ }
+});

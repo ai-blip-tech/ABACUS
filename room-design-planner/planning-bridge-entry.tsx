@@ -1,4 +1,4 @@
-import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds} from './modular-cabinets';
+import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,normalizeCabinetConfig} from './modular-cabinets';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Group} from 'three';
 import {registerTileProduct,tileProducts} from './tile-products.mjs';
@@ -72,13 +72,14 @@ function App(){const [viewMode,setViewMode]=useState<'3d'|'eye'>('3d'),[document
     }
    }
    // Keep 3D appearance, while every position and dimension comes from this 2D sheet.
-   for(const node of Object.values(result.scene.nodes) as any[]){if(node.type!=='item'||node.metadata?.column)continue;const old=Object.values(data.previousScene?.nodes||{}).find((n:any)=>n.type==='item'&&n.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;if(old?.asset&&old.metadata?.roomDesignModelAsset&&old.metadata?.roomDesignFurniture?.catalog?.id===node.metadata?.roomDesignFurniture?.catalog?.id&&old.metadata?.catalogTextureId===doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId)?.model3D?.textureId){try{const url=await loadAssetUrl(old.metadata.roomDesignModelAsset);if(url){node.asset={...old.asset,src:url};node.scale=old.metadata.modularCabinet?old.scale:node.scale.map((n:number,i:number)=>n/node.asset.dimensions[i]);node.metadata={...old.metadata,...node.metadata,roomDesignModelAsset:old.metadata.roomDesignModelAsset};if(old.metadata.representation==='catalog-converted')newModelFocus.current=node.id;}}catch{}}
+   for(const node of Object.values(result.scene.nodes) as any[]){if(node.type!=='item'||node.metadata?.column)continue;const old=Object.values(data.previousScene?.nodes||{}).find((n:any)=>n.type==='item'&&n.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;if((!old?.metadata?.modularCabinet||old.metadata.modularCabinet.version===2)&&old?.asset&&old.metadata?.roomDesignModelAsset&&old.metadata?.roomDesignFurniture?.catalog?.id===node.metadata?.roomDesignFurniture?.catalog?.id&&old.metadata?.catalogTextureId===doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId)?.model3D?.textureId){try{const url=await loadAssetUrl(old.metadata.roomDesignModelAsset);if(url){node.asset={...old.asset,src:url};node.scale=old.metadata.modularCabinet?old.scale:node.scale.map((n:number,i:number)=>n/node.asset.dimensions[i]);node.metadata={...old.metadata,...node.metadata,roomDesignModelAsset:old.metadata.roomDesignModelAsset};if(old.metadata.representation==='catalog-converted')newModelFocus.current=node.id;}}catch{}}
    }
    for(const node of Object.values(result.scene.nodes) as any[]){
     if(node.type!=='item'||node.metadata?.column||node.metadata?.roomDesignModelAsset)continue;
     const f=doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId),binding=f?.model3D;
     if(f?.catalog?.id===CABINET_PRODUCT){
-     const configuration={modules:[newCabinet(f.cabinetModel||'5041')]};
+     const previous=Object.values(data.previousScene?.nodes||{}).find((old:any)=>old.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;
+     const configuration=normalizeCabinetConfig(previous?.metadata?.modularCabinet||{modules:[newCabinet(f.cabinetModel||'5041')]});
      const assembled=await assembleCabinets(configuration,await cabinetCatalog());
      const dimensions=cabinetBounds(assembled).dimensions;
      const unit=new Group();unit.add(assembled);unit.scale.set(1/dimensions[0],1/dimensions[1],1/dimensions[2]);

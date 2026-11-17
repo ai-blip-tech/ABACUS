@@ -1,0 +1,102 @@
+{
+  "SPA6-NMTS-SHN": {
+    "slabWidthMm": 3200,
+    "slabHeightMm": 1600
+  },
+  "SPA6-NMTM-MAT": {
+    "slabWidthMm": 3200,
+    "slabHeightMm": 1600
+  },
+  "SPA6-LOOS-SHN": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-RDRC-SHN": {
+    "slabWidthMm": 3200,
+    "slabHeightMm": 1600
+  },
+  "SPA6-RDRCM-MAT": {
+    "slabWidthMm": 3200,
+    "slabHeightMm": 1600
+  },
+  "SPA6-RDRP-SHN": {
+    "slabWidthMm": 3200,
+    "slabHeightMm": 1600
+  },
+  "SPA6-SMC-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-BCAP-SHN": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-CP03-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-CHMB-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-CFL-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-CFD-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-TPM-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-ALGT-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-MLS-SHN": {
+    "slabWidthMm": 3200,
+    "slabHeightMm": 1600
+  },
+  "SPA6-OUTB-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-CRBN-MAT": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-STGC-MAT": {
+    "slabWidthMm": 2400,
+    "slabHeightMm": 1200
+  },
+  "SPA6-STGA-MAT": {
+    "slabWidthMm": 2400,
+    "slabHeightMm": 1200
+  },
+  "SPA6-STGCR-MAT": {
+    "slabWidthMm": 2400,
+    "slabHeightMm": 1200
+  },
+  "SPA6-MYMS-SHN": {
+    "slabWidthMm": 3200,
+    "slabHeightMm": 1600
+  },
+  "SPA6-ELA-SHN": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-CGOLD-SHN": {
+    "slabWidthMm": 2800,
+    "slabHeightMm": 1200
+  },
+  "SPA6-VAM-MAT": {
+    "slabWidthMm": 3200,
+    "slabHeightMm": 1600
+  },
+  "SPC3-ANT-MAT": {
+    "slabWidthMm": 3230,
+    "slabHeightMm": 1620
+  }
+}

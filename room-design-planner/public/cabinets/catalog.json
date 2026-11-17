@@ -84,61 +84,81 @@
       "id": "ceramic-0",
       "label": "ALMOND · SPA6-ELA-SHN",
       "image": "./cabinets/ceramic-0.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-1",
       "label": "AMARANTO GRANA · SPA6-STGA-MAT",
       "image": "./cabinets/ceramic-1.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2400,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-2",
       "label": "ANTHRACITE · SPC3-ANT-MAT",
       "image": "./cabinets/ceramic-2.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3230,
+      "slabHeightMm": 1620
     },
     {
       "id": "ceramic-3",
       "label": "BRÈCHE CAPRAIA · SPA6-BCAP-SHN",
       "image": "./cabinets/ceramic-3.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-4",
       "label": "C. FLAME DARK · SPA6-CFD-MAT",
       "image": "./cabinets/ceramic-4.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-5",
       "label": "C. FLAME LIGHT · SPA6-CFL-MAT",
       "image": "./cabinets/ceramic-5.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-6",
       "label": "CALACATTA GOLD · SPA6-CGOLD-SHN",
       "image": "./cabinets/ceramic-6.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-7",
       "label": "CARBONE GRANA · SPA6-STGCR-MAT",
       "image": "./cabinets/ceramic-7.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2400,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-8",
       "label": "COLOR POWDER 3 · SPA6-CP03-MAT",
       "image": "./cabinets/ceramic-8.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-9",
       "label": "COTONE GRANA · SPA6-STGC-MAT",
       "image": "./cabinets/ceramic-9.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2400,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-10",
@@ -150,91 +170,121 @@
       "id": "ceramic-11",
       "label": "E.TECH CARBON · SPA6-CRBN-MAT",
       "image": "./cabinets/ceramic-11.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-12",
       "label": "GOLD TRAVERTINE · SPA6-ALGT-MAT",
       "image": "./cabinets/ceramic-12.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-13",
       "label": "LES ORIGINES OR · SPA6-LOOS-SHN",
       "image": "./cabinets/ceramic-13.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-14",
       "label": "M YAMUNA MOKA · SPA6-MYMS-SHN",
       "image": "./cabinets/ceramic-14.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3200,
+      "slabHeightMm": 1600
     },
     {
       "id": "ceramic-15",
       "label": "MARBLE LAURENT STU. · SPA6-MLS-SHN",
       "image": "./cabinets/ceramic-15.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3200,
+      "slabHeightMm": 1600
     },
     {
       "id": "ceramic-16",
       "label": "N. MOOD TUNDRA · SPA6-NMTM-MAT",
       "image": "./cabinets/ceramic-16.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3200,
+      "slabHeightMm": 1600
     },
     {
       "id": "ceramic-17",
       "label": "N. MOOD TUNDRA · SPA6-NMTS-SHN",
       "image": "./cabinets/ceramic-17.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3200,
+      "slabHeightMm": 1600
     },
     {
       "id": "ceramic-18",
       "label": "OUTBACK GROUND · SPA6-OUTB-MAT",
       "image": "./cabinets/ceramic-18.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-19",
       "label": "P. CHARM AMBER · SPA6-CHMB-MAT",
       "image": "./cabinets/ceramic-19.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-20",
       "label": "R.DE REX CHOCO · SPA6-RDRC-SHN",
       "image": "./cabinets/ceramic-20.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3200,
+      "slabHeightMm": 1600
     },
     {
       "id": "ceramic-21",
       "label": "R.DE REX CHOCO · SPA6-RDRCM-MAT",
       "image": "./cabinets/ceramic-21.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3200,
+      "slabHeightMm": 1600
     },
     {
       "id": "ceramic-22",
       "label": "R.DE REX PERLA · SPA6-RDRP-SHN",
       "image": "./cabinets/ceramic-22.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3200,
+      "slabHeightMm": 1600
     },
     {
       "id": "ceramic-23",
       "label": "STONE MARFIL · SPA6-SMC-MAT",
       "image": "./cabinets/ceramic-23.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-24",
       "label": "TESSERAE PLATINO · SPA6-TPM-MAT",
       "image": "./cabinets/ceramic-24.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 2800,
+      "slabHeightMm": 1200
     },
     {
       "id": "ceramic-25",
       "label": "VERDE ALPI · SPA6-VAM-MAT",
       "image": "./cabinets/ceramic-25.jpg",
-      "kind": "ceramic"
+      "kind": "ceramic",
+      "slabWidthMm": 3200,
+      "slabHeightMm": 1600
     }
   ]
 }
