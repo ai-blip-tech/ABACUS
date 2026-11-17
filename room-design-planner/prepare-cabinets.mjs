@@ -9,7 +9,7 @@ const out=resolve('room-design-planner/public/cabinets');
 await mkdir(out,{recursive:true});
 globalThis.window={URL:{createObjectURL:()=>''}};
 globalThis.FileReader=class{readAsArrayBuffer(blob){blob.arrayBuffer().then(result=>{this.result=result;this.onloadend?.();});}};
-const models=[];
+let models=[];
 for(const name of ['5041','5042','6541','6542','base01','base02']){
  const b=await readFile(join(source,name+'.fbx'));
  const root=new FBXLoader().parse(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');
@@ -50,5 +50,9 @@ const slabSizes=JSON.parse(await readFile(new URL('./cabinet-slab-sizes.json',im
 for(const sample of samples){
  if(sample.kind==='ceramic')Object.assign(sample,slabSizes[sample.label.split(' · ').at(-1)]||{});
 }
+const factory=JSON.parse(await readFile(join(out,'sideboards-catalog.json'),'utf8'));
+const preparedIds=new Set(models.map(item=>item.id));
+models=[...factory.map(item=>({...item,available3D:preparedIds.has(item.id)})),...models.filter(item=>item.id.startsWith('base'))];
+models.sort((a,b)=>a.heightMm-b.heightMm||a.widthMm-b.widthMm||a.id.localeCompare(b.id));
 await writeFile(join(out,'catalog.json'),JSON.stringify({models,samples},null,2));
 console.log(JSON.stringify({models,textures:samples.length}));

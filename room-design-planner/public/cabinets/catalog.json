@@ -1,30 +1,6 @@
 {
   "models": [
     {
-      "id": "5041",
-      "widthMm": 500,
-      "heightMm": 390,
-      "depthMm": 450
-    },
-    {
-      "id": "5042",
-      "widthMm": 500,
-      "heightMm": 390,
-      "depthMm": 450
-    },
-    {
-      "id": "6541",
-      "widthMm": 650,
-      "heightMm": 390,
-      "depthMm": 450
-    },
-    {
-      "id": "6542",
-      "widthMm": 650,
-      "heightMm": 390,
-      "depthMm": 450
-    },
-    {
       "id": "base01",
       "widthMm": 466,
       "heightMm": 35,
@@ -35,6 +11,946 @@
       "widthMm": 618,
       "heightMm": 35,
       "depthMm": 409
+    },
+    {
+      "id": "5041",
+      "widthMm": 500,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "5041-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 6,
+      "available3D": true
+    },
+    {
+      "id": "5042",
+      "widthMm": 500,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "5042-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 6,
+      "available3D": true
+    },
+    {
+      "id": "5043",
+      "widthMm": 500,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "5043-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 6,
+      "available3D": false
+    },
+    {
+      "id": "5044",
+      "widthMm": 500,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "5044-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 6,
+      "available3D": false
+    },
+    {
+      "id": "5045",
+      "widthMm": 500,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "5045-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 6,
+      "available3D": false
+    },
+    {
+      "id": "5046",
+      "widthMm": 500,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "5046-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 6,
+      "available3D": false
+    },
+    {
+      "id": "6541",
+      "widthMm": 650,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "6541-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 7,
+      "available3D": true
+    },
+    {
+      "id": "6542",
+      "widthMm": 650,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "6542-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 7,
+      "available3D": true
+    },
+    {
+      "id": "6543",
+      "widthMm": 650,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "6543-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 7,
+      "available3D": false
+    },
+    {
+      "id": "6544",
+      "widthMm": 650,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "6544-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 7,
+      "available3D": false
+    },
+    {
+      "id": "6545",
+      "widthMm": 650,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "6545-catalog.png",
+      "sourcePdfPage": 4,
+      "sourcePrintedPage": 7,
+      "available3D": false
+    },
+    {
+      "id": "10041",
+      "widthMm": 1000,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "10041-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 8,
+      "available3D": false
+    },
+    {
+      "id": "10042",
+      "widthMm": 1000,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "10042-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 8,
+      "available3D": false
+    },
+    {
+      "id": "10043",
+      "widthMm": 1000,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "10043-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 8,
+      "available3D": false
+    },
+    {
+      "id": "10044",
+      "widthMm": 1000,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "10044-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 8,
+      "available3D": false
+    },
+    {
+      "id": "10045",
+      "widthMm": 1000,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "10045-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 8,
+      "available3D": false
+    },
+    {
+      "id": "13041",
+      "widthMm": 1300,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "13041-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 9,
+      "available3D": false
+    },
+    {
+      "id": "13042",
+      "widthMm": 1300,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "13042-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 9,
+      "available3D": false
+    },
+    {
+      "id": "13043",
+      "widthMm": 1300,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "13043-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 9,
+      "available3D": false
+    },
+    {
+      "id": "13044",
+      "widthMm": 1300,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "13044-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 9,
+      "available3D": false
+    },
+    {
+      "id": "13044P",
+      "widthMm": 1300,
+      "heightMm": 390,
+      "depthMm": 450,
+      "thumbnail": "13044P-catalog.png",
+      "sourcePdfPage": 5,
+      "sourcePrintedPage": 9,
+      "available3D": false
+    },
+    {
+      "id": "5061",
+      "widthMm": 500,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "5061-catalog.png",
+      "sourcePdfPage": 6,
+      "sourcePrintedPage": 10,
+      "available3D": false
+    },
+    {
+      "id": "5062",
+      "widthMm": 500,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "5062-catalog.png",
+      "sourcePdfPage": 6,
+      "sourcePrintedPage": 10,
+      "available3D": false
+    },
+    {
+      "id": "5063",
+      "widthMm": 500,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "5063-catalog.png",
+      "sourcePdfPage": 6,
+      "sourcePrintedPage": 10,
+      "available3D": false
+    },
+    {
+      "id": "5064",
+      "widthMm": 500,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "5064-catalog.png",
+      "sourcePdfPage": 6,
+      "sourcePrintedPage": 10,
+      "available3D": false
+    },
+    {
+      "id": "5065",
+      "widthMm": 500,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "5065-catalog.png",
+      "sourcePdfPage": 6,
+      "sourcePrintedPage": 11,
+      "available3D": false
+    },
+    {
+      "id": "5066",
+      "widthMm": 500,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "5066-catalog.png",
+      "sourcePdfPage": 6,
+      "sourcePrintedPage": 11,
+      "available3D": false
+    },
+    {
+      "id": "5164",
+      "widthMm": 500,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "5164-catalog.png",
+      "sourcePdfPage": 6,
+      "sourcePrintedPage": 11,
+      "available3D": false
+    },
+    {
+      "id": "6561",
+      "widthMm": 650,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "6561-catalog.png",
+      "sourcePdfPage": 7,
+      "sourcePrintedPage": 12,
+      "available3D": false
+    },
+    {
+      "id": "6562",
+      "widthMm": 650,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "6562-catalog.png",
+      "sourcePdfPage": 7,
+      "sourcePrintedPage": 12,
+      "available3D": false
+    },
+    {
+      "id": "6563",
+      "widthMm": 650,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "6563-catalog.png",
+      "sourcePdfPage": 7,
+      "sourcePrintedPage": 12,
+      "available3D": false
+    },
+    {
+      "id": "6564",
+      "widthMm": 650,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "6564-catalog.png",
+      "sourcePdfPage": 7,
+      "sourcePrintedPage": 12,
+      "available3D": false
+    },
+    {
+      "id": "6565",
+      "widthMm": 650,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "6565-catalog.png",
+      "sourcePdfPage": 7,
+      "sourcePrintedPage": 13,
+      "available3D": false
+    },
+    {
+      "id": "6566",
+      "widthMm": 650,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "6566-catalog.png",
+      "sourcePdfPage": 7,
+      "sourcePrintedPage": 13,
+      "available3D": false
+    },
+    {
+      "id": "6567",
+      "widthMm": 650,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "6567-catalog.png",
+      "sourcePdfPage": 7,
+      "sourcePrintedPage": 13,
+      "available3D": false
+    },
+    {
+      "id": "10061",
+      "widthMm": 1000,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "10061-catalog.png",
+      "sourcePdfPage": 8,
+      "sourcePrintedPage": 14,
+      "available3D": false
+    },
+    {
+      "id": "10062",
+      "widthMm": 1000,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "10062-catalog.png",
+      "sourcePdfPage": 8,
+      "sourcePrintedPage": 14,
+      "available3D": false
+    },
+    {
+      "id": "10063",
+      "widthMm": 1000,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "10063-catalog.png",
+      "sourcePdfPage": 8,
+      "sourcePrintedPage": 14,
+      "available3D": false
+    },
+    {
+      "id": "10064",
+      "widthMm": 1000,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "10064-catalog.png",
+      "sourcePdfPage": 8,
+      "sourcePrintedPage": 15,
+      "available3D": false
+    },
+    {
+      "id": "10064P",
+      "widthMm": 1000,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "10064P-catalog.png",
+      "sourcePdfPage": 8,
+      "sourcePrintedPage": 15,
+      "available3D": false
+    },
+    {
+      "id": "10065",
+      "widthMm": 1000,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "10065-catalog.png",
+      "sourcePdfPage": 8,
+      "sourcePrintedPage": 15,
+      "available3D": false
+    },
+    {
+      "id": "10162",
+      "widthMm": 1000,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "10162-catalog.png",
+      "sourcePdfPage": 8,
+      "sourcePrintedPage": 14,
+      "available3D": false
+    },
+    {
+      "id": "13061",
+      "widthMm": 1300,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "13061-catalog.png",
+      "sourcePdfPage": 9,
+      "sourcePrintedPage": 16,
+      "available3D": false
+    },
+    {
+      "id": "13062",
+      "widthMm": 1300,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "13062-catalog.png",
+      "sourcePdfPage": 9,
+      "sourcePrintedPage": 16,
+      "available3D": false
+    },
+    {
+      "id": "13063",
+      "widthMm": 1300,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "13063-catalog.png",
+      "sourcePdfPage": 9,
+      "sourcePrintedPage": 16,
+      "available3D": false
+    },
+    {
+      "id": "13063P",
+      "widthMm": 1300,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "13063P-catalog.png",
+      "sourcePdfPage": 9,
+      "sourcePrintedPage": 16,
+      "available3D": false
+    },
+    {
+      "id": "13064P",
+      "widthMm": 1300,
+      "heightMm": 590,
+      "depthMm": 450,
+      "thumbnail": "13064P-catalog.png",
+      "sourcePdfPage": 9,
+      "sourcePrintedPage": 16,
+      "available3D": false
+    },
+    {
+      "id": "3186",
+      "widthMm": 300,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "3186-catalog.png",
+      "sourcePdfPage": 9,
+      "sourcePrintedPage": 17,
+      "available3D": false
+    },
+    {
+      "id": "4186",
+      "widthMm": 400,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "4186-catalog.png",
+      "sourcePdfPage": 9,
+      "sourcePrintedPage": 17,
+      "available3D": false
+    },
+    {
+      "id": "5081",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5081-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 18,
+      "available3D": false
+    },
+    {
+      "id": "5082",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5082-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 18,
+      "available3D": false
+    },
+    {
+      "id": "5083",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5083-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 18,
+      "available3D": false
+    },
+    {
+      "id": "5084",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5084-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 18,
+      "available3D": false
+    },
+    {
+      "id": "5085",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5085-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 18,
+      "available3D": false
+    },
+    {
+      "id": "5086",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5086-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 19,
+      "available3D": false
+    },
+    {
+      "id": "5087",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5087-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 19,
+      "available3D": false
+    },
+    {
+      "id": "5088",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5088-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 19,
+      "available3D": false
+    },
+    {
+      "id": "5089",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5089-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 19,
+      "available3D": false
+    },
+    {
+      "id": "5186",
+      "widthMm": 500,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "5186-catalog.png",
+      "sourcePdfPage": 10,
+      "sourcePrintedPage": 19,
+      "available3D": false
+    },
+    {
+      "id": "6183",
+      "widthMm": 600,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "6183-catalog.png",
+      "sourcePdfPage": 11,
+      "sourcePrintedPage": 21,
+      "available3D": false
+    },
+    {
+      "id": "6581",
+      "widthMm": 650,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "6581-catalog.png",
+      "sourcePdfPage": 11,
+      "sourcePrintedPage": 20,
+      "available3D": false
+    },
+    {
+      "id": "6582",
+      "widthMm": 650,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "6582-catalog.png",
+      "sourcePdfPage": 11,
+      "sourcePrintedPage": 20,
+      "available3D": false
+    },
+    {
+      "id": "6583",
+      "widthMm": 650,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "6583-catalog.png",
+      "sourcePdfPage": 11,
+      "sourcePrintedPage": 20,
+      "available3D": false
+    },
+    {
+      "id": "6584",
+      "widthMm": 650,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "6584-catalog.png",
+      "sourcePdfPage": 11,
+      "sourcePrintedPage": 20,
+      "available3D": false
+    },
+    {
+      "id": "6585",
+      "widthMm": 650,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "6585-catalog.png",
+      "sourcePdfPage": 11,
+      "sourcePrintedPage": 21,
+      "available3D": false
+    },
+    {
+      "id": "6586",
+      "widthMm": 650,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "6586-catalog.png",
+      "sourcePdfPage": 11,
+      "sourcePrintedPage": 21,
+      "available3D": false
+    },
+    {
+      "id": "6587",
+      "widthMm": 650,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "6587-catalog.png",
+      "sourcePdfPage": 11,
+      "sourcePrintedPage": 21,
+      "available3D": false
+    },
+    {
+      "id": "10081",
+      "widthMm": 1000,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "10081-catalog.png",
+      "sourcePdfPage": 12,
+      "sourcePrintedPage": 22,
+      "available3D": false
+    },
+    {
+      "id": "10082",
+      "widthMm": 1000,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "10082-catalog.png",
+      "sourcePdfPage": 12,
+      "sourcePrintedPage": 22,
+      "available3D": false
+    },
+    {
+      "id": "10083",
+      "widthMm": 1000,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "10083-catalog.png",
+      "sourcePdfPage": 12,
+      "sourcePrintedPage": 22,
+      "available3D": false
+    },
+    {
+      "id": "10084",
+      "widthMm": 1000,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "10084-catalog.png",
+      "sourcePdfPage": 12,
+      "sourcePrintedPage": 23,
+      "available3D": false
+    },
+    {
+      "id": "10085",
+      "widthMm": 1000,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "10085-catalog.png",
+      "sourcePdfPage": 12,
+      "sourcePrintedPage": 23,
+      "available3D": false
+    },
+    {
+      "id": "10085P",
+      "widthMm": 1000,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "10085P-catalog.png",
+      "sourcePdfPage": 12,
+      "sourcePrintedPage": 23,
+      "available3D": false
+    },
+    {
+      "id": "10086",
+      "widthMm": 1000,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "10086-catalog.png",
+      "sourcePdfPage": 12,
+      "sourcePrintedPage": 23,
+      "available3D": false
+    },
+    {
+      "id": "10183",
+      "widthMm": 1000,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "10183-catalog.png",
+      "sourcePdfPage": 12,
+      "sourcePrintedPage": 22,
+      "available3D": false
+    },
+    {
+      "id": "13081",
+      "widthMm": 1300,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "13081-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 24,
+      "available3D": false
+    },
+    {
+      "id": "13082",
+      "widthMm": 1300,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "13082-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 24,
+      "available3D": false
+    },
+    {
+      "id": "13083",
+      "widthMm": 1300,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "13083-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 24,
+      "available3D": false
+    },
+    {
+      "id": "13084",
+      "widthMm": 1300,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "13084-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 24,
+      "available3D": false
+    },
+    {
+      "id": "13084P",
+      "widthMm": 1300,
+      "heightMm": 790,
+      "depthMm": 450,
+      "thumbnail": "13084P-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 24,
+      "available3D": false
+    },
+    {
+      "id": "30102",
+      "widthMm": 300,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "30102-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 25,
+      "available3D": false
+    },
+    {
+      "id": "31101",
+      "widthMm": 300,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "31101-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 25,
+      "available3D": false
+    },
+    {
+      "id": "40102",
+      "widthMm": 400,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "40102-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 25,
+      "available3D": false
+    },
+    {
+      "id": "41101",
+      "widthMm": 400,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "41101-catalog.png",
+      "sourcePdfPage": 13,
+      "sourcePrintedPage": 25,
+      "available3D": false
+    },
+    {
+      "id": "50101",
+      "widthMm": 500,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "50101-catalog.png",
+      "sourcePdfPage": 14,
+      "sourcePrintedPage": 26,
+      "available3D": false
+    },
+    {
+      "id": "50102",
+      "widthMm": 500,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "50102-catalog.png",
+      "sourcePdfPage": 14,
+      "sourcePrintedPage": 26,
+      "available3D": false
+    },
+    {
+      "id": "51101",
+      "widthMm": 500,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "51101-catalog.png",
+      "sourcePdfPage": 14,
+      "sourcePrintedPage": 26,
+      "available3D": false
+    },
+    {
+      "id": "60102",
+      "widthMm": 600,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "60102-catalog.png",
+      "sourcePdfPage": 14,
+      "sourcePrintedPage": 27,
+      "available3D": false
+    },
+    {
+      "id": "61101",
+      "widthMm": 600,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "61101-catalog.png",
+      "sourcePdfPage": 14,
+      "sourcePrintedPage": 27,
+      "available3D": false
+    },
+    {
+      "id": "65101",
+      "widthMm": 650,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "65101-catalog.png",
+      "sourcePdfPage": 14,
+      "sourcePrintedPage": 27,
+      "available3D": false
+    },
+    {
+      "id": "100101",
+      "widthMm": 1000,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "100101-catalog.png",
+      "sourcePdfPage": 15,
+      "sourcePrintedPage": 28,
+      "available3D": false
+    },
+    {
+      "id": "100102",
+      "widthMm": 1000,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "100102-catalog.png",
+      "sourcePdfPage": 15,
+      "sourcePrintedPage": 28,
+      "available3D": false
+    },
+    {
+      "id": "101101",
+      "widthMm": 1000,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "101101-catalog.png",
+      "sourcePdfPage": 15,
+      "sourcePrintedPage": 28,
+      "available3D": false
+    },
+    {
+      "id": "130101",
+      "widthMm": 1300,
+      "heightMm": 990,
+      "depthMm": 450,
+      "thumbnail": "130101-catalog.png",
+      "sourcePdfPage": 15,
+      "sourcePrintedPage": 28,
+      "available3D": false
     }
   ],
   "samples": [

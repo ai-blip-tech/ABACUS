@@ -4,12 +4,26 @@ export const CABINET_BASE_COLOR = '#45464a';
 export const CABINET_GLASS_THICKNESS_MM = 4;
 export const CABINET_DOOR_GAP_MM = 2;
 
+export function cabinetDimensionsMm(configuration, catalog) {
+ const specifications=configuration.modules.map(module=>{
+  const model=catalog.models.find(item=>item.id===module.model&&!item.id.startsWith('base'));
+  if(!model)throw Error('Модель комода отсутствует.');
+  return model;
+ });
+ const first=specifications[0];
+ if(!first)throw Error('Добавьте хотя бы один комод.');
+ if(specifications.some(model=>model.heightMm!==first.heightMm||model.depthMm!==first.depthMm)){
+  throw Error('Объединять можно только модули одинаковой высоты и глубины.');
+ }
+ return {
+  widthMm:specifications.reduce((sum,model)=>sum+model.widthMm,0),
+  heightMm:first.heightMm,
+  depthMm:first.depthMm,
+ };
+}
+
 export function cabinetWidthMm(configuration, catalog) {
- return configuration.modules.reduce((sum, module) => {
-  const model = catalog.models.find(item => item.id === module.model && !item.id.startsWith('base'));
-  if (!model) throw Error('Модель комода отсутствует.');
-  return sum + model.widthMm;
- }, 0);
+ return cabinetDimensionsMm(configuration,catalog).widthMm;
 }
 
 export function normalizeCabinetConfig(configuration) {
@@ -33,7 +47,7 @@ export function slabCut(configuration, catalog) {
  const sample=catalog.samples.find(item=>item.id===(configuration.front||configuration.modules[0].front));
  if(!sample?.slabWidthMm||!sample?.slabHeightMm)throw Error('Для этого декора не подтверждён размер слэба.');
  const slabWidthMm=sample.slabWidthMm,slabHeightMm=sample.slabHeightMm;
- const heightMm = 390;
+ const heightMm = cabinetDimensionsMm(configuration,catalog).heightMm;
  if(widthMm>slabWidthMm)throw Error('Длина выбранного слэба — '+slabWidthMm/10+' см. Для композиции выберите другой декор.');
  return {
   slabWidthMm,

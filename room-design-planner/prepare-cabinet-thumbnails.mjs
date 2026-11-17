@@ -2,7 +2,7 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {Box3,Vector3,EdgesGeometry} from 'three';
 const catalog=JSON.parse(await readFile(new URL('./public/cabinets/catalog.json',import.meta.url),'utf8'));
-for(const model of catalog.models){
+for(const model of catalog.models.filter(item=>item.id.startsWith('base'))){
  const bytes=await readFile(new URL('./public/cabinets/'+model.id+'.glb',import.meta.url));
  const scene=(await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'')).scene;
  scene.updateMatrixWorld(true);

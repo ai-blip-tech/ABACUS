@@ -52,6 +52,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  const [cabinetPart,setCabinetPart]=useState<'front'|'body'|'top'|'left'|'right'|'legs'>('front');
  const [allModules,setAllModules]=useState(false);
  const [assembling,setAssembling]=useState(cabinet);
+ const [catalogHeight,setCatalogHeight]=useState(390),[catalogWidth,setCatalogWidth]=useState('all'),[catalogDepth,setCatalogDepth]=useState(450);
  const [moduleAction,setModuleAction]=useState<'add'|'replace'>('add');
  const [samples,setSamples]=useState<Sample[]>([]);
  const [model,setModel]=useState<Group|null>(null);
@@ -67,7 +68,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  useEffect(()=>{
   let active=true;
   async function load() {
-   if(cabinet){const data=await cabinetCatalog();if(active){setCabinetData(data);setSamples(data.samples);}return;}
+   if(cabinet){const data=await cabinetCatalog();if(active){setCabinetData(data);setSamples(data.samples);const first=data.models.find(item=>item.id===configuration.modules[0]?.model);if(first){setCatalogHeight(first.heightMm);setCatalogDepth(first.depthMm);}}return;}
    if(!node?.metadata?.roomDesignModelAsset)throw Error('Сначала дождитесь загрузки 3D-модели TETRA.');
    const baseRef=node.metadata.surfaceTextureBase||node.metadata.roomDesignModelAsset;
    const [url,result]=await Promise.all([loadAssetUrl(baseRef),requestCatalog(TETRA_PRODUCT,{surfaceEditing:true})]);
@@ -97,16 +98,21 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
    setModel(assembled);
    setSelected(null);
    setAssembling(false);
-  }).catch(reason=>{if(active){setError(reason.message);setAssembling(false);}});
+  }).catch(reason=>{if(active){setError(reason.message);setAssembling(false);setModel(null);setParts([]);}});
   return()=>{active=false;};
  },[cabinet,cabinetData,configuration]);
 
  function setCabinetConfiguration(next:CabinetConfig){
   try{
-   if(cabinetData)slabCut(next,cabinetData);
+   if(cabinetData){
+    slabCut(next,cabinetData);
+    const missing=next.modules.find(module=>cabinetData.models.find(item=>item.id===module.model)?.available3D===false);
+    if(missing)throw Error('Для модуля '+missing.model+' ещё не подключена 3D-модель.');
+   }
    setConfiguration(next);
    setError('');
-  }catch(reason){setError((reason as Error).message);}
+   return true;
+  }catch(reason){setError((reason as Error).message);return false;}
  }
  function changeModule(patch:Partial<CabinetConfig['modules'][number]>){
   if(patch.front){setCabinetConfiguration({...configuration,front:patch.front});return;}
@@ -128,10 +134,7 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  function addModule(model:string){
   const module=newCabinet(model);
   const next={...configuration,modules:[...configuration.modules,module]};
-  try{
-   if(cabinetData)slabCut(next,cabinetData);
-   setCabinetConfiguration(next);setActiveModule(module.id);setAllModules(false);
-  }catch(reason){setError((reason as Error).message);}
+  if(setCabinetConfiguration(next)){setActiveModule(module.id);setAllModules(false);}
  }
  const activeCabinet=configuration.modules.find(module=>module.id===activeModule);
  function materialFor(sampleId:string) {
@@ -236,6 +239,11 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
  const selectedGlass=cabinetPart==='top'?configuration.top!:activeCabinet?.surfaces?.[cabinetPart as GlassPart]||{sample:activeCabinet?.glass,finish:activeCabinet?.finish};
  const glassSelected=['body','top','left','right'].includes(cabinetPart);
  const visibleSamples=cabinet?samples.filter(sample=>(sample as any).kind===(cabinetPart==='front'?'ceramic':'glass')):samples;
+ const catalogueModels=cabinetData?.models.filter(item=>!item.id.startsWith('base'))||[];
+ const heights=[...new Set(catalogueModels.map(item=>item.heightMm))].sort((a,b)=>a-b);
+ const depths=[...new Set(catalogueModels.filter(item=>item.heightMm===catalogHeight).map(item=>item.depthMm))].sort((a,b)=>a-b);
+ const widths=[...new Set(catalogueModels.filter(item=>item.heightMm===catalogHeight&&item.depthMm===catalogDepth).map(item=>item.widthMm))].sort((a,b)=>a-b);
+ const shownModels=catalogueModels.filter(item=>item.heightMm===catalogHeight&&item.depthMm===catalogDepth&&(catalogWidth==='all'||item.widthMm===Number(catalogWidth))).sort((a,b)=>a.widthMm-b.widthMm||a.id.localeCompare(b.id,undefined,{numeric:true}));
  const max=Math.max(...aspect);
  return <dialog ref={dialog} className={'rd-furniture-surface-editor'+(cabinet?' rd-cabinet-editor':'')} aria-label="Редактор текстур мебели" onCancel={event=>{event.preventDefault();if(!pending)onClose();}}>
   <header><button type="button" disabled={pending} onClick={onClose}>Назад к плану</button><h2>{node?.name||'TETRA'}</h2><button type="button" disabled={!model||pending||assembling} onClick={()=>void confirm()}>ОК</button></header>
@@ -247,22 +255,33 @@ function FurnitureSurfaceEditor({id,requestCatalog,onClose}:{id:string;requestCa
     {configuration.modules.map((module,index)=>{
      const dimensions=cabinetData?.models.find(item=>item.id===module.model);
      return <button type="button" key={module.id} aria-pressed={module.id===activeModule} onClick={()=>{setActiveModule(module.id);setAllModules(false);}}>
-      <img src={cabinetURL(module.model+'-preview.svg')} alt=""/>
+      <img src={cabinetURL(dimensions?.thumbnail||module.model+'-catalog.png')} alt=""/>
       <b>Модуль {index+1}</b><span>{dimensions?dimensions.widthMm/10+' см':''}</span>
      </button>;
     })}
    </div>
    {configuration.modules.length>1&&<button type="button" className="rd-cabinet-remove" onClick={()=>{const next=configuration.modules.filter(module=>module.id!==activeModule);setCabinetConfiguration({...configuration,modules:next});setActiveModule(next[0].id);}}>Убрать выбранный модуль</button>}
+   <div className="rd-cabinet-size-filters">
+    <label className="rd-cabinet-height-filter">Высота корпуса<select aria-label="Высота корпуса" value={catalogHeight} onChange={event=>{const height=Number(event.target.value);setCatalogHeight(height);setCatalogDepth(catalogueModels.find(item=>item.heightMm===height)?.depthMm||450);setCatalogWidth('all');}}>{heights.map(height=><option key={height} value={height}>{height/10} см</option>)}</select></label>
+    <label>Ширина<select aria-label="Ширина модуля" value={catalogWidth} onChange={event=>setCatalogWidth(event.target.value)}><option value="all">Все размеры</option>{widths.map(width=><option key={width} value={width}>{width/10} см</option>)}</select></label>
+    <label>Глубина<select aria-label="Глубина модуля" value={catalogDepth} onChange={event=>{setCatalogDepth(Number(event.target.value));setCatalogWidth('all');}}>{depths.map(depth=><option key={depth} value={depth}>{depth/10} см</option>)}</select></label>
+   </div>
    <div className="rd-cabinet-catalog-actions">
     <button type="button" aria-pressed={moduleAction==='add'} onClick={()=>setModuleAction('add')}>Добавить модуль</button>
     <button type="button" aria-pressed={moduleAction==='replace'} onClick={()=>setModuleAction('replace')}>Заменить выбранный</button>
    </div>
    <div className="rd-cabinet-model-cards">
-    {cabinetData?.models.filter(item=>!item.id.startsWith('base')).map(item=>{
+    {shownModels.map(item=>{
      const tooWide=moduleAction==='add'&&cabinetWidthMm(configuration,cabinetData)+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,cabinetData.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM);
-     return <button type="button" key={item.id} disabled={pending||tooWide} aria-label={(moduleAction==='add'?'Добавить':'Заменить на')+' модуль '+item.id} title={tooWide?'Достигнута максимальная ширина композиции':undefined} onClick={()=>moduleAction==='add'?addModule(item.id):changeModule({model:item.id})}>
-      <img src={cabinetURL(item.id+'-preview.svg')} alt={'Комод '+item.widthMm/10+' × '+item.heightMm/10+' × '+item.depthMm/10+' см'}/>
-      <span>Модуль {item.widthMm/10} см</span><span className="rd-cabinet-card-dimensions">{item.widthMm/10} × {item.heightMm/10} × {item.depthMm/10} см</span><small>{item.id}</small>
+     const incompatible=configuration.modules.some(module=>{
+      if(moduleAction==='replace'&&module.id===activeModule)return false;
+      const existing=cabinetData?.models.find(model=>model.id===module.model);
+      return existing&&(existing.heightMm!==item.heightMm||existing.depthMm!==item.depthMm);
+     });
+     const missing=item.available3D===false;
+     return <button type="button" key={item.id} disabled={pending||tooWide||incompatible||missing} aria-label={(moduleAction==='add'?'Добавить':'Заменить на')+' модуль '+item.id} title={missing?'Ожидается 3D-модель по этой схеме':incompatible?'Высота и глубина должны совпадать с композицией':tooWide?'Достигнута максимальная ширина композиции':undefined} onClick={()=>moduleAction==='add'?addModule(item.id):changeModule({model:item.id})}>
+      <img src={cabinetURL(item.thumbnail||item.id+'-preview.svg')} alt={'Комод '+item.widthMm/10+' × '+item.heightMm/10+' × '+item.depthMm/10+' см'}/>
+      <span>Модуль {item.widthMm/10} см</span><span className="rd-cabinet-card-dimensions">{item.widthMm/10} × {item.heightMm/10} × {item.depthMm/10} см</span><small>Артикул {item.id}</small>{missing&&<em>Ожидается 3D</em>}
      </button>;
     })}
    </div>

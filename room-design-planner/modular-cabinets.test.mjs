@@ -6,7 +6,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {splitCabinetBody,cabinetBounds,newCabinet} from './modular-cabinets.ts';
 const catalog=JSON.parse(await readFile(new URL('./public/cabinets/catalog.json',import.meta.url),'utf8'));
 test('all supplied cabinet variants retain real dimensions and separate front from body',async()=>{
- for(const entry of catalog.models.filter(model=>!model.id.startsWith('base'))){
+ for(const entry of catalog.models.filter(model=>!model.id.startsWith('base')&&model.available3D!==false)){
   const bytes=await readFile(new URL('./public/cabinets/'+entry.id+'.glb',import.meta.url));
   const model=(await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'')).scene;
   const front=new MeshPhysicalMaterial({color:'red'}),body=new MeshPhysicalMaterial({color:'white'});
@@ -111,4 +111,18 @@ test('legs use four supports through 2 m and six above 2 m, and base color is fi
  assert.equal(normalized.base.color,CABINET_BASE_COLOR);
  const onLegs=normalizeCabinetConfig({...normalized,support:{kind:'legs',legId:'fixture-foot'}});
  assert.equal(onLegs.base.enabled,false);
+});
+
+
+test('factory Sideboards are grouped by actual height and incompatible modules cannot be combined',async()=>{
+ const {cabinetDimensionsMm}=await import('./cabinet-layout.mjs');
+ const modules=catalog.models.filter(model=>!model.id.startsWith('base'));
+ assert.equal(modules.length,94);
+ assert.deepEqual([...new Set(modules.map(model=>model.heightMm))].sort((a,b)=>a-b),[390,590,790,990]);
+ assert.ok(modules.every(model=>model.thumbnail.endsWith('-catalog.png')));
+ assert.deepEqual(modules.filter(model=>model.available3D).map(model=>model.id).sort(),['5041','5042','6541','6542']);
+ assert.throws(()=>cabinetDimensionsMm({modules:[{model:'5041'},{model:'5061'}]},catalog),/высоты и глубины/);
+ const alternate={...catalog,models:[{id:'first',widthMm:500,heightMm:390,depthMm:450},{id:'second',widthMm:500,heightMm:390,depthMm:400}]};
+ assert.throws(()=>cabinetDimensionsMm({modules:[{model:'first'},{model:'second'}]},alternate),/высоты и глубины/);
+ assert.deepEqual(cabinetDimensionsMm({modules:[{model:'5041'},{model:'6542'}]},catalog),{widthMm:1150,heightMm:390,depthMm:450});
 });
