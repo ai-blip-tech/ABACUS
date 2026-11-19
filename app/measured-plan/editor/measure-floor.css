@@ -17,3 +17,46 @@
 .measured-plan-root .floor-axis-settings{display:grid;gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid #e8dfd5;font-size:12px}.measured-plan-root .floor-axis-settings label{display:flex;align-items:center;justify-content:space-between;gap:8px}.measured-plan-root .floor-axis-settings input{width:70px;border:1px solid #d5c8bb;border-radius:10px;padding:9px;background:white}.measured-plan-root .floor-axis-settings button{border-radius:999px;padding:10px;border:1px solid #842b39;background:white;color:#842b39}.measured-plan-root .floor-axis-settings small{font-size:11px;line-height:1.6;color:#857465}
 .floor-selected-tile{margin:12px 0 16px;padding:14px;background:#f7f3ed;border:1px solid #e1d9cf;border-radius:20px;font-family:Arial,sans-serif;color:#332d28}.floor-selected-tile>small{display:block;color:#8e142d;font-size:10px;letter-spacing:1px;margin-bottom:10px}.floor-selected-tile-body{display:flex;align-items:flex-start;gap:12px}.floor-selected-tile-body>button{flex:none!important;width:78px;height:90px;padding:0!important;border-radius:12px!important;overflow:hidden;background:white!important;color:#756960!important;font-size:10px}.floor-selected-tile-body img{width:100%;height:100%;object-fit:contain;display:block}.floor-selected-tile-body>div{display:grid;gap:6px;min-width:0}.floor-selected-tile-body b{font-size:13px;line-height:1.4}.floor-selected-tile-body span{font-size:11px;color:#796d63}.floor-selected-tile-body strong{font-size:12px}.floor-selected-tile-body a{font-size:11px;color:#94142f}.floor-selected-tile>p{font-size:11px;line-height:1.5;margin:12px 0 0}.floor-selected-tile .texture-ready{color:#47654c}.floor-selected-tile .texture-problem{color:#9a142f;font-weight:600}.floor-tile-lightbox{position:fixed;inset:0;z-index:1000;background:#211c19e8;display:grid;place-items:center;padding:30px}.floor-tile-lightbox>button{position:absolute;right:24px;top:24px;width:42px;height:42px;border-radius:50%;background:white!important;color:#302a26!important}.floor-tile-lightbox>div{background:#fffdf9;border-radius:22px;padding:22px;display:grid;gap:12px;max-width:85vw;text-align:center}.floor-tile-lightbox img{display:block;max-width:75vw;max-height:70vh;object-fit:contain}.floor-tile-lightbox p{margin:0;font-size:13px}
 dialog.floor-tile-lightbox{width:100vw;height:100dvh;max-width:none;max-height:none;border:0;margin:0}dialog.floor-tile-lightbox::backdrop{background:#211c19e8}
+/* Keep the selected-floor inspector in view when the narrow editor stacks its sidebar below the canvas. */
+@media(max-width:850px){
+ .measured-plan-root.has-document .measure-properties.has-floor-selection{position:fixed;z-index:80;top:min(112px,14dvh);right:12px;display:flex!important;width:min(300px,calc(100vw - 24px));max-height:calc(100dvh - min(112px,14dvh) - 16px);overflow:auto;padding:18px;background:#fffdfa;border:1px solid #e0d5cb;border-radius:22px;box-shadow:0 14px 48px #30231c30;overscroll-behavior:contain}
+}
+.measured-plan-root.focus-mode .measure-properties.has-floor-selection{position:fixed;z-index:80;top:16px;right:16px;display:flex!important;width:min(300px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:18px;border:1px solid #e0d5cb;border-radius:22px;background:#fffdfa;box-shadow:0 14px 48px #30231c30}
+
+/* Floor workspace: a compact workbench below the drawing, without a floating inspector. */
+.measured-plan-root .floor-workspace-properties{display:none!important}
+.measured-plan-root.has-document .measure-layout:has(.floor-workspace-properties){grid-template-columns:1fr}
+.measured-plan-root .floor-workspace-dock{position:sticky;bottom:0;z-index:40;margin:12px 0 0;padding:14px 18px;background:#fffdfa;border:1px solid #ded6cc;border-radius:20px;box-shadow:0 -5px 25px #3029220a}
+.measured-plan-root .floor-finish-docked{display:grid;grid-template-columns:minmax(150px,1fr) minmax(280px,2fr) minmax(160px,1fr);gap:10px 18px;max-height:300px;overflow:auto}
+.measured-plan-root .floor-finish-docked header{grid-column:1;border:0;padding:0;align-items:center}
+.measured-plan-root .floor-finish-docked header b{font-size:14px}
+.measured-plan-root .floor-finish-docked .floor-edit-hint{grid-column:2/4;grid-row:1;margin:0;align-self:center;font-size:11px}
+.measured-plan-root .floor-finish-docked .floor-wood-choice{padding:0;align-self:start;gap:6px}
+.measured-plan-root .floor-finish-docked .floor-wood-choice button{padding:8px 10px;cursor:pointer}
+.measured-plan-root .floor-finish-docked .floor-layout-grid{grid-column:2;grid-row:3/5;display:flex;gap:8px;overflow:auto;align-self:start}
+.measured-plan-root .floor-finish-docked .floor-layout-grid button{flex:0 0 90px;cursor:pointer}
+.measured-plan-root .floor-finish-docked .floor-layout-grid svg{height:45px}
+.measured-plan-root .floor-finish-docked .floor-axis-settings{grid-column:3;grid-row:2/6;gap:6px;margin:0;padding:0;border:0;font-size:11px}
+.measured-plan-root .floor-finish-docked .floor-axis-settings input{padding:5px;width:65px}
+.measured-plan-root .floor-finish-docked .floor-axis-settings button{padding:6px;cursor:pointer}
+.measured-plan-root .floor-finish-docked footer{grid-column:1;grid-row:4/6;padding:0;margin:0;border:0;align-self:end;flex-wrap:wrap}
+.measured-plan-root .floor-finish-docked .floor-selected-tile{grid-column:2;grid-row:2/6;margin:0;padding:10px}
+.measured-plan-root .floor-finish-docked .floor-tile-quantity{font-size:11px;margin:0}
+.measured-plan-root .floor-finish-docked>label{display:flex;align-items:center;gap:8px;font-size:11px}
+.measured-plan-root .floor-finish-docked>label input{width:60px;max-height:28px;border:1px solid #d5c8bb;border-radius:8px;padding:4px}
+.measured-plan-root .floor-workspace-empty{display:flex;gap:16px;align-items:center;font-size:12px}
+.measured-plan-root .floor-workspace-empty span{color:#83766b}.measured-plan-root .floor-workspace-empty button{margin-left:auto;border:1px solid #842b39;border-radius:999px;padding:9px 15px;background:white;color:#842b39;cursor:pointer}
+@media(max-width:650px){.measured-plan-root .floor-finish-docked{grid-template-columns:1fr 1fr;max-height:330px}.measured-plan-root .floor-finish-docked .floor-edit-hint{display:none}.measured-plan-root .floor-finish-docked .floor-layout-grid{grid-column:1/3;grid-row:auto}.measured-plan-root .floor-finish-docked .floor-axis-settings{grid-column:2;grid-row:2/4}.measured-plan-root .floor-finish-docked .floor-selected-tile{grid-column:1;grid-row:auto}.measured-plan-root .floor-finish-docked footer{grid-row:auto}}
+
+.measured-plan-root .floor-finish-docked .floor-edit-modes{grid-column:1/4;display:flex;gap:8px;grid-row:2}
+.measured-plan-root .floor-edit-modes button{font-size:11px;padding:7px 13px;border:1px solid #ddd2c6;border-radius:999px;background:white;cursor:pointer}
+.measured-plan-root .floor-edit-modes button[aria-pressed=true]{background:#842b39;color:white;border-color:#842b39}
+.measured-plan-root .floor-finish-docked>.floor-wood-choice{grid-column:1;grid-row:auto}
+.measured-plan-root .floor-finish-docked .floor-axis-settings{grid-row:3/8}
+.measured-plan-root .floor-finish-docked .floor-layout-grid{grid-row:3/7}
+.measured-plan-root .floor-finish-docked .floor-selected-tile{grid-row:3/8}
+.measured-plan-root .floor-finish-docked footer{grid-row:auto}
+@media(max-width:650px){.measured-plan-root .floor-finish-docked .floor-edit-modes{grid-column:1/3}.measured-plan-root .floor-finish-docked .floor-axis-settings{grid-row:3/6}.measured-plan-root .floor-finish-docked .floor-layout-grid{grid-column:1/3;grid-row:auto}}
+
+.measured-plan-root .floor-finish-docked[data-edit-mode=area] .floor-layout-grid,.measured-plan-root .floor-finish-docked[data-edit-mode=area] .floor-selected-tile{grid-column:2/4}
+@media(max-width:650px){.measured-plan-root .floor-finish-docked[data-edit-mode=area] .floor-layout-grid,.measured-plan-root .floor-finish-docked[data-edit-mode=area] .floor-selected-tile{grid-column:1/3;grid-row:auto}}

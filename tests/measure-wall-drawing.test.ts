@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {snapDrawingPoint,drawingLengthPoint} from '../lib/measured-plan/measure-wall-drawing.ts';
+import {snapDrawingPoint,drawingLengthPoint,parseDrawingLength} from '../lib/measured-plan/measure-wall-drawing.ts';
 test('new thick wall captures visible end-cap corner, not only thin axis hit target',()=>{const walls:Wall[]=[{id:'h',name:'h',a:[-1550,-4046],b:[6067,-4046],thickness:300,thicknessConfirmed:true,lengthConfirmed:false,height:null,group:'inner',provenance:'test'}];assert.deepEqual(snapDrawingPoint([-1370,-3866],null,walls,60,false,300).point,[-1550,-4046]);assert.deepEqual(snapDrawingPoint([-1370,-3866],null,walls,60,true,300).point,[-1370,-3866]);});
 test('thick wall start does not trap a short next segment in its own corner magnet',()=>{const walls:Wall[]=[{id:'h',name:'h',a:[0,0],b:[3000,0],thickness:300,thicknessConfirmed:true,lengthConfirmed:false,height:null,group:'inner',provenance:'test'}];assert.deepEqual(snapDrawingPoint([0,150],[0,0],walls,20,false,300).point,[0,150]);});
 import type {Wall} from '../lib/measured-plan/measure-model.ts';
@@ -27,3 +27,5 @@ test('exact dimension preserves heading and rejects invalid lengths',()=>{
  assert.throws(()=>drawingLengthPoint([0,0],[1,0],99));
  assert.throws(()=>drawingLengthPoint([0,0],[1,0],Infinity));
 });
+
+test('keyboard length accepts decimal comma and rejects malformed and unsafe sizes',()=>{assert.equal(parseDrawingLength('2 500,5'),2500.5);assert.equal(parseDrawingLength('1250.25'),1250.25);for(const s of ['','-100','99','50001','1e4','abc'])assert.throws(()=>parseDrawingLength(s));const p=drawingLengthPoint([50,75],[51,76],parseDrawingLength('2500'));assert.ok(Math.abs(Math.hypot(p[0]-50,p[1]-75)-2500)<1e-8);});

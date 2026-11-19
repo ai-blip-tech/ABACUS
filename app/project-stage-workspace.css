@@ -42,3 +42,36 @@ html[data-project-stage-embed] .materials-concept{min-height:0}
 .project-stage-workspace .project-menu-back{padding:9px 10px;min-height:32px;font-size:10px;border-radius:8px}
 @media(max-width:1000px){.project-stage-layout{grid-template-columns:176px minmax(0,1fr)}.project-stage-workspace .project-menu-summary h1{font-size:21px}}
 @media(max-width:650px){.project-stage-layout{grid-template-columns:136px minmax(0,1fr)}.project-stage-workspace .project-menu-sidebar{padding:12px 6px}.project-stage-workspace .project-menu-summary h1{font-size:18px}.project-stage-workspace .project-menu-stages li>button{grid-template-columns:20px minmax(0,1fr);padding:6px 4px;gap:4px;min-height:38px}.project-stage-workspace .project-menu-stages li>button>span{width:20px;height:20px;font-size:8px}.project-stage-workspace .project-menu-stages li>button b{font-size:10px}.project-stage-workspace .project-menu-stages li>button small{grid-column:2;font-size:8px}.project-stage-workspace .project-menu-stages::before{left:14px}}
+/* Preview: planning substeps keep their parent stage and the project numbering. */
+.project-stage-workspace .project-menu-stages li.is-substage{margin:3px 0 3px 18px;padding-left:10px;border-left:1px solid #dcd0c5}
+.project-stage-workspace .project-menu-stages li.is-substage>button{border-radius:999px;grid-template-columns:28px 1fr;min-height:34px;padding:6px 10px;background:transparent}
+.project-stage-workspace .project-menu-stages li.is-substage>button>span{width:auto;height:auto;background:transparent;border:0;color:#96867a;font-size:9px}
+.project-stage-workspace .project-menu-stages li.is-substage.is-active>button{background:#92142d;color:#fff}
+.project-stage-workspace .project-menu-stages li.is-substage.is-active>button>span{color:#f0d6dc}
+.project-stage-workspace .project-menu-stages li.has-active-substage>button b{color:#92142d}
+.planning-substage-overview{padding:clamp(24px,5vw,70px);max-width:1200px;margin:auto}
+.planning-substage-overview>span,.planning-wall-substage section>span{font-size:10px;letter-spacing:.18em;color:#92142d}
+.planning-substage-overview>h1{font:400 clamp(30px,3.3vw,48px) Georgia,serif;margin:16px 0}
+.planning-substage-overview>p{color:#887d73;font-size:14px}
+.planning-substage-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:34px}
+.planning-substage-cards>button{padding:20px;text-align:left;border:1px solid #e3d9d0;border-radius:28px;background:#fffdfa;color:#302b27;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.planning-substage-cards>button:hover{border-color:#92142d;box-shadow:0 12px 35px #6b36410c}
+.planning-substage-art{height:180px;display:grid;place-content:center;background:#f3eee6;border-radius:18px;margin-bottom:22px;color:#9b8370}
+.planning-substage-art svg{width:106px;height:106px}
+.planning-substage-cards>button>span{font-size:9px;letter-spacing:.15em;color:#988575}
+.planning-substage-cards h2{font:400 34px Georgia,serif;margin:10px 0}
+.planning-substage-cards p{font-size:13px;color:#887d73;min-height:30px}
+.planning-substage-cards b{display:flex;justify-content:space-between;border-top:1px solid #e9e0d8;padding-top:17px;font-size:13px;color:#92142d;font-weight:400}
+.planning-substage-cards i{font-style:normal;font-size:20px}
+@media(max-width:700px){.planning-substage-cards{grid-template-columns:1fr}.planning-substage-art{height:110px}.planning-substage-overview{padding:24px 18px}}
+.project-stage-workspace .project-menu-stages li.is-substage.is-active>button>b{color:#fff}
+.project-stage-workspace>.project-menu-header nav>em{flex-shrink:0}
+.project-stage-workspace .project-menu-stages li.has-substage-toggle{position:relative}
+.project-stage-workspace .project-menu-stages li.has-substage-toggle>button:first-child{padding-right:30px}
+.project-stage-workspace .project-menu-stages li>button.project-substage-toggle{position:absolute;right:2px;top:5px;display:grid;place-items:center;grid-template-columns:none;width:28px;height:28px;min-height:28px;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;color:#88796b}
+.project-stage-workspace .project-menu-stages li>button.project-substage-toggle:hover{background:#ecdfe1;color:#92142d}
+.project-substage-toggle svg{transition:transform .15s}
+.project-substage-toggle[aria-expanded=true] svg{transform:rotate(90deg)}
+.project-stage-workspace .project-menu-stages li.is-substage>button{grid-template-columns:1fr;padding-left:17px}
+/* Give the experimental floor workspace the full phone width; other stages retain their navigation. */
+@media(max-width:650px){.project-stage-workspace:has(#workspace-planning-floor-2:not([hidden])) .project-stage-layout{grid-template-columns:minmax(0,1fr)}.project-stage-workspace:has(#workspace-planning-floor-2:not([hidden])) .project-menu-sidebar{display:none}}

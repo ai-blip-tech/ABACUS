@@ -18,9 +18,12 @@ export function constrainFloorPoint(p:Point,surface:MultiPolygon,tolerance=0,anc
  return target;
 }
 export function floorPolygonInside(polygon:Point[],surface:MultiPolygon){const p=floorPolygon(polygon);return !surface.length||ringArea(p)-multiArea(clipping.intersection([p],surface))<1;}
-export function constrainFloorEdit(polygon:Point[],kind:'move'|'vertex'|'edge',index:number,delta:Point,surface:MultiPolygon,tolerance:number){
+export function constrainFloorEdit(polygon:Point[],kind:'move'|'vertex'|'edge',index:number,delta:Point,surface:MultiPolygon,tolerance:number,allowSlide=true){
  const base=floorPolygon(polygon.map(p=>constrainFloorPoint(p,surface))),next=editFloorPolygon(base,kind,index,delta);
  if(kind==='vertex'){next[index]=constrainFloorPoint(next[index],surface,tolerance,base[index]);}
  else{let fraction=1;for(let i=0;i<base.length;i++){const dx=next[i][0]-base[i][0],dy=next[i][1]-base[i][1],n=dx*dx+dy*dy;if(n<.001)continue;const q=constrainFloorPoint(next[i],surface,0,base[i]);fraction=Math.min(fraction,Math.max(0,((q[0]-base[i][0])*dx+(q[1]-base[i][1])*dy)/n));}for(let i=0;i<base.length;i++)next[i]=[base[i][0]+(next[i][0]-base[i][0])*fraction,base[i][1]+(next[i][1]-base[i][1])*fraction];}
- const result=floorPolygon(next);if(!floorPolygonInside(result,surface))throw Error('Граница пола не может пересекать стену или колонну');return result;
+ let result=floorPolygon(next);if(!floorPolygonInside(result,surface)){if(kind==='move'&&allowSlide)result=base;else throw Error('Граница пола не может пересекать стену или колонну');}
+ // A small perpendicular mouse movement must not lock a region against a wall.
+ if(kind==='move'&&allowSlide&&Math.hypot(...delta)>0){const target:Point=[base[0][0]+delta[0],base[0][1]+delta[1]];for(const shift of [[delta[0],0],[0,delta[1]]] as Point[]){try{const candidate=constrainFloorEdit(base,kind,index,shift,surface,tolerance,false);if(distance(candidate[0],target)<distance(result[0],target)-.01)result=candidate;}catch{}}}
+ return result;
 }

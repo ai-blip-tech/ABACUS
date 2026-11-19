@@ -28,3 +28,6 @@ export function drawingLengthPoint(a:Point,b:Point,mm:number):Point{
  if(!Number.isFinite(mm)||mm<100||mm>50000||size<1)throw Error('Длина стены — от 100 до 50 000 мм. Сначала задайте направление мышью.');
  return [a[0]+(b[0]-a[0])*mm/size,a[1]+(b[1]-a[1])*mm/size];
 }
+
+/** Millimetres accept decimal comma and spaces, but never scientific notation or negative lengths. */
+export function parseDrawingLength(value:string){const text=value.replace(/\s/g,'');if(!/^\d+(?:[.,]\d+)?$/.test(text))throw Error('Введите длину числом в миллиметрах');const n=Number(text.replace(',','.'));if(n<100||n>50000)throw Error('Длина стены — от 100 до 50 000 мм');return n;}

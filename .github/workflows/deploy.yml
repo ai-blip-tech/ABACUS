@@ -240,6 +240,7 @@ jobs:
             path = Path(sys.argv[1])
             updates = {
                 "ROOM_DESIGN_DATA_DIR": sys.argv[2],
+                "ROOM_DESIGN_PARQUET_DIR": "/home/codex/roomdesign-assets/floor-coverings-20261120",
                 "OPENAI_TEXT_MODEL": "gpt-6.1-sol",
                 "NEXT_PUBLIC_ONO_V2_ENABLED": "true",
                 "ONO_V2_ENABLED": "true",
@@ -267,6 +268,21 @@ jobs:
             grep -qx 'NEXT_PUBLIC_ONO_V2_ENABLED=true' "$env_file"
             grep -qx 'ONO_V2_ENABLED=true' "$env_file"
             echo "ONO_RELEASE_ENVIRONMENT=prepared-enabled"
+
+            python3 - /home/codex/roomdesign-assets/floor-coverings-20261120 <<'PY'
+            import hashlib, json, sys
+            from pathlib import Path
+            root=Path(sys.argv[1]); manifest=json.loads((root/'MANIFEST.json').read_text())
+            assert len(manifest['files'])==117
+            for name,item in manifest['files'].items():
+                file=root/name
+                assert file.is_file() and file.stat().st_size==item['size'] and hashlib.sha256(file.read_bytes()).hexdigest()==item['sha256'], 'Parquet asset integrity failure'
+            web=json.loads((root/'WEB-MANIFEST.json').read_text()); assert len(web)==20
+            for name,digest in web.items():
+                assert hashlib.sha256((root/name).read_bytes()).hexdigest()==digest
+            assert (root/'surface-catalog-approved-v2.json').is_file()
+            print('PARQUET_RELEASE_ASSETS=verified')
+            PY
 
             git archive "$release_sha" | tar -x -C "$release_dir"
             cp "$env_file" "$release_dir/.env"
@@ -303,6 +319,7 @@ jobs:
             PLANNING_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/planning-plan-local-smoke.mjs
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/planning-plan" >/dev/null
             node scripts/room-design-planner-http-smoke.mjs "http://127.0.0.1:${candidate_port}"
+            FLOOR_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/floor-covering-release-smoke.mjs
             cleanup_candidate
 
             cd "$live_dir"
@@ -332,6 +349,10 @@ jobs:
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/measured-plan)" = "401"
             curl --fail --silent --show-error http://127.0.0.1:3000/api/it/config | grep -q '"enabled":true'
 
+            curl --fail --silent --show-error http://127.0.0.1:3000/planning-floor-2 >/dev/null
+            curl --fail --silent --show-error http://127.0.0.1:3000/floor-layout/print >/dev/null
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/floor-2)" = "401"
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/floor-parquet/WoodFloor032/Color)" = "401"
             node scripts/room-design-planner-http-smoke.mjs http://127.0.0.1:3000
 
             node scripts/room-design-planner-http-smoke.mjs https://roomdesign.com.ru

@@ -1,6 +1,8 @@
+import {floorTileFromProduct} from "@/lib/floor-tile-product";
 import { catalogHasModel3D, catalogModelUrl } from "@/lib/catalog-model3d";
 import { matchesCatalogType } from "@/lib/catalog-filter";
 import { FURNITURE_CATALOG_SOURCES } from "@/lib/furniture-catalog";
+import {loadSurfaceCatalog,surfaceCatalogNotice} from "@/lib/surface-catalog";
 import { loadStudioCatalog } from "@/lib/studio-catalog";
 import { matchesCatalogSearch, catalogDiscount } from "@/lib/catalog-search";
 import { matchesCatalogFeature } from "@/lib/catalog-features";
@@ -33,13 +35,14 @@ export async function GET(request: Request) {
   const limit = Math.min(30, Math.max(6, Number(search.get("limit")) || 18));
 
   try {
-    const { products, unavailableSources } = await loadStudioCatalog();
+    const { products:loadedProducts, unavailableSources } = await ((search.get("scope")==="surfaces"||type==="porcelain"&&!query&&!ids.size)?loadSurfaceCatalog().then(products=>({products,unavailableSources:[]})):loadStudioCatalog());
+    const products=search.get("covering")==="1"?loadedProducts.map(p=>{if(!matchesCatalogType(p,'porcelain',p._trail||''))return p;try{const tile=floorTileFromProduct(p);return{...p,catalogImage:p.image,widthMm:tile.widthMm,depthMm:tile.heightMm,heightMm:tile.thicknessMm||null,price:tile.price||0,oldPrice:0};}catch{return p;}}):loadedProducts;
     const navigation = furnitureCatalogNavigation(products,{type,brands:selectedSources,query});
-    const matched = products.filter((product) => {
+    let matched = products.filter((product) => {
       if (search.get("model3d") === "1" && !catalogHasModel3D(product)) return false;
       if (ids.size) return ids.has(product.id) || (product.source === "norrmobler" && ids.has(product.sourceId));
       // Global search deliberately bypasses sidebar filters; clearing it restores them.
-      if (query) return matchesCatalogSearch(product,query);
+      if (query) {if(!matchesCatalogSearch(product,query))return false;if(search.get("covering")!=="1")return true;}
       if (!matchesFurnitureBrand(product, selectedSources)) return false;
       if (!matchesCatalogType(product, type, product._trail || "")) return false;
       if (availableOnly && !product.available) return false;
@@ -58,6 +61,8 @@ export async function GET(request: Request) {
       if (heightMaxMm && (!product.heightMm || product.heightMm > heightMaxMm)) return false;
       return true;
     });
+    const tileFormats=search.get("covering")==="1"?[...new Set(matched.filter(p=>matchesCatalogType(p,'porcelain',p._trail||'')&&p.widthMm&&p.depthMm).map(p=>`${p.widthMm}x${p.depthMm}`))].sort():[];
+    if(search.get("covering")==="1"&&search.get("format"))matched=matched.filter(p=>`${p.widthMm}x${p.depthMm}`===search.get("format"));
     if(sort==="model3d_first")matched.sort((a,b)=>Number(Boolean(catalogModelUrl(b)))*2+Number(catalogHasModel3D(b))-Number(Boolean(catalogModelUrl(a)))*2-Number(catalogHasModel3D(a)));
     if (sort === "price_asc") matched.sort((left, right) => (left.price || Number.POSITIVE_INFINITY) - (right.price || Number.POSITIVE_INFINITY));
     if (sort === "price_desc") matched.sort((left, right) => (right.price || 0) - (left.price || 0));
@@ -67,9 +72,9 @@ export async function GET(request: Request) {
     const selectedProducts = ids.size ? matched.slice(0, 100) : matched.slice(start, start + limit);
     const pageProducts = selectedProducts.map(({ _trail, _updatedAt, ...product }) => ({ ...product, canonicalUrl: product.url, updatedAt: _updatedAt, provenance: product.source === "gomoon" ? "gomoon_yml" : product.source === "leve-home" ? "leve_home_yml" : "norrmobler_yml" }));
     return Response.json({
-      products: pageProducts, total: matched.length, page, limit, subtypes, ...navigation,
+      products: pageProducts, tileFormats, total: matched.length, page, limit, subtypes, ...navigation,
       brands: [...FURNITURE_CATALOG_SOURCES, {id:"gomoon",name:"GoMoon"}].map(({ id, name }) => ({ id, name, available: !unavailableSources.includes(id) })),
-      unavailableSources,
+      unavailableSources, catalogNotice:surfaceCatalogNotice(),
     });
   } catch {
     return Response.json({ error: "Каталог временно недоступен. Попробуйте ещё раз." }, { status: 502 });

@@ -1,2 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {blankDoc} from '../lib/measured-plan/measure-model.ts';import type {FloorRegion} from '../lib/measured-plan/measure-floor-finishes.ts';import {optimizeFloorTile} from '../lib/measured-plan/floor-tile-optimizer.ts';import {floorTileQuantity} from '../lib/measured-plan/floor-tile-quantity.ts';
 test('optimized grid agrees with polygon-clipping purchase calculation for concave floor and column holes',()=>{const d=blankDoc({name:'',mime:'',hash:'',width:1,height:1,page:1,pages:1,method:'manual',image:'',words:[],pixelScale:1});d.floor=[[350.123456,250],[4000,250],[4000,1800],[2500,1800],[2500,4000],[350.123456,4000]];d.columns=[{id:'c',name:'c',a:[800,800],width:400,depth:500,height:2700,confirmed:true,structuralStatus:'bearing',provenance:'test'}];const r:FloorRegion={id:'floor_test',polygon:d.floor,material:'tile',layout:null,wood:'oak',tile:{id:'tile',name:'Tile',image:'/a.jpg',widthMm:1200,heightMm:600,jointMm:2,grout:'#ffffff'}};d.floorRegions=[r];const next=optimizeFloorTile(d,r);assert.ok(floorTileQuantity(d,next)!.count<=floorTileQuantity(d,r)!.count);assert.equal(next.tileLayoutMode,'auto');assert.equal(next.tile!.widthMm,1200);assert.deepEqual(d.floorRegions[0],r);});
+
+test('rotated grid with fractional intersections reports whole stock tiles without sweep-line failures',()=>{
+ const d=blankDoc({name:'',mime:'',hash:'',width:1,height:1,page:1,pages:1,method:'manual',image:'',words:[],pixelScale:1});
+ d.floor=[[982,351],[3790,351],[3790,2520],[982,2520]];
+ const r:FloorRegion={id:'rotated',polygon:d.floor,material:'tile',layout:null,wood:'oak',origin:[4022,110],angle:90,tile:{id:'tile',name:'Tile',image:'/a.jpg',widthMm:1200,heightMm:600,jointMm:2,grout:'#ffffff'}};d.floorRegions=[r];
+ const q=floorTileQuantity(d,r)!;assert.equal(q.count,18);assert.equal(q.cut,14);assert.equal(q.stockArea,12.96);assert.ok(q.tileArea<q.stockArea);
+ const optimized=floorTileQuantity(d,optimizeFloorTile(d,r))!;assert.equal(optimized.count,10);assert.equal(optimized.stockArea,7.2);
+});

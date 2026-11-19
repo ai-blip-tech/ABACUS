@@ -1,0 +1,12 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {manualPlanning} from '../lib/planning-plan/model.ts';
+import {createAlbum} from '../lib/planning-plan/variants.ts';
+import {withManualSheets} from '../lib/planning-plan/manual-workspace.ts';
+import {newFurniture} from '../lib/planning-plan/furniture.ts';
+import {mergeFloorCoverings} from '../lib/floor-2/planning-sync.ts';
+import {assignProduct} from '../lib/floor-2/model.ts';
+import {ambientParquet} from '../lib/floor-2/ambient-parquet.ts';
+function fixture(){const d=manualPlanning();d.plan.furniture=[newFurniture('sofa',[800,900])];d.plan.floor=[[0,0],[6000,0],[6000,4000],[0,4000]];return withManualSheets(createAlbum(d));}
+test('only coverings merge into latest planning document; furniture, metadata and other sheets survive',()=>{const album=fixture(),before=structuredClone(album),plan=structuredClone(album.variants.manual.plan);plan.furniture=[];plan.name='stale name';plan.floorRegions=[assignProduct({id:'floor',polygon:[[0,0],[6000,0],[6000,4000],[0,4000]],layout:null,wood:'oak'},ambientParquet.find(p=>p.id==='WoodFloor042'))];album.variants.manual.plan.name='Newest name';const result=mergeFloorCoverings(album,plan);assert.equal(result.variants.manual.plan.name,'Newest name');assert.deepEqual(result.variants.manual.plan.furniture,before.variants.manual.plan.furniture);assert.deepEqual(result.variants.manual.plan.floorRegions,plan.floorRegions);assert.deepEqual(result.manualWorkspace.sheets.manual[0].plan.floorRegions,plan.floorRegions);assert.deepEqual(result.manualWorkspace.sheets.manual.slice(1),before.manualWorkspace.sheets.manual.slice(1));assert.equal(album.variants.manual.plan.floorRegions,undefined);});
+test('other sheets and changed geometry refuse a stale floor update',()=>{const album=fixture(),plan=structuredClone(album.variants.manual.plan);assert.throws(()=>mergeFloorCoverings(album,{...plan,id:'other'}),/другой лист/);assert.throws(()=>mergeFloorCoverings(album,{...plan,floor:[[0,0],[7000,0],[7000,4000],[0,4000]]}),/Границы/);});
+test('undoing or deleting coverings propagates an empty list rather than keeping old material',()=>{const album=fixture();album.variants.manual.plan.floorRegions=[{id:'r',polygon:[[0,0],[1000,0],[1000,1000]],layout:'straight',wood:'oak'}];const plan={...structuredClone(album.variants.manual.plan),floorRegions:[]};assert.deepEqual(mergeFloorCoverings(album,plan).variants.manual.plan.floorRegions,[]);});

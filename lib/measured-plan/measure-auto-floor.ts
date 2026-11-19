@@ -85,5 +85,6 @@ function inside(p:Point,polygon:Point[]){let result=false;for(let i=0,j=polygon.
 
 export function withAutomaticFloor(doc:MeasureDoc,previous?:MeasureDoc|null):MeasureDoc{
  if(doc===previous)return doc;
+ if(previous&&JSON.stringify([doc.walls,doc.columns])===JSON.stringify([previous.walls,previous.columns]))return {...doc,floor:previous.floor,floorConfirmed:previous.floorConfirmed};
  return {...doc,floor:automaticFloor(doc.walls,doc.columns).polygon,floorConfirmed:false};
 }

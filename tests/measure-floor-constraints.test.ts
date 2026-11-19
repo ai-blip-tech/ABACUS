@@ -24,3 +24,10 @@ test('moving a floor edge or whole region stops at the wall while preserving its
  assert.deepEqual(constrainFloorEdit(p,'move',0,[-2000,0],surface,120),[[100,500],[1100,500],[1100,1500],[100,1500]]);
  assert.deepEqual(constrainFloorEdit(p,'vertex',0,[-600,-600],surface,120)[0],[100,100]);
 });
+
+
+test('a region touching a wall still slides along it despite diagonal pointer drift',()=>{
+ const p: [number,number][]=[[100,500],[1100,500],[1100,1500],[100,1500]];
+ const next=constrainFloorEdit(p,'move',0,[-25,400],surface,120);
+ assert.deepEqual(next,[[100,900],[1100,900],[1100,1900],[100,1900]]);
+});
