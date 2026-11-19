@@ -19,7 +19,7 @@ import type {MeasureDoc} from '@/lib/measured-plan/measure-model';
 import {cameraManifest} from '@/lib/visualizations/brief.mjs';
 import {materialAtlas} from '@/lib/visualizations/client';
 import renderProducts from '@/lib/wall-elevations/products.json';
-import renderWallpapers from '@/public/experimental-wallpapers/catalog.json';
+import renderWallpapers from '@/lib/wallpaper-catalog';
 import './planner-view.css';
 import './planning.css';
 import './manual-workspace.css';

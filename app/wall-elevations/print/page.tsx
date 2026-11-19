@@ -4,7 +4,7 @@ import AlbumCover from '../../materials-concept/print/album-cover';
 import '../../materials-concept/print/print.css';
 import './walls.css';
 import products from '@/lib/wall-elevations/products.json';
-import wallpapers from '@/public/experimental-wallpapers/catalog.json';
+import wallpapers from '@/lib/wallpaper-catalog';
 const finishImage=(f:any)=>f.surface?.kind==='wallpaper'?wallpapers.find(p=>p.id===f.surface.wallpaperId)?.image:'/_next/static/room-design-planner/wall-panels/'+f.surface?.material+'_1K-JPG_Color.jpg';
 import {wallElevations} from '@/lib/wall-elevations/model.mjs';
 const drawingScale=(w:any)=>[50,100,200].find(s=>(w.length*1000+900)/s<=380&&(w.height*1000+900)/s<=175)||200;
