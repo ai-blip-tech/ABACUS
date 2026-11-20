@@ -1,3 +1,5 @@
+import {rotateTileDecor,replaceTileDecor} from '../room-design-planner/tile-decoration.mjs';
+import {registerTileProduct,tileProduct} from '../room-design-planner/tile-products.mjs';
 import assert from 'node:assert/strict';
 import {blankDoc} from '../lib/measured-plan/measure-model.ts';
 import {planningToPlanner} from '../lib/planning-plan/planner-adapter.ts';
@@ -25,4 +27,12 @@ assert.equal((await req(path,'PUT',{action:'workspace-save',revision:data.revisi
 assert.equal((await req(path,'GET',undefined,false)).status,401);
 assert.equal((await req('/planning-walls')).status,200);
 r=await req('/api/catalog?scope=surfaces&type=porcelain&covering=1&limit=6');assert.equal(r.status,200);assert.ok((await r.json()).products.length);
-console.log('WALL_PREVIEW_PASSED: paint sides, tile phase, save/reload, shared 3D roundtrip, revision conflicts, auth and catalog');
+// Saving floor coverings in their own stage must reach the wall editor's source.
+const floorPath='/api/projects/'+id+'/floor-2',floorData=await(await req(floorPath)).json();
+const floorPlan=structuredClone(floorData.sourcePlan);floorPlan.floorRegions=[{id:'smoke-floor',name:'Паркет',material:'parquet',wood:'oak',layout:'herringbone',polygon:[[60,60],[3940,60],[3940,2940],[60,2940]]}];
+r=await req(floorPath,'PUT',{revision:floorData.revision,document:{version:1,layeringVersion:1,plan:floorPlan,sourceFingerprint:floorData.document.sourceFingerprint}});assert.equal(r.status,200,JSON.stringify(await r.clone().json()));
+loaded=await(await req(path)).json();const withFloor=loaded.document.variants.manual.plan;assert.equal(withFloor.floorRegions[0].id,'smoke-floor');
+const tiledScene=planningToPlanner(withFloor,{assetFor:()=>'/model.glb',wallHeightMm:2800}).scene;assert.equal(tiledScene.nodes.slab_roomdesign.metadata.roomDesignFloorRegions.length,1);assert.ok(tiledScene.nodes.slab_roomdesign.metadata.roomDesignFloorGeometry[0].polygons.length);
+const tiles=withFloor.walls[0].plannerFinish.roomDesignTiles,original=structuredClone(tiles);const alternate=registerTileProduct({...tileProduct(tiles[0].productId),id:'test:alternate'});tiles[0]=replaceTileDecor(rotateTileDecor(tiles[0]),alternate.id);withFloor.walls[0].plannerFinish.roomDesignTileProducts=[alternate];
+r=await req(path,'PUT',{action:'workspace-save',revision:loaded.revision,plan:withFloor});assert.equal(r.status,200);loaded=await(await req(path)).json();assert.deepEqual(loaded.document.variants.manual.plan.walls[0].plannerFinish.roomDesignTiles.slice(1),original.slice(1));assert.equal(loaded.document.variants.manual.plan.walls[0].plannerFinish.roomDesignTiles[0].productId,alternate.id);assert.equal(loaded.document.variants.manual.plan.floorRegions[0].id,'smoke-floor');
+console.log('WALL_PREVIEW_PASSED: floor save → shared plan → 3D geometry, one-tile rotate/replace persistence; paint sides, tile phase, save/reload, shared 3D roundtrip, revision conflicts, auth and catalog');

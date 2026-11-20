@@ -140,3 +140,5 @@ html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}.linked-room-pla
 .rd-wall-work-mode .rd-wall-panel-refined{min-height:0;height:auto}
 .rd-wall-work-mode .rd-palette-tabs input[type=color]{max-width:100%;height:32px}
 .rd-wall-work-mode div[style*="text-shadow"]{display:none!important}
+
+.rd-tile-decor-tools{display:flex;gap:6px;margin-bottom:8px}.rd-wall-panel .rd-tile-decor-tools button{flex:1;padding:7px 8px;font-size:11px;cursor:pointer;border-radius:18px;border:1px solid #ded5cd;background:#fff}.rd-wall-panel .rd-tile-decor-tools button[aria-pressed=true]{background:#94162f;color:#fff}.rd-tile-decor-hint{display:block;font-size:11px;margin:0 0 8px;color:#756b64}
