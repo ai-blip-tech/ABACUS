@@ -13,6 +13,7 @@ export default defineConfig({
   define: {'process.env': {}},
   resolve: {
     alias: {
+      '@': path('../'),
       'next/image': path('./next-image.tsx'),
       'next/link': path('./next-link.tsx'),
       'polygon-clipping': fileURLToPath(import.meta.resolve('polygon-clipping')),
