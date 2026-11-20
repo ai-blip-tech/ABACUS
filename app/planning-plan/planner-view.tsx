@@ -3,21 +3,25 @@ import {forwardRef,useEffect,useImperativeHandle,useRef,useState} from 'react';
 import {floorRegionGeometry} from '@/lib/measured-plan/measure-floor-finishes';
 import {editorKeyCommand} from '@/lib/planning-plan/key-command';
 import type {MeasureDoc} from '@/lib/measured-plan/measure-model';
+import type {wallWorkContext} from '@/lib/wall-decoration/surfaces';
 import type {PlannerScene} from '@/lib/planning-plan/planner-sync';
 export type PlannerSnapshot={scene:PlannerScene;baseline:PlannerScene};
 export type PlannerViewControl={configureCabinet:(kind:"dresser"|"tv_stand")=>void;wallTile:(product:any)=>void;floor:(plan:MeasureDoc)=>void;floorEditing:(active:boolean)=>void;focus:()=>void;snapshot:()=>Promise<PlannerSnapshot>;capture:()=>Promise<any>};
 export const plannerEntry = process.env.NODE_ENV === 'development'
   ? 'http://localhost:4198/planning-bridge.html'
   : '/room-design-planner/view';
-export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectId:string;projectName:string;disabled?:boolean;mode:'3d'|'eye';floorEditing?:boolean;onWallTileCatalog?:()=>void;onFloorSelect?:(id:string)=>void;onFloorSync?:(regions:NonNullable<MeasureDoc["floorRegions"]>)=>void;onDirty:()=>void}>(({plan,projectId,projectName,onDirty,disabled,mode,onFloorSelect,floorEditing,onFloorSync,onWallTileCatalog},control)=>{
+export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectId:string;projectName:string;disabled?:boolean;mode:'3d'|'eye';floorEditing?:boolean;wallWork?:ReturnType<typeof wallWorkContext>|null;onWallNavigate?:(direction:number)=>void;onWallTileCatalog?:()=>void;onFloorSelect?:(id:string)=>void;onFloorSync?:(regions:NonNullable<MeasureDoc["floorRegions"]>)=>void;onDirty:()=>void}>(({plan,projectId,projectName,onDirty,disabled,mode,onFloorSelect,floorEditing,onFloorSync,onWallTileCatalog,wallWork,onWallNavigate},control)=>{
  const frame=useRef<HTMLIFrameElement>(null),[session]=useState(()=>crypto.randomUUID()),[ready,setReady]=useState(false),[editingTextures,setEditingTextures]=useState(false),[error,setError]=useState(''),pending=useRef(new Map<string,{resolve:(s:PlannerSnapshot)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>());
  const origin = plannerEntry?.startsWith('http:') ? new URL(plannerEntry).origin : typeof window !== 'undefined' ? window.location.origin : '';
  const pendingCabinet=useRef<'dresser'|'tv_stand'|null>(null);
+ // Rebinding a callback is not an editor close: keep in-flight save snapshots alive.
+ useEffect(()=>()=>{for(const job of pending.current.values()){clearTimeout(job.timer);job.reject(Error('3D-редактор закрыт'));}pending.current.clear();},[session,origin]);
  const cacheKey='roomdesign-pascal-linked:'+projectId+':'+plan.id;
  useEffect(()=>{const receive=(event:MessageEvent)=>{if(event.origin!==origin||event.source!==frame.current?.contentWindow||event.data?.session!==session)return;const data=event.data;
-  if(data.type==='pascal:ready'){let previousScene;try{previousScene=JSON.parse(localStorage.getItem(cacheKey)||'null')?.scene;}catch{}frame.current?.contentWindow?.postMessage({type:'roomdesign:open',session,document:plan,projectId,projectName,previousScene,mode},origin);}
+  if(data.type==='pascal:ready'){let previousScene;try{previousScene=JSON.parse(localStorage.getItem(cacheKey)||'null')?.scene;}catch{}frame.current?.contentWindow?.postMessage({type:'roomdesign:open',session,document:plan,projectId,projectName,previousScene,mode,wallWork},origin);}
   if(data.type==='pascal:model-prepare'){void (async()=>{try{const r=await fetch('/api/catalog/model-asset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:data.productId,textureId:data.textureId,inspect:data.surfaceEditing===true,surfaceEditing:data.surfaceEditing===true})}),result=await r.json();if(!r.ok)throw Error(result.error||'Не удалось подготовить модель');frame.current?.contentWindow?.postMessage({type:'roomdesign:model-prepared',session,requestId:data.requestId,result:{...result,...(result.url?{url:location.origin+result.url}:{})}},origin);}catch(e){frame.current?.contentWindow?.postMessage({type:'roomdesign:model-prepared',session,requestId:data.requestId,error:(e as Error).message},origin);}})();}
   if(data.type==='pascal:furniture-textures-open')setEditingTextures(data.active===true);
+  if(data.type==='roomdesign:wall-work-navigate')onWallNavigate?.(data.direction);
   if(data.type==='pascal:wall-tile-catalog')onWallTileCatalog?.();
   if(data.type==='pascal:floor-select')onFloorSelect?.(data.id);
   if(data.type==='pascal:floor-error')setError(data.error);
@@ -26,7 +30,8 @@ export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectI
   if(data.type==='pascal:camera'){const p=pending.current.get(data.requestId);if(!p)return;clearTimeout(p.timer);pending.current.delete(data.requestId);if(data.error)p.reject(Error(data.error));else p.resolve(data);}
   if(data.type==='pascal:snapshot'){const p=pending.current.get(data.requestId);if(!p)return;clearTimeout(p.timer);pending.current.delete(data.requestId);if(data.error)p.reject(Error(data.error));else{try{localStorage.setItem(cacheKey,JSON.stringify({scene:data.scene,baseline:data.baseline}));}catch{}p.resolve({scene:data.scene,baseline:data.baseline});}}
   if(data.type==='pascal:error')setError(data.error||'Не удалось открыть 3D');
- };window.addEventListener('message',receive);return()=>{window.removeEventListener('message',receive);for(const p of pending.current.values()){clearTimeout(p.timer);p.reject(Error('3D-редактор закрыт'));}pending.current.clear();};},[session,plan,projectId,projectName,cacheKey,onDirty,mode,onFloorSelect,onFloorSync,onWallTileCatalog,origin]);
+ };window.addEventListener('message',receive);return()=>{window.removeEventListener('message',receive);};},[session,plan,projectId,projectName,cacheKey,onDirty,mode,onFloorSelect,onFloorSync,onWallTileCatalog,onWallNavigate,wallWork,origin]);
+ useEffect(()=>{if(ready)frame.current?.contentWindow?.postMessage({type:'roomdesign:wall-work',session,context:wallWork||null},origin);},[ready,wallWork,session,origin]);
  useEffect(()=>{if(ready)frame.current?.contentWindow?.postMessage({type:'roomdesign:floor-editing',session,active:floorEditing===true},origin);},[ready,floorEditing,session,origin]);
  useEffect(()=>{if(ready)frame.current?.contentWindow?.postMessage({type:'roomdesign:view',session,mode},origin);},[ready,mode,session,origin]);
  useEffect(()=>{if(!ready||disabled)return;const key=(event:KeyboardEvent)=>{if(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"],dialog,[role="dialog"]'))return;const command=editorKeyCommand(event);if(!command)return;event.preventDefault();event.stopImmediatePropagation();frame.current?.contentWindow?.postMessage({type:'roomdesign:editor-command',session,command},origin);};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[ready,disabled,session,origin]);

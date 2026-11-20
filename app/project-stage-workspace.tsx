@@ -8,8 +8,10 @@ type User={id:string;email:string;firstName:string;lastName:string;role:'user'|'
 import {projectStages as baseStages,projectStageFrameUrl} from '@/lib/project-stage-routing';
 export default function ProjectStageWorkspace({user,projectId,projectName,projectType,onHome,onProjects,onBriefSaved}:{user:User|null;projectId:string;projectName:string;projectType:string;onHome:()=>void;onProjects:()=>void;onBriefSaved:(project:BriefProject)=>void}){
  const hasPlanningSubstages=true;
+ const [wallPreview,setWallPreview]=useState(false);
+ useEffect(()=>{setWallPreview(['localhost','127.0.0.1'].includes(location.hostname));},[]);
  const [substepsOpen,setSubstepsOpen]=useState(false);
- const stages:(typeof baseStages[number]&{parentId?:string;substage?:'floor'|'floor2'|'walls'})[]=hasPlanningSubstages?baseStages.flatMap(stage=>stage.id==='planning'?[stage,{id:'planning-floor-2',label:'Напольное покрытие',path:'/planning-floor-2',parentId:'planning',substage:'floor2'}]:[stage]):baseStages;
+ const stages:(typeof baseStages[number]&{parentId?:string;substage?:'floor'|'floor2'|'walls'})[]=hasPlanningSubstages?baseStages.flatMap(stage=>stage.id==='planning'?[stage,{id:'planning-floor-2',label:'Напольное покрытие',path:'/planning-floor-2',parentId:'planning',substage:'floor2'},...(wallPreview?[{id:'planning-walls',label:'Декорирование стен',path:'/planning-walls',parentId:'planning',substage:'walls' as const}]:[])]:[stage]):baseStages;
  const [selected,setSelected]=useState('sources');
  const [opened,setOpened]=useState<string[]>([]);
  const [loaded,setLoaded]=useState<string[]>([]);
@@ -32,11 +34,12 @@ export default function ProjectStageWorkspace({user,projectId,projectName,projec
  useEffect(()=>{
   const restore=()=>{let saved='sources';try{saved=localStorage.getItem(`roomdesign:last-stage:${projectId}`)||saved;}catch{}
    const value=new URLSearchParams(location.search).get('stage')||saved;const requested=hasPlanningSubstages&&value==='planning-floor'?'planning-floor-2':value;
+   if(requested==='planning-walls'&&!wallPreview&&['localhost','127.0.0.1'].includes(location.hostname))return;
    select(stages.some(stage=>stage.id===requested)?requested:'sources',false);};
   restore();window.addEventListener('popstate',restore);return()=>window.removeEventListener('popstate',restore);
- },[projectId,hasPlanningSubstages]);
+ },[projectId,hasPlanningSubstages,wallPreview]);
  const active=stages.find(stage=>stage.id===selected)!;
- const frameUrl=(stage:typeof stages[number])=>{const source=stage.substage==='floor2'?'/planning-floor-2?project='+encodeURIComponent(projectId)+'&embeddedStage=1':projectStageFrameUrl(stage.parentId||stage.id,projectId)!;const url=new URL(source,location.origin);if(stage.substage){url.searchParams.set('substage',stage.substage);}if(!previewTenant)return url.pathname+url.search;url.searchParams.set('previewTenant',previewTenant);return `${url.pathname}${url.search}`;};
+ const frameUrl=(stage:typeof stages[number])=>{const source=stage.substage==='walls'?'/planning-walls?project='+encodeURIComponent(projectId)+'&embeddedStage=1':stage.substage==='floor2'?'/planning-floor-2?project='+encodeURIComponent(projectId)+'&embeddedStage=1':projectStageFrameUrl(stage.parentId||stage.id,projectId)!;const url=new URL(source,location.origin);if(stage.substage){url.searchParams.set('substage',stage.substage);}if(!previewTenant)return url.pathname+url.search;url.searchParams.set('previewTenant',previewTenant);return `${url.pathname}${url.search}`;};
  return <main className={`project-menu-preview project-stage-workspace${active.path?' has-workspace':''}${fullscreenStage===selected?' is-stage-fullscreen':''}`}>
   <header className="project-menu-header">
    <button className="project-menu-wordmark room-design-wordmark" type="button" onClick={onHome}>ROOM DESIGN</button>
