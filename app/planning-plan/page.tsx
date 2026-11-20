@@ -1,4 +1,5 @@
 'use client';
+import {EyeViewIcon} from './eye-view-icon';
 import RenderResultDialog,{type PlannerRenderResult} from './render-result-dialog';
 import {catalogModelPreviewStatus} from '@/lib/catalog-model3d';
 import {FloorCatalogDialog} from '../measured-plan/editor/floor-catalog-dialog';
@@ -70,7 +71,7 @@ export default function PlanningPlanPage(){
  if(!album||!project)return <main className="planning-start">{header}<section><h1>Планировочное решение</h1>{error?<p role="alert">{error}</p>:<p role="status">{loaded?'Выберите проект':'Открываем рабочую область…'}</p>}</section></main>;
  const plan=album.variants.manual!.plan,mode=manualSourceMode(album);
  const sheetControls=<div className="planning-sheet-tabs" role="tablist" aria-label="Листы текущего режима">{[0,1,2].map(index=><button key={index} role="tab" aria-selected={manualSheetIndex(album)===index} disabled={busy} onClick={()=>void sheet(index)}>Лист {index+1}</button>)}</div>;
- const viewToggle=plannerEntry&&substage!=='floor'?<div className="planning-view-toggle" role="tablist" aria-label="Вид планировочного решения">{(['2d','3d','eye'] as const).map(id=><button key={id} role="tab" aria-label={id==='eye'?'Вид из глаз':id.toUpperCase()} title={id==='eye'?'Вид из глаз':id.toUpperCase()} aria-selected={view===id} disabled={busy} onClick={()=>void switchView(id)}>{id==='eye'?<svg width="28" height="18" viewBox="0 0 32 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M1 10s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5ZM17 10s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5Z"/><circle cx="8" cy="10" r="2" fill="currentColor" stroke="none"/><circle cx="24" cy="10" r="2" fill="currentColor" stroke="none"/></svg>:id.toUpperCase()}</button>)}</div>:null;
+ const viewToggle=plannerEntry&&substage!=='floor'?<div className="planning-view-toggle" role="tablist" aria-label="Вид планировочного решения">{(['2d','3d','eye'] as const).map(id=><button key={id} role="tab" aria-label={id==='eye'?'Вид из глаз':id.toUpperCase()} title={id==='eye'?'Вид из глаз':id.toUpperCase()} aria-selected={view===id} disabled={busy} onClick={()=>void switchView(id)}>{id==='eye'?<EyeViewIcon/>:id.toUpperCase()}</button>)}</div>:null;
  const plannerTools=<div className="planning-room-planner-tools" role="group" aria-label="Инструменты Room Design Planner">
   <button type="button" aria-label="Слои 3D" title="Слои" aria-pressed={layers} onClick={()=>setLayers(!layers)}>
    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/></svg>
