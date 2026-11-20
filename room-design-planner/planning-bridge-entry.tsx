@@ -1,3 +1,4 @@
+import {snapshotScene} from './scene-snapshot.mjs';
 import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,normalizeCabinetConfig} from './modular-cabinets';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Group} from 'three';
@@ -25,19 +26,7 @@ import './planning-bridge.css';
 const bootstrap=loadPlugin(builtinPlugin),params=new URLSearchParams(location.search),session=params.get('session'),parentOrigin=params.get('parentOrigin')||'';
 const allowed=new Set([location.origin]);
 const send=(data:any)=>{if(allowed.has(parentOrigin))window.parent.postMessage({...data,session},parentOrigin);};
-function sceneSnapshot() {
- const state = useScene.getState();
- const scene = structuredClone({nodes:state.nodes,rootNodeIds:state.rootNodeIds});
- for (const node of Object.values(scene.nodes) as any[]) {
-  if (node.type !== 'wall') continue;
-  const metadata = node.metadata || {};
-  const ids = new Set([...(metadata.roomDesignTiles || []), ...(metadata.roomDesignTileRegions || []), metadata.roomDesignTileSettings].filter(Boolean).map(piece => piece.productId));
-  const products = tileProducts.filter(product => ids.has(product.id));
-  if (products.length) metadata.roomDesignTileProducts = products;
-  else delete metadata.roomDesignTileProducts;
- }
- return scene;
-}
+function sceneSnapshot() { return snapshotScene(useScene.getState(),tileProducts); }
 function requestCatalogModel(productId:string,options:{textureId?:string;surfaceEditing?:true}={}) {
  return new Promise<any>((resolve,reject)=>{
   const requestId=crypto.randomUUID();
@@ -61,7 +50,7 @@ function App(){const [wallWork,setWallWork]=useState<any>(null);const [viewMode,
   if(data.type==='roomdesign:editor-command'){window.dispatchEvent(new CustomEvent('roomdesign:editor-command',{detail:{command:data.command}}));return;}
   if(data.type==='roomdesign:walk-key'){if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(data.key))window.dispatchEvent(new CustomEvent('roomdesign:walk-key',{detail:{key:data.key,pressed:data.pressed===true}}));return;}
   if(data.type==='roomdesign:view'){setViewMode(data.mode==='eye'?'eye':'3d');return;}
-  if(data.type==='roomdesign:snapshot'){if(opening.current||!loaded.current){send({type:'pascal:snapshot',requestId:data.requestId,error:'Дождитесь открытия 3D'});return;}send({type:'pascal:snapshot',requestId:data.requestId,scene:sceneSnapshot(),baseline:baseline.current});return;}
+  if(data.type==='roomdesign:snapshot'){if(opening.current||!loaded.current){send({type:'pascal:snapshot',requestId:data.requestId,error:'Дождитесь открытия 3D'});return;}try{send({type:'pascal:snapshot',requestId:data.requestId,scene:sceneSnapshot(),baseline:baseline.current});}catch(e){send({type:'pascal:snapshot',requestId:data.requestId,error:(e as Error).message});}return;}
   if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;const doc=data.document;setDocument(doc);setWallWork(data.wallWork||null);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
    const result=planningToPlanner(doc,{wallHeightMm:2800,doorHeightMm:2100,windowHeightMm:1400,windowSillMm:900,furnitureHeightsMm:overrides,assetFor:(kind:string)=>new URL(`${import.meta.env.BASE_URL}models/${kind}.glb`, location.origin).href});
    for(const node of Object.values(result.scene.nodes) as any[]) {
@@ -117,7 +106,7 @@ function App(){const [wallWork,setWallWork]=useState<any>(null);const [viewMode,
  };window.addEventListener('message',receive);send({type:'pascal:ready'});return()=>window.removeEventListener('message',receive);},[]);
  useEffect(()=>{const select=(e:any)=>send({type:'pascal:floor-select',id:e.detail?.id}),error=(e:any)=>send({type:'pascal:floor-error',error:e.detail});window.addEventListener('roomdesign:floor-select',select);window.addEventListener('roomdesign:floor-error',error);const wallNavigate=(e:any)=>send({type:'roomdesign:wall-work-navigate',direction:e.detail});window.addEventListener('roomdesign:wall-work-navigate',wallNavigate);const catalog=()=>send({type:'pascal:wall-tile-catalog'});window.addEventListener('roomdesign:wall-tile-catalog-request',catalog);const done=(e:any)=>send({type:'pascal:camera',...e.detail});window.addEventListener('roomdesign:camera-captured',done);return()=>{window.removeEventListener('roomdesign:wall-work-navigate',wallNavigate);window.removeEventListener('roomdesign:wall-tile-catalog-request',catalog);window.removeEventListener('roomdesign:camera-captured',done);window.removeEventListener('roomdesign:floor-select',select);window.removeEventListener('roomdesign:floor-error',error);};},[]);
  const onLoad=useCallback(async()=>structuredClone(scene),[scene]);
- const onSave=useCallback(async(next:any)=>{if(!loaded.current)return;const text=JSON.stringify(next.nodes);if(text===lastChange.current)return;lastChange.current=text;send({type:'pascal:changed',scene:next,baseline:baseline.current});},[]);
+ const onSave=useCallback(async(next:any)=>{if(!loaded.current)return;const text=JSON.stringify(next.nodes);if(text===lastChange.current)return;lastChange.current=text;send({type:'pascal:changed',scene:snapshotScene(next,tileProducts),baseline:baseline.current});},[]);
  const ready=useCallback((show:boolean)=>{if(show||!scene)return;useEditor.getState().setViewLayout(sceneLayout('3d'));loaded.current=true;lastChange.current=JSON.stringify(useScene.getState().nodes);send({type:'pascal:loaded'});if(newModelFocus.current){const n:any=useScene.getState().nodes[newModelFocus.current];newModelFocus.current=null;if(n){const [x,y,z]=n.position,[w,h,d]=n.scale;emitter.emit('camera-controls:frame',{bounds:{min:[x-w/2,y,z-d/2],max:[x+w/2,y+h,z+d/2]},pose:{position:[x+1.8,y+1.3,z+1.8],target:[x,y+h/2,z]}});return;}}const walls=Object.values(scene.nodes).filter((n:any)=>n.type==='wall') as any[],points=walls.flatMap(w=>[w.start,w.end]);if(points.length){const xs=points.map(p=>p[0]),zs=points.map(p=>p[1]),x=(Math.min(...xs)+Math.max(...xs))/2,z=(Math.min(...zs)+Math.max(...zs))/2,r=Math.max(Math.max(...xs)-Math.min(...xs),Math.max(...zs)-Math.min(...zs),4);emitter.emit('camera-controls:frame',{bounds:{min:[Math.min(...xs),0,Math.min(...zs)],max:[Math.max(...xs),3,Math.max(...zs)]},pose:{position:[x+r,r*1.25,z+r],target:[x,.5,z]}});}},[scene]);
  const demo=params.get('cabinets')==='1';
  function openCabinet(){
