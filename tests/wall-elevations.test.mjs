@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {wallElevations} from '../lib/wall-elevations/model.mjs';
-const p={id:'tile',width:1.2,height:2.8,price:100};
+const p={id:'tile',width:1.2,height:2.8,price:100,priceUnit:'м²'};
 const scene={nodes:{w:{id:'w',type:'wall',start:[0,0],end:[3,0],height:3,children:['d'],metadata:{roomDesignTiles:[{id:'a',productId:'tile',side:1,x:0,y:0,angle:0,joint:.002,grout:'#000000'},{id:'b',productId:'tile',side:1,x:1.202,y:0,angle:0,joint:.002,grout:'#000000'}]}},d:{id:'d',type:'door',position:[.6,1],width:1,height:2}}};
 test('wall net area deducts door once and separates sides',()=>{const [a,b]=wallElevations(scene,[p]);assert.equal(a.net,7);assert.equal(b.spec.length,0);assert.equal(a.spec[0].count,2);assert.ok(Math.abs(a.spec[0].area-4.72)<1e-6);assert.ok(Math.abs(a.spec[0].stockArea-6.72)<1e-6);assert.ok(Math.abs(a.spec[0].cost-672)<1e-6);});
 test('masks exclude cladding and unknown price stays unknown',()=>{const s=structuredClone(scene);s.nodes.w.metadata.roomDesignTiles[1].masks=[[1.202,0,2.402,1]];const [a]=wallElevations(s,[{...p,price:null}]);assert.ok(Math.abs(a.spec[0].area-3.52)<1e-6);assert.equal(a.spec[0].cost,null);});
