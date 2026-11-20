@@ -1,7 +1,28 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Room Design — Editorial R Cut">
-  <g transform="translate(7 230) scale(.325 -.325)">
-    <path fill="#F7F5F1" d="M546 0Q530 0 493.5 38.5Q457 77 406 148.5Q355 220 291 319L358 340Q442 219 500.5 147Q559 75 604 43.5Q649 12 690 12Q693 12 693 6Q693 0 690 0Q634 0 598.5 0Q563 0 546 0ZM306 628Q390 628 434.5 592.5Q479 557 479 498Q479 442 447 398Q415 354 363.5 329Q312 304 253 304Q241 304 228 304.5Q215 305 204 306L204 81Q204 52 209.5 37Q215 22 232.5 17Q250 12 285 12Q288 12 288 6Q288 0 285 0Q260 0 230 1Q200 2 164 2Q130 2 99 1Q68 0 43 0Q40 0 40 6Q40 12 43 12Q77 12 94.5 17Q112 22 118.5 37Q125 52 125 81L125 544Q125 573 119 587.5Q113 602 96 607.5Q79 613 44 613Q42 613 42 619Q42 625 44 625Q69 625 99.5 623.5Q130 622 164 622Q196 622 236 625Q276 628 306 628ZM397 466Q397 522 382 553.5Q367 585 339.5 598Q312 611 275 611Q237 611 220.5 597.5Q204 584 204 542L204 331Q218 330 234.5 329Q251 328 263 328Q337 328 367 362Q397 396 397 466Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Transparent outside the circle; pure white only inside. -->
+  <circle cx="256" cy="256" r="244" fill="#FFFFFF" stroke="#2A1710" stroke-width="7"/>
+
+  <!-- Architectural measuring system, inspired by the supplied reference. -->
+  <g fill="none" stroke="#2A1710" stroke-width="1.4" opacity="0.46" stroke-dasharray="7 7">
+    <path d="M45 276H467"/>
+    <path d="M250 48V464"/>
+    <path d="M104 89H311V303H104Z"/>
+    <path d="M232 209H406V410H232Z"/>
   </g>
-  <path fill="#6E242A" d="M94 62h24v24H94z"/>
+  <g stroke="#2A1710" stroke-width="1.6" opacity="0.58">
+    <path d="M45 264V288M104 264V288M250 264V288M406 264V288M467 264V288"/>
+    <path d="M238 48H262M238 89H262M238 209H262M238 410H262M238 464H262"/>
+  </g>
+  <g fill="#2A1710" opacity="0.62" font-family="Arial, sans-serif" font-size="14" letter-spacing="0.6">
+    <text x="132" y="268">3 050 мм</text>
+    <text x="299" y="268">3 542 мм</text>
+    <text x="414" y="268">2 537 мм</text>
+    <text x="263" y="150" transform="rotate(90 263 150)">2 697 мм</text>
+  </g>
+
+  <!-- Room Design monogram. -->
+  <g fill="#2A1710" font-family="Georgia, 'Times New Roman', serif" font-weight="400">
+    <text x="72" y="320" font-size="306">R</text>
+    <text x="227" y="430" font-size="280">D</text>
+  </g>
 </svg>

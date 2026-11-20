@@ -39,44 +39,39 @@ const manrope = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ROOM design — ИИ-платформа для дизайнеров интерьера",
+  title: "Room Design - создавайте интерьер. Выбирайте мебель и материалы.",
   description: "Визуализируйте мебель в интерьерных проектах с помощью ИИ.",
   openGraph: {
-    title: "ROOM design — ИИ-платформа для дизайнеров интерьера",
+    title: "Room Design - создавайте интерьер. Выбирайте мебель и материалы.",
     description: "Визуализируйте мебель в интерьерных проектах с помощью ИИ.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ROOM design — ИИ-платформа для дизайнеров интерьера",
+    title: "Room Design - создавайте интерьер. Выбирайте мебель и материалы.",
     description: "Визуализируйте мебель в интерьерных проектах с помощью ИИ.",
   },
-  manifest: "/site.webmanifest?v=editorial-r-1",
+  manifest: "/site.webmanifest?v=rd-final-20261120",
   icons: {
     icon: [
       {
-        url: "/favicon.svg?v=editorial-r-1",
+        url: "/favicon.svg?v=rd-final-20261120",
         type: "image/svg+xml",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/favicon-dark.svg?v=editorial-r-1",
+        url: "/favicon-dark.svg?v=rd-final-20261120",
         type: "image/svg+xml",
         media: "(prefers-color-scheme: dark)",
       },
-      { url: "/favicon.ico?v=editorial-r-1", sizes: "any" },
-      { url: "/favicon-32x32.png?v=editorial-r-1", type: "image/png", sizes: "32x32" },
-      { url: "/favicon-16x16.png?v=editorial-r-1", type: "image/png", sizes: "16x16" },
+      { url: "/favicon.ico?v=rd-final-20261120", sizes: "any" },
+      { url: "/favicon-32x32.png?v=rd-final-20261120", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png?v=rd-final-20261120", type: "image/png", sizes: "16x16" },
     ],
-    shortcut: "/favicon.ico?v=editorial-r-1",
+    shortcut: "/favicon.ico?v=rd-final-20261120",
     apple: {
-      url: "/apple-touch-icon.png?v=editorial-r-1",
+      url: "/apple-touch-icon.png?v=rd-final-20261120",
       type: "image/png",
       sizes: "180x180",
-    },
-    other: {
-      rel: "mask-icon",
-      url: "/safari-pinned-tab.svg?v=editorial-r-1",
-      color: "#6E242A",
     },
   },
 };
