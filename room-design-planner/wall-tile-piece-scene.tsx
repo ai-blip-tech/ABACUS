@@ -1,7 +1,7 @@
 import {interiorShape,sharedShapeMesh} from './tile-shape-mesh.mjs';
 import {TileBoundaryJoints} from './tile-boundary-joints-scene';
 import {upgradeShapedGroups} from './tile-wall-fill.mjs';
-import {tileShape} from '../lib/tile-shape.mjs';import {tileProduct} from './tile-products.mjs';import {clipTrianglesToTile} from './irregular-tiles.mjs';
+import {tileShape} from '../lib/tile-shape.mjs';import {tileProduct} from './tile-products.mjs';import {clipTrianglesToTile} from './tile-shape-clip.mjs';
 import {shiftWallPattern,adjacentJointHeights,alignWallPattern} from './wall-pattern-phase.mjs';
 import {getWallWork} from './wall-work-scope.mjs';
 import {Suspense} from 'react';
