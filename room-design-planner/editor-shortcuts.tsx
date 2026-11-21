@@ -10,10 +10,9 @@ export function EditorShortcuts(){useEffect(()=>{
  const cancel=()=>{window.dispatchEvent(new CustomEvent('roomdesign:cancel-item-gesture'));window.dispatchEvent(new CustomEvent('roomdesign:item-interaction',{detail:{type:'cancel'}}));};
  const clear=()=>{useViewer.getState().setSelection({selectedIds:[],zoneId:null});useViewer.setState({hoveredId:null});useEditor.getState().clearRoom();};
  const tileCommand=(command:string,clipboardText?:string)=>{const event=new CustomEvent('roomdesign:tile-editor-command',{cancelable:true,detail:{command,clipboardText}});window.dispatchEvent(event);return event;};
- const run=(command:EditorKeyCommand)=>{const tile=tileCommand(command);if(tile.defaultPrevented)return;const selected=useViewer.getState().selection.selectedIds.filter(id=>{const node=useScene.getState().nodes[id as any];return node&&!['site','building','level'].includes(node.type);}) as any[];
+ const run=(command:EditorKeyCommand)=>{if(command==='clear'){cancel();tileCommand(command);clear();return;}const tile=tileCommand(command);if(tile.defaultPrevented)return;const selected=useViewer.getState().selection.selectedIds.filter(id=>{const node=useScene.getState().nodes[id as any];return node&&!['site','building','level'].includes(node.type);}) as any[];
   if(command==='copy'){copySelectedNodesToEditorClipboard(selected);return;}
   cancel();
-  if(command==='clear'){clear();return;}
   if(command==='undo'||command==='redo'){if(command==='undo')runUndo();else runRedo();clear();return;}
   if(command==='delete'||command==='cut'){if(!selected.length)return;if(command==='cut'&&!copySelectedNodesToEditorClipboard(selected))return;runAsSingleSceneHistoryStep(useScene,()=>useScene.getState().deleteNodes(selected));clear();return;}
   if(command==='paste')runAsSingleSceneHistoryStep(useScene,()=>{const result=pasteEditorClipboardToLevel('level_roomdesign' as any);if(!result)return;const nodes=useScene.getState().nodes;useScene.getState().updateNodes(result.pastedIds.flatMap(id=>{const node:any=nodes[id];return node?.type==='item'?[{id,data:{position:[node.position[0]+.2,node.position[1],node.position[2]+.2]}}]:[]}) as any);});
