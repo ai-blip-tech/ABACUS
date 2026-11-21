@@ -14,3 +14,6 @@ export function alignWallPattern(group,heights,bounds,threshold=.018){
 /** Preserve individual decors of cells that remain visible after a grid shift. */
 export function retainShiftedDecor(pieces,moved){const cells=new Map(moved.map(p=>[[p.x,p.y].map(n=>Math.round(n*1e6)).join(':'),p]));return pieces.map(p=>{const old=cells.get([p.x,p.y].map(n=>Math.round(n*1e6)).join(':'));return old?{...p,productId:old.productId,angle:old.angle}:p;});}
 export function patternRecipe(pieces){const counts=new Map();for(const p of pieces){const key=p.productId+':'+p.angle;const entry=counts.get(key)||{piece:p,count:0};entry.count++;counts.set(key,entry);}return [...counts.values()].sort((a,b)=>b.count-a.count)[0]?.piece;}
+
+/** Keep mounted cells stable when a moved pattern is regenerated. */
+export function retainCellIds(pieces,previous){const ids=new Map(previous.filter(p=>p.grid).map(p=>[[p.grid.column,p.grid.row].join(':'),p.id]));return pieces.map(p=>({...p,id:ids.get([p.grid?.column,p.grid?.row].join(':'))||p.id}));}

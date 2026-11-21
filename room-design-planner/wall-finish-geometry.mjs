@@ -1,5 +1,5 @@
 export const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-export function cells(bounds,holes){const [a,b,c,d]=bounds,xs=[a,c,...holes.flatMap(h=>[clamp(h[0],a,c),clamp(h[2],a,c)])].sort((a,b)=>a-b),ys=[b,d,...holes.flatMap(h=>[clamp(h[1],b,d),clamp(h[3],b,d)])].sort((a,b)=>a-b),out=[];for(let i=0;i<xs.length-1;i++)for(let j=0;j<ys.length-1;j++){const x=(xs[i]+xs[i+1])/2,y=(ys[j]+ys[j+1])/2;if(xs[i+1]-xs[i]<.0001||ys[j+1]-ys[j]<.0001||holes.some(h=>x>h[0]&&x<h[2]&&y>h[1]&&y<h[3]))continue;out.push([xs[i],ys[j],xs[i+1],ys[j+1]]);}return out;}
+export function cells(bounds,holes){if(!Array.isArray(bounds)||bounds.length!==4||!bounds.every(Number.isFinite)||bounds[2]<=bounds[0]||bounds[3]<=bounds[1])return [];const [a,b,c,d]=bounds,xs=[a,c,...holes.flatMap(h=>[clamp(h[0],a,c),clamp(h[2],a,c)])].sort((a,b)=>a-b),ys=[b,d,...holes.flatMap(h=>[clamp(h[1],b,d),clamp(h[3],b,d)])].sort((a,b)=>a-b),out=[];for(let i=0;i<xs.length-1;i++)for(let j=0;j<ys.length-1;j++){const x=(xs[i]+xs[i+1])/2,y=(ys[j]+ys[j+1])/2;if(xs[i+1]-xs[i]<.0001||ys[j+1]-ys[j]<.0001||holes.some(h=>x>h[0]&&x<h[2]&&y>h[1]&&y<h[3]))continue;out.push([xs[i],ys[j],xs[i+1],ys[j+1]]);}return out;}
 
 // Replace existing paint in the new rectangle, retaining previous paint outside it.
 // Separate opposite wall faces; never stack coplanar opaque paint surfaces.
