@@ -1,3 +1,4 @@
+import {sameWallGeometry,syncOpenings} from '@/lib/planning-plan/opening-sync';
 import {requireTenantUser,storage,tenantStoragePrefix} from '@/lib/auth';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
@@ -22,7 +23,8 @@ export async function GET(request:Request,{params}:Context){
  const album=readAlbum(JSON.parse(source.document_json)),sourcePlan=album.variants.manual?.plan||album.baseline;
  const row=await database.prepare('SELECT revision,document_json FROM planning_floor_previews WHERE project_id=? AND user_id=? AND tenant_id=?').bind(id,user.id,user.tenantId).first<{revision:number;document_json:string}>();
  const document:Floor2Document=row?JSON.parse(row.document_json):{version:1,plan:structuredClone(sourcePlan),sourceFingerprint:sourceFingerprint(sourcePlan)};
- return Response.json({project,document:upgradeFloorLayers(document),sourcePlan,revision:row?.revision||0},{headers:{'Cache-Control':'private, no-store'}});
+ const synced=sameWallGeometry(document.plan,sourcePlan)?{...document,plan:syncOpenings(document.plan,sourcePlan),sourceFingerprint:sourceFingerprint(sourcePlan)}:document;
+ return Response.json({project,document:upgradeFloorLayers(synced),sourcePlan,revision:row?.revision||0},{headers:{'Cache-Control':'private, no-store'}});
 }
 export async function PUT(request:Request,{params}:Context){
  const user=await requireTenantUser(request);if(!user)return Response.json({error:'Войдите в Room Design'},{status:401});if(!isSameOrigin(request))return Response.json({error:'Недопустимый источник'},{status:403});const{id}=await params;
