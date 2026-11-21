@@ -12,7 +12,7 @@ export const parquetLayouts=[
 ] as const;
 export type ParquetLayout=typeof parquetLayouts[number]['id'];
 export type FloorWood='oak'|'walnut';
-export type FloorTile={id:string;name:string;article?:string;brand?:string;url?:string;image:string;widthMm:number;heightMm:number;thicknessMm?:number;price?:number;priceUnit?:string;jointMm:number;grout:string;textureReviewed?:boolean};
+export type FloorTile={tileShape?:{kind:string;capDepthMm:number;stagger?:number};id:string;name:string;article?:string;brand?:string;url?:string;image:string;widthMm:number;heightMm:number;thicknessMm?:number;price?:number;priceUnit?:string;jointMm:number;grout:string;textureReviewed?:boolean};
 export type FloorRegion={holes?:Point[][];tileLayoutMode?:'auto'|'manual';material?:'parquet'|'tile';tile?:FloorTile;id:string;polygon:Point[];layout:ParquetLayout|null;wood:FloorWood;origin?:Point;angle?:number};
 
 const cross=(a:Point,b:Point,c:Point)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
