@@ -1,3 +1,4 @@
+import {profileMeshPositions} from './decaro-geometry.mjs';
 import {inheritedMouldingMesh} from './orac-moulding-math.mjs';
 import {getDecaroContext} from './decaro-context.mjs';
 import { FavoriteTabs, rememberFinish, useFinishFavorites } from './finish-favorites.tsx';
@@ -6,8 +7,7 @@ import { useScene, sceneRegistry } from '@pascal-app/core';
 import { useViewer } from '@pascal-app/viewer';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { Group, Color, BufferGeometry, Float32BufferAttribute, Shape, ExtrudeGeometry, Vector2, Vector3, Matrix4, Raycaster, Plane, DoubleSide } from 'three';
-import sections from '../lib/decaro/sections.json';
+import { Group, Color, BufferGeometry, Float32BufferAttribute, Vector2, Vector3, Matrix4, Raycaster, Plane, DoubleSide } from 'three';
 import { DECARO_VARIANTS, profileVariant, profileLength, placedProfileSegments, profileHit, validateProfile, profileReport, snapProfilePoint } from '../lib/decaro/profiles.mjs';
 import { wallOpenings } from './orac-mouldings.tsx';
 import { getWallWork, workBounds } from './wall-work-scope.mjs';
@@ -55,32 +55,12 @@ export function changeDecaroProfile(wall: any, s: any, action: string, data: any
 }
 function localPoint(e: any, wall: any, side: number, camera: any, gl: any) { const root = sceneRegistry.nodes.get(wall.id); if (!root)
     return null; root.updateWorldMatrix(true, false); const rect = gl.domElement.getBoundingClientRect(), ray = new Raycaster(); ray.setFromCamera(new Vector2((e.x - rect.left) / rect.width * 2 - 1, -(e.y - rect.top) / rect.height * 2 + 1), camera); ray.ray.applyMatrix4(new Matrix4().copy(root.matrixWorld).invert()); const p = ray.ray.intersectPlane(new Plane(new Vector3(0, 0, 1), -side * wall.thickness / 2), new Vector3()); return p ? [p.x * 1000, p.y * 1000] : null; }
-function faceLoops(record: any) { const raw = (sections as any)[record.variant.model].loops, turn = record.variant.model === 'D00X' ? -Math.PI / 2 * record.face : record.variant.sides.length > 1 ? Math.PI * record.face : 0, c = Math.cos(turn), s = Math.sin(turn); const loops = raw.map((l: number[][]) => l.map(([x, y]) => [(x * c - y * s) / 1000, (x * s + y * c) / 1000])); const top = Math.max(...loops.flat().map((p: number[]) => p[1])); return loops.map((l: number[][]) => l.map(([x, y]) => [x, y - top])); }
 function finishLevel(wall: any, record: any) { let level = .0015; for (const t of wall.metadata?.roomDesignTiles || [])
     if (t.side === record.side)
         level = Math.max(level, .0075); for (const f of wall.metadata?.roomDesignFinishes || [])
     if (f.side === record.side && f.surface)
         level = Math.max(level, f.surface.mode==='slats'?(f.surface.depth||.02)+.0015:.0015); return level; }
-function sectionGeometry(record: any, segments: any[], wall: any) {
-    const loops = faceLoops(record), positions: number[] = [], surface = finishLevel(wall, record);
-    for (const segment of segments) {
-        const [a, b] = [segment.start, segment.end].map((p: number[]) => p.map(v => v / 1000)), length = segment.lengthMm / 1000, dx = (b[0] - a[0]) / length, dy = (b[1] - a[1]) / length;
-        for (const loop of loops) {
-            const shape = new Shape(loop.map(([x, y]: number[]) => new Vector2(x, y))), g0 = new ExtrudeGeometry(shape, { depth: length, bevelEnabled: false, steps: 1, curveSegments: 8 }), g = g0.index ? g0.toNonIndexed() : g0, p = g.attributes.position;
-            for (let i = 0; i < p.count; i++) {
-                const x = p.getX(i), depth = p.getY(i), rawAlong = p.getZ(i), idx = segment.pathIndex, points = record.points, closed = points.length > 2 && Math.hypot(points[0][0] - points.at(-1)[0], points[0][1] - points.at(-1)[1]) < .01, prev = idx > 0 ? points[idx - 1] : closed ? points.at(-2) : null, next = idx + 2 < points.length ? points[idx + 2] : closed ? points[1] : null, turn = (u: number[], v: number[]) => { const angle = Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]); return Math.max(-5, Math.min(5, Math.tan(angle / 2))); }, atStart = Math.hypot(segment.start[0] - points[idx][0], segment.start[1] - points[idx][1]) < .01, atEnd = Math.hypot(segment.end[0] - points[idx + 1][0], segment.end[1] - points[idx + 1][1]) < .01, startShift = prev && atStart ? x * turn([points[idx][0] - prev[0], points[idx][1] - prev[1]], [dx, dy]) : 0, endShift = next && atEnd ? -x * turn([dx, dy], [next[0] - points[idx + 1][0], next[1] - points[idx + 1][1]]) : 0, along = rawAlong + startShift * (1 - rawAlong / length) + endShift * rawAlong / length;
-                positions.push(a[0] + along * dx - x * dy, a[1] + along * dy + x * dx, record.side * (wall.thickness / 2 + surface + depth + .0007));
-            }
-            if (g !== g0)
-                g.dispose();
-            g0.dispose();
-        }
-    }
-    const geometry = new BufferGeometry();
-    const inherited=record.sitePaint?.mode==='wall'?inheritedMouldingMesh(positions,wall.metadata?.roomDesignFinishes||[],record.side):null;geometry.setAttribute('position', new Float32BufferAttribute(inherited?.positions||positions, 3));if(inherited)geometry.setAttribute('color',new Float32BufferAttribute(inherited.hexes.flatMap((hex:string)=>new Color(hex).toArray()),3));
-    geometry.computeVertexNormals();
-    return geometry;
-}
+function sectionGeometry(record:any,segments:any[],wall:any){const positions=profileMeshPositions(record,segments,wall.thickness,finishLevel(wall,record)),inherited=record.sitePaint?.mode==='wall'?inheritedMouldingMesh(positions,wall.metadata?.roomDesignFinishes||[],record.side):null,geometry=new BufferGeometry();geometry.setAttribute('position',new Float32BufferAttribute(inherited?.positions||positions,3));if(inherited)geometry.setAttribute('color',new Float32BufferAttribute(inherited.hexes.flatMap((hex:string)=>new Color(hex).toArray()),3));geometry.computeVertexNormals();return geometry;}
 function ProfileMesh({ wall, record, selected, active }: {
     wall: any;
     record: any;
@@ -88,7 +68,7 @@ function ProfileMesh({ wall, record, selected, active }: {
     active: boolean;
 }) {
     const group = useRef<Group>(null), { camera, gl, invalidate } = useThree(), [draft, setDraft] = useState<any>(null), drag = useRef<any>(null), p = draft || record;
-    const sceneNodes = useScene(s => s.nodes), segments = useMemo(() => placedProfileSegments(p, holesMm(wall)), [p, wall.children, sceneNodes]), geometry = useMemo(() => sectionGeometry(p, segments, wall), [p, segments, wall.thickness, wall.metadata?.roomDesignTiles, wall.metadata?.roomDesignFinishes]);
+    const sceneNodes = useScene(s => s.nodes), openingKey=JSON.stringify(wallOpenings(wall,sceneNodes)),segments = useMemo(() => placedProfileSegments(p, holesMm(wall)), [p, openingKey]), geometry = useMemo(() => sectionGeometry(p, segments, wall), [p, segments, wall.thickness, wall.metadata?.roomDesignTiles, wall.metadata?.roomDesignFinishes]);
     useEffect(() => () => geometry.dispose(), [geometry]);
     useEffect(() => { const root = group.current; return () => root?.removeFromParent(); }, []);
     useFrame(() => { const root = sceneRegistry.nodes.get(wall.id); if (group.current && root) {
