@@ -16,6 +16,7 @@ runs:
     - shell: bash
       run: |
         npx --yes pnpm@11.25.0 --dir room-design-planner install --frozen-lockfile
+        node --test room-design-planner/tests/*.test.mjs
         node --max-old-space-size=4096 scripts/build-room-design-planner.mjs
         sh scripts/room-design-planner-archive-tool.sh
         node scripts/room-design-planner-converter-smoke.mjs

@@ -1,3 +1,5 @@
+import {profileVariant} from '../lib/decaro/profiles.mjs';
+import {wallElevations,wallMaterialReport} from '../lib/wall-elevations/model.mjs';
 import {rotateTileDecor,replaceTileDecor} from '../room-design-planner/tile-decoration.mjs';
 import {registerTileProduct,tileProduct} from '../room-design-planner/tile-products.mjs';
 import assert from 'node:assert/strict';
@@ -5,8 +7,8 @@ import {blankDoc} from '../lib/measured-plan/measure-model.ts';
 import {planningToPlanner} from '../lib/planning-plan/planner-adapter.ts';
 import {planningFromPlanner} from '../lib/planning-plan/planner-sync.ts';
 import {fillRegion} from '../room-design-planner/tile-wall-fill.mjs';
-const base=process.env.WALL_PREVIEW_BASE;
-assert.ok(base&&['http://127.0.0.1:3141','http://localhost:3141'].includes(base),'Local preview only');
+const base=process.env.WALL_RELEASE_SMOKE_BASE||process.env.WALL_PREVIEW_BASE;
+assert.ok(base&&['http://127.0.0.1:3141','http://localhost:3141','http://127.0.0.1:3901','http://127.0.0.1:3902'].includes(base),'Isolated local/candidate server only');
 const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:`wall-preview-${Date.now()}@example.test`,password:'Preview-Walls-Only26!',firstName:'Проверка',lastName:'Стен'})});
 assert.equal(registration.status,200);const cookie=registration.headers.get('set-cookie').split(';')[0];
 const req=(path,method='GET',body,auth=true)=>fetch(base+path,{method,headers:{...(auth?{Cookie:cookie}:{}),Origin:base,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -15,6 +17,10 @@ r=await req(path,'PUT',{action:'start-manual',revision:0,baseKind:'manual'});ass
 const plan=blankDoc({name:'Walls',mime:'application/x-room-plan',hash:'preview-walls',width:1,height:1,page:1,pages:1,method:'manual',image:'',words:[],pixelScale:1});plan.id=data.document.variants.manual.plan.id;plan.floor=[[0,0],[4000,0],[4000,3000],[0,3000]];plan.height=2800;plan.walls=plan.floor.map((a,i)=>({id:'check-'+i,name:'Стена '+i,a,b:plan.floor[(i+1)%4],thickness:120,height:2800,group:'outer',lengthConfirmed:true,thicknessConfirmed:true,provenance:'Preview test'}));
 const pieces=fillRegion(4,2.8,1,{productId:'norrmobler:34339',angle:90,joint:.002,grout:'#dddddd',origin:[0,.03]},[],[.06,0,3.94,2.8]).pieces;
 plan.walls[0].plannerFinish={roomDesignFinishes:[{id:'front',side:1,bounds:[.06,0,3.94,2.8],hex:'#688a79'},{id:'back',side:-1,bounds:[0,0,4,2.8],hex:'#e8cbb8'}],roomDesignTiles:pieces};
+const profile=(model,color,uid,y,length=1600)=>({id:uid,projectId:id,sheetId:plan.id,side:1,face:0,variant:profileVariant('decaro:'+model+':'+color),points:[[100,y],[100+length,y]],sitePaint:{mode:'factory'},allowJoints:false});
+plan.walls[0].plannerFinish.roomDesignProfiles=[profile('d008','black','decaro-a',600)];
+plan.walls[1].plannerFinish={roomDesignProfiles:[profile('d008','black','decaro-b',1000),profile('d008','black','decaro-c',1500)]};
+plan.walls[2].plannerFinish={roomDesignProfiles:[profile('rizzt','brass','decaro-bundle',1000,2400)]};
 r=await req(path,'PUT',{action:'workspace-save',revision:data.revision,plan});assert.equal(r.status,200);data=await r.json();
 let loaded=await(await req(path)).json();assert.deepEqual(loaded.document.variants.manual.plan.walls[0].plannerFinish,plan.walls[0].plannerFinish);
 const persisted=loaded.document.variants.manual.plan,scene=planningToPlanner(persisted,{assetFor:()=>'/model.glb',wallHeightMm:2800}).scene;
@@ -36,3 +42,5 @@ const tiledScene=planningToPlanner(withFloor,{assetFor:()=>'/model.glb',wallHeig
 const tiles=withFloor.walls[0].plannerFinish.roomDesignTiles,original=structuredClone(tiles);const alternate=registerTileProduct({...tileProduct(tiles[0].productId),id:'test:alternate'});tiles[0]=replaceTileDecor(rotateTileDecor(tiles[0]),alternate.id);withFloor.walls[0].plannerFinish.roomDesignTileProducts=[alternate];
 r=await req(path,'PUT',{action:'workspace-save',revision:loaded.revision,plan:withFloor});assert.equal(r.status,200);loaded=await(await req(path)).json();assert.deepEqual(loaded.document.variants.manual.plan.walls[0].plannerFinish.roomDesignTiles.slice(1),original.slice(1));assert.equal(loaded.document.variants.manual.plan.walls[0].plannerFinish.roomDesignTiles[0].productId,alternate.id);assert.equal(loaded.document.variants.manual.plan.floorRegions[0].id,'smoke-floor');
 console.log('WALL_PREVIEW_PASSED: floor save → shared plan → 3D geometry, one-tile rotate/replace persistence; paint sides, tile phase, save/reload, shared 3D roundtrip, revision conflicts, auth and catalog');
+
+const snapshot=planningToPlanner(loaded.document.variants.manual.plan,{assetFor:()=>'/model.glb',wallHeightMm:2800}).scene;for(const wall of loaded.document.variants.manual.plan.walls)Object.assign(snapshot.nodes['wall_'+wall.id].metadata,wall.plannerFinish||{});const report=wallMaterialReport(wallElevations(snapshot));const d008=report.profiles.find(g=>g.variant.model==='D008'),rizz=report.profiles.find(g=>g.variant.model==='RizzT');assert.equal(d008.installedMm,4800);assert.equal(d008.barCount,3);assert.equal(d008.cost,6210);assert.equal(rizz.barCount,1);assert.equal(rizz.cost,4080);assert.equal((await req('/wall-elevations/print')).status,200);console.log('WALL_RELEASE_PASSED: Decaro persisted across floor/3D roundtrips, D008 3 bars and RizzT one bundle, print available');

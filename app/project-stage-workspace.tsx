@@ -8,8 +8,7 @@ type User={id:string;email:string;firstName:string;lastName:string;role:'user'|'
 import {projectStages as baseStages,projectStageFrameUrl} from '@/lib/project-stage-routing';
 export default function ProjectStageWorkspace({user,projectId,projectName,projectType,onHome,onProjects,onBriefSaved}:{user:User|null;projectId:string;projectName:string;projectType:string;onHome:()=>void;onProjects:()=>void;onBriefSaved:(project:BriefProject)=>void}){
  const hasPlanningSubstages=true;
- const [wallPreview,setWallPreview]=useState(false);
- useEffect(()=>{setWallPreview(['localhost','127.0.0.1'].includes(location.hostname));},[]);
+ const wallPreview=true;
  const [substepsOpen,setSubstepsOpen]=useState(false);
  const stages:(typeof baseStages[number]&{parentId?:string;substage?:'floor'|'floor2'|'walls'})[]=hasPlanningSubstages?baseStages.flatMap(stage=>stage.id==='planning'?[stage,{id:'planning-floor-2',label:'Напольное покрытие',path:'/planning-floor-2',parentId:'planning',substage:'floor2'},...(wallPreview?[{id:'planning-walls',label:'Декорирование стен',path:'/planning-walls',parentId:'planning',substage:'walls' as const}]:[])]:[stage]):baseStages;
  const [selected,setSelected]=useState('sources');
@@ -34,7 +33,6 @@ export default function ProjectStageWorkspace({user,projectId,projectName,projec
  useEffect(()=>{
   const restore=()=>{let saved='sources';try{saved=localStorage.getItem(`roomdesign:last-stage:${projectId}`)||saved;}catch{}
    const value=new URLSearchParams(location.search).get('stage')||saved;const requested=hasPlanningSubstages&&value==='planning-floor'?'planning-floor-2':value;
-   if(requested==='planning-walls'&&!wallPreview&&['localhost','127.0.0.1'].includes(location.hostname))return;
    select(stages.some(stage=>stage.id===requested)?requested:'sources',false);};
   restore();window.addEventListener('popstate',restore);return()=>window.removeEventListener('popstate',restore);
  },[projectId,hasPlanningSubstages,wallPreview]);
