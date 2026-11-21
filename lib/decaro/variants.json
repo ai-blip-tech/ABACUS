@@ -1,0 +1,1277 @@
+[
+  {
+    "parameters": {
+      "internalGrooveNote": "Канал 10 мм; полукруг и П-образная сторона",
+      "ledAvailable": true
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d007:black",
+    "brand": "Decaro Engineering",
+    "model": "D007",
+    "article": "D007",
+    "drawingAlias": "D007",
+    "factoryColor": "анодированный чёрный",
+    "color": "black",
+    "hex": "#242526",
+    "stockMm": 3000,
+    "sectionMm": [
+      15,
+      13
+    ],
+    "sectionLabel": "15 × 13",
+    "visibleMm": [
+      13,
+      15
+    ],
+    "sides": [
+      "Полукруг",
+      "П-образный канал"
+    ],
+    "components": [],
+    "price": 790,
+    "barPrice": 2370,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d007/",
+    "image": "/materials/decaro/decaro_engineering_d007.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2023/05/teh.karta_d007.008.009-1.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "Технический паз 7,5 мм; каталожный зазор 8 / 10 мм"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d008:black",
+    "brand": "Decaro Engineering",
+    "model": "D008",
+    "article": "D008",
+    "drawingAlias": "D008",
+    "factoryColor": "анодированный чёрный",
+    "color": "black",
+    "hex": "#242526",
+    "stockMm": 3000,
+    "sectionMm": [
+      10,
+      10
+    ],
+    "sectionLabel": "10 × 10",
+    "visibleMm": [
+      8,
+      10
+    ],
+    "sides": [
+      "Полукруг",
+      "П-образный паз"
+    ],
+    "components": [],
+    "price": 690,
+    "barPrice": 2070,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d008/",
+    "image": "/materials/decaro/decaro_engineering_d008.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2023/05/teh.karta_d007.008.009-1.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "В техкарте 2,7 мм; в отдельных схемах 2,5 мм. Посадка — по официальной CAD-модели"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d009:black",
+    "brand": "Decaro Engineering",
+    "model": "D009",
+    "article": "D009",
+    "drawingAlias": "D009",
+    "factoryColor": "анодированный чёрный",
+    "color": "black",
+    "hex": "#242526",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      10
+    ],
+    "sectionLabel": "5 × 10",
+    "visibleMm": [
+      3,
+      5
+    ],
+    "sides": [
+      "Тонкий стык",
+      "Основание для вставки"
+    ],
+    "components": [],
+    "price": 690,
+    "barPrice": 2070,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009/",
+    "image": "/materials/decaro/decaro_engineering_d009.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2023/05/teh.karta_d007.008.009-1.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "В техкарте 2,7 мм; в отдельных схемах 2,5 мм. Посадка — по официальной CAD-модели"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d009:bronze",
+    "brand": "Decaro Engineering",
+    "model": "D009",
+    "article": "D009",
+    "drawingAlias": "D009",
+    "factoryColor": "анодированный бронзовый",
+    "color": "bronze",
+    "hex": "#79604a",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      10
+    ],
+    "sectionLabel": "5 × 10",
+    "visibleMm": [
+      3,
+      5
+    ],
+    "sides": [
+      "Тонкий стык",
+      "Основание для вставки"
+    ],
+    "components": [],
+    "price": 790,
+    "barPrice": 2370,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009/",
+    "image": "/materials/decaro/decaro_engineering_d009.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2023/05/teh.karta_d007.008.009-1.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "В техкарте 2,7 мм; в отдельных схемах 2,5 мм. Посадка — по официальной CAD-модели"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d009:brass",
+    "brand": "Decaro Engineering",
+    "model": "D009",
+    "article": "D009",
+    "drawingAlias": "D009",
+    "factoryColor": "анодированный латунный",
+    "color": "brass",
+    "hex": "#b69b60",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      10
+    ],
+    "sectionLabel": "5 × 10",
+    "visibleMm": [
+      3,
+      5
+    ],
+    "sides": [
+      "Тонкий стык",
+      "Основание для вставки"
+    ],
+    "components": [],
+    "price": 790,
+    "barPrice": 2370,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009/",
+    "image": "/materials/decaro/decaro_engineering_d009.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2023/05/teh.karta_d007.008.009-1.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "В техкарте 2,7 мм; в отдельных схемах 2,5 мм. Посадка — по официальной CAD-модели"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d009:copper",
+    "brand": "Decaro Engineering",
+    "model": "D009",
+    "article": "D009",
+    "drawingAlias": "D009",
+    "factoryColor": "анодированный медный",
+    "color": "copper",
+    "hex": "#b77956",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      10
+    ],
+    "sectionLabel": "5 × 10",
+    "visibleMm": [
+      3,
+      5
+    ],
+    "sides": [
+      "Тонкий стык",
+      "Основание для вставки"
+    ],
+    "components": [],
+    "price": 790,
+    "barPrice": 2370,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009/",
+    "image": "/materials/decaro/decaro_engineering_d009.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2023/05/teh.karta_d007.008.009-1.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "В техкарте 2,7 мм; в отдельных схемах 2,5 мм. Посадка — по официальной CAD-модели"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d009:titanium",
+    "brand": "Decaro Engineering",
+    "model": "D009",
+    "article": "D009",
+    "drawingAlias": "D009",
+    "factoryColor": "анодированный титановый",
+    "color": "titanium",
+    "hex": "#929394",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      10
+    ],
+    "sectionLabel": "5 × 10",
+    "visibleMm": [
+      3,
+      5
+    ],
+    "sides": [
+      "Тонкий стык",
+      "Основание для вставки"
+    ],
+    "components": [],
+    "price": 790,
+    "barPrice": 2370,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009/",
+    "image": "/materials/decaro/decaro_engineering_d009.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2023/05/teh.karta_d007.008.009-1.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.2a:black",
+    "brand": "Decaro Engineering",
+    "model": "D009.2A",
+    "article": "D009.2A",
+    "drawingAlias": "D009.2",
+    "factoryColor": "анодированный чёрный",
+    "color": "black",
+    "hex": "#242526",
+    "stockMm": 3000,
+    "sectionMm": [
+      3,
+      8.5
+    ],
+    "sectionLabel": "3 × 8,5",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля"
+    ],
+    "components": [],
+    "price": 490,
+    "barPrice": 1470,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.2.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.2a:bronze",
+    "brand": "Decaro Engineering",
+    "model": "D009.2A",
+    "article": "D009.2A",
+    "drawingAlias": "D009.2",
+    "factoryColor": "анодированный бронзовый",
+    "color": "bronze",
+    "hex": "#79604a",
+    "stockMm": 3000,
+    "sectionMm": [
+      3,
+      8.5
+    ],
+    "sectionLabel": "3 × 8,5",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля"
+    ],
+    "components": [],
+    "price": 570,
+    "barPrice": 1710,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.2.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.2a:brass",
+    "brand": "Decaro Engineering",
+    "model": "D009.2A",
+    "article": "D009.2A",
+    "drawingAlias": "D009.2",
+    "factoryColor": "анодированный латунный",
+    "color": "brass",
+    "hex": "#b69b60",
+    "stockMm": 3000,
+    "sectionMm": [
+      3,
+      8.5
+    ],
+    "sectionLabel": "3 × 8,5",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля"
+    ],
+    "components": [],
+    "price": 570,
+    "barPrice": 1710,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.2.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.2a:copper",
+    "brand": "Decaro Engineering",
+    "model": "D009.2A",
+    "article": "D009.2A",
+    "drawingAlias": "D009.2",
+    "factoryColor": "анодированный медный",
+    "color": "copper",
+    "hex": "#b77956",
+    "stockMm": 3000,
+    "sectionMm": [
+      3,
+      8.5
+    ],
+    "sectionLabel": "3 × 8,5",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля"
+    ],
+    "components": [],
+    "price": 570,
+    "barPrice": 1710,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.2.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.2a:titanium",
+    "brand": "Decaro Engineering",
+    "model": "D009.2A",
+    "article": "D009.2A",
+    "drawingAlias": "D009.2",
+    "factoryColor": "анодированный титановый",
+    "color": "titanium",
+    "hex": "#929394",
+    "stockMm": 3000,
+    "sectionMm": [
+      3,
+      8.5
+    ],
+    "sectionLabel": "3 × 8,5",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля"
+    ],
+    "components": [],
+    "price": 570,
+    "barPrice": 1710,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.2.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.3a:black",
+    "brand": "Decaro Engineering",
+    "model": "D009.3A",
+    "article": "D009.3A",
+    "drawingAlias": "D009.3",
+    "factoryColor": "анодированный чёрный",
+    "color": "black",
+    "hex": "#242526",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      7.5
+    ],
+    "sectionLabel": "7 × 7,5",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-образная полка"
+    ],
+    "components": [],
+    "price": 490,
+    "barPrice": 1470,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.3.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.3a:bronze",
+    "brand": "Decaro Engineering",
+    "model": "D009.3A",
+    "article": "D009.3A",
+    "drawingAlias": "D009.3",
+    "factoryColor": "анодированный бронзовый",
+    "color": "bronze",
+    "hex": "#79604a",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      7.5
+    ],
+    "sectionLabel": "7 × 7,5",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-образная полка"
+    ],
+    "components": [],
+    "price": 570,
+    "barPrice": 1710,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.3.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.3a:brass",
+    "brand": "Decaro Engineering",
+    "model": "D009.3A",
+    "article": "D009.3A",
+    "drawingAlias": "D009.3",
+    "factoryColor": "анодированный латунный",
+    "color": "brass",
+    "hex": "#b69b60",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      7.5
+    ],
+    "sectionLabel": "7 × 7,5",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-образная полка"
+    ],
+    "components": [],
+    "price": 570,
+    "barPrice": 1710,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.3.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.3a:copper",
+    "brand": "Decaro Engineering",
+    "model": "D009.3A",
+    "article": "D009.3A",
+    "drawingAlias": "D009.3",
+    "factoryColor": "анодированный медный",
+    "color": "copper",
+    "hex": "#b77956",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      7.5
+    ],
+    "sectionLabel": "7 × 7,5",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-образная полка"
+    ],
+    "components": [],
+    "price": 570,
+    "barPrice": 1710,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.3.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:d009.3a:titanium",
+    "brand": "Decaro Engineering",
+    "model": "D009.3A",
+    "article": "D009.3A",
+    "drawingAlias": "D009.3",
+    "factoryColor": "анодированный титановый",
+    "color": "titanium",
+    "hex": "#929394",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      7.5
+    ],
+    "sectionLabel": "7 × 7,5",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-образная полка"
+    ],
+    "components": [],
+    "price": 570,
+    "barPrice": 1710,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d009-2-d009-3/",
+    "image": "/materials/decaro/decaro_engineering_d009.3.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizz:black",
+    "brand": "Decaro Engineering",
+    "model": "Rizz",
+    "article": "Rizz",
+    "drawingAlias": "Rizz",
+    "factoryColor": "анодированный чёрный",
+    "color": "black",
+    "hex": "#242526",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      11.539
+    ],
+    "sectionLabel": "D009 + D009.2",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.2A"
+    ],
+    "price": 1180,
+    "barPrice": 3540,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizz:bronze",
+    "brand": "Decaro Engineering",
+    "model": "Rizz",
+    "article": "Rizz",
+    "drawingAlias": "Rizz",
+    "factoryColor": "анодированный бронзовый",
+    "color": "bronze",
+    "hex": "#79604a",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      11.539
+    ],
+    "sectionLabel": "D009 + D009.2",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.2A"
+    ],
+    "price": 1360,
+    "barPrice": 4080,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizz:brass",
+    "brand": "Decaro Engineering",
+    "model": "Rizz",
+    "article": "Rizz",
+    "drawingAlias": "Rizz",
+    "factoryColor": "анодированный латунный",
+    "color": "brass",
+    "hex": "#b69b60",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      11.539
+    ],
+    "sectionLabel": "D009 + D009.2",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.2A"
+    ],
+    "price": 1360,
+    "barPrice": 4080,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizz:copper",
+    "brand": "Decaro Engineering",
+    "model": "Rizz",
+    "article": "Rizz",
+    "drawingAlias": "Rizz",
+    "factoryColor": "анодированный медный",
+    "color": "copper",
+    "hex": "#b77956",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      11.539
+    ],
+    "sectionLabel": "D009 + D009.2",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.2A"
+    ],
+    "price": 1360,
+    "barPrice": 4080,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 3
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizz:titanium",
+    "brand": "Decaro Engineering",
+    "model": "Rizz",
+    "article": "Rizz",
+    "drawingAlias": "Rizz",
+    "factoryColor": "анодированный титановый",
+    "color": "titanium",
+    "hex": "#929394",
+    "stockMm": 3000,
+    "sectionMm": [
+      5,
+      11.539
+    ],
+    "sectionLabel": "D009 + D009.2",
+    "visibleMm": [
+      3
+    ],
+    "sides": [
+      "Капля в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.2A"
+    ],
+    "price": 1360,
+    "barPrice": 4080,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizzt:black",
+    "brand": "Decaro Engineering",
+    "model": "RizzT",
+    "article": "RizzT",
+    "drawingAlias": "RizzT",
+    "factoryColor": "анодированный чёрный",
+    "color": "black",
+    "hex": "#242526",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      11.2044
+    ],
+    "sectionLabel": "D009 + D009.3",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-полка в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.3A"
+    ],
+    "price": 1180,
+    "barPrice": 3540,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz-t.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizzt:bronze",
+    "brand": "Decaro Engineering",
+    "model": "RizzT",
+    "article": "RizzT",
+    "drawingAlias": "RizzT",
+    "factoryColor": "анодированный бронзовый",
+    "color": "bronze",
+    "hex": "#79604a",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      11.2044
+    ],
+    "sectionLabel": "D009 + D009.3",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-полка в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.3A"
+    ],
+    "price": 1360,
+    "barPrice": 4080,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz-t.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizzt:brass",
+    "brand": "Decaro Engineering",
+    "model": "RizzT",
+    "article": "RizzT",
+    "drawingAlias": "RizzT",
+    "factoryColor": "анодированный латунный",
+    "color": "brass",
+    "hex": "#b69b60",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      11.2044
+    ],
+    "sectionLabel": "D009 + D009.3",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-полка в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.3A"
+    ],
+    "price": 1360,
+    "barPrice": 4080,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz-t.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizzt:copper",
+    "brand": "Decaro Engineering",
+    "model": "RizzT",
+    "article": "RizzT",
+    "drawingAlias": "RizzT",
+    "factoryColor": "анодированный медный",
+    "color": "copper",
+    "hex": "#b77956",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      11.2044
+    ],
+    "sectionLabel": "D009 + D009.3",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-полка в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.3A"
+    ],
+    "price": 1360,
+    "barPrice": 4080,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz-t.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "stemMm": 2,
+      "headMm": 7
+    },
+    "compatibleReference": [],
+    "id": "decaro:rizzt:titanium",
+    "brand": "Decaro Engineering",
+    "model": "RizzT",
+    "article": "RizzT",
+    "drawingAlias": "RizzT",
+    "factoryColor": "анодированный титановый",
+    "color": "titanium",
+    "hex": "#929394",
+    "stockMm": 3000,
+    "sectionMm": [
+      7,
+      11.2044
+    ],
+    "sectionLabel": "D009 + D009.3",
+    "visibleMm": [
+      7
+    ],
+    "sides": [
+      "Т-полка в основании"
+    ],
+    "components": [
+      "D009",
+      "D009.3A"
+    ],
+    "price": 1360,
+    "barPrice": 4080,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/rizz-rizzt/",
+    "image": "/materials/decaro/decaro_engineering_rizz-t.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/06/teh.karta_d009.2.3-rizzrizzt.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "Четыре рабочие стороны; сторона зубило имеет дополнительные монтажные плоскости"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d00x:black",
+    "brand": "Decaro Engineering",
+    "model": "D00X",
+    "article": "D00X",
+    "drawingAlias": "D00X",
+    "factoryColor": "анодированный чёрный",
+    "color": "black",
+    "hex": "#242526",
+    "stockMm": 3000,
+    "sectionMm": [
+      10,
+      10
+    ],
+    "sectionLabel": "10 × 10",
+    "visibleMm": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "sides": [
+      "Зигзаг",
+      "Острый угол",
+      "Полукруг",
+      "Зубило"
+    ],
+    "components": [],
+    "price": 790,
+    "barPrice": 2370,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d00x/",
+    "image": "/materials/decaro/decaro_engineering_d00x.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/03/teh.karta_d00x.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "Четыре рабочие стороны; сторона зубило имеет дополнительные монтажные плоскости"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d00x:bronze",
+    "brand": "Decaro Engineering",
+    "model": "D00X",
+    "article": "D00X",
+    "drawingAlias": "D00X",
+    "factoryColor": "анодированный бронзовый",
+    "color": "bronze",
+    "hex": "#79604a",
+    "stockMm": 3000,
+    "sectionMm": [
+      10,
+      10
+    ],
+    "sectionLabel": "10 × 10",
+    "visibleMm": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "sides": [
+      "Зигзаг",
+      "Острый угол",
+      "Полукруг",
+      "Зубило"
+    ],
+    "components": [],
+    "price": 970,
+    "barPrice": 2910,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d00x/",
+    "image": "/materials/decaro/decaro_engineering_d00x.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/03/teh.karta_d00x.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "Четыре рабочие стороны; сторона зубило имеет дополнительные монтажные плоскости"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d00x:brass",
+    "brand": "Decaro Engineering",
+    "model": "D00X",
+    "article": "D00X",
+    "drawingAlias": "D00X",
+    "factoryColor": "анодированный латунный",
+    "color": "brass",
+    "hex": "#b69b60",
+    "stockMm": 3000,
+    "sectionMm": [
+      10,
+      10
+    ],
+    "sectionLabel": "10 × 10",
+    "visibleMm": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "sides": [
+      "Зигзаг",
+      "Острый угол",
+      "Полукруг",
+      "Зубило"
+    ],
+    "components": [],
+    "price": 970,
+    "barPrice": 2910,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d00x/",
+    "image": "/materials/decaro/decaro_engineering_d00x.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/03/teh.karta_d00x.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "Четыре рабочие стороны; сторона зубило имеет дополнительные монтажные плоскости"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d00x:copper",
+    "brand": "Decaro Engineering",
+    "model": "D00X",
+    "article": "D00X",
+    "drawingAlias": "D00X",
+    "factoryColor": "анодированный медный",
+    "color": "copper",
+    "hex": "#b77956",
+    "stockMm": 3000,
+    "sectionMm": [
+      10,
+      10
+    ],
+    "sectionLabel": "10 × 10",
+    "visibleMm": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "sides": [
+      "Зигзаг",
+      "Острый угол",
+      "Полукруг",
+      "Зубило"
+    ],
+    "components": [],
+    "price": 970,
+    "barPrice": 2910,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d00x/",
+    "image": "/materials/decaro/decaro_engineering_d00x.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/03/teh.karta_d00x.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  },
+  {
+    "parameters": {
+      "internalGrooveNote": "Четыре рабочие стороны; сторона зубило имеет дополнительные монтажные плоскости"
+    },
+    "compatibleReference": [
+      "D001",
+      "D002",
+      "D003",
+      "D004"
+    ],
+    "id": "decaro:d00x:titanium",
+    "brand": "Decaro Engineering",
+    "model": "D00X",
+    "article": "D00X",
+    "drawingAlias": "D00X",
+    "factoryColor": "анодированный титановый",
+    "color": "titanium",
+    "hex": "#929394",
+    "stockMm": 3000,
+    "sectionMm": [
+      10,
+      10
+    ],
+    "sectionLabel": "10 × 10",
+    "visibleMm": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "sides": [
+      "Зигзаг",
+      "Острый угол",
+      "Полукруг",
+      "Зубило"
+    ],
+    "components": [],
+    "price": 970,
+    "barPrice": 2910,
+    "priceDate": "2026-11-21",
+    "url": "https://decaro-engineering.ru/product/razdelitelnyj-profil-d00x/",
+    "image": "/materials/decaro/decaro_engineering_d00x.png",
+    "manual": "https://decaro-engineering.ru/wp-content/uploads/2024/03/teh.karta_d00x.pdf",
+    "sitePaintAllowed": true,
+    "material": "Алюминий, анодирование"
+  }
+]

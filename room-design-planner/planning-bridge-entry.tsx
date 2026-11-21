@@ -1,3 +1,4 @@
+import {setDecaroContext} from './decaro-context.mjs';
 import {snapshotScene} from './scene-snapshot.mjs';
 import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,normalizeCabinetConfig} from './modular-cabinets';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
@@ -51,7 +52,7 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
   if(data.type==='roomdesign:walk-key'){if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(data.key))window.dispatchEvent(new CustomEvent('roomdesign:walk-key',{detail:{key:data.key,pressed:data.pressed===true}}));return;}
   if(data.type==='roomdesign:view'){setViewMode(data.mode==='eye'?'eye':'3d');return;}
   if(data.type==='roomdesign:snapshot'){if(opening.current||!loaded.current){send({type:'pascal:snapshot',requestId:data.requestId,error:'Дождитесь открытия 3D'});return;}try{send({type:'pascal:snapshot',requestId:data.requestId,scene:sceneSnapshot(),baseline:baseline.current});}catch(e){send({type:'pascal:snapshot',requestId:data.requestId,error:(e as Error).message});}return;}
-  if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;const doc=data.document;setDocument(doc);setWallWorkspace(data.wallWorkspace===true);setWallWork(data.wallWork||null);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
+  if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;const doc=data.document;setDecaroContext({projectId:data.projectId,sheetId:doc.id});setDocument(doc);setWallWorkspace(data.wallWorkspace===true);setWallWork(data.wallWork||null);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
    const result=planningToPlanner(doc,{wallHeightMm:2800,doorHeightMm:2100,windowHeightMm:1400,windowSillMm:900,furnitureHeightsMm:overrides,assetFor:(kind:string)=>new URL(`${import.meta.env.BASE_URL}models/${kind}.glb`, location.origin).href});
    for(const node of Object.values(result.scene.nodes) as any[]) {
     if (node.type !== 'wall') continue;

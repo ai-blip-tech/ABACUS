@@ -1,0 +1,47 @@
+{
+  "retrieved": "2026-11-21",
+  "units": "mm",
+  "copyright": "Decaro Engineering. Official manufacturer CAD for product visualization; no CC0 claim.",
+  "files": [
+    {
+      "file": "d007.fbx",
+      "sha256": "45ac4c5202bc0c84bc927f93850dae3547fec4e9fa6631ce3f2305f0d7ba826e",
+      "source": "https://decaro-engineering.ru/wp-content/uploads/d007.fbx"
+    },
+    {
+      "file": "d008.fbx",
+      "sha256": "ff7747f1c3e6f407bc9b36edb361f94e65e669696e7ac943d293a1868bb5f602",
+      "source": "https://decaro-engineering.ru/wp-content/uploads/d008.fbx"
+    },
+    {
+      "file": "d009.obj",
+      "sha256": "48323e1a2229e3077471eefc4e0554212a52b31f68b91fff32aec8fb80abd75e",
+      "source": "https://decaro-engineering.ru/wp-content/uploads/d009.obj"
+    },
+    {
+      "file": "d00x.dxf",
+      "sha256": "fde67b1f7fed4452d69b71d2673608e0c5ba0b49efaa7943c417b110c6cffac4",
+      "source": "https://decaro-engineering.ru/wp-content/uploads/d00h.dxf"
+    },
+    {
+      "file": "d009.2/D009.2/D009.2.obj",
+      "sha256": "ebcfc892c57033f1bdf31f2bb5f72f9dd0a584c851b939b1094fda97af242a13",
+      "source": "https://decaro-engineering.ru/wp-content/uploads/d009.2.zip"
+    },
+    {
+      "file": "d009.3/D009.3/D009.3.obj",
+      "sha256": "0a1fe4606c8d61e4aba29f13470eecb51f853639eb8505371c89e3d3f1e41882",
+      "source": "https://decaro-engineering.ru/wp-content/uploads/d009.3.zip"
+    },
+    {
+      "file": "rizz/rizz/rizz.obj",
+      "sha256": "7dfd1bcd5bc3f1ab373302cdc3439bfe53d7a223eeb93915e5287bd1ea91cc4f",
+      "source": "https://decaro-engineering.ru/wp-content/uploads/rizz.zip"
+    },
+    {
+      "file": "rizz-t/rizz T/rizz_T.obj",
+      "sha256": "647ba622e51bc026643d0391c7b146c8ddea67a75d9c5f30d7c00b64214de5e2",
+      "source": "https://decaro-engineering.ru/wp-content/uploads/rizz-t.zip"
+    }
+  ]
+}

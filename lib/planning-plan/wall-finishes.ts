@@ -1,5 +1,5 @@
 export const wallFinishFields = [
-  'roomDesignFinishes', 'roomDesignMouldings', 'roomDesignTiles',
+  'roomDesignFinishes', 'roomDesignMouldings', 'roomDesignProfiles', 'roomDesignProfileSettings', 'roomDesignTiles',
   'roomDesignTileSettings', 'roomDesignTileFillReport', 'roomDesignTileRegions', 'roomDesignTileProducts',
 ] as const;
 

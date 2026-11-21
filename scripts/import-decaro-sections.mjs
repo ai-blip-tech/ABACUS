@@ -1,0 +1,16 @@
+// Cross-sections are sliced from manufacturer meshes in millimetres, never guessed.
+import fs from 'node:fs';import {FBXLoader} from '../room-design-planner/node_modules/three/examples/jsm/loaders/FBXLoader.js';import {OBJLoader} from '../room-design-planner/node_modules/three/examples/jsm/loaders/OBJLoader.js';import DxfParser from '../room-design-planner/node_modules/dxf-parser/dist/dxf-parser.js';
+const base=(process.argv[2]||'lib/decaro/source')+'/',out={};
+for(const [model,file,swap] of [['D007','d007.fbx'],['D008','d008.fbx'],['D009','d009.obj',true],['D009.2A','d009.2/D009.2/D009.2.obj'],['D009.3A','d009.3/D009.3/D009.3.obj'],['Rizz','rizz/rizz/rizz.obj'],['RizzT','rizz-t/rizz T/rizz_T.obj']]){
+ const b=fs.readFileSync(base+file),root=file.endsWith('fbx')?new FBXLoader().parse(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),''):new OBJLoader().parse(b.toString()),meshes=[];root.traverse(n=>{if(n.isMesh)meshes.push(n)});
+ // D009 supplier OBJ contains the same profile twice at different drawing positions.
+ const mesh=meshes[model==='D009'?1:0],g=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry,p=g.attributes.position;g.computeBoundingBox();const bb=g.boundingBox,z=(bb.min.z+bb.max.z)/2,segments=[];
+ for(let i=0;i<p.count;i+=3){const tri=[0,1,2].map(j=>[p.getX(i+j),p.getY(i+j),p.getZ(i+j)]),hits=[];for(let j=0;j<3;j++){const a=tri[j],b=tri[(j+1)%3];if((a[2]<z)===(b[2]<z))continue;const t=(z-a[2])/(b[2]-a[2]);hits.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);}if(hits.length===2)segments.push(hits);}
+ const key=p=>p.map(v=>Math.round(v*1e3)).join(','),loops=[];while(segments.length){const [a,b]=segments.pop(),loop=[a,b];let found=true;while(found&&key(loop.at(-1))!==key(loop[0])){found=false;const k=key(loop.at(-1)),idx=segments.findIndex(([a,b])=>key(a)===k||key(b)===k);if(idx>=0){const [a,b]=segments.splice(idx,1)[0];loop.push(key(a)===k?b:a);found=true;}}if(key(loop.at(-1))!==key(loop[0]))throw Error(model+' open contour');loop.pop();loops.push(loop);}
+ const cx=(bb.min.x+bb.max.x)/2,cy=(bb.min.y+bb.max.y)/2;out[model]={source:file,units:'mm',loops:loops.map(l=>l.map(([x,y])=>(swap?[y-cy,x-cx]:[x-cx,y-cy]).map(v=>+v.toFixed(5))))};
+}
+const d=new DxfParser().parseSync(fs.readFileSync(base+'d00x.dxf','utf8')),e=d.entities[0],points=[];
+for(let i=0;i<e.vertices.length;i++){const a=e.vertices[i],b=e.vertices[(i+1)%e.vertices.length];points.push([a.x,a.y]);if(a.bulge){const angle=4*Math.atan(a.bulge),chord=Math.hypot(b.x-a.x,b.y-a.y),r=chord/(2*Math.sin(angle/2)),dx=b.x-a.x,dy=b.y-a.y,offset=chord/(2*Math.tan(angle/2)),cx=(a.x+b.x)/2-dy/chord*offset,cy=(a.y+b.y)/2+dx/chord*offset,start=Math.atan2(a.y-cy,a.x-cx);for(let j=1;j<16;j++){const theta=start+angle*j/16;points.push([cx+Math.abs(r)*Math.cos(theta),cy+Math.abs(r)*Math.sin(theta)]);}}}
+const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+out.D00X={source:'d00h.dxf',units:'mm',loops:[points.map(([x,y])=>[+(x-cx).toFixed(5),+(y-cy).toFixed(5)])]};
+fs.writeFileSync('lib/decaro/sections.json',JSON.stringify(out));console.log(Object.fromEntries(Object.entries(out).map(([k,v])=>[k,v.loops.map(l=>l.length)])));
