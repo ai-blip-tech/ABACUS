@@ -1,0 +1,5 @@
+'use client';
+export function PlannerCameraButton({cameraMode,toggleCamera,disabled=false}:{cameraMode:boolean;toggleCamera:()=>void;disabled?:boolean}){return <button type="button" aria-label="Фотоаппарат" title="Фотоаппарат" aria-pressed={cameraMode} disabled={disabled} onClick={toggleCamera}>
+   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h4l2-3h6l2 3h4a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="4"/></svg>
+  </button>;}
+export function PlannerCameraOverlay({rendering,photograph}:{rendering:boolean;photograph:()=>Promise<void>}){return <div className="planning-photo-overlay"><i className="camera-corner tl"/><i className="camera-corner tr"/><i className="camera-corner bl"/><i className="camera-corner br"/><button className="planning-shutter" aria-label="Сфотографировать и создать рендер" disabled={rendering} onClick={()=>void photograph()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="4"/></svg></button>{rendering&&<span className="camera-generating">Создаём рендер…</span>}</div>;}
