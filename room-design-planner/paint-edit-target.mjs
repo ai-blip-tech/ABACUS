@@ -1,0 +1,2 @@
+/** A colour change on an existing patch edits that patch, regardless of draw mode. */
+export function paintEditTarget(selection,patches,data){if(!data.targetPatchId||data.targetPatchId!==selection.patchId||selection.pendingRegion||!/^#[0-9a-f]{6}$/i.test(data.command?.hex||''))return null;const patch=patches.find(p=>p.id===data.targetPatchId&&p.side===selection.side);return patch?{...selection,bounds:[...patch.bounds],patchId:patch.id,tileRegion:false,tileMode:false,pendingRegion:false}:null;}
