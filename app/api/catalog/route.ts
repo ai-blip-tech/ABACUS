@@ -20,6 +20,11 @@ export async function GET(request: Request) {
   const minPrice = Math.max(0, Number(search.get("minPrice")) || 0);
   const maxPrice = Math.max(0, Number(search.get("maxPrice")) || 0);
   const color = normalize(search.get("color") || "");
+  const covering=search.get("covering")==="1";
+  const colors=covering?search.getAll("colors").map(normalize).filter(Boolean):[];
+  const formats=new Set(covering?search.getAll("formats").filter(Boolean):[]);
+  if(covering&&search.get("format"))formats.add(search.get("format")!);
+  if(covering&&search.get("minPrice")&&search.get("maxPrice")&&minPrice>maxPrice)return Response.json({error:"Минимальная цена не должна превышать максимальную."},{status:400});
   const recliner=search.get("recliner")||"";
   const sleeper=search.get("sleeper")||"";
   const ottoman=search.get("ottoman")||"";
@@ -30,7 +35,7 @@ export async function GET(request: Request) {
   const depthMaxMm = Math.max(0, Number(search.get("depthMaxMm")) || 0);
   const heightMinMm = Math.max(0, Number(search.get("heightMinMm")) || 0);
   const heightMaxMm = Math.max(0, Number(search.get("heightMaxMm")) || 0);
-  const sort = search.get("sort") || "";
+  const sort = search.get("sort") ?? (covering?"price_asc":"");
   const page = Math.max(1, Number(search.get("page")) || 1);
   const limit = Math.min(30, Math.max(6, Number(search.get("limit")) || 18));
 
@@ -38,6 +43,8 @@ export async function GET(request: Request) {
     const { products:loadedProducts, unavailableSources } = await ((search.get("scope")==="surfaces"||type==="porcelain"&&!query&&!ids.size)?loadSurfaceCatalog().then(products=>({products,unavailableSources:[]})):loadStudioCatalog());
     const products=search.get("covering")==="1"?loadedProducts.map(p=>{if(!matchesCatalogType(p,'porcelain',p._trail||''))return p;try{const tile=floorTileFromProduct(p);return{...p,catalogImage:p.image,widthMm:tile.widthMm,depthMm:tile.heightMm,heightMm:tile.thicknessMm||null,price:tile.price||0,oldPrice:0};}catch{return p;}}):loadedProducts;
     const navigation = furnitureCatalogNavigation(products,{type,brands:selectedSources,query});
+    // Facets describe the full available assortment, independent of pagination or active filters.
+    const tileFormats=covering?[...new Set(products.filter(p=>matchesCatalogType(p,'porcelain',p._trail||'')&&p.widthMm&&p.depthMm).map(p=>`${p.widthMm}x${p.depthMm}`))].sort((a,b)=>Number(a.split('x')[0])-Number(b.split('x')[0])||Number(a.split('x')[1])-Number(b.split('x')[1])):[];
     let matched = products.filter((product) => {
       if (search.get("model3d") === "1" && !catalogHasModel3D(product)) return false;
       if (ids.size) return ids.has(product.id) || (product.source === "norrmobler" && ids.has(product.sourceId));
@@ -48,8 +55,10 @@ export async function GET(request: Request) {
       if (availableOnly && !product.available) return false;
       if (minPrice && (!product.price || product.price < minPrice)) return false;
       if (maxPrice && (!product.price || product.price > maxPrice)) return false;
+      if(covering&&search.get("maxPrice")==="0"&&product.price>0)return false;
       if (subtype && normalize(product.subtype) !== subtype) return false;
-      if (!matchesCatalogColor(product,color)) return false;
+      if (colors.length?!colors.some(value=>matchesCatalogColor(product,value)):!matchesCatalogColor(product,color)) return false;
+      if(formats.size&&!formats.has(`${product.widthMm}x${product.depthMm}`))return false;
       if ((type==="sofa"||type==="armchair")&&(!matchesCatalogFeature(product,"recliner",recliner)||!matchesCatalogFeature(product,"sleeper",sleeper))) return false;
       if (type==="sofa"&&!matchesCatalogFeature(product,"ottoman",ottoman)) return false;
       if (material && !normalize(`${product.material} ${product.parameters.filter((item) => /материал|ткань/i.test(item.name)).map((item) => item.value).join(" ")}`).includes(material)) return false;
@@ -61,8 +70,6 @@ export async function GET(request: Request) {
       if (heightMaxMm && (!product.heightMm || product.heightMm > heightMaxMm)) return false;
       return true;
     });
-    const tileFormats=search.get("covering")==="1"?[...new Set(matched.filter(p=>matchesCatalogType(p,'porcelain',p._trail||'')&&p.widthMm&&p.depthMm).map(p=>`${p.widthMm}x${p.depthMm}`))].sort():[];
-    if(search.get("covering")==="1"&&search.get("format"))matched=matched.filter(p=>`${p.widthMm}x${p.depthMm}`===search.get("format"));
     if(sort==="model3d_first")matched.sort((a,b)=>Number(Boolean(catalogModelUrl(b)))*2+Number(catalogHasModel3D(b))-Number(Boolean(catalogModelUrl(a)))*2-Number(catalogHasModel3D(a)));
     if (sort === "price_asc") matched.sort((left, right) => (left.price || Number.POSITIVE_INFINITY) - (right.price || Number.POSITIVE_INFINITY));
     if (sort === "price_desc") matched.sort((left, right) => (right.price || 0) - (left.price || 0));

@@ -1,0 +1,28 @@
+Room Design: unified tile catalogue and planner corrections
+
+Base production/main: d64afb6f1f68ff4a576f603f4aba37cd53be2cf7.
+
+Changes:
+- Shared tile catalogue in floor coverings, wall decoration and planning 3D/eye view.
+- Approved top toolbar: search, stock, sorting; colour, format, brand and price popovers.
+- Server-side multiple colours/formats, global sorting and pagination; preserve replacement format.
+- Responsive 650/651px layout, keyboard focus/Escape, retry and empty results.
+- Remove duplicate brand breadcrumb; use only rounded search focus indicator.
+- Catalogue choice prepares the product; orientation is selected before clicking its card to lay tiles.
+- Delete removes selected painted wall patch and selection boundary; undo restores the patch.
+- Camera references are bound to visible surfaces with a depth-tested ID map, excluding occluded materials.
+- Native WebGPU row orientation/alignment and WebGL readback are normalized before the material map is encoded.
+
+Validation before publication:
+- 852 server tests with browser dependency boundary guard.
+- 10 planner geometry/camera tests.
+- Next.js build and browser planner build.
+- Preview browser: all three catalogue entry points; 4/2/1 reference filter case;
+  search, exact price, invalid range, reset/sort, error/retry, Escape/focus,
+  stale response protection, 650/651px breakpoints and no horizontal overflow.
+- Camera snapshot and surface map captured from actual planner without paid generation.
+- A new paid photorealistic generation was not run; generative fidelity is not guaranteed.
+
+Deployment uses the existing verified-backup gate, isolated Linux planner/converter build,
+atomic candidate switch, health/smoke checks and automatic rollback on failure.
+Local-only authentication entry, dependency symlinks and unrelated old drafts are excluded.

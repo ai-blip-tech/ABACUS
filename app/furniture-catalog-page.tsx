@@ -6,16 +6,17 @@ import { catalogDiscount } from "@/lib/catalog-search";
 import {floorTileFromProduct} from "@/lib/floor-tile-product";
 import {catalogHasModel3D,catalogModelUrl,catalogModelPreviewStatus} from "@/lib/catalog-model3d";
 import "./furniture-catalog-page.css";
+import TileCatalogView from "./tile-catalog-view";
 
-type CatalogProduct = { id:string; priceUnit?:string; hasModel3D?:boolean; model3dUrl?:string; source?:"norrmobler"|"leve-home"|"gomoon"; brand:string; name:string; article:string; image:string; images:string[]; url:string; price:number; oldPrice:number; available:boolean; category:string; subtype:string; color:string; material:string; widthMm:number|null; depthMm:number|null; heightMm:number|null; description:string; parameters:Array<{name:string;value:string}> };
+export type CatalogProduct = { id:string; priceUnit?:string; hasModel3D?:boolean; model3dUrl?:string; source?:"norrmobler"|"leve-home"|"gomoon"; brand:string; name:string; article:string; image:string; images:string[]; url:string; price:number; oldPrice:number; available:boolean; category:string; subtype:string; color:string; material:string; widthMm:number|null; depthMm:number|null; heightMm:number|null; description:string; parameters:Array<{name:string;value:string}> };
 type Brand = { id:string; name:string; count:number };
 const colorFilterEnabled=false;
-type Filters = { type:string; format:string; brands:string[]; query:string; subtype:string; color:string; recliner:string; sleeper:string; ottoman:string; available:boolean; model3d:boolean; sort:string; priceMin:string; priceMax:string; widthMin:string; widthMax:string; page:number };
-const initialFilters: Filters = {type:"sofa",format:"",brands:[],query:"",subtype:"",color:"",recliner:"",sleeper:"",ottoman:"",available:false,model3d:false,sort:"",priceMin:"",priceMax:"",widthMin:"",widthMax:"",page:1};
+export type Filters = { colors:string[]; formats:string[]; type:string; format:string; brands:string[]; query:string; subtype:string; color:string; recliner:string; sleeper:string; ottoman:string; available:boolean; model3d:boolean; sort:string; priceMin:string; priceMax:string; widthMin:string; widthMax:string; page:number };
+const initialFilters: Filters = {colors:[],formats:[],type:"sofa",format:"",brands:[],query:"",subtype:"",color:"",recliner:"",sleeper:"",ottoman:"",available:false,model3d:false,sort:"",priceMin:"",priceMax:"",widthMin:"",widthMax:"",page:1};
 const brandLogos:Record<string,string> = {"brand:fuga":"/catalog-brands/fuga.png","brand:leve home":"/catalog-brands/leve-home.png","brand:norr møbler":"/catalog-brands/norr-mobler.png","brand:norr carpets":"/catalog-brands/norr-carpets.png","brand:seyvaa paris":"/catalog-brands/seyvaa.svg","brand:mobliberica":"/catalog-brands/mobliberica.webp"};
 
 export default function FurnitureCatalogPage({projectName,roomName,selectedIds,onClose,onSelect,initialCategory="sofa",requiredFormat="",actionLabel,surfaceDetails=false,surfaceOnly=false,planning3D=false,prefer3D=false,onCustomCabinet}:{projectName:string;roomName:string;selectedIds:string[];onClose:()=>void;onSelect:(product:CatalogProduct,category:string)=>void;initialCategory?:string;requiredFormat?:string;actionLabel?:string;surfaceDetails?:boolean;surfaceOnly?:boolean;planning3D?:boolean;prefer3D?:boolean;onCustomCabinet?:(kind:"dresser"|"tv_stand")=>void}) {
-  const [filters,setFilters]=useState<Filters>(()=>({...initialFilters,format:requiredFormat,sort:prefer3D?"model3d_first":"",type:furnitureCatalogCategories.some(c=>c.type===initialCategory)?initialCategory:"sofa"}));
+  const [filters,setFilters]=useState<Filters>(()=>({...initialFilters,format:requiredFormat,sort:surfaceOnly&&surfaceDetails?"price_asc":prefer3D?"model3d_first":"",type:furnitureCatalogCategories.some(c=>c.type===initialCategory)?initialCategory:"sofa"}));
   const [searchInput,setSearchInput]=useState("");
   const [products,setProducts]=useState<CatalogProduct[]>([]);
   const [brands,setBrands]=useState<Brand[]>([]);
@@ -34,13 +35,15 @@ export default function FurnitureCatalogPage({projectName,roomName,selectedIds,o
   const update=(patch:Partial<Filters>)=>setFilters(current=>({...current,...(patch.type&&patch.type!==current.type?{color:"",recliner:"",sleeper:"",ottoman:""}:{}),...patch,...(requiredFormat?{format:requiredFormat}:{}),page:1}));
 
   useEffect(()=>{firstControl.current?.focus();},[]);
-  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;if(detail)setDetail(null);else onClose();};window.addEventListener("keydown",escape);return()=>window.removeEventListener("keydown",escape);},[detail,onClose]);
+  useEffect(()=>{if(surfaceOnly&&surfaceDetails)return;const escape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;if(detail)setDetail(null);else onClose();};window.addEventListener("keydown",escape);return()=>window.removeEventListener("keydown",escape);},[detail,onClose,surfaceOnly,surfaceDetails]);
   useEffect(()=>{const timer=window.setTimeout(()=>setFilters(current=>current.query===searchInput.trim()?current:{...current,query:searchInput.trim(),page:1}),300);return()=>window.clearTimeout(timer);},[searchInput]);
   useEffect(()=>{
     const controller=new AbortController();setLoading(true);setError("");
     const params=new URLSearchParams({type:filters.type,page:String(filters.page),limit:"24"});
     if(surfaceOnly)params.set("scope","surfaces");
     if(surfaceDetails){params.set("covering","1");if(filters.format)params.set("format",filters.format);}
+    for(const value of filters.colors)params.append("colors",value);
+    for(const value of filters.formats)params.append("formats",value);
     if(filters.brands.length)params.set("brands",filters.brands.join(","));
     if(planning3D&&filters.model3d)params.set("model3d","1");
     if(filters.available)params.set("available","1");
@@ -62,9 +65,11 @@ export default function FurnitureCatalogPage({projectName,roomName,selectedIds,o
   },[filters,retry,planning3D,surfaceOnly,surfaceDetails]);
 
   const toggleBrand=(id:string)=>{const selected=filters.brands.includes(id);update({brands:selected?filters.brands.filter(item=>item!==id):[...filters.brands,id],...(!selected&&id==="brand:gomoon"?{type:"technical_light",subtype:""}:{})});};
-  const reset=()=>{setFilters(surfaceOnly?{...initialFilters,type:"porcelain",format:requiredFormat}:initialFilters);setSearchInput("");};
+  const reset=()=>{setFilters(current=>surfaceOnly?{...initialFilters,type:"porcelain",format:requiredFormat,sort:current.sort}:initialFilters);setSearchInput("");};
   const filterCount=Number(!!filters.format)+filters.brands.length+Number(Boolean(filters.query))+Number(Boolean(filters.subtype))+Number(Boolean(filters.color))+Number(Boolean(filters.recliner))+Number(Boolean(filters.sleeper))+Number(Boolean(filters.ottoman))+Number(filters.available)+Number(filters.model3d)+Number(Boolean(filters.sort))+Number(Boolean(filters.priceMin||filters.priceMax))+Number(Boolean(filters.widthMin||filters.widthMax));
   const selectedCategory=furnitureCatalogCategories.find(item=>item.type===filters.type);
+
+  if(surfaceOnly&&surfaceDetails)return <TileCatalogView products={products} brands={brands} colors={categoryColors[filters.type]||[]} formats={tileFormats} filters={filters} search={searchInput} onSearch={setSearchInput} update={update} reset={reset} total={total} loading={loading} error={error} notice={catalogNotice} retry={()=>setRetry(v=>v+1)} more={()=>setFilters(current=>({...current,page:current.page+1}))} onClose={onClose} onSelect={onSelect} selectedIds={selectedIds} requiredFormat={requiredFormat}/>;
 
   return <section className={"room-catalog-page"+(surfaceOnly?" room-catalog-surfaces":"")} role="dialog" aria-modal="true" aria-labelledby="room-catalog-title">
     <header className="room-catalog-header"><button className="room-catalog-selection-count" ref={firstControl} type="button" onClick={onClose} title="Вернуться в проект">Выбрано товаров — <span aria-live="polite" aria-atomic="true">{new Set(selectedIds).size}</span></button><div><span>{projectName} · {roomName}</span><h1 id="room-catalog-title">Каталог брендов партнеров</h1></div><button className="room-catalog-close" type="button" onClick={onClose} aria-label="Закрыть каталог">×</button></header>

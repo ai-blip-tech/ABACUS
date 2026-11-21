@@ -1,2 +1,11 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {cameraManifest,cameraRenderPrompt} from '../lib/visualizations/brief.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {cameraManifest,cameraRenderManifest,cameraRenderPrompt} from '../lib/visualizations/brief.mjs';
 test('material manifest deduplicates tiles while retaining assignments and real joint settings',()=>{const tile={productId:'p',side:-1,angle:90,joint:.01,grout:'#000000',grid:{region:[0,0,4,3]}},scene={nodes:{w:{id:'w',type:'wall',start:[0,0],end:[4,0],height:3,metadata:{roomDesignTiles:Array.from({length:1000},(_,i)=>({...tile,x:i*.01,y:0})),roomDesignFinishes:[{id:'wood',side:1,bounds:[0,0,1,1],surface:{material:'Wood049'}}]}}}},manifest=cameraManifest(scene,{floorRegions:[{finish:'oak'}]},[{id:'p',article:'a',brand:'b',name:'tile',width:1.2,height:2.8,thickness:6}]);assert.equal(manifest.walls[0].tiles.length,1);assert.equal(manifest.walls[0].tiles[0].count,1000);assert.equal(manifest.walls[0].tiles[0].jointMm,10);assert.equal(manifest.samples.length,2);assert.ok(cameraRenderPrompt(manifest).length<32000);assert.match(cameraRenderPrompt(manifest),/CAMERA AND GEOMETRY LOCK/);});
+test('camera render only references visible surfaces and uses floor data from the captured scene',()=>{
+ const manifest={walls:[{id:'visible-wall'},{id:'hidden-graphite-wall'}],floors:[{id:'stale-floor'}],furniture:[{name:'hidden cabinet'}],samples:[{id:'graphite'}]};
+ const capture={scene:{nodes:{slab_roomdesign:{metadata:{roomDesignFloorRegions:[{id:'live-floor',finish:'grey'}]}}}},materials:[{id:'grey',name:'floor'},{id:'dark-cabinet'}],surfaceMap:{image:'data:image/png;base64,AA==',surfaces:[{id:'grey',ownerId:'live-floor',hasSample:true},{id:'wall-light',ownerId:'visible-wall',hasSample:false}]}};
+ const actual=cameraRenderManifest(manifest,capture);
+ assert.deepEqual(actual.walls,[{id:'visible-wall'}]);assert.deepEqual(actual.floors,[{id:'live-floor',finish:'grey'}]);
+ assert.deepEqual(actual.furniture,[]);assert.deepEqual(actual.samples,[{id:'grey',name:'floor'}]);
+ const prompt=cameraRenderPrompt(actual);assert.match(prompt,/IMAGE 2 is a flat surface-ID mask/);assert.match(prompt,/grey floor must stay grey/);assert.match(prompt,/Images 3 onwards/);
+ assert.throws(()=>cameraRenderManifest(manifest,{}),/привязать материалы/);
+});
