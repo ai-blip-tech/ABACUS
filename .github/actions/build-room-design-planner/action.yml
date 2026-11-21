@@ -15,11 +15,13 @@ runs:
         node-version: 24
     - shell: bash
       run: |
+        npm ci --ignore-scripts
         npx --yes pnpm@11.25.0 --dir room-design-planner install --frozen-lockfile
         node --test room-design-planner/tests/*.test.mjs
         node --max-old-space-size=4096 scripts/build-room-design-planner.mjs
         sh scripts/room-design-planner-archive-tool.sh
         node scripts/room-design-planner-converter-smoke.mjs
+        ROOM_DESIGN_DATA_DIR="$RUNNER_TEMP/roomdesign-unit-candidate" npm run test:unit
     - id: package
       shell: bash
       run: |
