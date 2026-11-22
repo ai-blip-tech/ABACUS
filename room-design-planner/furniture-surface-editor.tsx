@@ -1,3 +1,7 @@
+import {plannerFurnitureNode} from '../lib/planning-plan/planner-adapter';
+import type {FurnitureViewPose} from '../lib/planning-plan/furniture-view-placement';
+import type {FurnitureItem} from '../lib/planning-plan/furniture';
+import type {MeasureDoc} from '../lib/measured-plan/measure-model';
 import React, {useEffect,useMemo,useRef,useState} from 'react';
 import {Canvas, type ThreeEvent} from '@react-three/fiber';
 import {Environment,Lightformer,OrbitControls} from '@react-three/drei';
@@ -16,11 +20,14 @@ type Draft = Record<string,string>;
 type CatalogRequest = (productId:string, options:{surfaceEditing:true})=>Promise<{textures:Sample[]}>;
 const catalogId = (node:any) => node?.metadata?.catalogProductId || node?.metadata?.roomDesignFurniture?.catalog?.id;
 
-export function FurnitureSurfaceMenu({requestCatalog,onOpenChange}:{requestCatalog:CatalogRequest;onOpenChange:(active:boolean)=>void}) {
+type CabinetCreation={kind:'dresser'|'tv_stand';pose:FurnitureViewPose};
+type FurniturePlacement=(item:FurnitureItem,pose:FurnitureViewPose)=>{item:FurnitureItem;plan:MeasureDoc};
+
+export function FurnitureSurfaceMenu({requestCatalog,onOpenChange,resolvePlacement}:{requestCatalog:CatalogRequest;onOpenChange:(active:boolean)=>void;resolvePlacement:FurniturePlacement}) {
  const [menu,setMenu]=useState<{id:string;x:number;y:number}|null>(null);
  const [target,setTarget]=useState<string|null>(null);
- const [createKind,setCreateKind]=useState<"dresser"|"tv_stand"|null>(null);
- useEffect(()=>{onOpenChange(!!target||!!createKind);return()=>onOpenChange(false);},[target,createKind,onOpenChange]);
+ const [creation,setCreation]=useState<CabinetCreation|null>(null);
+ useEffect(()=>{onOpenChange(!!target||!!creation);return()=>onOpenChange(false);},[target,creation,onOpenChange]);
  useEffect(()=>{
   let point={x:20,y:60};
   const remember=(event:MouseEvent)=>{point={x:event.clientX,y:event.clientY};};
@@ -29,7 +36,7 @@ export function FurnitureSurfaceMenu({requestCatalog,onOpenChange}:{requestCatal
   const scene=(event:any)=>{if(![TETRA_PRODUCT,CABINET_PRODUCT].includes(catalogId(event.node)))return;event.stopPropagation?.();open(event.node.id);};
   const close=(event:PointerEvent)=>{if(event.button===0&&event.target instanceof HTMLCanvasElement)setMenu(null);};
   const configure=(event:Event)=>setTarget((event as CustomEvent).detail.id);
-  const create=(event:Event)=>{const kind=(event as CustomEvent).detail.kind;if(kind==='dresser'||kind==='tv_stand'){setTarget(null);setMenu(null);setCreateKind(kind);}};
+  const create=(event:Event)=>{const detail=(event as CustomEvent<CabinetCreation>).detail;if((detail.kind==='dresser'||detail.kind==='tv_stand')&&detail.pose){setTarget(null);setMenu(null);setCreation(detail);}};
   window.addEventListener('roomdesign:configure-cabinet-create',create);
   window.addEventListener('roomdesign:configure-cabinet',configure);
   window.addEventListener('contextmenu',remember,true);
@@ -42,12 +49,13 @@ export function FurnitureSurfaceMenu({requestCatalog,onOpenChange}:{requestCatal
   {menu&&<div className="rd-furniture-surface-menu" style={{left:Math.min(menu.x,innerWidth-184),top:Math.min(menu.y,innerHeight-56)}}>
    <button type="button" onClick={()=>{setTarget(menu.id);setMenu(null);}}>Добавить текстуру</button>
   </div>}
-  {createKind&&<FurnitureSurfaceEditor id="new-cabinet" createKind={createKind} requestCatalog={requestCatalog} onClose={()=>setCreateKind(null)}/>}
-  {target&&<FurnitureSurfaceEditor key={target} id={target} requestCatalog={requestCatalog} onClose={()=>setTarget(null)}/>}
+  {creation&&<FurnitureSurfaceEditor id="new-cabinet" creation={creation} resolvePlacement={resolvePlacement} requestCatalog={requestCatalog} onClose={()=>setCreation(null)}/>}
+  {target&&<FurnitureSurfaceEditor key={target} id={target} resolvePlacement={resolvePlacement} requestCatalog={requestCatalog} onClose={()=>setTarget(null)}/>}
  </>;
 }
 
-function FurnitureSurfaceEditor({id,createKind,requestCatalog,onClose}:{id:string;createKind?:"dresser"|"tv_stand";requestCatalog:CatalogRequest;onClose:()=>void}) {
+function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onClose}:{id:string;creation?:CabinetCreation;resolvePlacement:FurniturePlacement;requestCatalog:CatalogRequest;onClose:()=>void}) {
+ const createKind=creation?.kind;
  const dialog=useRef<HTMLDialogElement>(null);
  const node=(createKind?{name:createKind==='tv_stand'?'Индивидуальная ТВ-тумба':'Индивидуальный комод',metadata:{catalogProductId:CABINET_PRODUCT}}:useScene.getState().nodes[id as any]) as any;
  const cabinet=catalogId(node)===CABINET_PRODUCT;
@@ -241,6 +249,16 @@ function FurnitureSurfaceEditor({id,createKind,requestCatalog,onClose}:{id:strin
     exported.add(model.clone(true));
     exported.scale.set(1/dimensions[0],1/dimensions[1],1/dimensions[2]);
    }
+   let newCabinetNode:ReturnType<typeof plannerFurnitureNode>|undefined;
+   if(creation){
+    if(!dimensions)throw Error('Не удалось определить габариты комода');
+    const kind=creation.kind,name=kind==='tv_stand'?'Индивидуальная ТВ-тумба':'Индивидуальный комод';
+    const furniture:FurnitureItem={id:crypto.randomUUID(),kind,name,position:[0,0],
+     width:dimensions[0]*1000,height:dimensions[1]*1000,depth:dimensions[2]*1000,rotation:0,
+     dimensionsSource:'user',catalogType:kind,catalog:{id:CABINET_PRODUCT,name,url:'',source:'room-design'}};
+    const placement=resolvePlacement(furniture,creation.pose);
+    newCabinetNode=plannerFurnitureNode(placement.plan,placement.item,dimensions,'');
+   }
    const buffer=await new GLTFExporter().parseAsync(exported,{binary:true});
    if(!(buffer instanceof ArrayBuffer))throw Error('Не удалось подготовить модель с текстурами');
    const assetRef=await saveAsset(new File([buffer],cabinet?'modular-cabinet.glb':'tetra-surface-textures.glb',{type:'model/gltf-binary'}));
@@ -248,18 +266,13 @@ function FurnitureSurfaceEditor({id,createKind,requestCatalog,onClose}:{id:strin
    const store=useScene.getState();
    const current=store.nodes[id as any] as any;
    if(!src)throw Error('Не удалось применить текстуры к предмету');
-   if(createKind&&dimensions){
-    const level=store.nodes['level_roomdesign' as any];
-    if(!level)throw Error('Сначала откройте проект планировочного решения.');
-    const polygon=(store.nodes['slab_roomdesign' as any] as any)?.polygon||[];
-    const position=polygon.length?polygon.reduce((sum:number[],p:number[])=>[sum[0]+p[0]/polygon.length,sum[1]+p[1]/polygon.length],[0,0]):[0,0];
-    const furnitureId=crypto.randomUUID(),nodeId='item_'+furnitureId;
-    const name=createKind==='tv_stand'?'Индивидуальная ТВ-тумба':'Индивидуальный комод';
-    const furniture={id:furnitureId,kind:createKind,name,position:position.map((n:number)=>n*1000),width:dimensions[0]*1000,height:dimensions[1]*1000,depth:dimensions[2]*1000,rotation:0,dimensionsSource:'user',catalogType:createKind,catalog:{id:CABINET_PRODUCT,name,url:'',source:'room-design'},modularCabinet:configuration};
-    const item={object:'node',type:'item',id:nodeId,parentId:level.id,name,visible:true,children:[],position:[position[0],0,position[1]],rotation:[0,0,0],scale:dimensions,asset:{id:nodeId,src,name,category:createKind,thumbnail:'',dimensions:[1,1,1]},metadata:{roomDesignId:furnitureId,kind:createKind,catalogProductId:CABINET_PRODUCT,roomDesignFurniture:furniture,modularCabinet:configuration,roomDesignModelAsset:assetRef,representation:'catalog-converted'}};
+   if(newCabinetNode){
     const schema=nodeRegistry.get('item')?.schema;
     if(!schema)throw Error('Редактор мебели ещё загружается.');
-    store.createNode(schema.parse(item) as any,level.id);
+    newCabinetNode.asset={...newCabinetNode.asset,id:newCabinetNode.id,src};
+    Object.assign(newCabinetNode.metadata,{catalogProductId:CABINET_PRODUCT,modularCabinet:configuration,
+     roomDesignModelAsset:assetRef,representation:'catalog-converted'});
+    store.createNode(schema.parse(newCabinetNode) as any,newCabinetNode.parentId as any);
     onClose();return;
    }
    if(!current)throw Error('Не удалось применить текстуры к предмету');
@@ -307,17 +320,23 @@ function FurnitureSurfaceEditor({id,createKind,requestCatalog,onClose}:{id:strin
   <div className={cabinet?'rd-cabinet-workspace':'rd-furniture-texture-workspace'}>
   <aside className={cabinet?'rd-cabinet-sidebar':undefined}>
   {cabinet&&<div className="rd-cabinet-controls">
-   <div className="rd-cabinet-summary"><small>Максимальная ширина 260 см</small></div>
+   <div className="rd-cabinet-summary">
+    {cabinetData&&<strong>Общая ширина {cabinetWidthMm(configuration,cabinetData)/10} см</strong>}
+    <small>Максимальная ширина 260 см</small>
+   </div>
    <div className="rd-cabinet-modules">
     {configuration.modules.map((module,index)=>{
      const dimensions=cabinetData?.models.find(item=>item.id===module.model);
      return <button type="button" key={module.id} aria-pressed={module.id===activeModule} onClick={()=>{setActiveModule(module.id);setAllModules(false);}}>
       <img src={cabinetURL(dimensions?.thumbnail||module.model+'-catalog.png')} alt=""/>
-      <b>Модуль {index+1}</b><span>{dimensions?dimensions.widthMm/10+' см':''}</span>
+      <b>Модуль {index+1}</b><span>{module.model}{dimensions?' · '+dimensions.widthMm/10+' см':''}</span>
      </button>;
     })}
    </div>
-   {configuration.modules.length>1&&<button type="button" className="rd-cabinet-remove" onClick={()=>{const next=configuration.modules.filter(module=>module.id!==activeModule);setCabinetConfiguration({...configuration,modules:next});setActiveModule(next[0].id);}}>Убрать выбранный модуль</button>}
+   {configuration.modules.length>1&&<button type="button" className="rd-cabinet-remove" disabled={pending} onClick={()=>{
+    const modules=configuration.modules.filter(module=>module.id!==activeModule);
+    if(setCabinetConfiguration({...configuration,modules}))setActiveModule(modules[0].id);
+   }}>Убрать выбранный</button>}
    <div className="rd-cabinet-size-filters">
     <label className="rd-cabinet-height-filter">Высота корпуса<select aria-label="Высота корпуса" value={catalogHeight} onChange={event=>{const height=Number(event.target.value);setCatalogHeight(height);setCatalogDepth(catalogueModels.find(item=>item.heightMm===height)?.depthMm||450);setCatalogWidth('all');}}>{heights.map(height=><option key={height} value={height}>{height/10} см</option>)}</select></label>
     <label>Ширина<select aria-label="Ширина модуля" value={catalogWidth} onChange={event=>setCatalogWidth(event.target.value)}><option value="all">Все размеры</option>{widths.map(width=><option key={width} value={width}>{width/10} см</option>)}</select></label>

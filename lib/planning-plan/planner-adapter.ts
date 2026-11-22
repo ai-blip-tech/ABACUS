@@ -1,5 +1,7 @@
 import {floorRegionGeometry,validateFloorRegions} from '../measured-plan/measure-floor-finishes.ts';
-import type {MeasureDoc} from '../measured-plan/measure-model';
+import type {MeasureDoc,Point} from '../measured-plan/measure-model';
+import {inside} from '../wall-decoration/surfaces.ts';
+import type {FurnitureItem} from './furniture';
 
 /** Exchange boundary: Room Design XY millimetres -> Pascal XZ metres.
  * Furniture rotation is clockwise in source XY, hence negative Three.js Y.
@@ -26,10 +28,35 @@ export function planningToPlanner(plan:MeasureDoc,options:{wallHeightMm?:number;
  }
  if(plan.floor.length<3)throw Error('Не задан контур пола');
  child('slab','slab_roomdesign',{name:'Пол',material:{preset:'white',properties:{color:'#dfddd6',roughness:1}},polygon:plan.floor.map(point),elevation:0,thickness:.1,autoFromWalls:false,metadata:{roomDesignFloor:true,roomDesignFloorRegions:validateFloorRegions(plan.floorRegions||[]),roomDesignFloorGeometry:(plan.floorRegions||[]).map(region=>({id:region.id,...floorRegionGeometry(plan,region)}))}});
- const within=(p:number[],polygon:number[][])=>{let yes=false;for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){const a=polygon[i],b=polygon[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes;}return yes;};
- const elevation=(p:number[])=>{const zones=plan.zones.filter(z=>within(p,z.polygon));if(zones.length>1)throw Error('Пересечение зон высоты');return zones[0]?.elevation||0;};
  for(const z of plan.zones){child('slab','slab_zone_'+z.id,{name:z.name,polygon:z.polygon.map(point),elevation:mm(z.elevation),thickness:.1,autoFromWalls:false,metadata:{roomDesignId:z.id,ceilingHeightMm:z.height}});if(z.height&&z.height!==plan.height)warnings.push(`${z.name}: отдельная высота потолка сохранена в metadata, сложный потолок не построен`);}
- for(const c of plan.columns||[]){child('item','item_column_'+c.id,{name:c.name,position:[mm(c.a[0]+c.width/2),mm(elevation(c.a)),mm(c.a[1]+c.depth/2)],rotation:[0,0,0],scale:[mm(c.width),height(c.height||plan.height,options.wallHeightMm,c.name),mm(c.depth)],children:[],asset:{id:'roomdesign-column',name:c.name,category:'column',thumbnail:'',src:options.assetFor('column'),dimensions:[1,1,1]},metadata:{roomDesignId:c.id,column:true}});}
- for(const f of plan.furniture||[]){if(!positive(f.width)||!positive(f.depth))throw Error('Укажите габариты мебели: '+f.name);const dimensions=[mm(f.width),height(f.height,options.furnitureHeightsMm?.[f.id],f.name),mm(f.depth)];if(f.cad?.classification==='unknown')warnings.push(`${f.name}: назначение не определено, показан CAD-контур без подмены типом мебели`);child('item','item_'+f.id,{name:f.name,position:[mm(f.position[0]),mm(elevation(f.position)),mm(f.position[1])],rotation:[0,-f.rotation*Math.PI/180,0],scale:dimensions,children:[],asset:{id:'roomdesign-'+f.kind,name:f.name,category:f.kind,thumbnail:f.catalog?.image||'',src:options.assetFor(f.kind,f.id),dimensions:[1,1,1]},metadata:{roomDesignId:f.id,kind:f.kind,dimensionsSource:f.dimensionsSource,roomDesignFurniture:structuredClone(f),representation:f.cad?'extruded-cad-footprint':'schematic-not-exact-catalog-model'}});}
+ for(const c of plan.columns||[]){child('item','item_column_'+c.id,{name:c.name,position:[mm(c.a[0]+c.width/2),mm(elevationAt(plan,c.a)),mm(c.a[1]+c.depth/2)],rotation:[0,0,0],scale:[mm(c.width),height(c.height||plan.height,options.wallHeightMm,c.name),mm(c.depth)],children:[],asset:{id:'roomdesign-column',name:c.name,category:'column',thumbnail:'',src:options.assetFor('column'),dimensions:[1,1,1]},metadata:{roomDesignId:c.id,column:true}});}
+ for(const f of plan.furniture||[]){
+  const dimensions=furnitureDimensions(f,height(f.height,options.furnitureHeightsMm?.[f.id],f.name)*1000);
+  if(f.cad?.classification==='unknown')warnings.push(`${f.name}: назначение не определено, показан CAD-контур без подмены типом мебели`);
+  const {id,type,parentId,object,visible,...body}=plannerFurnitureNode(plan,f,dimensions,options.assetFor(f.kind,f.id));
+  child(type,id,body);
+ }
  return{scene:{nodes,rootNodeIds:[site.id],installedPlugins:['pascal:core']},warnings,report:{walls:plan.walls.length,openings:plan.openings.length,furniture:plan.furniture?.length||0,columns:plan.columns?.length||0,units:'m',sourceUnits:'mm'}};
+}
+
+
+function elevationAt(plan:MeasureDoc,position:Point){
+ const zones=plan.zones.filter(zone=>inside(position,zone.polygon));
+ if(zones.length>1)throw Error('Пересечение зон высоты');
+ return zones[0]?.elevation||0;
+}
+
+export function furnitureDimensions(item:FurnitureItem,heightMm:number):[number,number,number]{
+ if(![item.width,item.depth].every(value=>Number.isFinite(value)&&value>0))throw Error('Укажите габариты мебели: '+item.name);
+ return [item.width/1000,heightMm/1000,item.depth/1000];
+}
+
+export function plannerFurnitureNode(plan:MeasureDoc,item:FurnitureItem,dimensions:[number,number,number],src:string){
+ return {object:'node',type:'item',id:'item_'+item.id,parentId:'level_roomdesign',visible:true,
+  name:item.name,position:[item.position[0]/1000,elevationAt(plan,item.position)/1000,item.position[1]/1000],
+  rotation:[0,-item.rotation*Math.PI/180,0],scale:dimensions,children:[],
+  asset:{id:'roomdesign-'+item.kind,name:item.name,category:item.kind,thumbnail:item.catalog?.image||'',src,dimensions:[1,1,1]},
+  metadata:{roomDesignId:item.id,kind:item.kind,dimensionsSource:item.dimensionsSource,
+   roomDesignFurniture:structuredClone(item),representation:item.cad?'extruded-cad-footprint':'schematic-not-exact-catalog-model'},
+ };
 }

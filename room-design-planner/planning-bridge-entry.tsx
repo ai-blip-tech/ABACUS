@@ -16,7 +16,12 @@ import {createRoot} from 'react-dom/client';
 import {Editor,sceneLayout,useEditor} from '@pascal-app/editor';
 import {builtinPlugin} from '@pascal-app/nodes';
 import {loadPlugin,useScene,loadAssetUrl,saveAsset,nodeRegistry,emitter} from '@pascal-app/core';
-import {planningToPlanner} from '../lib/planning-plan/planner-adapter';
+import {furnitureDimensions,plannerFurnitureNode,planningToPlanner} from '../lib/planning-plan/planner-adapter';
+import {planningFromPlanner} from '../lib/planning-plan/planner-sync';
+import {furniturePositionInView,type FurnitureViewPose} from '../lib/planning-plan/furniture-view-placement';
+import type {FurnitureItem} from '../lib/planning-plan/furniture';
+import type {MeasureDoc} from '../lib/measured-plan/measure-model';
+import {FurnitureViewCamera} from './furniture-view-camera';
 import {EditorShortcuts} from './editor-shortcuts.tsx';
 import {WalkCamera,WalkHud} from './walkthrough.tsx';
 import {MouldingPaintBadge} from './orac-mouldings.tsx';
@@ -41,13 +46,80 @@ function requestCatalogModel(productId:string,options:{textureId?:string;surface
 }
 const textureEditorChanged=(active:boolean)=>send({type:'pascal:furniture-textures-open',active});
 const defaults:Record<string,number>={chair:850,armchair:850,sofa:850,bed:900,wardrobe:2400,table:750,desk:750,kitchen:900,fridge:2000,bath:600,shower:2100,toilet:750,sink:850,ottoman:450,rug:10,lamp:1600,plant:1200,decor:300,shelf:2100,tv_stand:500,tv:700,nightstand:550,dresser:900};
+const templateAsset=(kind:string)=>new URL(`${import.meta.env.BASE_URL}models/${kind}.glb`,location.origin).href;
+
+async function prepareFurnitureModel(node:any,furniture?:FurnitureItem){
+ const binding=furniture?.model3D;
+ if(!furniture||!binding)return;
+ if(!binding.url)return {warning:`${furniture.name}: ссылка на 3D-модель ещё недоступна; показано условное обозначение`};
+ try{
+  const prepared=await requestCatalogModel(binding.productId,{textureId:binding.textureId});
+  const url=new URL(prepared.url,location.origin);
+  if(url.origin!==location.origin||url.pathname!=='/api/catalog/model-asset')throw Error('Недопустимый адрес модели');
+  const response=await fetch(url,{signal:AbortSignal.timeout(20000)});
+  if(!response.ok)throw Error('Файл недоступен');
+  const bytes=await response.arrayBuffer();
+  if(bytes.byteLength<12||bytes.byteLength>50*1024*1024||new DataView(bytes).getUint32(0,true)!==0x46546c67)throw Error('Некорректный GLB');
+  const ref=await saveAsset(new File([bytes],binding.productId+'.glb',{type:'model/gltf-binary'}));
+  const src=await loadAssetUrl(ref);
+  if(!src)throw Error('Не удалось открыть подготовленную модель');
+  node.asset={...node.asset,id:'catalog-'+binding.productId,src};
+  node.metadata={...node.metadata,roomDesignModelAsset:ref,representation:'catalog-converted',
+   catalogProductId:binding.productId,...(binding.textureId?{catalogTextureId:binding.textureId}:{})};
+  return {ready:true,warning:prepared.warning?`${furniture.name}: ${prepared.warning}`:undefined};
+ }catch(error){
+  const message=error instanceof Error?error.message:'модель не загрузилась';
+  return {warning:`${furniture.name}: ${message}; показано условное обозначение`};
+ }
+}
+
 function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wallWork,setWallWork]=useState<any>(null);const cameraHandoff=useRef<WallCameraPose|null>(null);const [viewMode,setViewMode]=useState<'3d'|'eye'>('3d'),[document,setDocument]=useState<any>(null);const [scene,setScene]=useState<any>(null),[error,setError]=useState(''),[warnings,setWarnings]=useState<string[]>([]),[key,setKey]=useState(0),baseline=useRef<any>(null),newModelFocus=useRef<string|null>(null),opening=useRef(false),loaded=useRef(false),lastChange=useRef('');
+ const readFurniturePose=useRef<(() => FurnitureViewPose)|null>(null);
+ const furniturePose=useRef<FurnitureViewPose|null>(null);
+ const sourcePlan=useRef<MeasureDoc|null>(null);
+
+ function resolveFurniturePlacement(item:FurnitureItem,pose:FurnitureViewPose){
+  if(!sourcePlan.current)throw Error('Дождитесь открытия 3D');
+  const plan=planningFromPlanner(sourcePlan.current,sceneSnapshot(),baseline.current);
+  if((plan.furniture?.length||0)>=500)throw Error('Можно добавить не более 500 предметов');
+  return {plan,item:{...item,position:furniturePositionInView(plan,pose,item)}};
+ }
+
  useEffect(()=>{useEditor.getState().setViewLayout(sceneLayout('3d'));},[]);
  useEffect(()=>{const receive=async(event:MessageEvent)=>{if(event.source!==window.parent||event.origin!==parentOrigin||event.data?.session!==session||!allowed.has(parentOrigin))return;const data=event.data;if(data.type==='roomdesign:model-prepared'){const job=catalogModelJobs.get(data.requestId);if(job){clearTimeout(job.timer);catalogModelJobs.delete(data.requestId);if(data.error)job.reject(Error(data.error));else job.resolve(data.result);}return;}
   if(data.type==='roomdesign:wall-zoom'){window.dispatchEvent(new CustomEvent('roomdesign:wall-zoom',{detail:data.action}));return;}if(data.type==='roomdesign:wall-work'){setWallWork(data.context||null);return;}
   if(data.type==='roomdesign:wall-tile-product'){window.dispatchEvent(new CustomEvent('roomdesign:wall-tile-product',{detail:data.product}));return;}
   if(data.type==='roomdesign:floor-update'){const store=useScene.getState(),slab:any=store.nodes['slab_roomdesign'];if(slab)store.updateNode(slab.id,{metadata:{...slab.metadata,roomDesignFloorRegions:data.regions,roomDesignFloorGeometry:data.geometry}} as any);return;}
-  if(data.type==='roomdesign:configure-cabinet-create'){if(['dresser','tv_stand'].includes(data.kind))window.dispatchEvent(new CustomEvent('roomdesign:configure-cabinet-create',{detail:{kind:data.kind}}));return;}
+  if(data.type==='roomdesign:remember-furniture-view'){
+   furniturePose.current=loaded.current?readFurniturePose.current?.()||null:null;
+   send({type:'pascal:furniture-view',requestId:data.requestId,error:furniturePose.current?undefined:'Дождитесь открытия 3D'});
+   return;
+  }
+  if(data.type==='roomdesign:configure-cabinet-create'){
+   if(furniturePose.current&&['dresser','tv_stand'].includes(data.kind)){
+    window.dispatchEvent(new CustomEvent('roomdesign:configure-cabinet-create',{detail:{kind:data.kind,pose:furniturePose.current}}));
+   }
+   return;
+  }
+  if(data.type==='roomdesign:add-furniture'){
+   try{
+    const pose=furniturePose.current;
+    if(!loaded.current||!pose)throw Error('Откройте каталог из нужного ракурса в 3D');
+    const {plan,item}=resolveFurniturePlacement(data.item,pose);
+    const dimensions=furnitureDimensions(item,item.height||defaults[item.kind]||900);
+    const node=plannerFurnitureNode(plan,item,dimensions,templateAsset(item.kind));
+    const schema=nodeRegistry.get('item')?.schema;
+    if(!schema)throw Error('Редактор мебели ещё загружается');
+    const model=await prepareFurnitureModel(node,item);
+    if(!loaded.current||furniturePose.current!==pose)throw Error('Ракурс изменился. Откройте каталог повторно');
+    const store=useScene.getState();
+    if(!store.nodes[node.id as any])store.createNode(schema.parse(node) as any,node.parentId as any);
+    send({type:'pascal:furniture-added',requestId:data.requestId,warning:model?.warning});
+   }catch(error){
+    send({type:'pascal:furniture-added',requestId:data.requestId,error:(error as Error).message});
+   }
+   return;
+  }
   if(data.type==='roomdesign:floor-editing'){window.document.documentElement.dataset.floorEditing=String(data.active===true);return;}
   if(data.type==='roomdesign:capture'){window.dispatchEvent(new CustomEvent('roomdesign:capture-frame',{detail:{requestId:data.requestId}}));return;}
   if(data.type==='roomdesign:focus'){const canvas=window.document.querySelector('canvas');if(canvas){canvas.tabIndex=0;canvas.focus({preventScroll:true});}return;}
@@ -55,8 +127,8 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
   if(data.type==='roomdesign:walk-key'){if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(data.key))window.dispatchEvent(new CustomEvent('roomdesign:walk-key',{detail:{key:data.key,pressed:data.pressed===true}}));return;}
   if(data.type==='roomdesign:view'){setViewMode(data.mode==='eye'?'eye':'3d');if('wallWork'in data)setWallWork(data.wallWork||null);return;}
   if(data.type==='roomdesign:snapshot'){if(opening.current||!loaded.current){send({type:'pascal:snapshot',requestId:data.requestId,error:'Дождитесь открытия 3D'});return;}try{send({type:'pascal:snapshot',requestId:data.requestId,scene:sceneSnapshot(),baseline:baseline.current});}catch(e){send({type:'pascal:snapshot',requestId:data.requestId,error:(e as Error).message});}return;}
-  if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;cameraHandoff.current=null;const doc=data.document;setDecaroContext({projectId:data.projectId,sheetId:doc.id});setDocument(doc);setWallWorkspace(data.wallWorkspace===true);setWallWork(data.wallWork||null);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
-   const result=planningToPlanner(doc,{wallHeightMm:2800,doorHeightMm:2100,windowHeightMm:1400,windowSillMm:900,furnitureHeightsMm:overrides,assetFor:(kind:string)=>new URL(`${import.meta.env.BASE_URL}models/${kind}.glb`, location.origin).href});
+  if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;cameraHandoff.current=null;const doc=data.document;sourcePlan.current=doc;furniturePose.current=null;setDecaroContext({projectId:data.projectId,sheetId:doc.id});setDocument(doc);setWallWorkspace(data.wallWorkspace===true);setWallWork(data.wallWork||null);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
+   const result=planningToPlanner(doc,{wallHeightMm:2800,doorHeightMm:2100,windowHeightMm:1400,windowSillMm:900,furnitureHeightsMm:overrides,assetFor:templateAsset});
    for(const node of Object.values(result.scene.nodes) as any[]) {
     if (node.type !== 'wall') continue;
     const saved = doc.walls.find((wall:any) => wall.id === node.metadata?.roomDesignId)?.plannerFinish;
@@ -72,7 +144,7 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
    }
    for(const node of Object.values(result.scene.nodes) as any[]){
     if(node.type!=='item'||node.metadata?.column||node.metadata?.roomDesignModelAsset)continue;
-    const f=doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId),binding=f?.model3D;
+    const f=doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId);
     if(f?.catalog?.id===CABINET_PRODUCT){
      const previous=Object.values(data.previousScene?.nodes||{}).find((old:any)=>old.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;
      const configuration=normalizeCabinetConfig(f.modularCabinet||previous?.metadata?.modularCabinet||{modules:[newCabinet(f.cabinetModel||'5041')]});
@@ -87,22 +159,9 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
      newModelFocus.current=node.id;
      continue;
     }
-    if(!binding)continue;
-    if (!binding.url) {
-      result.warnings.push(`${f.name}: ссылка на 3D-модель ещё недоступна; показано условное обозначение`);
-      continue;
-    }
-    try {
-      const prepared = await requestCatalogModel(binding.productId, {textureId:binding.textureId});
-      if (prepared.warning) result.warnings.push(`${f.name}: ${prepared.warning}`);
-      const modelURL = new URL(prepared.url, location.origin);
-      if (modelURL.origin !== location.origin || modelURL.pathname !== '/api/catalog/model-asset') throw Error('Недопустимый адрес модели');
-      const response = await fetch(modelURL, {signal:AbortSignal.timeout(20000)});
-      if (!response.ok) throw Error('Файл недоступен');
-      const bytes = await response.arrayBuffer();
-      if (bytes.byteLength < 12 || bytes.byteLength > 50*1024*1024 || new DataView(bytes).getUint32(0,true)!==0x46546c67) throw Error('Некорректный GLB');
-     const ref=await saveAsset(new File([bytes],binding.productId+'.glb',{type:'model/gltf-binary'}));node.asset={...node.asset,id:'catalog-'+binding.productId,src:await loadAssetUrl(ref)};node.metadata={...node.metadata,roomDesignModelAsset:ref,representation:'catalog-converted',catalogProductId:binding.productId,...(binding.textureId?{catalogTextureId:binding.textureId}:{})};newModelFocus.current=node.id;
-    }catch(error){result.warnings.push(`${f.name}: ${error instanceof Error ? error.message : 'модель не загрузилась'}; 2D-привязка сохранена, показано условное обозначение`);}
+    const resultModel=await prepareFurnitureModel(node,f);
+    if(resultModel?.warning)result.warnings.push(resultModel.warning);
+    if(resultModel?.ready)newModelFocus.current=node.id;
    }
    for(const [id,node] of Object.entries(result.scene.nodes)){const schema=nodeRegistry.get((node as any).type)?.schema;if(!schema)throw Error('Неизвестный тип 3D-объекта');result.scene.nodes[id]=schema.parse(node);}
    baseline.current=structuredClone(result.scene);setWarnings(result.warnings);setScene(result.scene);setKey(k=>k+1);lastChange.current='';send({type:'pascal:scene-prepared'});
@@ -117,7 +176,7 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
   const node=Object.values(useScene.getState().nodes).find((node:any)=>node.metadata?.catalogProductId===CABINET_PRODUCT) as any;
   if(node)window.dispatchEvent(new CustomEvent('roomdesign:configure-cabinet',{detail:{id:node.id}}));
  }
- return <div className={`linked-room-planner ${viewMode==='eye'?'is-walkthrough':''} ${wallWork?'rd-wall-work-mode':''} ${wallWorkspace?'rd-wall-docked':''}`}>{demo&&scene&&<div className="rd-cabinet-preview-tools"><button type="button" onClick={openCabinet}>Настроить комоды</button></div>}{warnings.length>0&&<details className="linked-room-planner-assumptions"><summary>Особенности 3D · {warnings.length}</summary>{warnings.map((w,i)=><p key={i}>{w}</p>)}<p>Исходные размеры в 2D сохраняются. Временное значение станет размером плана только при его изменении в 3D.</p></details>}{error&&<p role="alert">{error}</p>}{scene?<><FurnitureSurfaceMenu requestCatalog={requestCatalogModel} onOpenChange={textureEditorChanged}/><EditorShortcuts/>{!wallWork&&<DragControls keyboard={viewMode==='3d'}/>}{viewMode==='eye'&&<WalkHud/>}<WallRegionIndicator/><WallFinishPanel docked={wallWorkspace} active={viewMode==='eye'||!!wallWork}/><MouldingPaintBadge active={viewMode==='eye'||!!wallWork}/><div className="rd-editor-viewport"><Editor disablePostFx={!!wallWork} viewerSceneSlot={<><CameraCapture/><FloorSurfaces/>{viewMode==='3d'&&!wallWork&&<WallProximity/>}<WallFinishScene active={viewMode==='eye'||!!wallWork} plan={document}/>{wallWork&&<WallWorkCamera context={wallWork} handoff={cameraHandoff}/>}<WalkCamera active={viewMode==='eye'&&!wallWork} plan={document} onError={setError} onPose={wallWorkspace?sendWalkPose:undefined} handoff={wallWorkspace?cameraHandoff:undefined}/></>} key={key} viewBar={false} layoutVersion="v2" projectId={'linked:'+session} onLoad={onLoad} onSave={onSave} onLoaderChange={ready} actionMenuPlacement="top"/></div></>:!error&&<p className="linked-room-planner-wait">Подготавливаем текущий лист…</p>}</div>;
+ return <div className={`linked-room-planner ${viewMode==='eye'?'is-walkthrough':''} ${wallWork?'rd-wall-work-mode':''} ${wallWorkspace?'rd-wall-docked':''}`}>{demo&&scene&&<div className="rd-cabinet-preview-tools"><button type="button" onClick={openCabinet}>Настроить комоды</button></div>}{warnings.length>0&&<details className="linked-room-planner-assumptions"><summary>Особенности 3D · {warnings.length}</summary>{warnings.map((w,i)=><p key={i}>{w}</p>)}<p>Исходные размеры в 2D сохраняются. Временное значение станет размером плана только при его изменении в 3D.</p></details>}{error&&<p role="alert">{error}</p>}{scene?<><FurnitureSurfaceMenu resolvePlacement={resolveFurniturePlacement} requestCatalog={requestCatalogModel} onOpenChange={textureEditorChanged}/><EditorShortcuts/>{!wallWork&&<DragControls keyboard={viewMode==='3d'}/>}{viewMode==='eye'&&<WalkHud/>}<WallRegionIndicator/><WallFinishPanel docked={wallWorkspace} active={viewMode==='eye'||!!wallWork}/><MouldingPaintBadge active={viewMode==='eye'||!!wallWork}/><div className="rd-editor-viewport"><Editor disablePostFx={!!wallWork} viewerSceneSlot={<><FurnitureViewCamera readPose={readFurniturePose} mode={viewMode}/><CameraCapture/><FloorSurfaces/>{viewMode==='3d'&&!wallWork&&<WallProximity/>}<WallFinishScene active={viewMode==='eye'||!!wallWork} plan={document}/>{wallWork&&<WallWorkCamera context={wallWork} handoff={cameraHandoff}/>}<WalkCamera active={viewMode==='eye'&&!wallWork} plan={document} onError={setError} onPose={wallWorkspace?sendWalkPose:undefined} handoff={wallWorkspace?cameraHandoff:undefined}/></>} key={key} viewBar={false} layoutVersion="v2" projectId={'linked:'+session} onLoad={onLoad} onSave={onSave} onLoaderChange={ready} actionMenuPlacement="top"/></div></>:!error&&<p className="linked-room-planner-wait">Подготавливаем текущий лист…</p>}</div>;
 }
 createRoot(document.getElementById('root')!,{
  onUncaughtError(error){

@@ -18,7 +18,7 @@ async function requestArchiveModel(id:string, options:{inspect?:boolean;textureI
 }
 
 /** The full partner catalog from Image Editor, in the native top layer (also in fullscreen). */
-export function PlanningFurnitureDialog({projectName,initialKind,initialItem,selectedIds,onClose,onAdd,replacing=false,prefer3D=false,onCustomCabinet}:{projectName:string;initialKind:FurnitureKind;initialItem?:FurnitureItem;selectedIds:string[];onClose:()=>void;onAdd:(item:FurnitureItem)=>void;replacing?:boolean;prefer3D?:boolean;onCustomCabinet?:(kind:"dresser"|"tv_stand")=>void}){
+export function PlanningFurnitureDialog({projectName,initialKind,initialItem,selectedIds,onClose,onAdd,replacing=false,prefer3D=false,onCustomCabinet}:{projectName:string;initialKind:FurnitureKind;initialItem?:FurnitureItem;selectedIds:string[];onClose:()=>void;onAdd:(item:FurnitureItem)=>void|Promise<void>;replacing?:boolean;prefer3D?:boolean;onCustomCabinet?:(kind:"dresser"|"tv_stand")=>void}){
  const ref=useRef<HTMLDialogElement>(null),[error,setError]=useState('');
  const [choice,setChoice]=useState<{item:FurnitureItem;textures:ArchiveTexture[];selected:string}|null>(null);
  const [loading,setLoading]=useState('');
@@ -28,14 +28,16 @@ export function PlanningFurnitureDialog({projectName,initialKind,initialItem,sel
 
  async function chooseItem(item:FurnitureItem) {
   if(pending.current)return;
-  if(!prefer3D||!item.model3D?.url||!(/\.(rar|zip)(?:[?#]|$)/i).test(item.model3D.url)){onAdd(item);return;}
+  const archive=prefer3D&&item.model3D?.url&&/\.(rar|zip)(?:[?#]|$)/i.test(item.model3D.url);
   pending.current=true;
   setError('');
-  setLoading('Ищем текстуры в архиве модели…');
+  setLoading(archive?'Ищем текстуры в архиве модели…':'Добавляем предмет…');
   try {
-   const {textures}=await requestArchiveModel(item.model3D.productId,{inspect:true});
-   if(textures.length){setChoice({item,textures,selected:''});return;}
-   onAdd(item);
+   if(archive&&item.model3D){
+    const {textures}=await requestArchiveModel(item.model3D.productId,{inspect:true});
+    if(textures.length){setChoice({item,textures,selected:''});return;}
+   }
+   await onAdd(item);
   } catch (cause) {
    setError((cause as Error).message);
   } finally {
@@ -52,7 +54,7 @@ export function PlanningFurnitureDialog({projectName,initialKind,initialItem,sel
   const model3D={...choice.item.model3D,textureId:choice.selected};
   try {
    await requestArchiveModel(model3D.productId,{textureId:model3D.textureId});
-   onAdd({...choice.item,model3D});
+   await onAdd({...choice.item,model3D});
   } catch (cause) {
    setError((cause as Error).message);
   } finally {
