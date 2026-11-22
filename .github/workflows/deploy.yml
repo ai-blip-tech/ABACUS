@@ -29,11 +29,13 @@ jobs:
           PLANNER_BUILD_ID: ${{ steps.planner.outputs.artifact-id }}
           PLANNER_BUILD_DIGEST: ${{ steps.planner.outputs.digest }}
           PLANNER_BUILD_TOKEN: ${{ github.token }}
+          ROOM_DESIGN_MEASURE_AI_MODEL: ${{ secrets.MEASURE_AI_MODEL }}
+          ROOM_DESIGN_MEASURE_AI_SERVICE_TIER: ${{ secrets.MEASURE_AI_SERVICE_TIER }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: PLANNER_BUILD_ID,PLANNER_BUILD_DIGEST,PLANNER_BUILD_TOKEN
+          envs: PLANNER_BUILD_ID,PLANNER_BUILD_DIGEST,PLANNER_BUILD_TOKEN,ROOM_DESIGN_MEASURE_AI_MODEL,ROOM_DESIGN_MEASURE_AI_SERVICE_TIER
           command_timeout: 18m
           script: |
             set -eu
@@ -235,10 +237,16 @@ jobs:
             git show "$release_sha:scripts/cad/dwg2dxf-linux-wrapper.sh" | cmp - "$converter_dir/dwg2dxf"
             python3 - "$env_file" "$data_dir" "$converter_dir/dwg2dxf" <<'PY'
             from pathlib import Path
-            import sys
+            import os, sys
 
             path = Path(sys.argv[1])
+            private_model = os.environ.get("ROOM_DESIGN_MEASURE_AI_MODEL", "").strip()
+            private_tier = os.environ.get("ROOM_DESIGN_MEASURE_AI_SERVICE_TIER", "").strip()
+            if not private_model or not private_tier or any(c in private_model + private_tier for c in "\r\n"):
+                raise SystemExit("Missing private measured-plan analysis settings")
             updates = {
+                "ROOM_DESIGN_MEASURE_AI_MODEL": private_model,
+                "ROOM_DESIGN_MEASURE_AI_SERVICE_TIER": private_tier,
                 "ROOM_DESIGN_DATA_DIR": sys.argv[2],
                 "ROOM_DESIGN_PARQUET_DIR": "/home/codex/roomdesign-assets/floor-coverings-20261120",
                 "OPENAI_TEXT_MODEL": "gpt-6.1-sol",

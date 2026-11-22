@@ -182,3 +182,16 @@
 @media(max-width:850px){.measured-plan-root .measure-layer-floating{top:13px;right:60px}.measured-plan-root .measure-layers-popover{position:fixed;right:12px;top:150px;max-height:calc(100dvh - 170px);overflow:auto}}
 .measured-plan-root .dimension-tool { display: inline-flex; align-items: center; justify-content: center; color: #42755c; }
 .measured-plan-root .dimension-tool.active { border-color: #42755c; background: #edf5ef; }
+
+.measured-plan-root.has-document .analyze-file-button{background:#842b39;color:#fff;border-color:#842b39}
+.measured-plan-root.has-document .analysis-progress{order:3;display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:#796b60;font-size:11px;line-height:1.5}
+.measured-plan-root .analysis-progress b{flex:1;font-weight:400}.measured-plan-root .analysis-progress span{font-variant-numeric:tabular-nums}.measured-plan-root .analysis-progress progress,.measured-plan-root .analysis-progress small{width:100%}
+
+.measured-plan-root .analysis-outcome{flex:none;display:flex;flex-wrap:wrap;gap:7px 14px;align-items:center;padding:14px 20px;border-bottom:1px solid #d9c89d;background:#fff7e3;color:#725523;font-size:12px;line-height:1.5}.measured-plan-root .analysis-outcome b{font-size:13px}.measured-plan-root .analysis-outcome.success{background:#e7f4eb;border-color:#9fc8ad;color:#255f3d}.measured-plan-root .analysis-outcome.error{background:#fff0ed;border-color:#deb5ab;color:#8b3b30}
+
+.measured-plan-root .measure-board.is-analysis-loading>:not(.analysis-loader){display:none!important}
+.measured-plan-root .analysis-loader{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:28px;background:#fcfaf7;text-align:center;color:#342d28}
+.measured-plan-root .analysis-loader-spinner{width:46px;height:46px;border:3px solid #e9ddd9;border-top-color:#842b39;border-radius:50%;animation:measure-analysis-spin 1s linear infinite}
+.measured-plan-root .analysis-loader h2{margin:4px 0 0;font:26px Georgia,serif}.measured-plan-root .analysis-loader p{max-width:480px;margin:0;font-size:15px;line-height:1.65;color:#78695f}.measured-plan-root .analysis-loader-time{font:36px Arial,sans-serif;font-variant-numeric:tabular-nums;color:#842b39;letter-spacing:2px}.measured-plan-root .analysis-loader-phase,.measured-plan-root .analysis-loader small{font-size:12px;color:#8c7b6e;line-height:1.5}.measured-plan-root.is-analyzing .measure-legend{visibility:hidden}.measured-plan-root.is-analyzing .measure-draw-tools{pointer-events:none;opacity:.5}
+@keyframes measure-analysis-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.measured-plan-root .analysis-loader-spinner{animation:none}}

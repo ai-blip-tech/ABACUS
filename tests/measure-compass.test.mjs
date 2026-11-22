@@ -11,7 +11,7 @@ test('shared compass is accessible and fixed in the top-right of its canvas',()=
 });
 test('both editors put compass outside the panned and scaled SVG and reset default camera',()=>{
  const measured=readFileSync('app/measured-plan/editor/measure-app.tsx','utf8'),partition=readFileSync('app/partition-plan/page.tsx','utf8');
- assert.match(measured,/className="measure-board"><PlanCompass/);assert.match(measured,/<PlanCompass onReset=\{\(\)=>\{setPan\(\{x:0,y:0,zoom:1\}\)/);
+ assert.ok(measured.indexOf("<PlanCompass onReset=")<measured.indexOf("<svg ref={svgRef}"));assert.match(measured,/<PlanCompass onReset=\{\(\)=>\{setPan\(\{x:0,y:0,zoom:1\}\)/);
  assert.match(partition,/className="partition-canvas"[^\n]+<PlanCompass/);assert.match(partition,/<PlanCompass disabled=\{busy\} onReset=\{\(\)=>\{setZoom\(1\);setOffset\(\[0,0\]\)/);
  const body=readFileSync('app/plan-compass.tsx','utf8');assert.match(body,/e.stopPropagation\(\);onReset\(\)/);
 });

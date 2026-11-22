@@ -13,7 +13,7 @@ export type Wall={plannerFinish?:PlannerWallFinish;id:string;name:string;a:Point
 export type RoomLabel={id:string;name:string;anchor:Point};
 export type Opening={id:string;wallId:string;kind:'door'|'window'|'opening';offset:number;width:number;height:number|null;sill:number|null;toCeiling?:boolean;hingesSide?:'left'|'right';swingDirection?:'inward'|'outward';confirmed:boolean};
 export type Zone={id:string;name:string;polygon:Point[];elevation:number;height:number|null;confirmed:boolean};
-export type Source={name:string;mime:string;hash:string;width:number;height:number;page:number;pages:number;method:string;image:string;words:any[];ocrWarning?:string;pixelScale:number};
+export type Source={analysisResult?:{jobId:string;completedAt:string};name:string;mime:string;hash:string;width:number;height:number;page:number;pages:number;method:string;image:string;words:any[];ocrWarning?:string;pixelScale:number};
 export type MeasureDoc={schemaVersion:1;floorRegions?:FloorRegion[];furniture?:FurnitureItem[];columns?:Column[];dimensions?:PlanDimension[];roomLabels?:RoomLabel[];openingDefaults?:{commonHeight?:number|null;doorHeight?:number|null;windowHeight?:number|null;sill?:number|null};testOnly?:boolean;id:string;name:string;source:Source;walls:Wall[];openings:Opening[];floor:Point[];floorConfirmed:boolean;scaleConfirmed:boolean;calibration:{a:Point;b:Point;length:number}|null;height:number|null;heightMode:'unknown'|'uniform'|'different';zones:Zone[];geometryReviewed:boolean;drawingReviewed:boolean;conflictNotes:Record<string,string>;updatedAt:string};
 export const uuid=()=>crypto.randomUUID();
 export const length=(w:Wall)=>Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1]);
