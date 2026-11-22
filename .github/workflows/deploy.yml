@@ -242,6 +242,7 @@ jobs:
                 "ROOM_DESIGN_DATA_DIR": sys.argv[2],
                 "ROOM_DESIGN_PARQUET_DIR": "/home/codex/roomdesign-assets/floor-coverings-20261120",
                 "OPENAI_TEXT_MODEL": "gpt-6.1-sol",
+                "ROOM_DESIGN_MEASURE_AI_ENABLED": "1",
                 "NEXT_PUBLIC_ONO_V2_ENABLED": "true",
                 "ONO_V2_ENABLED": "true",
                 "ROOM_DWG_CONVERTER": sys.argv[3],

@@ -5,7 +5,7 @@ const app=readFileSync(new URL('../app/measured-plan/editor/measure-app.tsx',imp
 test('wall inspector keeps essential measurements and precise geometry without duplicate actions',()=>{
  assert.doesNotMatch(app,/Повернуть на 90°|>Развернуть<|>＋ Дверь<|>＋ Окно<|>Удалить стену и её проёмы</);
  assert.match(app,/label="Угол стены, °"/);
- assert.match(app,/Тип выбранной стены/);assert.match(app,/Размеры по осевой линии/);assert.match(app,/Длина по оси стены, мм/);assert.match(app,/Размеры по рисунку ориентировочные/);assert.match(app,/Подтвердить размеры этой стены/);
+ assert.match(app,/Тип выбранной стены/);assert.match(app,/Размеры по осевой линии/);assert.match(app,/Длина по оси стены, мм/);assert.match(app,/Пропорции взяты с рисунка/);assert.match(app,/opening-extra precise-wall-controls" open=\{planning\?true:undefined\}/);assert.match(app,/Подтвердить размеры этой стены/);
 });
 test('toolbar exposes door and window placement next to measurement tools',()=>{
  const toolbar=app.slice(app.indexOf('<div className="measure-draw-tools">'),app.indexOf('aria-label="Масштаб плана"'));
@@ -18,7 +18,7 @@ test('Delete removes selected opening through undoable document change, not its 
  const removal=app.slice(app.indexOf('function removeSelectedOpening'),app.indexOf('function historyStep'));
  assert.match(removal,/setDoc\(next\)/);assert.match(removal,/removeOpening\(doc,opening.id\)/);
  assert.doesNotMatch(removal,/deleteWall|d.walls=/);
- assert.match(app,/e.key==='Delete'\|\|e.key==='Backspace'\)&&opening&&tool==='select'/);
+ assert.match(app,/e.key==='Delete'\|\|e.key==='Backspace'\)&&tool==='select'/);assert.match(app,/if\(opening\)\{e.preventDefault\(\);removeSelectedOpening\(\);return;/);
  const key=app.slice(app.indexOf('const key=(e:KeyboardEvent)'));
- assert.ok(key.indexOf("target.closest('input,textarea,select")<key.indexOf('removeSelectedOpening()'));
+ assert.ok(key.indexOf("target?.closest('input,textarea,select")<key.indexOf('removeSelectedOpening()'));
 });

@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {buildAIPlan,type AIPlan} from '../lib/measured-plan/measure-ai.ts';
+import {blankDoc} from '../lib/measured-plan/measure-model.ts';
+const doc=()=>blankDoc({name:'test',mime:'image/png',hash:'x',width:1000,height:1000,page:1,pages:1,method:'raster-estimated',image:'/test',words:[],pixelScale:10});
+const point=(x:number,y:number)=>({x,y});
+function input():AIPlan{return{walls:[{id:'a',a:point(10,10),b:point(90,10),thickness_percent:2,outer:true,confidence:.9},{id:'b',a:point(90,10),b:point(90,90),thickness_percent:2,outer:true,confidence:.9},{id:'c',a:point(90,90),b:point(10,90),thickness_percent:2,outer:true,confidence:.9},{id:'d',a:point(10,90),b:point(10,10),thickness_percent:2,outer:true,confidence:.9}],openings:[{wall_id:'a',kind:'window',a:point(30,10),b:point(50,10),hinge:'unknown',swing:'unknown',confidence:.9}],dimensions:[{a:point(10,10),b:point(90,10),length_mm:4000,text:'4.00',confidence:.95},{a:point(90,10),b:point(90,90),length_mm:4000,text:'4.00',confidence:.95}],warnings:[]};}
+test('AI plan derives consensus scale, creates hosted window and leaves all sizes unconfirmed',()=>{const source=doc(),before=JSON.stringify(source),result=buildAIPlan(source,input());assert.equal(result.document.source.pixelScale,5);assert.equal(result.document.openings[0].width,1000);assert.equal(result.document.openings[0].kind,'window');assert.equal(result.report.measuredScale,true);assert.equal(result.document.scaleConfirmed,true);assert.ok(result.document.walls.every(w=>!w.lengthConfirmed&&!w.thicknessConfirmed));assert.equal(JSON.stringify(source),before);});
+test('off-wall openings and references to missing walls are omitted with warnings',()=>{const p=input();p.openings[0].a.y=50;p.openings[0].b.y=50;const result=buildAIPlan(doc(),p);assert.equal(result.document.openings.length,0);assert.ok(result.report.warnings.length>0);});
+test('AI coordinates outside the image are rejected instead of applied',()=>{const p=input();p.walls[0].a.x=120;assert.throws(()=>buildAIPlan(doc(),p));});
+test('area label or inconsistent measurement does not override scale',()=>{const p=input();p.dimensions=[{a:point(10,10),b:point(90,10),length_mm:17600,text:'17.6',confidence:.4}];assert.equal(buildAIPlan(doc(),p).document.source.pixelScale,10);});

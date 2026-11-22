@@ -1,3 +1,5 @@
+import {wallBodies,wallJoins} from './measure-display.ts';
+import {unionRings,wallRectangle,ringArea} from '../planning-plan/usable-area.ts';
 import type {Column,MeasureDoc,Point,Wall} from './measure-model.ts';
 type Segment={a:Point;b:Point};
 const cross=(a:Point,b:Point)=>a[0]*b[1]-a[1]*b[0];
@@ -86,5 +88,15 @@ function inside(p:Point,polygon:Point[]){let result=false;for(let i=0,j=polygon.
 export function withAutomaticFloor(doc:MeasureDoc,previous?:MeasureDoc|null):MeasureDoc{
  if(doc===previous)return doc;
  if(previous&&JSON.stringify([doc.walls,doc.columns])===JSON.stringify([previous.walls,previous.columns]))return {...doc,floor:previous.floor,floorConfirmed:previous.floorConfirmed};
- return {...doc,floor:automaticFloor(doc.walls,doc.columns).polygon,floorConfirmed:false};
+ const automatic=automaticFloor(doc.walls,doc.columns);
+ let floor=automatic.polygon;
+ if(!floor.length&&doc.source?.method==='raster-estimated'){
+  // A cropped scan can contain closed rooms and unfinished walls outside them.
+  // Use only cavities actually enclosed by observed wall bodies. Open strokes
+  // cannot create a room and no bounding rectangle closes the missing photo.
+  const bodies=wallBodies(doc.walls),solids=unionRings([...bodies.map(w=>wallRectangle(w)),...wallJoins(bodies,0).map(j=>j.polygon)]);
+  const closed=solids.filter(poly=>poly.slice(1).some(hole=>ringArea(hole)>=250000)).sort((a,b)=>ringArea(b[0])-ringArea(a[0]));
+  if(closed.length===1)floor=closed[0][0];
+ }
+ return {...doc,floor,floorConfirmed:false};
 }
