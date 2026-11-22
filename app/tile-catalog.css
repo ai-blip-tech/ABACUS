@@ -10,3 +10,5 @@
 .rd-tile-catalog .rd-tile-search input:focus,.rd-tile-catalog .rd-tile-search input:focus-visible{outline:none;box-shadow:none;border:0}.rd-tile-catalog .rd-tile-search:focus-within{border-color:#9d1230;box-shadow:0 0 0 1px #9d1230}
 
 .rd-tile-catalog-header h1{margin-top:0}
+
+.rd-tile-filterbar{grid-template-columns:repeat(5,minmax(0,1fr))}@media(max-width:800px){.rd-tile-filterbar{grid-template-columns:repeat(2,minmax(0,1fr))}}

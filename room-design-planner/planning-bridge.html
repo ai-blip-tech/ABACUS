@@ -1,1 +1,18 @@
-<!doctype html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Room Design Planner</title></head><body><div id="root"></div><script type="module" src="/planning-bridge-entry.tsx"></script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+ <meta charset="UTF-8"/>
+ <meta name="viewport" content="width=device-width,initial-scale=1"/>
+ <title>Room Design Planner</title>
+ <script>
+  // This listener can report a download failure even when the editor code cannot run.
+  window.addEventListener('error', function (event) {
+   if (!(event.target instanceof HTMLScriptElement) || event.target.type !== 'module') return;
+   const query = new URLSearchParams(location.search);
+   if (query.get('parentOrigin') !== location.origin || parent === window) return;
+   parent.postMessage({type: 'pascal:module-error', session: query.get('session')}, location.origin);
+  }, true);
+ </script>
+</head>
+<body><div id="root"></div><script type="module" src="/planning-bridge-entry.tsx"></script></body>
+</html>

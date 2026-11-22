@@ -1,3 +1,4 @@
+import {tileDesigns,matchesTileDesign,prioritizeRecent} from '@/lib/tile-design';
 import {floorTileFromProduct} from "@/lib/floor-tile-product";
 import { catalogHasModel3D, catalogModelUrl } from "@/lib/catalog-model3d";
 import { matchesCatalogType } from "@/lib/catalog-filter";
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
   const maxPrice = Math.max(0, Number(search.get("maxPrice")) || 0);
   const color = normalize(search.get("color") || "");
   const covering=search.get("covering")==="1";
+  const designs=covering?search.getAll("designs").filter(Boolean):[];
   const colors=covering?search.getAll("colors").map(normalize).filter(Boolean):[];
   const formats=new Set(covering?search.getAll("formats").filter(Boolean):[]);
   if(covering&&search.get("format"))formats.add(search.get("format")!);
@@ -45,6 +47,7 @@ export async function GET(request: Request) {
     const navigation = furnitureCatalogNavigation(products,{type,brands:selectedSources,query});
     // Facets describe the full available assortment, independent of pagination or active filters.
     const tileFormats=covering?[...new Set(products.filter(p=>matchesCatalogType(p,'porcelain',p._trail||'')&&p.widthMm&&p.depthMm).map(p=>`${p.widthMm}x${p.depthMm}`))].sort((a,b)=>Number(a.split('x')[0])-Number(b.split('x')[0])||Number(a.split('x')[1])-Number(b.split('x')[1])):[];
+    const tileDesignOptions=covering?[...new Set(products.filter(p=>matchesCatalogType(p,'porcelain',p._trail||'')).flatMap(tileDesigns))].sort((a,b)=>a.localeCompare(b,'ru')):[];
     let matched = products.filter((product) => {
       if (search.get("model3d") === "1" && !catalogHasModel3D(product)) return false;
       if (ids.size) return ids.has(product.id) || (product.source === "norrmobler" && ids.has(product.sourceId));
@@ -58,6 +61,7 @@ export async function GET(request: Request) {
       if(covering&&search.get("maxPrice")==="0"&&product.price>0)return false;
       if (subtype && normalize(product.subtype) !== subtype) return false;
       if (colors.length?!colors.some(value=>matchesCatalogColor(product,value)):!matchesCatalogColor(product,color)) return false;
+      if(!matchesTileDesign(product,designs))return false;
       if(formats.size&&!formats.has(`${product.widthMm}x${product.depthMm}`))return false;
       if ((type==="sofa"||type==="armchair")&&(!matchesCatalogFeature(product,"recliner",recliner)||!matchesCatalogFeature(product,"sleeper",sleeper))) return false;
       if (type==="sofa"&&!matchesCatalogFeature(product,"ottoman",ottoman)) return false;
@@ -74,12 +78,14 @@ export async function GET(request: Request) {
     if (sort === "price_asc") matched.sort((left, right) => (left.price || Number.POSITIVE_INFINITY) - (right.price || Number.POSITIVE_INFINITY));
     if (sort === "price_desc") matched.sort((left, right) => (right.price || 0) - (left.price || 0));
     if (sort === "discount_desc") matched.sort((left,right)=>catalogDiscount(right)-catalogDiscount(left));
+    const hasSurfaceFilter=query||selectedSources.size||availableOnly||colors.length||formats.size||designs.length||minPrice||search.has("maxPrice")||widthMinMm||widthMaxMm||subtype||color||material||depthMinMm||depthMaxMm||heightMinMm||heightMaxMm;
+    if(covering&&!hasSurfaceFilter)matched=prioritizeRecent(matched,(search.get("recent")||"").split(",").filter(Boolean));
     const subtypes = navigation.categorySubtypes[type] || [];
     const start = (page - 1) * limit;
     const selectedProducts = ids.size ? matched.slice(0, 100) : matched.slice(start, start + limit);
     const pageProducts = selectedProducts.map(({ _trail, _updatedAt, ...product }) => ({ ...product, canonicalUrl: product.url, updatedAt: _updatedAt, provenance: product.source === "gomoon" ? "gomoon_yml" : product.source === "leve-home" ? "leve_home_yml" : "norrmobler_yml" }));
     return Response.json({
-      products: pageProducts, tileFormats, total: matched.length, page, limit, subtypes, ...navigation,
+      products: pageProducts, tileFormats, tileDesigns:tileDesignOptions, total: matched.length, page, limit, subtypes, ...navigation,
       brands: [...FURNITURE_CATALOG_SOURCES, {id:"gomoon",name:"GoMoon"}].map(({ id, name }) => ({ id, name, available: !unavailableSources.includes(id) })),
       unavailableSources, catalogNotice:surfaceCatalogNotice(),
     });

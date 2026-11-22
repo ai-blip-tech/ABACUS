@@ -1,3 +1,5 @@
+import {partitionFromPlanning} from '@/lib/partition-plan/planning-sync';
+import {manualSheetIndex} from '@/lib/planning-plan/manual-workspace';
 import {restoreManualDraft,switchManualSource,importManualDxf,withManualSheets,switchManualSheet} from '@/lib/planning-plan/manual-workspace';
 import {parseDxf,convertDxf} from '@/lib/planning-plan/dxf-import';
 import {auditDxf} from '@/lib/planning-plan/dxf-audit';
@@ -60,6 +62,7 @@ export async function PUT(request:Request,{params}:Context){
    document=withManualSheets(document,source);
    const revision=(old?.revision||0)+1;
    db.prepare('INSERT INTO planning_plans(project_id,user_id,tenant_id,revision,document_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(project_id,user_id,tenant_id) DO UPDATE SET revision=excluded.revision,document_json=excluded.document_json,updated_at=excluded.updated_at').run(id,u.id,u.tenantId,revision,JSON.stringify(document),new Date().toISOString());
+   if(['workspace-save','save'].includes(b.action)&&document.variants.manual?.plan){const target=document.variants.manual.plan,construction=partitionFromPlanning(partition?JSON.parse(partition.document_json):null,measured?JSON.parse(measured.document_json):document.baseline,target,revision,manualSheetIndex(document)+1);if(!partition&&measured)construction.sourceRevision=measured.revision;db.prepare('INSERT INTO partition_plans(project_id,user_id,tenant_id,revision,document_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(project_id,user_id,tenant_id) DO UPDATE SET revision=excluded.revision,document_json=excluded.document_json,updated_at=excluded.updated_at').run(id,u.id,u.tenantId,(partition?.revision||0)+1,JSON.stringify(construction),new Date().toISOString());}
    db.prepare('UPDATE projects SET updated_at=? WHERE id=? AND user_id=? AND tenant_id=?').run(new Date().toISOString(),id,u.id,u.tenantId);return{document,revision};
   });
   if(!result)return Response.json({error:'План изменён в другой вкладке. Сохранение остановлено; обновите страницу.'},{status:409});return Response.json(result,{headers:{'Cache-Control':'no-store'}});

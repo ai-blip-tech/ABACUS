@@ -15,3 +15,23 @@ export function snapTileCorner(point:Point,regions:Floor2Region[],selectedId:str
  }
  return {point:best,snapped:distance<Infinity};
 }
+
+export type SeamGuide={a:Point;b:Point;axis:'x'|'y';neighborId:string};
+/** Align grout centre lines independently; moving a pattern never resizes a zone. */
+export function snapPatternSeams(origin:Point,selected:Floor2Region,regions:Floor2Region[],tolerance:number):{point:Point;snapped:boolean;guides:SeamGuide[]}{
+ const product=regionProduct(selected),guides:SeamGuide[]=[];if(product?.category!=='tile'||!['straight','diagonal'].includes(selected.scheme||'straight'))return {point:origin,snapped:false,guides};
+ const angle=floorPlacement(selected).angle*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle),j=selected.tile?.jointMm??2,px=product.widthMm+j,py=product.heightMm+j;
+ const project=(p:Point):Point=>[p[0]*c+p[1]*s,-p[0]*s+p[1]*c],world=(p:Point):Point=>[p[0]*c-p[1]*s,p[0]*s+p[1]*c];
+ const proposed=project(origin),best=[Infinity,Infinity],value=[...proposed],neighbors:(Floor2Region|null)[]=[null,null];
+ const box=(r:Floor2Region)=>{const xs=r.polygon.map(p=>p[0]),ys=r.polygon.map(p=>p[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];},a=box(selected);
+ for(const other of regions){if(other.id===selected.id)continue;const p=regionProduct(other);if(!p||p.id!==product.id||p.widthMm!==product.widthMm||p.heightMm!==product.heightMm||(other.tile?.jointMm??2)!==j||(other.scheme||'straight')!==(selected.scheme||'straight'))continue;
+  const b=box(other);if(Math.hypot(Math.max(0,a[0]-b[2],b[0]-a[2]),Math.max(0,a[1]-b[3],b[1]-a[3]))>600)continue;
+  const placement=floorPlacement(other),period=product.widthMm===product.heightMm?90:180,degrees=((placement.angle-floorPlacement(selected).angle)%period+period)%period;if(Math.min(degrees,period-degrees)>.01)continue;
+  const r=placement.angle*Math.PI/180,nc=Math.cos(r),ns=Math.sin(r),seam=project([placement.origin[0]-nc*j/2+ns*j/2,placement.origin[1]-ns*j/2-nc*j/2]);
+  for(const axis of [0,1]){const pitch=axis===0?px:py,phase=seam[axis]+j/2,candidate=phase+Math.round((proposed[axis]-phase)/pitch)*pitch,d=Math.abs(candidate-proposed[axis]);if(d<=tolerance&&d<best[axis]){best[axis]=d;value[axis]=candidate;neighbors[axis]=other;}}
+ }
+ for(const axis of [0,1]){const other=neighbors[axis];if(!other)continue;const points=[...selected.polygon,...other.polygon].map(project),across=1-axis,lo=Math.min(...points.map(p=>p[across])),hi=Math.max(...points.map(p=>p[across])),mid=points.reduce((n,p)=>n+p[axis],0)/points.length,pitch=axis===0?px:py,line=value[axis]-j/2+Math.round((mid-value[axis]+j/2)/pitch)*pitch;
+  guides.push({axis:axis===0?'x':'y',neighborId:other.id,a:world(axis===0?[line,lo]:[lo,line]),b:world(axis===0?[line,hi]:[hi,line])});
+ }
+ return {point:world(value as Point),snapped:guides.length>0,guides};
+}

@@ -3,14 +3,14 @@ import {useEffect,useId,useRef,useState,type CSSProperties} from 'react';
 import type {CatalogProduct,Filters} from './furniture-catalog-page';
 import './tile-catalog.css';
 
-type Facet='color'|'format'|'brand'|'price';
-type Props={products:CatalogProduct[];brands:{id:string;name:string;count:number}[];colors:string[];formats:string[];
+type Facet='color'|'format'|'design'|'brand'|'price';
+type Props={designs:string[];products:CatalogProduct[];brands:{id:string;name:string;count:number}[];colors:string[];formats:string[];
  filters:Filters;search:string;onSearch:(v:string)=>void;update:(v:Partial<Filters>)=>void;reset:()=>void;
  total:number;loading:boolean;error:string;notice:string;retry:()=>void;more:()=>void;onClose:()=>void;
  onSelect:(product:CatalogProduct,category:string)=>void;selectedIds:string[];requiredFormat:string};
 const money=(value:number)=>new Intl.NumberFormat('ru-RU').format(value);
 const format=(value:string)=>value.replace('x',' × ')+' мм';
-const groups={color:'Цвет',format:'Формат',brand:'Бренд',price:'Цена'};
+const groups={color:'Цвет',format:'Формат',design:'Дизайн',brand:'Бренд',price:'Цена'};
 const swatch=(name:string)=>{const values:[RegExp,string][]=[[/бел|white/i,'#eeeae0'],[/сер|grey|gray/i,'#999b98'],[/чер|black/i,'#393632'],[/беж|beige|cream/i,'#d3c3ab'],[/корич|brown/i,'#8a6650'],[/зелен|зелён|green/i,'#75816a'],[/син|blue/i,'#69818e'],[/роз|pink/i,'#cda7a2'],[/золот|gold/i,'#c5a56b']];return values.find(([rx])=>rx.test(name))?.[1]||'#bdb5a8';};
 
 export default function TileCatalogView(p:Props){
@@ -26,7 +26,7 @@ export default function TileCatalogView(p:Props){
   document.addEventListener('pointerdown',outside,true);window.addEventListener('keydown',key,true);
   return()=>{document.removeEventListener('pointerdown',outside,true);window.removeEventListener('keydown',key,true);};
  },[open,p.onClose]);
- const toggle=(key:'colors'|'formats'|'brands',value:string)=>p.update({[key]:p.filters[key].includes(value)?p.filters[key].filter(v=>v!==value):[...p.filters[key],value]});
+ const toggle=(key:'colors'|'formats'|'brands'|'designs',value:string)=>p.update({[key]:p.filters[key].includes(value)?p.filters[key].filter(v=>v!==value):[...p.filters[key],value]});
  const range=(kind:'price'|'width',index:number,value:string)=>{
   const next=[...(kind==='price'?price:width)];next[index]=value;
   (kind==='price'?setPrice:setWidth)(next);
@@ -34,11 +34,11 @@ export default function TileCatalogView(p:Props){
   (kind==='price'?setPriceError:setWidthError)(invalid?'Минимум не должен превышать максимум.':'');
   if(!invalid)p.update(kind==='price'?{priceMin:next[0],priceMax:next[1]}:{widthMin:next[0],widthMax:next[1]});
  };
- const active=Boolean(p.search||p.filters.available||p.filters.colors.length||p.filters.formats.length||p.filters.brands.length||p.filters.priceMin||p.filters.priceMax||p.filters.widthMin||p.filters.widthMax||priceError||widthError);
+ const active=Boolean(p.search||p.filters.available||p.filters.designs.length||p.filters.colors.length||p.filters.formats.length||p.filters.brands.length||p.filters.priceMin||p.filters.priceMax||p.filters.widthMin||p.filters.widthMax||priceError||widthError);
  const reset=()=>{setPrice(['','']);setWidth(['','']);setPriceError('');setWidthError('');p.reset();};
  const label=(key:Facet)=>{
   if(key==='price'){const [min,max]=[p.filters.priceMin,p.filters.priceMax];return min&&max?`${money(Number(min))}–${money(Number(max))} ₽/м²`:min?`От ${money(Number(min))} ₽/м²`:max?`До ${money(Number(max))} ₽/м²`:'Цена';}
-  const values=key==='color'?p.filters.colors:key==='brand'?p.filters.brands:p.requiredFormat?[p.requiredFormat]:p.filters.formats;
+  const values=key==='design'?p.filters.designs:key==='color'?p.filters.colors:key==='brand'?p.filters.brands:p.requiredFormat?[p.requiredFormat]:p.filters.formats;
   return values.length>1?groups[key]+' · '+values.length:values.length?key==='format'?format(values[0]):key==='brand'?p.brands.find(b=>b.id===values[0])?.name||values[0]:values[0]:groups[key];
  };
  const choose=async(product:CatalogProduct)=>{if(choosing)return;setChoosing(product.id);setChoiceError('');try{await p.onSelect(product,'porcelain');}catch(e){setChoiceError((e as Error).message);}finally{setChoosing('');}};
@@ -56,6 +56,7 @@ export default function TileCatalogView(p:Props){
      {open===key&&<div className="rd-tile-options" id={id+'-'+key} role="group" aria-label={'Фильтр: '+groups[key]}>
       {key==='color'&&<div className="rd-tile-color-options">{p.colors.map(value=><label key={value}><input type="checkbox" checked={p.filters.colors.includes(value)} onChange={()=>toggle('colors',value)}/><i style={{background:swatch(value)}} aria-hidden="true"/><span>{value}</span></label>)}{!p.colors.length&&<p>Поставщик не указал цвета.</p>}</div>}
       {key==='format'&&<><div className="rd-tile-format-options">{[...new Set([...(p.requiredFormat?[p.requiredFormat]:[]),...p.formats])].map(value=><label key={value}><input type="checkbox" disabled={!!p.requiredFormat} checked={p.requiredFormat?value===p.requiredFormat:p.filters.formats.includes(value)} onChange={()=>toggle('formats',value)}/>{format(value)}</label>)}</div><fieldset><legend>Ширина, мм</legend><div className="rd-tile-range">{['От','До'].map((value,index)=><input key={value} type="number" min="0" placeholder={value} aria-label={value==='От'?'Минимальная ширина, мм':'Максимальная ширина, мм'} value={width[index]} onChange={e=>range('width',index,e.target.value)}/>)}</div>{widthError&&<p role="alert">{widthError}</p>}</fieldset></>}
+      {key==='design'&&<div>{p.designs.map(value=><label key={value}><input type="checkbox" checked={p.filters.designs.includes(value)} onChange={()=>toggle('designs',value)}/><span>{value}</span></label>)}{!p.designs.length&&<p>Дизайн не указан поставщиком.</p>}</div>}
       {key==='brand'&&p.brands.map(b=><label key={b.id}><input type="checkbox" checked={p.filters.brands.includes(b.id)} onChange={()=>toggle('brands',b.id)}/><span>{b.name}</span></label>)}
       {key==='price'&&<fieldset><legend>Цена, ₽/м²</legend><div className="rd-tile-range">{['От','До'].map((value,index)=><input key={value} type="number" min="0" step="any" placeholder={value} aria-label={value==='От'?'Минимальная цена, ₽/м²':'Максимальная цена, ₽/м²'} value={price[index]} onChange={e=>range('price',index,e.target.value)}/>)}</div>{priceError&&<p role="alert">{priceError}</p>}</fieldset>}
      </div>}

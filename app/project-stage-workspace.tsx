@@ -22,7 +22,7 @@ export default function ProjectStageWorkspace({user,projectId,projectName,projec
  const select=(id:string,push=true)=>{
   if(hasPlanningSubstages&&id==='planning-floor')id='planning-floor-2';
   if(!stages.some(stage=>stage.id===id))return;
-  setSelected(id);if(id==='planning'||id==='planning-walls')frames.current.get(id)?.contentWindow?.postMessage({type:'roomdesign:stage-active'},location.origin);if(push&&id.startsWith('planning-'))setSubstepsOpen(true);setFullscreenStage(null);setOpened(current=>current.includes(id)?current:[...current,id]);
+  setSelected(id);frames.current.get(id)?.contentWindow?.postMessage({type:'roomdesign:stage-active'},location.origin);if(push&&id.startsWith('planning-'))setSubstepsOpen(true);setFullscreenStage(null);setOpened(current=>current.includes(id)?current:[...current,id]);
   const url=new URL(location.href);url.searchParams.set('stage',id);url.hash='меню-проекта';
   if(push)history.pushState({projectId,norrView:'projectMenu'},'',url);
   try{localStorage.setItem(`roomdesign:last-stage:${projectId}`,id);}catch{/* Navigation still works without local storage. */}

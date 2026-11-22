@@ -87,3 +87,6 @@
   .planning-linked-3d .planning-project-bar { flex-wrap: wrap; justify-content: center; gap: 10px 16px; padding: 12px; }
   .planning-room-planner-tools { order: 1; flex-basis: 100%; }
 }
+
+.planning-3d-retry{max-width:min(420px,90%);padding:18px;text-align:center}
+.planning-3d-retry button{padding:9px 16px;border:1px solid #dcd2c7;border-radius:999px;background:#fffdf9;color:#842b39;cursor:pointer}

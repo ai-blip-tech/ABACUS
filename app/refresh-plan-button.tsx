@@ -1,0 +1,2 @@
+'use client';
+export function RefreshPlanButton({onClick,busy=false,className=''}:{onClick:()=>void;busy?:boolean;className?:string}){return <button type="button" className={'refresh-plan-button '+className} aria-label="Обновить из планировочного решения" title="Обновить из планировочного решения" disabled={busy} onClick={onClick}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.2 8a7.5 7.5 0 0 1 12.4-3L20 8M4 16l2.4 3A7.5 7.5 0 0 0 18.8 16"/></svg></button>;}
