@@ -1,4 +1,5 @@
 import type {PlanningDoc} from './model.ts';
+import {measuredWallAxisError} from '../measured-plan/measure-editing.ts';
 import type {PlanningAlbum} from './variants.ts';
 export type PlanningSourceMode='measured'|'manual'|'archicad';
 export type ManualWorkspace={active:PlanningSourceMode;drafts:Partial<Record<PlanningSourceMode,PlanningDoc>>;history:PlanningDoc[];sheets?:Partial<Record<PlanningSourceMode,PlanningDoc[]>>;activeSheets?:Partial<Record<PlanningSourceMode,number>>};
@@ -8,7 +9,7 @@ export function withManualSheets(album:PlanningAlbum,bases?:{measured:PlanningDo
  const next=structuredClone(album),old=next.variants.manual;if(!old)return next;
  const state=next.manualWorkspace||{active:manualSourceMode(next),drafts:{},history:[]};state.sheets||={};state.activeSheets||={};
  state.drafts[state.active]={version:1,source:structuredClone(next.source),plan:structuredClone(old.plan)};
- for(const mode of ['measured','archicad','manual'] as const){const draft=state.drafts[mode];if(!draft)continue;if(!state.sheets[mode]){const base=mode==='measured'?bases?.measured:null;const sheets=copies(base||draft);sheets[0]=structuredClone(draft);state.sheets[mode]=sheets;state.activeSheets[mode]=0;}}
+ for(const mode of ['measured','archicad','manual'] as const){const draft=state.drafts[mode];if(!draft)continue;if(!state.sheets[mode]){const base=mode==='measured'?bases?.measured:null;const sheets=copies(base&&!measuredWallAxisError(base.plan)?base:draft);sheets[0]=structuredClone(draft);state.sheets[mode]=sheets;state.activeSheets[mode]=0;}}
  state.sheets[state.active]![state.activeSheets[state.active]||0]=structuredClone(state.drafts[state.active]!);next.manualWorkspace=state;return next;
 }
 export function manualSheetIndex(album:PlanningAlbum){return album.manualWorkspace?.activeSheets?.[manualSourceMode(album)]||0;}
@@ -25,6 +26,7 @@ export function switchManualSource(album:PlanningAlbum,mode:unknown,bases:{measu
  state.drafts[state.active]={version:1,source:structuredClone(next.source),plan:structuredClone(old.plan)};
  if(!state.drafts[mode]||refresh){
   const base=mode==='archicad'?null:bases[mode];if(!base)throw Error(mode==='archicad'?'Сначала загрузите и подтвердите DXF.':'Сначала сохраните обмерный план в этом проекте');
+  if(mode==='measured'){const wallError=measuredWallAxisError(base.plan);if(wallError)throw Error(wallError);}
   if(state.drafts[mode])state.history.push(...(state.sheets?.[mode]||[state.drafts[mode]!]).map(d=>structuredClone(d)));
   state.drafts[mode]=structuredClone(base);
   state.sheets![mode]=copies(base);state.activeSheets![mode]=0;

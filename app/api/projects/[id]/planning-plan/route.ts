@@ -6,6 +6,7 @@ import {auditDxf} from '@/lib/planning-plan/dxf-audit';
 import {createHash} from 'node:crypto';
 import {requireTenantUser} from '@/lib/auth';
 import {database} from '@/lib/server-runtime';
+import {measuredWallAxisError} from '@/lib/measured-plan/measure-editing';
 import {isSameOrigin} from '@/lib/measured-plan/request-origin';
 import {ensureMeasuredStore,validateMeasuredDocument} from '@/lib/measured-plan/store';
 import {ensurePartitionStore} from '@/lib/partition-plan/store';
@@ -39,7 +40,7 @@ export async function PUT(request:Request,{params}:Context){
    if(!old){
     if(!['start-manual','manual','from-installation','from-measured'].includes(b.action))throw Error('Выберите режим планирования');
     const kind=b.action==='manual'?'manual':b.action==='from-installation'?'installation':b.action==='from-measured'?'measured':b.baseKind||'measured';
-    if(!['manual','installation','measured'].includes(kind))throw Error('Некорректная основа');const base=source[kind as keyof typeof source];if(!base)throw Error('Сначала сохраните выбранный исходный этап');document=createAlbum(base);
+    if(!['manual','installation','measured'].includes(kind))throw Error('Некорректная основа');const base=source[kind as keyof typeof source];if(!base)throw Error('Сначала сохраните выбранный исходный этап');if(kind==='measured'){const wallError=measuredWallAxisError(base.plan);if(wallError)throw Error(wallError);}document=createAlbum(base);
    }else{
     document=restored(JSON.parse(old.document_json),source);
     const validate=(value:unknown)=>validateMeasuredDocument(value,id,{allowManualSource:true});
@@ -62,7 +63,14 @@ export async function PUT(request:Request,{params}:Context){
    document=withManualSheets(document,source);
    const revision=(old?.revision||0)+1;
    db.prepare('INSERT INTO planning_plans(project_id,user_id,tenant_id,revision,document_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(project_id,user_id,tenant_id) DO UPDATE SET revision=excluded.revision,document_json=excluded.document_json,updated_at=excluded.updated_at').run(id,u.id,u.tenantId,revision,JSON.stringify(document),new Date().toISOString());
-   if(['workspace-save','save'].includes(b.action)&&document.variants.manual?.plan){const target=document.variants.manual.plan,construction=partitionFromPlanning(partition?JSON.parse(partition.document_json):null,measured?JSON.parse(measured.document_json):document.baseline,target,revision,manualSheetIndex(document)+1);if(!partition&&measured)construction.sourceRevision=measured.revision;db.prepare('INSERT INTO partition_plans(project_id,user_id,tenant_id,revision,document_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(project_id,user_id,tenant_id) DO UPDATE SET revision=excluded.revision,document_json=excluded.document_json,updated_at=excluded.updated_at').run(id,u.id,u.tenantId,(partition?.revision||0)+1,JSON.stringify(construction),new Date().toISOString());}
+   if(['workspace-save','save'].includes(b.action)&&document.variants.manual?.plan){
+    const target=document.variants.manual.plan,base=measured?JSON.parse(measured.document_json) as PlanningDoc['plan']:document.baseline;
+    if(partition||!measuredWallAxisError(base)){
+     const construction=partitionFromPlanning(partition?JSON.parse(partition.document_json):null,base,target,revision,manualSheetIndex(document)+1);
+     if(!partition&&measured)construction.sourceRevision=measured.revision;
+     db.prepare('INSERT INTO partition_plans(project_id,user_id,tenant_id,revision,document_json,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(project_id,user_id,tenant_id) DO UPDATE SET revision=excluded.revision,document_json=excluded.document_json,updated_at=excluded.updated_at').run(id,u.id,u.tenantId,(partition?.revision||0)+1,JSON.stringify(construction),new Date().toISOString());
+    }
+   }
    db.prepare('UPDATE projects SET updated_at=? WHERE id=? AND user_id=? AND tenant_id=?').run(new Date().toISOString(),id,u.id,u.tenantId);return{document,revision};
   });
   if(!result)return Response.json({error:'План изменён в другой вкладке. Сохранение остановлено; обновите страницу.'},{status:409});return Response.json(result,{headers:{'Cache-Control':'no-store'}});

@@ -19,6 +19,7 @@ import {hasMeasuredGeometry,type PlanningDoc} from '@/lib/planning-plan/model';
 import {PlannerView,plannerEntry,type PlannerViewControl} from './planner-view';
 import {planningFromPlanner,planFingerprint} from '@/lib/planning-plan/planner-sync';
 import type {MeasureDoc} from '@/lib/measured-plan/measure-model';
+import {measuredWallAxisError} from '@/lib/measured-plan/measure-editing';
 import renderProducts from '@/lib/wall-elevations/products.json';
 import './planner-view.css';
 import './planning.css';
@@ -66,7 +67,7 @@ export default function PlanningPlanPage(){
  const menu=()=>{if(substage&&window.parent!==window){window.parent.postMessage({type:'roomdesign:stage-open',stage:'planning'},location.origin);return;}location.assign(project?'/?project='+project.id+'&stage=planning'+(substage?'&preview=planning-substages':'')+'#меню-проекта':'/#кабинет');};
  const header=<EditorHeader user={user} projectName={project?.name||'Планировочное решение'} sectionName={substage?'Планировочное решение · '+(substage==='floor'?'Пол':'Стены'):'Планировочное решение'} onHome={()=>location.assign('/')} onProjectMenu={menu} onLogin={()=>location.assign('/#кабинет')}/>;
  if(substage==='walls')return <main className="planning-wall-substage">{header}<section><span>ПЛАНИРОВОЧНОЕ РЕШЕНИЕ · ПОДЭТАП 02</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth=".8" aria-hidden="true"><path d="M3 4h18v16H3zM3 9h18M3 15h18M9 4v5m7 0v6m-7 0v5"/></svg><h1>Стены</h1><p>Подэтап для работы со стенами.<br/>Настроим его содержимое следующим шагом.</p><button type="button" onClick={menu}>К подэтапам планировочного решения ↗</button></section></main>;
- if(!album||!project)return <main className="planning-start">{header}<section><h1>Планировочное решение</h1>{error?<p role="alert">{error}</p>:<p role="status">{loaded?'Выберите проект':'Открываем рабочую область…'}</p>}</section></main>;
+ if(!album||!project)return <main className="planning-start">{header}<section><h1>Планировочное решение</h1>{error?<><p role="alert">{error}</p>{project&&measured&&measuredWallAxisError(measured.plan)&&<a href={'/measured-plan?project='+encodeURIComponent(project.id)}>Открыть обмерный план</a>}</>:<p role="status">{loaded?'Выберите проект':'Открываем рабочую область…'}</p>}</section></main>;
  const plan=album.variants.manual!.plan,mode=manualSourceMode(album);
  const sheetControls=<div className="planning-sheet-tabs" role="tablist" aria-label="Листы текущего режима">{[0,1,2].map(index=><button key={index} role="tab" aria-selected={manualSheetIndex(album)===index} disabled={busy} onClick={()=>void sheet(index)}>Лист {index+1}</button>)}</div>;
  const viewToggle=plannerEntry&&substage!=='floor'?<div className="planning-view-toggle" role="tablist" aria-label="Вид планировочного решения">{(['2d','3d','eye'] as const).map(id=><button key={id} role="tab" aria-label={id==='eye'?'Вид из глаз':id.toUpperCase()} title={id==='eye'?'Вид из глаз':id.toUpperCase()} aria-selected={view===id} disabled={busy} onClick={()=>void switchView(id)}>{id==='eye'?<EyeViewIcon/>:id.toUpperCase()}</button>)}</div>:null;

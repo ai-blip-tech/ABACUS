@@ -3,12 +3,12 @@ import {forwardRef,useCallback,useEffect,useImperativeHandle,useRef,useState} fr
 import {floorRegionGeometry} from '@/lib/measured-plan/measure-floor-finishes';
 import {editorKeyCommand} from '@/lib/planning-plan/key-command';
 import type {MeasureDoc} from '@/lib/measured-plan/measure-model';
-import type {wallWorkContext} from '@/lib/wall-decoration/surfaces';
+import type {WallWalkPose,wallWorkContext} from '@/lib/wall-decoration/surfaces';
 import type {PlannerScene} from '@/lib/planning-plan/planner-sync';
 export type PlannerSnapshot={scene:PlannerScene;baseline:PlannerScene};
 export type PlannerViewControl={clearSelection:()=>void;configureCabinet:(kind:"dresser"|"tv_stand")=>void;wallTile:(product:any)=>void;wallZoom:(action:'in'|'out'|'fit')=>void;floor:(plan:MeasureDoc)=>void;floorEditing:(active:boolean)=>void;focus:()=>void;snapshot:()=>Promise<PlannerSnapshot>;capture:()=>Promise<any>};
 export const plannerEntry = '/room-design-planner/view';
-export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectId:string;projectName:string;disabled?:boolean;mode:'3d'|'eye';floorEditing?:boolean;wallWork?:ReturnType<typeof wallWorkContext>|null;onWallNavigate?:(direction:number)=>void;onWallTileCatalog?:(target?:{tileId:string;widthMm:number;heightMm:number})=>void;onFloorSelect?:(id:string)=>void;onFloorSync?:(regions:NonNullable<MeasureDoc["floorRegions"]>)=>void;onDirty:()=>void}>(({plan,projectId,projectName,onDirty,disabled,mode,onFloorSelect,floorEditing,onFloorSync,onWallTileCatalog,wallWork,onWallNavigate},control)=>{
+export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectId:string;projectName:string;disabled?:boolean;mode:'3d'|'eye';floorEditing?:boolean;wallWork?:ReturnType<typeof wallWorkContext>|null;onWallNavigate?:(direction:number)=>void;onWalkPose?:(pose:WallWalkPose)=>void;onWallTileCatalog?:(target?:{tileId:string;widthMm:number;heightMm:number})=>void;onFloorSelect?:(id:string)=>void;onFloorSync?:(regions:NonNullable<MeasureDoc["floorRegions"]>)=>void;onDirty:()=>void}>(({plan,projectId,projectName,onDirty,disabled,mode,onFloorSelect,floorEditing,onFloorSync,onWallTileCatalog,wallWork,onWallNavigate,onWalkPose},control)=>{
  const frame=useRef<HTMLIFrameElement>(null),[session,setSession]=useState(()=>crypto.randomUUID()),[ready,setReady]=useState(false),[editingTextures,setEditingTextures]=useState(false),[error,setError]=useState(''),pending=useRef(new Map<string,{resolve:(s:PlannerSnapshot)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>());
  const origin = plannerEntry?.startsWith('http:') ? new URL(plannerEntry).origin : typeof window !== 'undefined' ? window.location.origin : '';
  const [frameSession,setFrameSession]=useState('');
@@ -53,6 +53,11 @@ export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectI
   if(data.type==='pascal:model-prepare'){void (async()=>{try{const r=await fetch('/api/catalog/model-asset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:data.productId,textureId:data.textureId,inspect:data.surfaceEditing===true,surfaceEditing:data.surfaceEditing===true})}),result=await r.json();if(!r.ok)throw Error(result.error||'Не удалось подготовить модель');frame.current?.contentWindow?.postMessage({type:'roomdesign:model-prepared',session,requestId:data.requestId,result:{...result,...(result.url?{url:location.origin+result.url}:{})}},origin);}catch(e){frame.current?.contentWindow?.postMessage({type:'roomdesign:model-prepared',session,requestId:data.requestId,error:(e as Error).message},origin);}})();}
   if(data.type==='pascal:furniture-textures-open')setEditingTextures(data.active===true);
   if(data.type==='roomdesign:wall-work-navigate')onWallNavigate?.(data.direction);
+  if(data.type==='pascal:wall-walk-pose'&&mode==='eye'&&onWalkPose){
+   const pose=data.pose as WallWalkPose|undefined;
+   if(pose&&Array.isArray(pose.position)&&pose.position.length===2&&Array.isArray(pose.direction)&&pose.direction.length===2&&
+      [...pose.position,...pose.direction,pose.height,pose.slope].every(Number.isFinite))onWalkPose(pose);
+  }
   if(data.type==='pascal:wall-tile-catalog')onWallTileCatalog?.(data.target);
   if(data.type==='pascal:floor-select')onFloorSelect?.(data.id);
   if(data.type==='pascal:floor-error')setError(data.error);
@@ -67,7 +72,7 @@ export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectI
    if(ready)setError(message);
    else failStartup(message);
   }
- };window.addEventListener('message',receive);return()=>{window.removeEventListener('message',receive);};},[session,plan,projectId,projectName,cacheKey,onDirty,mode,onFloorSelect,onFloorSync,onWallTileCatalog,onWallNavigate,wallWork,origin,ready,failStartup]);
+ };window.addEventListener('message',receive);return()=>{window.removeEventListener('message',receive);};},[session,plan,projectId,projectName,cacheKey,onDirty,mode,onFloorSelect,onFloorSync,onWallTileCatalog,onWallNavigate,onWalkPose,wallWork,origin,ready,failStartup]);
  // Mount after registering the listener so a cached module cannot send ready too early.
  useEffect(()=>{setFrameSession(session);},[session]);
  useEffect(()=>{
@@ -78,9 +83,8 @@ export const PlannerView=forwardRef<PlannerViewControl,{plan:MeasureDoc;projectI
   const timer=window.setTimeout(()=>failStartup(message,phase==='module'),timeLimit);
   return()=>window.clearTimeout(timer);
  },[phase,ready,session,startupError,wallWorkspace,failStartup]);
- useEffect(()=>{if(ready)frame.current?.contentWindow?.postMessage({type:'roomdesign:wall-work',session,context:wallWork||null},origin);},[ready,wallWork,session,origin]);
  useEffect(()=>{if(ready)frame.current?.contentWindow?.postMessage({type:'roomdesign:floor-editing',session,active:floorEditing===true},origin);},[ready,floorEditing,session,origin]);
- useEffect(()=>{if(ready)frame.current?.contentWindow?.postMessage({type:'roomdesign:view',session,mode},origin);},[ready,mode,session,origin]);
+ useEffect(()=>{if(ready)frame.current?.contentWindow?.postMessage({type:'roomdesign:view',session,mode,wallWork:wallWork||null},origin);},[ready,mode,wallWork,session,origin]);
  useEffect(()=>{if(!ready||disabled)return;const key=(event:KeyboardEvent)=>{if(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"],dialog,[role="dialog"]'))return;const command=editorKeyCommand(event);if(!command)return;event.preventDefault();event.stopImmediatePropagation();frame.current?.contentWindow?.postMessage({type:'roomdesign:editor-command',session,command},origin);};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[ready,disabled,session,origin]);
  // The host mode switch can keep keyboard focus outside the embedded canvas.
  useEffect(()=>{if(mode!=='eye'||!ready)return;const held=new Set<string>(),arrows=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);

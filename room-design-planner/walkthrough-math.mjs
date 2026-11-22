@@ -10,7 +10,25 @@ export function walkable(point,plan){
  return true;
 }
 export function walkStep(position,delta,plan){let p=[...position];const n=Math.max(1,Math.ceil(Math.hypot(...delta)/.06));for(let i=0;i<n;i++){const dx=delta[0]/n,dz=delta[1]/n,next=[p[0]+dx,p[1]+dz];if(walkable(next,plan))p=next;else{const x=[p[0]+dx,p[1]],z=[p[0],p[1]+dz];if(walkable(x,plan))p=x;else if(walkable(z,plan))p=z;}}return p;}
-export function findWalkStart(plan,preferred){if(walkable(preferred,plan))return preferred;const xs=plan.floor.map(p=>p[0]/1000),zs=plan.floor.map(p=>p[1]/1000),center=[(Math.min(...xs)+Math.max(...xs))/2,(Math.min(...zs)+Math.max(...zs))/2];let best=null,score=Infinity;for(let x=Math.min(...xs)+.3;x<Math.max(...xs);x+=.25)for(let z=Math.min(...zs)+.3;z<Math.max(...zs);z+=.25){const p=[x,z];if(walkable(p,plan)){const d=Math.hypot(x-center[0],z-center[1]);if(d<score){best=p;score=d;}}}return best;}
+export function findWalkStart(plan,preferred,room){
+ const available=p=>{
+  const mm=p.map(n=>n*1000);
+  return (!room||inside(mm,room.polygon)&&!room.holes.some(hole=>inside(mm,hole)))&&walkable(p,plan);
+ };
+ if(available(preferred))return preferred;
+ const polygon=room?.polygon||plan.floor,xs=polygon.map(p=>p[0]/1000),zs=polygon.map(p=>p[1]/1000);
+ const minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);
+ const target=room?preferred:[(minX+maxX)/2,(minZ+maxZ)/2],step=room ? .125 : .25;
+ let best=null,score=Infinity;
+ const consider=p=>{
+  const d=Math.hypot(p[0]-target[0],p[1]-target[1]);
+  if(d<score&&available(p)){best=p;score=d;}
+ };
+ if(room)consider(room.anchor.map(n=>n/1000));
+ const pad=room?step/2:.3;
+ for(let x=minX+pad;x<maxX;x+=step)for(let z=minZ+pad;z<maxZ;z+=step)consider([x,z]);
+ return best;
+}
 
 /** Navigation must use furniture's current 3D position after a user drags it. */
 export function currentWalkPlan(plan,nodes){

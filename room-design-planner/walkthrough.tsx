@@ -1,3 +1,5 @@
+import {rememberWallCamera,type WallCameraHandoff} from './wall-camera-pose';
+import type {WallWalkPose} from '../lib/wall-decoration/surfaces';
 import {useEffect,useRef} from 'react';
 import {useFrame,useThree} from '@react-three/fiber';
 import {useEditor} from '@pascal-app/editor';
@@ -6,14 +8,25 @@ import {emitter,sceneRegistry,useScene} from '@pascal-app/core';
 import {Box3,Euler,Raycaster,Vector2,Vector3} from 'three';
 import {eyeDragPosition} from './eye-furniture-drag.mjs';
 import {EYE_HEIGHT,currentWalkPlan,findWalkStart,inside,walkStep} from './walkthrough-math.mjs';
-export function WalkCamera({active,plan,onError}:{active:boolean;plan:any;onError:(error:string)=>void}){
+export function WalkCamera({active,plan,onError,onPose,handoff}:{active:boolean;plan:any;onError:(error:string)=>void;onPose?:(pose:WallWalkPose)=>void;handoff?:WallCameraHandoff}){
  const {camera,gl,invalidate,controls}=useThree(),motion=useRef<any>(null),collision=useRef<any>({});
+ const reported=useRef<{time:number;pose:WallWalkPose}|null>(null),direction=useRef(new Vector3());
  const currentPlan=()=>{const nodes=useScene.getState().nodes;if(collision.current.nodes!==nodes||collision.current.source!==plan)collision.current={nodes,source:plan,plan:currentWalkPlan(plan,nodes)};return collision.current.plan;};
- useEffect(()=>{if(!active)return;const start=findWalkStart(currentPlan(),[camera.position.x,camera.position.z]);if(!start){onError('Нет свободного участка пола для прогулки. Проверьте контур и мебель.');return;}
+ const floorHeight=(p:number[])=>(plan.zones?.find((z:any)=>inside(p.map(n=>n*1000),z.polygon))?.elevation||0)/1000;
+ useEffect(()=>{reported.current=null;if(!active)return;
+  const fromWall=handoff?.current?.mode==='wall'?handoff.current:null;
+  const position=fromWall?.position||camera.position,preferred=[position.x,position.z];
+  const start=findWalkStart(currentPlan(),preferred,fromWall?.fromWalk?undefined:fromWall?.room);
+  if(!start){onError(fromWall?.room?'В выбранном помещении нет свободного места для вида из глаз.':'Нет свободного участка пола для прогулки. Проверьте контур и мебель.');return;}
   const previous={position:camera.position.clone(),quaternion:camera.quaternion.clone(),fov:(camera as any).fov,mode:useViewer.getState().cameraMode,target:new Vector3()};if((controls as any)?.getTarget)(controls as any).getTarget(previous.target);else previous.target.copy(camera.position).add(camera.getWorldDirection(new Vector3()).multiplyScalar(4));
   useViewer.getState().setCameraMode('perspective');useViewer.getState().setSelection({selectedIds:[]});useEditor.getState().setFirstPersonMode(true);
-  const e=new Euler().setFromQuaternion(camera.quaternion,'YXZ'),s={position:start,yaw:e.y,pitch:0,keys:new Set<string>(),held:new Set<string>(),goal:null as number[]|null,drag:null as any};motion.current=s;
-  if('fov'in camera){(camera as any).fov=70;(camera as any).updateProjectionMatrix();}const canvas=gl.domElement;canvas.tabIndex=0;canvas.focus({preventScroll:true});const oldTouch=canvas.style.touchAction,oldCursor=canvas.style.cursor;canvas.style.touchAction='none';canvas.style.cursor='default';
+  const e=new Euler().setFromQuaternion(fromWall?.quaternion||camera.quaternion,'YXZ');
+  const eyeHeight=fromWall&&start===preferred?position.y-floorHeight(start):EYE_HEIGHT;
+  const s={position:start,yaw:e.y,pitch:fromWall?e.x:0,eyeHeight,keys:new Set<string>(),held:new Set<string>(),goal:null as number[]|null,drag:null as any};motion.current=s;
+  camera.position.set(start[0],floorHeight(start)+eyeHeight,start[1]);
+  camera.quaternion.setFromEuler(new Euler(s.pitch,s.yaw,0,'YXZ'));
+  if('fov'in camera){(camera as any).clearViewOffset();(camera as any).fov=fromWall?.fov??70;(camera as any).updateProjectionMatrix();}
+  camera.updateMatrixWorld();invalidate();const canvas=gl.domElement;canvas.tabIndex=0;canvas.focus({preventScroll:true});const oldTouch=canvas.style.touchAction,oldCursor=canvas.style.cursor;canvas.style.touchAction='none';canvas.style.cursor='default';
   const editable=(t:any)=>t?.closest?.('input,textarea,select,[contenteditable=true]');
   const move=(forward:number,right=0)=>{s.position=walkStep(s.position,[-Math.sin(s.yaw)*forward+Math.cos(s.yaw)*right,-Math.cos(s.yaw)*forward-Math.sin(s.yaw)*right],currentPlan());invalidate();};
   const sendItem=(type:string,data:any={})=>window.dispatchEvent(new CustomEvent('roomdesign:item-interaction',{detail:{type,...data}}));
@@ -28,14 +41,28 @@ export function WalkCamera({active,plan,onError}:{active:boolean;plan:any;onErro
   const remoteKey=(event:any)=>{const {key,pressed}=event.detail||{};if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(key))return;if(pressed){s.keys.add(key);s.goal=null;invalidate();}else s.keys.delete(key);};const clear=()=>{const id=s.drag?.id;s.keys.clear();s.held.clear();s.goal=null;s.drag=null;sendItem('dragging',{value:false});if(id!==undefined&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);};
   const zoom=(event:any)=>{if('fov'in camera){const c:any=camera;c.fov=event.detail==='fit'?70:Math.max(35,Math.min(90,c.fov*(event.detail==='in'?1/1.15:1.15)));c.updateProjectionMatrix();invalidate();}};window.addEventListener('roomdesign:wall-zoom',zoom);const command=(event:any)=>{const {action,pressed}=event.detail||{};if(pressed)s.held.add(action);else s.held.delete(action);s.goal=null;invalidate();};
   window.addEventListener('pointerdown',down,true);window.addEventListener('pointermove',drag,true);window.addEventListener('pointerup',up,true);window.addEventListener('pointercancel',up,true);canvas.addEventListener('lostpointercapture',clear);canvas.addEventListener('wheel',wheel,{capture:true,passive:false});window.addEventListener('keydown',keyDown,true);window.addEventListener('keyup',keyUp,true);window.addEventListener('roomdesign:walk-key',remoteKey);window.addEventListener('blur',clear);window.addEventListener('roomdesign:cancel-item-gesture',clear);window.addEventListener('roomdesign:walk-control',command);
-  return()=>{window.removeEventListener('roomdesign:wall-zoom',zoom);motion.current=null;clear();canvas.style.touchAction=oldTouch;canvas.style.cursor=oldCursor;window.removeEventListener('pointerdown',down,true);window.removeEventListener('pointermove',drag,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',up,true);canvas.removeEventListener('lostpointercapture',clear);canvas.removeEventListener('wheel',wheel,true);window.removeEventListener('keydown',keyDown,true);window.removeEventListener('keyup',keyUp,true);window.removeEventListener('roomdesign:walk-key',remoteKey);window.removeEventListener('blur',clear);window.removeEventListener('roomdesign:cancel-item-gesture',clear);window.removeEventListener('roomdesign:walk-control',command);useEditor.getState().setFirstPersonMode(false);useViewer.getState().setCameraMode(previous.mode);camera.position.copy(previous.position);camera.quaternion.copy(previous.quaternion);if('fov'in camera){(camera as any).fov=previous.fov;(camera as any).updateProjectionMatrix();}requestAnimationFrame(()=>emitter.emit('camera-controls:frame',{bounds:{min:previous.target.clone().addScalar(-1).toArray(),max:previous.target.clone().addScalar(1).toArray()},pose:{position:previous.position.toArray(),target:previous.target.toArray()}}));invalidate();};
-  function floorHeight(p:number[]){return (plan.zones?.find((z:any)=>inside(p.map(n=>n*1000),z.polygon))?.elevation||0)/1000;}
- },[active,plan,camera,gl,invalidate]);
+  return()=>{window.removeEventListener('roomdesign:wall-zoom',zoom);motion.current=null;clear();canvas.style.touchAction=oldTouch;canvas.style.cursor=oldCursor;window.removeEventListener('pointerdown',down,true);window.removeEventListener('pointermove',drag,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',up,true);canvas.removeEventListener('lostpointercapture',clear);canvas.removeEventListener('wheel',wheel,true);window.removeEventListener('keydown',keyDown,true);window.removeEventListener('keyup',keyUp,true);window.removeEventListener('roomdesign:walk-key',remoteKey);window.removeEventListener('blur',clear);window.removeEventListener('roomdesign:cancel-item-gesture',clear);window.removeEventListener('roomdesign:walk-control',command);useEditor.getState().setFirstPersonMode(false);useViewer.getState().setCameraMode(previous.mode);if(!handoff){camera.position.copy(previous.position);camera.quaternion.copy(previous.quaternion);if('fov'in camera){(camera as any).fov=previous.fov;(camera as any).updateProjectionMatrix();}requestAnimationFrame(()=>emitter.emit('camera-controls:frame',{bounds:{min:previous.target.clone().addScalar(-1).toArray(),max:previous.target.clone().addScalar(1).toArray()},pose:{position:previous.position.toArray(),target:previous.target.toArray()}}));}invalidate();};
+ },[active,plan,camera,gl,invalidate,handoff]);
  useFrame((_,delta)=>{const s=motion.current;if(!active||!s)return;if(s.drag?.type==='item'||useViewer.getState().inputDragging)return;const dt=Math.min(delta,.04),pressed=(action:string,...keys:string[])=>s.held.has(action)||keys.some(k=>s.keys.has(k));let f=Number(pressed('forward','KeyW','ArrowUp'))-Number(pressed('back','KeyS','ArrowDown')),r=Number(pressed('right','KeyD','ArrowRight'))-Number(pressed('left','KeyA','ArrowLeft'));const turn=Number(pressed('turnLeft','KeyQ'))-Number(pressed('turnRight','KeyE'));s.yaw+=turn*dt*1.2;
   let movement=[(-Math.sin(s.yaw)*f+Math.cos(s.yaw)*r)*dt*1.4,(-Math.cos(s.yaw)*f-Math.sin(s.yaw)*r)*dt*1.4];if(f&&r)movement=movement.map(n=>n/Math.SQRT2);
   if(s.goal){const dx=s.goal[0]-s.position[0],dz=s.goal[1]-s.position[1],d=Math.hypot(dx,dz),step=Math.min(dt*1.5,d);if(d<.05)s.goal=null;else movement=[dx/d*step,dz/d*step];}
-  const next=walkStep(s.position,movement,currentPlan());if(s.goal&&Math.hypot(next[0]-s.position[0],next[1]-s.position[1])<.0001)s.goal=null;s.position=next;const elevation=(plan.zones?.find((z:any)=>inside(next.map((n:number)=>n*1000),z.polygon))?.elevation||0)/1000;
-  camera.position.set(next[0],elevation+EYE_HEIGHT,next[1]);camera.quaternion.setFromEuler(new Euler(s.pitch,s.yaw,0,'YXZ'));camera.updateMatrixWorld();if(f||r||turn||s.goal)invalidate();
+  const next=walkStep(s.position,movement,currentPlan());if(s.goal&&Math.hypot(next[0]-s.position[0],next[1]-s.position[1])<.0001)s.goal=null;s.position=next;const elevation=floorHeight(next);
+  camera.position.set(next[0],elevation+s.eyeHeight,next[1]);camera.quaternion.setFromEuler(new Euler(s.pitch,s.yaw,0,'YXZ'));camera.updateMatrixWorld();
+  rememberWallCamera(handoff,camera,'eye',true);
+  const now=performance.now(),last=reported.current;
+  if(onPose){
+   const view=camera.getWorldDirection(direction.current),horizontal=Math.hypot(view.x,view.z)||1;
+   const pose:WallWalkPose={position:[next[0]*1000,next[1]*1000],direction:[view.x/horizontal,view.z/horizontal],height:camera.position.y*1000,slope:view.y/horizontal};
+   if(!last||Math.hypot(last.pose.position[0]-pose.position[0],last.pose.position[1]-pose.position[1])>4||
+       Math.hypot(last.pose.direction[0]-pose.direction[0],last.pose.direction[1]-pose.direction[1])>.004||
+       Math.abs(last.pose.slope-pose.slope)>.004||Math.abs(last.pose.height-pose.height)>4){
+    if(!last||now-last.time>=100){
+     onPose(pose);
+     reported.current={pose,time:now};
+    }else invalidate();
+   }
+  }
+  if(f||r||turn||s.goal)invalidate();
  },-.2);
  return null;
 }

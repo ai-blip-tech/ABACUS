@@ -38,3 +38,40 @@ export function wallWorkContext(surface:WallSurface,surfaces:WallSurface[],corne
  const adjacent=surfaces.filter(s=>s.roomId===surface.roomId&&s.id!==surface.id&&[s.a,s.b].some(p=>[surface.a,surface.b].some(q=>distance(p,q)<5)));
  return{surface,adjacent,corner};
 }
+
+export type WallWalkPose={position:Point;direction:Point;height:number;slope:number};
+export function wallInView(plan:MeasureDoc,surfaces:WallSurface[],pose:WallWalkPose){
+ const cross=(a:Point,b:Point)=>a[0]*b[1]-a[1]*b[0];
+ let nearest:{surface:WallSurface;point:Point;distance:number}|null=null;
+ for(const surface of surfaces){
+  if(dot(pose.direction,surface.normal)>=-1e-6)continue;
+  const edge:Point=[surface.b[0]-surface.a[0],surface.b[1]-surface.a[1]];
+  const start:Point=[surface.a[0]-pose.position[0],surface.a[1]-pose.position[1]];
+  const denominator=cross(pose.direction,edge);
+  if(Math.abs(denominator)<1e-6)continue;
+  const distance=cross(start,edge)/denominator,along=cross(start,pose.direction)/denominator;
+  if(distance<1||along<0||along>1||nearest&&distance>=nearest.distance)continue;
+  const height=pose.height+distance*pose.slope;
+  if(height<0||height>surface.heightMm)continue;
+  const point:Point=[pose.position[0]+pose.direction[0]*distance,pose.position[1]+pose.direction[1]*distance];
+  const throughOpening=surface.parts.some(part=>{
+   const wall=plan.walls.find(w=>w.id===part.wallId);
+   if(!wall)return false;
+   const L=Math.hypot(wall.b[0]-wall.a[0],wall.b[1]-wall.a[1]);
+   const x=((point[0]-wall.a[0])*(wall.b[0]-wall.a[0])+(point[1]-wall.a[1])*(wall.b[1]-wall.a[1]))/L;
+   return x>=part.from-1&&x<=part.to+1&&plan.openings.some(opening=>{
+    if(opening.wallId!==wall.id||Math.abs(x-opening.offset)>opening.width/2)return false;
+    const bottom=opening.kind==='window'?opening.sill??900:0;
+    const top=bottom+(opening.height??(opening.kind==='window'?1400:2100));
+    return height>=bottom&&height<=top;
+   });
+  });
+  if(!throughOpening)nearest={surface,point,distance};
+ }
+ return nearest;
+}
+
+export function wallSurfaceAt(surfaces:WallSurface[],wallId:string,side:number,x:number,position:Point){
+ const candidates=surfaces.filter(s=>s.parts.some(p=>p.wallId===wallId&&p.side===side&&x>=p.from-2&&x<=p.to+2));
+ return candidates.reduce<WallSurface|undefined>((best,s)=>!best||projectToSegment(position,s.a,s.b).distance<projectToSegment(position,best.a,best.b).distance?s:best,undefined);
+}
