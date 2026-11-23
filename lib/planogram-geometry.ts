@@ -7,6 +7,21 @@ export type PlanogramItemGeometry = {
   rotation: number;
 };
 
+export const PLANOGRAM_ROOM_MIN_MM = 1;
+export const PLANOGRAM_ROOM_MAX_MM = 100_000;
+
+export function planogramRoomDimensionMm(value: number) {
+  return Math.max(PLANOGRAM_ROOM_MIN_MM, Math.min(PLANOGRAM_ROOM_MAX_MM, Math.round(value)));
+}
+
+export function planogramRasterSize(room: PlanogramRoomGeometry) {
+  const scale = 1600 / Math.max(room.width, room.length);
+  return {
+    width: Math.max(16, Math.round(room.width * scale)),
+    height: Math.max(16, Math.round(room.length * scale)),
+  };
+}
+
 const minimumItemPercent = 4;
 
 export function planogramItemSizePercent(item: Pick<PlanogramItemGeometry, "width" | "depth">, room: PlanogramRoomGeometry) {

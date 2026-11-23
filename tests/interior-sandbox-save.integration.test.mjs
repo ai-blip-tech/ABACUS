@@ -10,6 +10,7 @@ registerHooks({resolve(s,c,next){return next(s.startsWith('@/')?pathToFileURL(jo
 const auth=await import('../lib/auth.ts'),{database}=await import('../lib/server-runtime.ts');
 const {GET,PUT}=await import('../app/api/projects/[id]/interior-sandbox/route.ts');
 const {emptyBoard}=await import('../lib/material-board/model.ts');
+const {emptyInterior}=await import('../lib/material-board/interior-workspace.ts');
 const {asWorkbook,appendSheet}=await import('../lib/material-board/workbook.ts');
 await auth.ensureStore();
 const user={id:'sandbox-user',email:'sandbox@example.test',role:'user',tenantId:'tenant_norrmobler',tenantSlug:'norrmobler',tenantRole:'member',firstName:'Test',lastName:'',phone:'',companyRole:''},now=new Date().toISOString();
@@ -23,11 +24,11 @@ const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAA
 let saved;
 test('only the authenticated owner can read or save sandbox sheets',async()=>{assert.equal((await GET(request(null,false),context)).status,401);assert.equal((await PUT(request({revision:0,document:emptyBoard()},false),context)).status,401);assert.equal((await GET(request(),{params:Promise.resolve({id:'other-project'})})).status,404);});
 test('all sheets and inactive image assets survive save/reopen without changing other stages',async()=>{
- const first={...emptyBoard(),nodes:[{id:'scene',kind:'reference',scene:true,title:'Room',image:png,originalImage:png,x:0,y:0,width:300,height:200}]};
+ const first={...emptyBoard(),nodes:[{id:'scene',kind:'reference',scene:true,title:'Room',image:png,originalImage:png,x:0,y:0,width:300,height:200,interior:{...emptyInterior(30,20),room:{width:375,length:1125}}}]};
  const workbook=appendSheet(asWorkbook(first),'second');workbook.sheets[1].name='Ткани';workbook.sheets[1].board.furniturePosition={x:600,y:400};
  const response=await PUT(request({revision:0,workbook}),context);assert.equal(response.status,200);saved=await response.json();assert.equal(saved.revision,1);assert.equal(saved.workbook.sheets.length,2);const image=saved.workbook.sheets[0].board.nodes[0].image;assert.match(image,/\/assets\/sandbox-/);
  const asset=image.split('/').at(-1),file=await auth.storage().get(auth.tenantStoragePrefix(user)+'/projects/sandbox-project/'+asset);assert.ok(file);
- saved=await(await PUT(request({revision:1,workbook:saved.workbook}),context)).json();const reopened=await(await GET(request(),context)).json();assert.deepEqual(reopened.workbook,saved.workbook);assert.equal(reopened.workbook.sheets[1].name,'Ткани');assert.deepEqual(reopened.workbook.sheets[1].board.furniturePosition,{x:600,y:400});assert.ok(await auth.storage().get(auth.tenantStoragePrefix(user)+'/projects/sandbox-project/'+asset));
+ saved=await(await PUT(request({revision:1,workbook:saved.workbook}),context)).json();const reopened=await(await GET(request(),context)).json();assert.deepEqual(reopened.workbook,saved.workbook);assert.deepEqual(reopened.workbook.sheets[0].board.nodes[0].interior.room,{width:375,length:1125});assert.equal(reopened.workbook.sheets[1].name,'Ткани');assert.deepEqual(reopened.workbook.sheets[1].board.furniturePosition,{x:600,y:400});assert.ok(await auth.storage().get(auth.tenantStoragePrefix(user)+'/projects/sandbox-project/'+asset));
  assert.deepEqual(JSON.parse((await database.prepare('SELECT state_json FROM projects WHERE id=?').bind('sandbox-project').first()).state_json),{planItems:[{id:'existing-chair'}],technicalLighting:{keep:true}});
 });
 test('stale revisions and cross-project assets cannot overwrite the saved workbook',async()=>{

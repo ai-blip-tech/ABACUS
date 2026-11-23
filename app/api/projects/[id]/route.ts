@@ -1,3 +1,4 @@
+import { PLANOGRAM_ROOM_MIN_MM, PLANOGRAM_ROOM_MAX_MM } from '@/lib/planogram-geometry';
 import { ensureStore, requireTenantUser, storage, tenantStoragePrefix } from "@/lib/auth";
 import { database } from "@/lib/server-runtime";
 import { ensureMeasuredStore } from "@/lib/measured-plan/store";
@@ -353,7 +354,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }];
   });
   const planRoomInput = draft.planRoom && typeof draft.planRoom === "object" ? draft.planRoom as Record<string, unknown> : {};
-  const planRoom = { width: finiteNumber(planRoomInput.width, 6000, 500, 30000), length: finiteNumber(planRoomInput.length, 4500, 500, 30000) };
+  const planRoom = { width: finiteNumber(planRoomInput.width, 6000, PLANOGRAM_ROOM_MIN_MM, PLANOGRAM_ROOM_MAX_MM), length: finiteNumber(planRoomInput.length, 4500, PLANOGRAM_ROOM_MIN_MM, PLANOGRAM_ROOM_MAX_MM) };
   const planFloorReference = planSurfaceReference(draft.planFloorReference, "plan-floor", collectImage);
   const planWallReference = planSurfaceReference(draft.planWallReference, "plan-wall", collectImage);
   const cameraInput = draft.planCamera && typeof draft.planCamera === "object" ? draft.planCamera as Record<string, unknown> : null;

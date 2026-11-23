@@ -4,6 +4,8 @@ import {
   clampPlanogramItemToRoom,
   planogramItemCenterPercent,
   planogramItemPositionBounds,
+  planogramRoomDimensionMm,
+  planogramRasterSize,
 } from "../lib/planogram-geometry.ts";
 
 const room = { width: 6000, length: 4500 };
@@ -50,4 +52,15 @@ test("render coordinates use the furniture centre even when its technical top-le
 
   assert.ok(center.x >= 0 && center.x <= 100);
   assert.ok(center.y >= 0 && center.y <= 100);
+});
+
+test("planogram room dimensions can be set below the old drag and persistence limits", () => {
+  assert.equal(planogramRoomDimensionMm(375.2),375);
+  assert.equal(planogramRoomDimensionMm(0),1);
+  assert.equal(planogramRoomDimensionMm(99999),99999);
+});
+
+test("rendering a narrow planogram bounds canvas allocation on both axes", () => {
+  assert.deepEqual(planogramRasterSize({width:100,length:20000}),{width:16,height:1600});
+  assert.deepEqual(planogramRasterSize({width:6000,length:4500}),{width:1600,height:1200});
 });
