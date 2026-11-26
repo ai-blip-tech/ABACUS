@@ -11,7 +11,7 @@ import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Box3, Color, Group, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3} from 'three';
 import {CABINET_PRODUCT,CABINET_GEOMETRY_VERSION,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,cabinetURL,normalizeCabinetConfig,cabinetWidthMm,type CabinetConfig,type CabinetCatalog,type GlassPart} from './modular-cabinets';
 import type {CabinetFrontFinish} from '../lib/planning-plan/modular-cabinet';
-import {MAX_CABINET_WIDTH_MM,cabinetCategoryLabels,cabinetInCategory,isStandaloneCabinet,slabCut} from './cabinet-layout.mjs';
+import {MAX_CABINET_WIDTH_MM,cabinetCategoryLabels,cabinetCombinationConflict,cabinetInCategory,isStandaloneCabinet,slabCut} from './cabinet-layout.mjs';
 import {cabinetFrontFinish,glassCabinetArticle,isFixedCabinetFront} from './cabinet-front-finishes.mjs';
 import {cabinetMetalFinishId} from './cabinet-metal-finishes.mjs';
 import {cabinetRetailPrice,cabinetSupportPrice} from './cabinet-pricing.mjs';
@@ -106,7 +106,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  const [catalogHeight,setCatalogHeight]=useState(390),[catalogWidth,setCatalogWidth]=useState('all'),[catalogDepth,setCatalogDepth]=useState(450);
  const [showDimensions,setShowDimensions]=useState(false);
  const dimensionControls=useRef<any>(null);
- const [category,setCategory]=useState<string>(catalogSession?.category||'sideboards');
+ const [category,setCategory]=useState<string>(catalogSession?.category||(createKind==='tv_stand'?'tv':'sideboards'));
  const [moduleAction,setModuleAction]=useState<'add'|'replace'>('add');
  const [samples,setSamples]=useState<Sample[]>([]);
  const [model,setModel]=useState<Group|null>(null);
@@ -158,7 +158,9 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
     if(first){
      setCatalogHeight(first.heightMm);
      setCatalogDepth(first.depthMm);
-     setCategory(cabinetInCategory(first,'sideboards')?'sideboards':first.categories?.[0]||'sideboards');
+     if(!cabinetInCategory(first,category)){
+      setCategory(cabinetInCategory(first,'sideboards')?'sideboards':first.categories?.[0]||'sideboards');
+     }
      if(isStandaloneCabinet(first))setModuleAction('replace');
     }
     return;
@@ -678,15 +680,19 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
     {shownModels.map(item=>{
      const replacedWidth=replacing?(activeModel?.widthMm||0):0;
      const tooWide=width-replacedWidth+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,configuration.frontType==='glass'||standalone||browsingStandalone||item.fixedFront?MAX_CABINET_WIDTH_MM:cabinetData.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM);
-     const incompatible=configuration.modules.some(module=>{
-      if(replacing&&module.id===activeModule)return false;
+     let conflict;
+     for(const module of configuration.modules){
+      if(replacing&&module.id===activeModule)continue;
       const existing=cabinetData?.models.find(model=>model.id===module.model);
-      return existing&&(isStandaloneCabinet(item)||isStandaloneCabinet(existing)||existing.heightMm!==item.heightMm||existing.depthMm!==item.depthMm);
-     });
+      if(existing)conflict=cabinetCombinationConflict(existing,item);
+      if(conflict)break;
+     }
      const missing=item.available3D===false;
-     return <button type="button" key={item.id} disabled={pending||tooWide||incompatible||missing} aria-label={(!replacing?'Добавить':'Заменить на')+' модуль '+item.id} title={missing?'Ожидается 3D-модель по этой схеме':incompatible?'Высота и глубина должны совпадать с композицией':tooWide?'Достигнута максимальная ширина композиции':undefined} onClick={()=>chooseModule(item.id)}>
+     return <button type="button" key={item.id} disabled={pending||tooWide||!!conflict||missing} aria-label={(!replacing?'Добавить':'Заменить на')+' модуль '+item.id} title={conflict||(missing?'Ожидается 3D-модель по этой схеме':tooWide?'Достигнута максимальная ширина композиции':undefined)} onClick={()=>chooseModule(item.id)}>
       {item.thumbnail&&<img src={cabinetURL(item.thumbnail)} alt="" loading="lazy"/>}
-      <b>{item.fixedFront==='transparent-glass'?'Прозрачная дверца':'Модуль '+item.widthMm/10+' см'}</b><small>{item.widthMm/10} × {item.heightMm/10} × {item.depthMm/10} см</small><small>арт. {item.id}</small>{missing&&<small>Ожидается 3D</small>}
+      <b>{item.fixedFront==='transparent-glass'?'Прозрачная дверца':'Модуль '+item.widthMm/10+' см'}</b><small>{item.widthMm/10} × {item.heightMm/10} × {item.depthMm/10} см</small><small>арт. {item.id}</small>
+      {category==='tv'&&<small>{item.categories?.includes('tv')?'ТВ-модуль':'Модуль комода'}</small>}
+      {missing&&<small>Ожидается 3D</small>}
      </button>;
     })}
    </div>

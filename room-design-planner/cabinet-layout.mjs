@@ -13,11 +13,24 @@ export const cabinetCategoryLabels = {
 };
 
 export function cabinetInCategory(model,category) {
- return model.categories?.includes(category)||(category==='sideboards'&&model.categories?.includes('drawers'));
+ const sideboard=model.categories?.includes('sideboards')||model.categories?.includes('drawers');
+ return model.categories?.includes(category)||(sideboard&&(category==='sideboards'||category==='tv'&&model.heightMm===390));
 }
 
 export function isStandaloneCabinet(model) {
  return !!model?.categories?.some(category=>['wall','transparent-wall','bars'].includes(category));
+}
+
+export function cabinetCombinationConflict(first,second) {
+ if(isStandaloneCabinet(first)||isStandaloneCabinet(second)){
+  return 'Настенные шкафы и бары добавляются по одному.';
+ }
+ if(Boolean(first.categories?.includes('tv'))!==Boolean(second.categories?.includes('tv'))){
+  return 'ТВ-модули и модули комодов собираются в отдельные композиции.';
+ }
+ if(first.heightMm!==second.heightMm||first.depthMm!==second.depthMm){
+  return 'Объединять можно только модули одинаковой высоты и глубины.';
+ }
 }
 
 export function cabinetDimensionsMm(configuration, catalog) {
@@ -28,11 +41,9 @@ export function cabinetDimensionsMm(configuration, catalog) {
  });
  const first=specifications[0];
  if(!first)throw Error('Добавьте хотя бы один комод.');
- if(specifications.length>1&&specifications.some(isStandaloneCabinet)){
-  throw Error('Настенные шкафы и бары добавляются по одному.');
- }
- if(specifications.some(model=>model.heightMm!==first.heightMm||model.depthMm!==first.depthMm)){
-  throw Error('Объединять можно только модули одинаковой высоты и глубины.');
+ for(const model of specifications.slice(1)){
+  const conflict=cabinetCombinationConflict(first,model);
+  if(conflict)throw Error(conflict);
  }
  return {
   widthMm:specifications.reduce((sum,model)=>sum+model.widthMm,0),

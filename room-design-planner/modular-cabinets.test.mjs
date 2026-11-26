@@ -144,6 +144,24 @@ test('factory Sideboards are grouped by actual height and incompatible modules c
 });
 
 
+test('39 cm sideboards are shown with TV cabinets but the factory ranges assemble separately',async()=>{
+ const {cabinetInCategory,cabinetDimensionsMm}=await import('./cabinet-layout.mjs');
+ const {default:sonorous}=await import('../lib/planning-plan/sonorous-catalog.mjs');
+ const models=Object.entries(sonorous).map(([id,model])=>({id,...model}));
+ const get=id=>models.find(model=>model.id===id);
+ const arrangement=(...ids)=>({modules:ids.map(model=>({model}))});
+ assert.ok(cabinetInCategory(get('5041'),'tv'));
+ assert.ok(cabinetInCategory(get('5044'),'tv'));
+ assert.ok(cabinetInCategory(get('5041'),'sideboards'));
+ assert.ok(!cabinetInCategory(get('5061'),'tv'));
+ assert.ok(cabinetInCategory(get('10041F'),'tv'));
+ assert.ok(!cabinetInCategory(get('10041F'),'sideboards'));
+ assert.equal(cabinetDimensionsMm(arrangement('5041','6542'),{models}).widthMm,1150);
+ assert.equal(cabinetDimensionsMm(arrangement('10041F','13041F'),{models}).widthMm,2300);
+ assert.throws(()=>cabinetDimensionsMm(arrangement('10041F','5041'),{models}),/отдельные композиции/);
+ assert.throws(()=>cabinetDimensionsMm(arrangement('5041','10041F'),{models}),/отдельные композиции/);
+});
+
 test('support heights and fixed transparent doors match the price-list',()=>{
  const expected={BS:35,S13:130,S20:200,PLN:130,TBE:130,CRB:130,WL:0,CG2:200,CG4:400,GPLN:160};
  assert.equal(catalog.supports.length,10);
