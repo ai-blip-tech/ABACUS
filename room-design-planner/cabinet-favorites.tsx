@@ -56,7 +56,6 @@ export function CabinetFavorites({items,rate,busy,onRemove}:{
  }
 
  return <div className="rd-cabinet-favorites" ref={root}
-  onBlur={event=>{if(event.relatedTarget instanceof Node&&!event.currentTarget.contains(event.relatedTarget))setOpen(false);}}
   onKeyDown={event=>{
    if(event.key!=='Escape'||!open)return;
    event.preventDefault();

@@ -18,6 +18,15 @@ export type CabinetSpecification = {
   photos: {front: Blob; view: Blob};
 };
 
+type StoredPhoto = {bytes: ArrayBuffer; type: string};
+type StoredCabinetSpecification = Omit<CabinetSpecification, 'photos'> & {
+  photos: {front: StoredPhoto | Blob; view: StoredPhoto | Blob};
+};
+
+function restorePhoto(photo: StoredPhoto | Blob): Blob {
+  return photo instanceof Blob ? photo : new Blob([photo.bytes], {type:photo.type});
+}
+
 function groupFinishes<T>(parts: {part: T; finish: Finish}[], label: (parts: T[]) => string): ModuleFinish[] {
   const groups = new Map<string,{finish: Finish; parts: T[]}>();
   for (const {part,finish} of parts) {
@@ -102,12 +111,14 @@ function openSpecificationStore(): Promise<IDBDatabase> {
 export async function loadCabinetSpecification(scope: string): Promise<CabinetSpecification[]> {
   const db = await openSpecificationStore();
   try {
-    const entries = await new Promise<CabinetSpecification[]>((resolve, reject) => {
+    const entries = await new Promise<StoredCabinetSpecification[]>((resolve, reject) => {
       const request = db.transaction('items').objectStore('items').index('scope').getAll(scope);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    return entries.sort((left, right) => left.createdAt - right.createdAt);
+    return entries.sort((left, right) => left.createdAt - right.createdAt).map(item => ({
+      ...item, photos:{front:restorePhoto(item.photos.front),view:restorePhoto(item.photos.view)},
+    }));
   } finally {
     db.close();
   }
@@ -127,8 +138,12 @@ async function updateSpecificationStore(update: (items: IDBObjectStore) => void)
   }
 }
 
-export function saveCabinetSpecification(item: CabinetSpecification) {
-  return updateSpecificationStore(items => items.put(item));
+export async function saveCabinetSpecification(item: CabinetSpecification) {
+  // Store photo bytes because WebKit can reject Blob writes to IndexedDB.
+  const [front, view] = await Promise.all([item.photos.front,item.photos.view].map(async photo => ({
+    bytes:await photo.arrayBuffer(),type:photo.type,
+  })));
+  return updateSpecificationStore(items => items.put({...item,photos:{front,view}}));
 }
 
 export function removeCabinetSpecification(scope: string, fingerprint: string) {

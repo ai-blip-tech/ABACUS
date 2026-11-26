@@ -17,6 +17,7 @@
   --cabinet-rule: #e1dbd1;
   --cabinet-paper: #fffdf9;
   --cabinet-ruby: #92142d;
+  --cabinet-ruby-hover: #711024;
   --cabinet-rose: #f8e7ec;
   --cabinet-green: #28583e;
   --cabinet-serif: 'RD Cormorant', Georgia, serif;
@@ -51,6 +52,7 @@
 
 .rd-cabinet-wordmark {
   flex: none;
+  color: var(--cabinet-ink);
   font: 22px/1 var(--cabinet-serif);
   letter-spacing: .08em;
   white-space: nowrap;
@@ -374,6 +376,26 @@
   display: none;
 }
 
+.rd-cabinet-editor button.rd-cabinet-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: 48px;
+  padding: 0 clamp(20px, 3vw, 42px);
+  border: 0;
+  border-radius: 24px;
+  background: var(--cabinet-ruby);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.rd-cabinet-order:focus-visible {
+  outline: 2px solid var(--cabinet-ruby);
+  outline-offset: 3px;
+}
+
 .rd-cabinet-price {
   margin-left: auto;
   text-align: right;
@@ -541,7 +563,7 @@
   align-items: stretch;
 }
 
-.rd-cabinet-editor .rd-cabinet-modules button,
+.rd-cabinet-editor .rd-cabinet-modules .rd-cabinet-composition-card,
 .rd-cabinet-editor .rd-cabinet-model-cards button,
 .rd-cabinet-editor .rd-cabinet-support button,
 .rd-cabinet-editor .rd-furniture-texture-samples button {
@@ -571,14 +593,43 @@
     background-color: var(--cabinet-rose);
     color: var(--cabinet-ruby);
   }
+
+  .rd-cabinet-editor .rd-cabinet-view-footer > button.rd-cabinet-order:enabled:hover,
+  .rd-cabinet-editor .rd-cabinet-bar > button:last-child:enabled:hover {
+    border-color: var(--cabinet-ruby-hover);
+    background-color: var(--cabinet-ruby-hover);
+    color: white;
+  }
 }
 
 .rd-cabinet-editor button:disabled {
   border-color: var(--cabinet-rule);
 }
 
-.rd-cabinet-modules button[aria-pressed='true'] {
+.rd-cabinet-composition-module {
+  position: relative;
+  min-width: 0;
+}
+
+.rd-cabinet-composition-card {
+  height: 100%;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.rd-cabinet-composition-card[aria-pressed='true'] {
   box-shadow: inset 0 0 0 1px var(--cabinet-ruby);
+}
+
+.rd-cabinet-editor .rd-cabinet-composition-module .rd-cabinet-remove-module {
+  position: absolute;
+  inset: auto 7px 7px;
+  min-height: 42px;
+  padding: 6px;
+  background: var(--cabinet-paper);
+  color: var(--cabinet-ruby);
+  font-weight: 600;
 }
 
 .rd-cabinet-editor .rd-furniture-texture-samples button[aria-pressed='true'] {
@@ -771,6 +822,12 @@
     font-size: 10px;
   }
 
+  .rd-cabinet-editor button.rd-cabinet-order {
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
   .rd-cabinet-price strong {
     font-size: 31px;
   }
@@ -797,7 +854,7 @@
 
 
 @media (max-width: 490px) {
-  .rd-cabinet-wordmark {
+  .rd-cabinet-bar .rd-cabinet-wordmark {
     display: none;
   }
 }

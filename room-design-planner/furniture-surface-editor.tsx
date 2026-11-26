@@ -16,6 +16,9 @@ import {cabinetFrontFinish,glassCabinetArticle,isFixedCabinetFront} from './cabi
 import {cabinetMetalFinishId} from './cabinet-metal-finishes.mjs';
 import {cabinetRetailPrice,cabinetSupportPrice} from './cabinet-pricing.mjs';
 import {CabinetDimensions} from './cabinet-dimensions';
+import {CabinetCompositionModule} from './cabinet-composition-module';
+import {CabinetOrder} from './cabinet-order';
+import type {CabinetOrderProduct} from '../lib/cabinet-order';
 import {cabinetEuro,cabinetRateLabel,cabinetRubles,fetchCabinetEuroRate,useCabinetEuroRate} from './cabinet-currency';
 import {CabinetFavorites} from './cabinet-favorites';
 import {CabinetPhoto} from './cabinet-photo';
@@ -117,6 +120,8 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  const [error,setError]=useState('');
  const [pending,setPending]=useState(false);
  const [savedDraft,setSavedDraft]=useState(false);
+ const [order,setOrder]=useState<{product:CabinetOrderProduct;photo:Blob}|null>(null);
+ const [openingOrder,setOpeningOrder]=useState(false);
  const [specification,setSpecification]=useState<CabinetSpecification[]|null>(null);
  const [savingSpecification,setSavingSpecification]=useState(false);
  const [removingSpecification,setRemovingSpecification]=useState(false);
@@ -535,15 +540,38 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  const rublePrice=price&&'priceInCents' in price?cabinetRubles(price.priceInCents,euroRate):undefined;
  const replacing=!emptyCabinet&&(moduleAction==='replace'||standalone||browsingStandalone);
  const metalFinish=cabinetMetalFinishId(configuration.support?.color);
- const moduleCount=configuration.modules.length;
- const moduleLabel=moduleCount===1?'модуль':moduleCount>=2&&moduleCount<=4?'модуля':'модулей';
  const supportKind=configuration.support?.kind;
  const supportId=supportKind==='legs'?configuration.support?.legId:supportKind==='base'?'BS':supportKind;
  const supportLabel=cabinetData?.supports?.find(support=>support.id===supportId)?.label;
  const fingerprint=cabinet&&!emptyCabinet?cabinetFingerprint(configuration):'';
- const isFavorite=!!specification?.some(item=>item.fingerprint===fingerprint);
+ const favoriteItem=specification?.find(item=>item.fingerprint===fingerprint);
+ const isFavorite=!!favoriteItem;
  const noCategoryModels=catalogSession&&cabinetData&&!catalogueModels.some(item=>item.available3D);
  const cabinetStatus=pending?'Сохраняем композицию…':savingSpecification?'Добавляем в спецификацию…':preparingSpecification?'Готовим PowerPoint…':assembling?'Обновляем 3D-модель…':savedDraft?'Черновик сохранён в этом браузере.':noCategoryModels?'Для этого типа товара пока нет 3D-моделей. Можно посмотреть модули.':'';
+ async function openOrder(){
+  if(openingOrder||assembling||!model||!capturePhoto.current||!cabinetData||!firstModel||!price)return;
+  setOpeningOrder(true);
+  setError('');
+  try {
+   const dimensions=cabinetBounds(model).dimensions;
+   const finishes=cabinetSpecificationFinishes(configuration,cabinetData).flat()
+    .map(({material,article})=>[material,article].filter(Boolean).join(' · '));
+   updateFurnitureSurfaces(parts,{},null,null);
+   setSelected(null);
+   const {view}=await capturePhoto.current(dimensions);
+   setOrder({photo:view,product:{
+    name:cabinetTitles[firstModel.categories?.[0]||'']||(createKind==='tv_stand'||catalogSession?.category==='tv'?'ТВ-тумба':'Модульный комод'),
+    dimensions:[dimensions[0],dimensions[2],dimensions[1]].map(value=>Math.round(value*1000).toLocaleString('ru-RU')).join(' × ')+' мм',
+    finish:[...new Set(finishes)].join(' / ')||'Заводская отделка',
+    construction:'Модули '+configuration.modules.map(module=>module.model).join(' и ')+(supportLabel?' · опора '+supportLabel:''),
+    price:'priceInCents' in price?(rublePrice||cabinetEuro.format(price.priceInCents!/100)):'Цена по запросу',
+   }});
+  }catch(cause){
+   setError(cause instanceof Error?cause.message:'Не удалось открыть форму заказа.');
+  }finally{
+   setOpeningOrder(false);
+  }
+ }
  async function addToSpecification(){
   if(!specification||isFavorite||specificationBusy||pending||assembling||!model||!capturePhoto.current||!cabinetData||!firstModel||!price)return;
   setSavingSpecification(true);
@@ -577,11 +605,17 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
   if(specificationBusy)return;
   setRemovingSpecification(true);
   try{
-   await removeCabinetSpecification(specificationScope,item.fingerprint);
-   setSpecification(items=>items?.filter(entry=>entry.fingerprint!==item.fingerprint)??null);
+   await removeCabinetSpecification(item.scope,item.fingerprint);
+   setSpecification(items=>items?.filter(entry=>entry.scope!==item.scope||entry.fingerprint!==item.fingerprint)??null);
   }finally{
    setRemovingSpecification(false);
   }
+ }
+ async function toggleSpecificationFavorite(){
+  if(!favoriteItem){await addToSpecification();return;}
+  setError('');
+  try{await removeFromSpecification(favoriteItem);}
+  catch{setError('Не удалось удалить товар из избранного. Попробуйте ещё раз.');}
  }
  async function downloadSpecification(){
   if(!specification?.length||specificationBusy)return;
@@ -629,7 +663,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  }
  return <dialog ref={dialog} className={'rd-furniture-surface-editor'+(cabinet?' rd-cabinet-editor':'')} aria-label="Редактор текстур мебели" onKeyDownCapture={event=>{
   const deleteKey=event.key==='Delete'||event.key==='Backspace';
-  if(!cabinet||!deleteKey||event.altKey||event.ctrlKey||event.metaKey||(event.target instanceof Element&&event.target.closest('.rd-cabinet-favorites,input,textarea,select,[role="combobox"],[role="listbox"],[contenteditable="true"]')))return;
+  if(!cabinet||!deleteKey||event.altKey||event.ctrlKey||event.metaKey||(event.target instanceof Element&&event.target.closest('.rd-order-page,.rd-cabinet-favorites,input,textarea,select,[role="combobox"],[role="listbox"],[contenteditable="true"]')))return;
   event.preventDefault();
   event.stopPropagation();
   if(!event.repeat)removeActiveModule();
@@ -659,10 +693,11 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
    <div className="rd-cabinet-modules">
     {configuration.modules.map((module,index)=>{
      const dimensions=cabinetData?.models.find(item=>item.id===module.model);
-     return <button type="button" key={module.id} aria-pressed={module.id===activeModule} onClick={()=>{setActiveModule(module.id);setFrontIndex(null);setSelected(null);setAllModules(false);}}>
-      {dimensions?.thumbnail&&<img src={cabinetURL(dimensions.thumbnail)} alt=""/>}
+     return <CabinetCompositionModule key={module.id} selected={module.id===activeModule} disabled={pending} onRemove={removeActiveModule}
+      onSelect={()=>{setActiveModule(module.id);setFrontIndex(null);setSelected(null);setAllModules(false);}}>
+      {dimensions?.thumbnail&&<img src={cabinetURL(dimensions.thumbnail)} alt="" draggable={false}/>}
       <b>Модуль {index+1}</b><small>{dimensions?dimensions.widthMm/10+' см · ':''}арт. {module.model}</small>
-     </button>;
+     </CabinetCompositionModule>;
     })}
    </div>
    <div className="rd-cabinet-library">
@@ -781,7 +816,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
       <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 16 13-13 5 5L8 21zM7 12l2 2m2-6 2 2"/></svg>
      </button>
      <div className="rd-cabinet-specification-tools">
-      <button type="button" className="rd-cabinet-favorite" aria-label={isFavorite?'Комод в спецификации':'Добавить комод в избранное и спецификацию'} title={isFavorite?'Комод в спецификации':'Добавить в избранное и спецификацию'} aria-pressed={isFavorite} disabled={!photoReady||!specification||pending||assembling||specificationBusy} onClick={()=>void addToSpecification()}>
+      <button type="button" className="rd-cabinet-favorite" aria-label={isFavorite?'Удалить комод из избранного и спецификации':'Добавить комод в избранное и спецификацию'} title={isFavorite?'Удалить из избранного и спецификации':'Добавить в избранное и спецификацию'} aria-pressed={isFavorite} disabled={!specification||pending||specificationBusy||(!isFavorite&&(!photoReady||assembling))} onClick={()=>void toggleSpecificationFavorite()}>
        <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" strokeWidth="1.5" strokeLinejoin="round"><path d="M12 21 3.8 13a5.3 5.3 0 0 1 7.5-7.5l.7.7.7-.7a5.3 5.3 0 0 1 7.5 7.5Z"/></svg>
       </button>
       {!!specification?.length&&<span className="rd-cabinet-specification-count" role="status" aria-label={`Товаров в спецификации: ${specification.length}`}>{specification.length}</span>}
@@ -796,7 +831,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
     <OrbitControls ref={dimensionControls} makeDefault target={[0,aspect[1]/max/2,0]} minDistance={.65} maxDistance={5}/>
    </Canvas>}
    {cabinet&&<footer className="rd-cabinet-view-footer">
-    {cabinetData&&!emptyCabinet&&<span>{moduleCount} {moduleLabel}{supportLabel?' · '+supportLabel:''}</span>}
+    {price&&<button type="button" className="rd-cabinet-order" disabled={openingOrder||assembling||!photoReady} onClick={()=>void openOrder()}>{openingOrder?'Открываем…':'Заказать'}</button>}
     {price&&<output aria-live="polite" className="rd-cabinet-price">
      {'priceInCents' in price?<>
       <small>{price.estimated?'Предварительная цена':'Стоимость композиции'}</small>
@@ -809,5 +844,6 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
    </footer>}
   </div>
   </div>
+  {order&&<CabinetOrder product={order.product} photo={order.photo} onClose={()=>setOrder(null)}/>}
  </dialog>;
 }
