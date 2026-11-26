@@ -1,5 +1,6 @@
 import PptxGenJS from 'pptxgenjs';
 import {PROPOSAL_BRAND} from '../lib/proposal-brand';
+import {cabinetEuroCents,cabinetRateLabel,cabinetRubles,type CabinetEuroRate} from './cabinet-currency';
 import type {CabinetSpecification} from './cabinet-specification';
 
 const W=11.6929, H=8.2677;
@@ -45,7 +46,7 @@ function brandImage(path:string):Promise<string>{
  });
 }
 
-async function addCabinetSlide(pptx:PptxGenJS,item:CabinetSpecification,index:number){
+async function addCabinetSlide(pptx:PptxGenJS,item:CabinetSpecification,index:number,rate:CabinetEuroRate|null){
  const [view,front]=await Promise.all([item.photos.view,item.photos.front].map(async blob=>fittedImage(await photoData(blob))));
  const slide=pptx.addSlide();
  slide.background={color:'FFFFFF'};
@@ -65,8 +66,12 @@ async function addCabinetSlide(pptx:PptxGenJS,item:CabinetSpecification,index:nu
   addText(slide,caption,.55,y+h+.035,4.14,.18,{color:MUTED,fontSize:8});
  }
  addText(slide,'Стоимость композиции',.55,7.06,4,.23,{fontSize:9,color:MUTED});
- addText(slide,item.price,.55,7.34,4,.4,{fontSize:21,bold:true,color:'28583E'});
- if(item.priceNote)addText(slide,item.priceNote,.55,7.84,4,.2,{fontSize:8,color:MUTED});
+ const cents=cabinetEuroCents(item.price,item.priceInCents);
+ const rubles=cabinetRubles(cents,rate);
+ const currencyNote=rubles?item.price+' · '+cabinetRateLabel(rate):cents!==undefined?cabinetRateLabel(rate):undefined;
+ const notes=[currencyNote,item.priceNote].filter(Boolean).join('\n');
+ addText(slide,rubles||item.price,.55,7.34,4,.4,{fontSize:21,bold:true,color:'28583E'});
+ if(notes)addText(slide,notes,.55,7.77,4.14,.34,{fontSize:8,color:MUTED});
 
  addText(slide,'Состав и отделка модулей',5,.91,6.14,.32,{fontFace:'Georgia',fontSize:18});
  const split=item.modules.length>2?Math.ceil(item.modules.length/2):item.modules.length;
@@ -98,7 +103,7 @@ async function addCabinetSlide(pptx:PptxGenJS,item:CabinetSpecification,index:nu
  }
 }
 
-export async function downloadCabinetSpecification(items:CabinetSpecification[]){
+export async function downloadCabinetSpecification(items:CabinetSpecification[],rate:CabinetEuroRate|null){
  const [coverBrand,closingBrand]=await Promise.all([brandImage(PROPOSAL_BRAND.coverAsset),brandImage(PROPOSAL_BRAND.circleAsset)]);
  const pptx=new PptxGenJS();
  pptx.defineLayout({name:'CABINET_A4',width:W,height:H});
@@ -116,7 +121,7 @@ export async function downloadCabinetSpecification(items:CabinetSpecification[])
  addText(cover,'Спецификация мебели',7.28,3.25,3.7,.35,{color:MUTED,fontSize:12});
  addText(cover,PROPOSAL_BRAND.domain,8.89,7.65,2.22,.22,{color:MUTED,align:'right',fontSize:8,charSpacing:1.2});
 
- for(const [index,item] of items.entries())await addCabinetSlide(pptx,item,index);
+ for(const [index,item] of items.entries())await addCabinetSlide(pptx,item,index,rate);
 
  const closing=pptx.addSlide();
  closing.background={color:IVORY};

@@ -13,6 +13,7 @@ export type CabinetSpecification = {
   modules: {article: string; type: string; size: CabinetSpecification['size']; finishes?: ModuleFinish[]}[];
   support?: string;
   price: string;
+  priceInCents?: number;
   priceNote?: string;
   photos: {front: Blob; view: Blob};
 };

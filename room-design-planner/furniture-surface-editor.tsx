@@ -16,6 +16,7 @@ import {cabinetFrontFinish,glassCabinetArticle,isFixedCabinetFront} from './cabi
 import {cabinetMetalFinishId} from './cabinet-metal-finishes.mjs';
 import {cabinetRetailPrice,cabinetSupportPrice} from './cabinet-pricing.mjs';
 import {CabinetDimensions} from './cabinet-dimensions';
+import {cabinetEuro,cabinetRateLabel,cabinetRubles,fetchCabinetEuroRate,useCabinetEuroRate} from './cabinet-currency';
 import {CabinetFavorites} from './cabinet-favorites';
 import {CabinetPhoto} from './cabinet-photo';
 import {cabinetFingerprint,cabinetSpecificationFinishes,loadCabinetSpecification,removeCabinetSpecification,restoreCabinetSpecificationFinishes,saveCabinetSpecification,type CabinetSpecification} from './cabinet-specification';
@@ -27,7 +28,6 @@ export const TETRA_PRODUCT = 'leve-home:334625_819';
 const cabinetPanels = [['modules','Модули'],['finish','Отделка'],['support','Опора']] as const;
 type CabinetPanel = typeof cabinetPanels[number][0];
 type Sample = {id:string;label:string;image:string;kind?:string;decor?:string;priceGroup?:number;slabWidthMm?:number;slabHeightMm?:number};
-const retailCurrency=new Intl.NumberFormat('ru-RU',{style:'currency',currency:'EUR'});
 const cabinetTitles:Record<string,string>={wall:'Настенный шкаф','transparent-wall':'Прозрачный настенный шкаф',bars:'Бар',drawers:'Комод',tv:'ТВ-тумба'};
 type Draft = Record<string,string>;
 type CatalogRequest = (productId:string, options:{surfaceEditing:true})=>Promise<{textures:Sample[]}>;
@@ -89,6 +89,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  const dialog=useRef<HTMLDialogElement>(null);
  const node=(createKind||catalogSession?{name:createKind==='tv_stand'||catalogSession?.category==='tv'?'Индивидуальная ТВ-тумба':'Индивидуальный комод',metadata:{catalogProductId:CABINET_PRODUCT}}:useScene.getState().nodes[id as any]) as any;
  const cabinet=catalogId(node)===CABINET_PRODUCT;
+ const euroRate=useCabinetEuroRate(cabinet);
  const [cabinetData,setCabinetData]=useState<CabinetCatalog|null>(null);
  const [configuration,setConfiguration]=useState<CabinetConfig>(()=>{
   const initial=normalizeCabinetConfig(node?.metadata?.modularCabinet||{modules:[newCabinet()]});
@@ -531,6 +532,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  const ceramicFrontChosen=cabinet&&cabinetPart==='front'&&!frontIsGlass&&!fixedTransparentFront&&!waitingForFront&&!emptyCabinet;
  const ceramicGroups=[2,3,4].map(group=>({group,samples:visibleSamples.filter(sample=>sample.priceGroup===group)}));
  const price=cabinetData&&!emptyCabinet&&cabinetRetailPrice(configuration,cabinetData);
+ const rublePrice=price&&'priceInCents' in price?cabinetRubles(price.priceInCents,euroRate):undefined;
  const replacing=!emptyCabinet&&(moduleAction==='replace'||standalone||browsingStandalone);
  const metalFinish=cabinetMetalFinishId(configuration.support?.color);
  const moduleCount=configuration.modules.length;
@@ -560,7 +562,8 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
    await saveCabinetSpecification({
     scope:specificationScope,fingerprint,createdAt:Date.now(),name:cabinetTitles[firstModel.categories?.[0]||'']||'Комод',
     size:{width,height:Math.round(dimensions[1]*1000),depth:Math.round(dimensions[2]*1000)},modules,support:supportLabel,photos,
-    price:'priceInCents' in price?retailCurrency.format(price.priceInCents!/100):'Цена по запросу',
+    price:'priceInCents' in price?cabinetEuro.format(price.priceInCents!/100):'Цена по запросу',
+    priceInCents:'priceInCents' in price?price.priceInCents:undefined,
     priceNote:'priceInCents' in price?(price.estimated?'Предварительная цена':undefined):price.reason,
    });
    setSpecification(await loadCabinetSpecification(specificationScope));
@@ -588,8 +591,11 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
    const legacy=specification.some(item=>item.modules.some(module=>!module.finishes));
    const catalog=legacy?(cabinetData||await cabinetCatalog().catch(()=>null)):null;
    const items=catalog?specification.map(item=>restoreCabinetSpecificationFinishes(item,catalog)):specification;
-   const {downloadCabinetSpecification}=await import('./cabinet-specification-pptx');
-   await downloadCabinetSpecification(items);
+   const [{downloadCabinetSpecification},rate]=await Promise.all([
+    import('./cabinet-specification-pptx'),
+    fetchCabinetEuroRate().catch(()=>euroRate?{...euroRate,stale:true}:null),
+   ]);
+   await downloadCabinetSpecification(items,rate);
   }catch(cause){
    setError((cause as Error).message||'Не удалось подготовить коммерческое предложение PowerPoint.');
   }finally{
@@ -631,7 +637,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
   <header className={cabinet?'rd-cabinet-bar':undefined}>
    {cabinet&&<><span className="rd-cabinet-wordmark">ROOM DESIGN</span><h2>Конфигуратор мебели</h2></>}
    <button type="button" disabled={pending} onClick={onClose}>{catalogSession?'Назад в каталог':'Назад к плану'}</button>
-   {cabinet&&<CabinetFavorites items={specification} busy={specificationBusy} onRemove={removeFromSpecification}/>}
+   {cabinet&&<CabinetFavorites items={specification} rate={euroRate} busy={specificationBusy} onRemove={removeFromSpecification}/>}
    {cabinet?<div className="rd-cabinet-category"><span>Тип товара</span><CabinetSelect label="Тип товара" value={category}
     onChange={browseCategory} options={Object.entries(cabinetCategoryLabels).map(([value,label])=>({value,label}))}/></div>:<h2>{node?.name||'TETRA'}</h2>}
    {cabinet&&<button type="button" className="rd-cabinet-print" aria-label="Скачать коммерческое предложение PowerPoint" title={specification?.length?'Скачать PowerPoint':'Добавьте комод в спецификацию'} disabled={!specification?.length||specificationBusy} onClick={()=>void downloadSpecification()}>▤</button>}
@@ -794,7 +800,9 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
     {price&&<output aria-live="polite" className="rd-cabinet-price">
      {'priceInCents' in price?<>
       <small>{price.estimated?'Предварительная цена':'Стоимость композиции'}</small>
-      <strong>{retailCurrency.format(price.priceInCents!/100)}</strong>
+      <strong>{rublePrice||cabinetEuro.format(price.priceInCents!/100)}</strong>
+      {rublePrice?<small>{cabinetEuro.format(price.priceInCents!/100)} · {cabinetRateLabel(euroRate)}</small>
+       :euroRate&&<small>{cabinetRateLabel(euroRate)}</small>}
       {price.estimated&&<small>Корпус рассчитан по более дорогой группе отделки</small>}
      </>:<><strong className="rd-cabinet-price-on-request">Цена по запросу</strong><small>{price.reason}</small></>}
     </output>}

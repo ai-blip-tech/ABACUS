@@ -1,4 +1,5 @@
 import React,{useEffect,useId,useRef,useState} from 'react';
+import {cabinetEuroCents,cabinetRubles,type CabinetEuroRate} from './cabinet-currency';
 import type {CabinetSpecification} from './cabinet-specification';
 
 function FavoritePhoto({photo}:{photo:Blob}){
@@ -11,8 +12,9 @@ function FavoritePhoto({photo}:{photo:Blob}){
  return <img src={url} alt="" loading="lazy"/>;
 }
 
-export function CabinetFavorites({items,busy,onRemove}:{
+export function CabinetFavorites({items,rate,busy,onRemove}:{
  items:CabinetSpecification[]|null;
+ rate:CabinetEuroRate|null;
  busy:boolean;
  onRemove:(item:CabinetSpecification)=>Promise<void>;
 }){
@@ -73,17 +75,20 @@ export function CabinetFavorites({items,busy,onRemove}:{
   {open&&items&&<div id={panelId} className="rd-cabinet-favorites-panel" role="region" aria-label="Сохранённые товары">
    {error&&<p role="alert">{error}</p>}
    {items.length>0?<ul ref={list}>
-    {items.map((item,index)=><li key={item.fingerprint}>
+    {items.map((item,index)=>{
+     const rubles=cabinetRubles(cabinetEuroCents(item.price,item.priceInCents),rate);
+     return <li key={item.fingerprint}>
      <FavoritePhoto photo={item.photos.front}/>
      <div className="rd-cabinet-favorites-item">
       <strong>{item.name}</strong>
       <span>{item.modules.map(module=>module.article).join(' + ')}</span>
-      <b>{item.price}</b>
+      <b>{rubles||item.price}</b>
+      {rubles&&<span>{item.price}</span>}
      </div>
      <button type="button" className="rd-cabinet-favorites-remove" aria-disabled={busy}
       aria-label={'Удалить из избранного: '+item.name+' '+(index+1)}
       onClick={()=>void remove(item,index)}>Удалить</button>
-    </li>)}
+    </li>})}
    </ul>:<p>Нажмите на сердечко, чтобы добавить товар.</p>}
   </div>}
  </div>;
