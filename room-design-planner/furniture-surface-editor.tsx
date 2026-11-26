@@ -16,8 +16,9 @@ import {cabinetFrontFinish,glassCabinetArticle,isFixedCabinetFront} from './cabi
 import {cabinetMetalFinishId} from './cabinet-metal-finishes.mjs';
 import {cabinetRetailPrice,cabinetSupportPrice} from './cabinet-pricing.mjs';
 import {CabinetDimensions} from './cabinet-dimensions';
+import {CabinetFavorites} from './cabinet-favorites';
 import {CabinetPhoto} from './cabinet-photo';
-import {cabinetFingerprint,cabinetSpecificationFinishes,loadCabinetSpecification,restoreCabinetSpecificationFinishes,saveCabinetSpecification,type CabinetSpecification} from './cabinet-specification';
+import {cabinetFingerprint,cabinetSpecificationFinishes,loadCabinetSpecification,removeCabinetSpecification,restoreCabinetSpecificationFinishes,saveCabinetSpecification,type CabinetSpecification} from './cabinet-specification';
 import {CabinetSelect} from './cabinet-select';
 import {furnitureSurfaces,updateFurnitureSurfaces} from './furniture-surface-geometry.mjs';
 import './cabinet-configurator.css';
@@ -96,8 +97,10 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
  const [pending,setPending]=useState(false);
  const [specification,setSpecification]=useState<CabinetSpecification[]|null>(null);
  const [savingSpecification,setSavingSpecification]=useState(false);
+ const [removingSpecification,setRemovingSpecification]=useState(false);
  const [photoReady,setPhotoReady]=useState(false);
  const [preparingSpecification,setPreparingSpecification]=useState(false);
+ const specificationBusy=savingSpecification||removingSpecification||preparingSpecification;
  const capturePhoto=useRef<((dimensions:[number,number,number])=>Promise<CabinetSpecification['photos']>)|null>(null);
  const materials=useRef(new Map<string,MeshStandardMaterial>());
  const highlight=useRef(new MeshStandardMaterial({color:'#ede1dc',emissive:'#82364b',emissiveIntensity:.3}));
@@ -487,7 +490,7 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
  const isFavorite=!!specification?.some(item=>item.fingerprint===fingerprint);
  const cabinetStatus=pending?'Сохраняем композицию…':savingSpecification?'Добавляем в спецификацию…':preparingSpecification?'Готовим PowerPoint…':assembling?'Обновляем 3D-модель…':'';
  async function addToSpecification(){
-  if(!specification||isFavorite||savingSpecification||pending||assembling||!model||!capturePhoto.current||!cabinetData||!firstModel||!price)return;
+  if(!specification||isFavorite||specificationBusy||pending||assembling||!model||!capturePhoto.current||!cabinetData||!firstModel||!price)return;
   setSavingSpecification(true);
   setError('');
   try{
@@ -514,8 +517,18 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
    setSavingSpecification(false);
   }
  }
+ async function removeFromSpecification(item:CabinetSpecification){
+  if(specificationBusy)return;
+  setRemovingSpecification(true);
+  try{
+   await removeCabinetSpecification(specificationScope,item.fingerprint);
+   setSpecification(items=>items?.filter(entry=>entry.fingerprint!==item.fingerprint)??null);
+  }finally{
+   setRemovingSpecification(false);
+  }
+ }
  async function downloadSpecification(){
-  if(!specification?.length)return;
+  if(!specification?.length||specificationBusy)return;
   setError('');
   setPreparingSpecification(true);
   try{
@@ -557,7 +570,7 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
  }
  return <dialog ref={dialog} className={'rd-furniture-surface-editor'+(cabinet?' rd-cabinet-editor':'')} aria-label="Редактор текстур мебели" onKeyDownCapture={event=>{
   const deleteKey=event.key==='Delete'||event.key==='Backspace';
-  if(!cabinet||!deleteKey||event.altKey||event.ctrlKey||event.metaKey||(event.target instanceof Element&&event.target.closest('input,textarea,select,[role="combobox"],[role="listbox"],[contenteditable="true"]')))return;
+  if(!cabinet||!deleteKey||event.altKey||event.ctrlKey||event.metaKey||(event.target instanceof Element&&event.target.closest('.rd-cabinet-favorites,input,textarea,select,[role="combobox"],[role="listbox"],[contenteditable="true"]')))return;
   event.preventDefault();
   event.stopPropagation();
   if(!event.repeat)removeActiveModule();
@@ -565,9 +578,10 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
   <header className={cabinet?'rd-cabinet-bar':undefined}>
    {cabinet&&<><span className="rd-cabinet-wordmark">ROOM DESIGN</span><h2>Конфигуратор мебели</h2></>}
    <button type="button" disabled={pending} onClick={onClose}>Назад к плану</button>
+   {cabinet&&<CabinetFavorites items={specification} busy={specificationBusy} onRemove={removeFromSpecification}/>}
    {cabinet?<div className="rd-cabinet-category"><span>Тип товара</span><CabinetSelect label="Тип товара" value={category}
     onChange={browseCategory} options={Object.entries(cabinetCategoryLabels).map(([value,label])=>({value,label}))}/></div>:<h2>{node?.name||'TETRA'}</h2>}
-   {cabinet&&<button type="button" className="rd-cabinet-print" aria-label="Скачать коммерческое предложение PowerPoint" title={specification?.length?'Скачать PowerPoint':'Добавьте комод в спецификацию'} disabled={!specification?.length||savingSpecification||preparingSpecification} onClick={()=>void downloadSpecification()}>▤</button>}
+   {cabinet&&<button type="button" className="rd-cabinet-print" aria-label="Скачать коммерческое предложение PowerPoint" title={specification?.length?'Скачать PowerPoint':'Добавьте комод в спецификацию'} disabled={!specification?.length||specificationBusy} onClick={()=>void downloadSpecification()}>▤</button>}
    <button type="button" disabled={pending||assembling||(emptyCabinet?!!creation:!model)} onClick={()=>void confirm()}>{emptyCabinet&&!creation?'Удалить изделие':cabinet?'Сохранить':'ОК'}</button>
   </header>
   <div className={cabinet?'rd-cabinet-workspace':'rd-furniture-texture-workspace'}>
@@ -704,7 +718,7 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
       <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 16 13-13 5 5L8 21zM7 12l2 2m2-6 2 2"/></svg>
      </button>
      <div className="rd-cabinet-specification-tools">
-      <button type="button" className="rd-cabinet-favorite" aria-label={isFavorite?'Комод в спецификации':'Добавить комод в избранное и спецификацию'} title={isFavorite?'Комод в спецификации':'Добавить в избранное и спецификацию'} aria-pressed={isFavorite} disabled={!photoReady||!specification||pending||assembling||savingSpecification} onClick={()=>void addToSpecification()}>
+      <button type="button" className="rd-cabinet-favorite" aria-label={isFavorite?'Комод в спецификации':'Добавить комод в избранное и спецификацию'} title={isFavorite?'Комод в спецификации':'Добавить в избранное и спецификацию'} aria-pressed={isFavorite} disabled={!photoReady||!specification||pending||assembling||specificationBusy} onClick={()=>void addToSpecification()}>
        <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" strokeWidth="1.5" strokeLinejoin="round"><path d="M12 21 3.8 13a5.3 5.3 0 0 1 7.5-7.5l.7.7.7-.7a5.3 5.3 0 0 1 7.5 7.5Z"/></svg>
       </button>
       {!!specification?.length&&<span className="rd-cabinet-specification-count" role="status" aria-label={`Товаров в спецификации: ${specification.length}`}>{specification.length}</span>}

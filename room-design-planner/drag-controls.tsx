@@ -27,7 +27,7 @@ export function DragControls({keyboard=true}:{keyboard?:boolean}={}){useEffect((
    cancel();rotation={id:d.id,x:d.x,base:n.rotation[1],original:[...n.rotation]};notify();
   }
  };window.addEventListener('roomdesign:item-interaction',bridge);
- const editable=(target:EventTarget|null)=>target instanceof HTMLElement&&!!target.closest('input,textarea,select,[contenteditable="true"]');
+ const editable=(target:EventTarget|null)=>target instanceof HTMLElement&&!!target.closest('input,textarea,select,[contenteditable="true"],dialog,[role="dialog"]');
  const key=(e:KeyboardEvent)=>{
   if(!keyboard||editable(e.target)||e.metaKey||e.ctrlKey||e.altKey)return;
   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();if(rotation)finish(true);else clear();return;}

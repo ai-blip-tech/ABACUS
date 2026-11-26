@@ -112,16 +112,24 @@ export async function loadCabinetSpecification(scope: string): Promise<CabinetSp
   }
 }
 
-export async function saveCabinetSpecification(item: CabinetSpecification) {
+async function updateSpecificationStore(update: (items: IDBObjectStore) => void) {
   const db = await openSpecificationStore();
   try {
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction('items','readwrite');
-      transaction.objectStore('items').put(item);
+      update(transaction.objectStore('items'));
       transaction.oncomplete = () => resolve();
       transaction.onabort = () => reject(transaction.error);
     });
   } finally {
     db.close();
   }
+}
+
+export function saveCabinetSpecification(item: CabinetSpecification) {
+  return updateSpecificationStore(items => items.put(item));
+}
+
+export function removeCabinetSpecification(scope: string, fingerprint: string) {
+  return updateSpecificationStore(items => items.delete([scope, fingerprint]));
 }
