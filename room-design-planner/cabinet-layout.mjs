@@ -4,6 +4,22 @@ export const CABINET_BASE_COLOR = '#45464a';
 export const CABINET_GLASS_THICKNESS_MM = 4;
 export const CABINET_DOOR_GAP_MM = 2;
 
+export const cabinetCategoryLabels = {
+ sideboards:'Комоды',
+ tv:'ТВ-тумбы',
+ wall:'Настенные шкафы',
+ 'transparent-wall':'Прозрачные настенные шкафы',
+ bars:'Бары',
+};
+
+export function cabinetInCategory(model,category) {
+ return model.categories?.includes(category)||(category==='sideboards'&&model.categories?.includes('drawers'));
+}
+
+export function isStandaloneCabinet(model) {
+ return !!model?.categories?.some(category=>['wall','transparent-wall','bars'].includes(category));
+}
+
 export function cabinetDimensionsMm(configuration, catalog) {
  const specifications=configuration.modules.map(module=>{
   const model=catalog.models.find(item=>item.id===module.model&&!item.id.startsWith('base'));
@@ -12,6 +28,9 @@ export function cabinetDimensionsMm(configuration, catalog) {
  });
  const first=specifications[0];
  if(!first)throw Error('Добавьте хотя бы один комод.');
+ if(specifications.length>1&&specifications.some(isStandaloneCabinet)){
+  throw Error('Настенные шкафы и бары добавляются по одному.');
+ }
  if(specifications.some(model=>model.heightMm!==first.heightMm||model.depthMm!==first.depthMm)){
   throw Error('Объединять можно только модули одинаковой высоты и глубины.');
  }
@@ -27,17 +46,24 @@ export function cabinetWidthMm(configuration, catalog) {
 }
 
 export function normalizeCabinetConfig(configuration) {
- const first = configuration.modules[0];
+ const glassSurface=surface=>surface?.sample?.startsWith('ceramic-')?{sample:'WHT',finish:'gloss'}:surface;
+ const modules=configuration.modules.map(module=>{
+  const body=glassSurface({sample:module.glass,finish:module.finish});
+  const surfaces=module.surfaces&&Object.fromEntries(Object.entries(module.surfaces).map(([key,value])=>[key,glassSurface(value)]));
+  return {...module,glass:body.sample,finish:body.finish,surfaces};
+ });
+ const first = modules[0];
  if (!first) throw Error('Добавьте хотя бы один комод.');
  const support=configuration.support||{kind:(configuration.base?.enabled??first.legs)?'base':'none'};
  return {
   ...configuration,
   version: 3,
+  modules,
   support,
   front: configuration.front || first.front,
   frontType:configuration.frontType||'ceramic',
   frontGlass:configuration.frontGlass||{sample:first.glass,finish:first.finish},
-  top: configuration.top || first.surfaces?.top || {sample:first.glass, finish:first.finish},
+  top: glassSurface(configuration.top) || first.surfaces?.top || {sample:first.glass, finish:first.finish},
   base: {enabled:support.kind==='base',color:CABINET_BASE_COLOR},
  };
 }
@@ -52,6 +78,7 @@ export function slabCut(configuration, catalog) {
  const sample=catalog.samples.find(item=>item.id===(configuration.front||configuration.modules[0].front));
  if(!sample?.slabWidthMm||!sample?.slabHeightMm)throw Error('Для этого декора не подтверждён размер слэба.');
  const slabWidthMm=sample.slabWidthMm,slabHeightMm=sample.slabHeightMm;
+ if(heightMm>slabHeightMm)throw Error('Высота корпуса превышает короткую сторону выбранного слэба.');
  if(widthMm>slabWidthMm)throw Error('Длина выбранного слэба — '+slabWidthMm/10+' см. Для композиции выберите другой декор.');
  return {
   slabWidthMm,

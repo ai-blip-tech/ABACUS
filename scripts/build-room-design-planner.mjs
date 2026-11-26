@@ -17,3 +17,13 @@ await buildConverter({
   format: 'esm',
   target: 'node22',
 });
+
+await buildConverter({
+  entryPoints: [resolve(workspace, 'import-cabinet-supplier.mjs')],
+  outfile: '.next/room-design-planner-tools/import-cabinet-supplier.mjs',
+  bundle: true,
+  external: ['jszip'],
+  platform: 'node',
+  format: 'esm',
+  target: 'node22',
+});

@@ -316,6 +316,13 @@ jobs:
             node scripts/room-design-planner-converter-smoke.mjs
             test -f .next/BUILD_ID
 
+            cabinet_library="$data_dir/storage/cabinet-library"
+            if [ ! -s "$cabinet_library/versions/current" ]; then
+              ROOM_DESIGN_DATA_DIR="$data_dir" node .next/room-design-planner-tools/import-cabinet-supplier.mjs
+            fi
+            mkdir -p isolated-smoke-data/storage
+            ln -s "$cabinet_library" isolated-smoke-data/storage/cabinet-library
+
             candidate_port=3901
             ROOM_DESIGN_DATA_DIR="$(pwd)/isolated-smoke-data" PORT="$candidate_port" ./node_modules/.bin/next start >candidate.log 2>&1 &
             candidate_pid=$!
@@ -327,7 +334,7 @@ jobs:
             MEASURE_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/partition-plan-local-smoke.mjs
             PLANNING_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/planning-plan-local-smoke.mjs
             curl --fail --silent --show-error "http://127.0.0.1:${candidate_port}/planning-plan" >/dev/null
-            node scripts/room-design-planner-http-smoke.mjs "http://127.0.0.1:${candidate_port}"
+            ROOM_DESIGN_CHECK_CABINET_LIBRARY=1 node scripts/room-design-planner-http-smoke.mjs "http://127.0.0.1:${candidate_port}"
             FLOOR_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/floor-covering-release-smoke.mjs
             WALL_RELEASE_SMOKE_BASE="http://127.0.0.1:${candidate_port}" node --no-experimental-strip-types --import ./scripts/register-test-typescript.mjs scripts/wall-decoration-preview-smoke.mjs
             cleanup_candidate
@@ -366,9 +373,9 @@ jobs:
             curl --fail --silent --show-error http://127.0.0.1:3000/floor-layout/print >/dev/null
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/projects/release-auth-check/floor-2)" = "401"
             test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/floor-parquet/WoodFloor032/Color)" = "401"
-            node scripts/room-design-planner-http-smoke.mjs http://127.0.0.1:3000
+            ROOM_DESIGN_CHECK_CABINET_LIBRARY=1 node scripts/room-design-planner-http-smoke.mjs http://127.0.0.1:3000
 
-            node scripts/room-design-planner-http-smoke.mjs https://roomdesign.com.ru
+            ROOM_DESIGN_CHECK_CABINET_LIBRARY=1 node scripts/room-design-planner-http-smoke.mjs https://roomdesign.com.ru
 
             production_html="$(curl --fail --silent --show-error http://127.0.0.1:3000/)"
             production_css="$(printf '%s' "$production_html" | grep -oE '/_next/static/[^\" ]+\.css' | sort -u | while IFS= read -r asset; do curl --fail --silent --show-error "http://127.0.0.1:3000${asset}"; done)"

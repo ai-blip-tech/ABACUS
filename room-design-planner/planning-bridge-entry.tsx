@@ -2,7 +2,7 @@ import type {WallCameraPose} from './wall-camera-pose';
 import type {WallWalkPose} from '../lib/wall-decoration/surfaces';
 import {setDecaroContext} from './decaro-context.mjs';
 import {snapshotScene} from './scene-snapshot.mjs';
-import {CABINET_PRODUCT,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,normalizeCabinetConfig} from './modular-cabinets';
+import {CABINET_PRODUCT,CABINET_GEOMETRY_VERSION,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,normalizeCabinetConfig} from './modular-cabinets';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Group} from 'three';
 import {registerTileProduct,tileProducts} from './tile-products.mjs';
@@ -77,6 +77,7 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
  const readFurniturePose=useRef<(() => FurnitureViewPose)|null>(null);
  const furniturePose=useRef<FurnitureViewPose|null>(null);
  const sourcePlan=useRef<MeasureDoc|null>(null);
+ const [cabinetSpecificationScope,setCabinetSpecificationScope]=useState('preview');
 
  function resolveFurniturePlacement(item:FurnitureItem,pose:FurnitureViewPose){
   if(!sourcePlan.current)throw Error('Дождитесь открытия 3D');
@@ -127,7 +128,7 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
   if(data.type==='roomdesign:walk-key'){if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(data.key))window.dispatchEvent(new CustomEvent('roomdesign:walk-key',{detail:{key:data.key,pressed:data.pressed===true}}));return;}
   if(data.type==='roomdesign:view'){setViewMode(data.mode==='eye'?'eye':'3d');if('wallWork'in data)setWallWork(data.wallWork||null);return;}
   if(data.type==='roomdesign:snapshot'){if(opening.current||!loaded.current){send({type:'pascal:snapshot',requestId:data.requestId,error:'Дождитесь открытия 3D'});return;}try{send({type:'pascal:snapshot',requestId:data.requestId,scene:sceneSnapshot(),baseline:baseline.current});}catch(e){send({type:'pascal:snapshot',requestId:data.requestId,error:(e as Error).message});}return;}
-  if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;cameraHandoff.current=null;const doc=data.document;sourcePlan.current=doc;furniturePose.current=null;setDecaroContext({projectId:data.projectId,sheetId:doc.id});setDocument(doc);setWallWorkspace(data.wallWorkspace===true);setWallWork(data.wallWork||null);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
+  if(data.type!=='roomdesign:open'||opening.current)return;opening.current=true;loaded.current=false;setError('');try{await bootstrap;cameraHandoff.current=null;const doc=data.document;sourcePlan.current=doc;furniturePose.current=null;setDecaroContext({projectId:data.projectId,sheetId:doc.id});setCabinetSpecificationScope(typeof data.projectId==='string'&&data.projectId?'project:'+data.projectId:'preview');setDocument(doc);setWallWorkspace(data.wallWorkspace===true);setWallWork(data.wallWork||null);setViewMode(data.mode==='eye'?'eye':'3d');const overrides=Object.fromEntries((doc.furniture||[]).map((f:any)=>[f.id,f.height||defaults[f.kind]||900]));
    const result=planningToPlanner(doc,{wallHeightMm:2800,doorHeightMm:2100,windowHeightMm:1400,windowSillMm:900,furnitureHeightsMm:overrides,assetFor:templateAsset});
    for(const node of Object.values(result.scene.nodes) as any[]) {
     if (node.type !== 'wall') continue;
@@ -140,23 +141,26 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
     }
    }
    // Keep 3D appearance, while every position and dimension comes from this 2D sheet.
-   for(const node of Object.values(result.scene.nodes) as any[]){if(node.type!=='item'||node.metadata?.column)continue;const old=Object.values(data.previousScene?.nodes||{}).find((n:any)=>n.type==='item'&&n.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;if((!old?.metadata?.modularCabinet||old.metadata.modularCabinet.version===3)&&(!node.metadata?.roomDesignFurniture?.modularCabinet||JSON.stringify(node.metadata.roomDesignFurniture.modularCabinet)===JSON.stringify(old?.metadata?.modularCabinet))&&old?.asset&&old.metadata?.roomDesignModelAsset&&old.metadata?.roomDesignFurniture?.catalog?.id===node.metadata?.roomDesignFurniture?.catalog?.id&&old.metadata?.catalogTextureId===doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId)?.model3D?.textureId){try{const url=await loadAssetUrl(old.metadata.roomDesignModelAsset);if(url){node.asset={...old.asset,src:url};node.scale=old.metadata.modularCabinet?old.scale:node.scale.map((n:number,i:number)=>n/node.asset.dimensions[i]);node.metadata={...old.metadata,...node.metadata,roomDesignModelAsset:old.metadata.roomDesignModelAsset};if(old.metadata.representation==='catalog-converted')newModelFocus.current=node.id;}}catch{}}
+   for(const node of Object.values(result.scene.nodes) as any[]){if(node.type!=='item'||node.metadata?.column)continue;const old=Object.values(data.previousScene?.nodes||{}).find((n:any)=>n.type==='item'&&n.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;if((!old?.metadata?.modularCabinet||(old.metadata.modularCabinet.version===3&&old.metadata.cabinetGeometryVersion===CABINET_GEOMETRY_VERSION))&&(!node.metadata?.roomDesignFurniture?.modularCabinet||JSON.stringify(node.metadata.roomDesignFurniture.modularCabinet)===JSON.stringify(old?.metadata?.modularCabinet))&&old?.asset&&old.metadata?.roomDesignModelAsset&&old.metadata?.roomDesignFurniture?.catalog?.id===node.metadata?.roomDesignFurniture?.catalog?.id&&old.metadata?.catalogTextureId===doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId)?.model3D?.textureId){try{const url=await loadAssetUrl(old.metadata.roomDesignModelAsset);if(url){node.asset={...old.asset,src:url};node.scale=old.metadata.modularCabinet?old.scale:node.scale.map((n:number,i:number)=>n/node.asset.dimensions[i]);node.metadata={...old.metadata,...node.metadata,roomDesignModelAsset:old.metadata.roomDesignModelAsset};if(old.metadata.representation==='catalog-converted')newModelFocus.current=node.id;}}catch{}}
    }
+   let supplierCatalogue:ReturnType<typeof cabinetCatalog>|undefined;
    for(const node of Object.values(result.scene.nodes) as any[]){
     if(node.type!=='item'||node.metadata?.column||node.metadata?.roomDesignModelAsset)continue;
     const f=doc.furniture?.find((f:any)=>f.id===node.metadata?.roomDesignId);
     if(f?.catalog?.id===CABINET_PRODUCT){
-     const previous=Object.values(data.previousScene?.nodes||{}).find((old:any)=>old.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;
-     const configuration=normalizeCabinetConfig(f.modularCabinet||previous?.metadata?.modularCabinet||{modules:[newCabinet(f.cabinetModel||'5041')]});
-     const assembled=await assembleCabinets(configuration,await cabinetCatalog());
-     const dimensions=cabinetBounds(assembled).dimensions;
-     const unit=new Group();unit.add(assembled);unit.scale.set(1/dimensions[0],1/dimensions[1],1/dimensions[2]);
-     const bytes=await new GLTFExporter().parseAsync(unit,{binary:true});
-     const assetRef=await saveAsset(new File([bytes as ArrayBuffer],'modular-cabinet.glb',{type:'model/gltf-binary'}));
-     node.asset={...node.asset,id:'modular-'+f.id,src:await loadAssetUrl(assetRef)};
-     node.scale=dimensions;
-     node.metadata={...node.metadata,roomDesignModelAsset:assetRef,representation:'catalog-converted',catalogProductId:CABINET_PRODUCT,modularCabinet:configuration};
-     newModelFocus.current=node.id;
+     try{
+      const previous=Object.values(data.previousScene?.nodes||{}).find((old:any)=>old.metadata?.roomDesignId===node.metadata?.roomDesignId) as any;
+      const configuration=normalizeCabinetConfig(f.modularCabinet||previous?.metadata?.modularCabinet||{modules:[newCabinet(f.cabinetModel||'5041')]});
+      const assembled=await assembleCabinets(configuration,await (supplierCatalogue??=cabinetCatalog()));
+      const dimensions=cabinetBounds(assembled).dimensions;
+      const unit=new Group();unit.add(assembled);unit.scale.set(1/dimensions[0],1/dimensions[1],1/dimensions[2]);
+      const bytes=await new GLTFExporter().parseAsync(unit,{binary:true});
+      const assetRef=await saveAsset(new File([bytes as ArrayBuffer],'modular-cabinet.glb',{type:'model/gltf-binary'}));
+      node.asset={...node.asset,id:'modular-'+f.id,src:await loadAssetUrl(assetRef)};
+      node.scale=dimensions;
+      node.metadata={...node.metadata,roomDesignModelAsset:assetRef,representation:'catalog-converted',catalogProductId:CABINET_PRODUCT,modularCabinet:configuration,cabinetGeometryVersion:CABINET_GEOMETRY_VERSION};
+      newModelFocus.current=node.id;
+     }catch(reason){result.warnings.push(f.name+' — '+(reason as Error).message);}
      continue;
     }
     const resultModel=await prepareFurnitureModel(node,f);
@@ -176,7 +180,7 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
   const node=Object.values(useScene.getState().nodes).find((node:any)=>node.metadata?.catalogProductId===CABINET_PRODUCT) as any;
   if(node)window.dispatchEvent(new CustomEvent('roomdesign:configure-cabinet',{detail:{id:node.id}}));
  }
- return <div className={`linked-room-planner ${viewMode==='eye'?'is-walkthrough':''} ${wallWork?'rd-wall-work-mode':''} ${wallWorkspace?'rd-wall-docked':''}`}>{demo&&scene&&<div className="rd-cabinet-preview-tools"><button type="button" onClick={openCabinet}>Настроить комоды</button></div>}{warnings.length>0&&<details className="linked-room-planner-assumptions"><summary>Особенности 3D · {warnings.length}</summary>{warnings.map((w,i)=><p key={i}>{w}</p>)}<p>Исходные размеры в 2D сохраняются. Временное значение станет размером плана только при его изменении в 3D.</p></details>}{error&&<p role="alert">{error}</p>}{scene?<><FurnitureSurfaceMenu resolvePlacement={resolveFurniturePlacement} requestCatalog={requestCatalogModel} onOpenChange={textureEditorChanged}/><EditorShortcuts/>{!wallWork&&<DragControls keyboard={viewMode==='3d'}/>}{viewMode==='eye'&&<WalkHud/>}<WallRegionIndicator/><WallFinishPanel docked={wallWorkspace} active={viewMode==='eye'||!!wallWork}/><MouldingPaintBadge active={viewMode==='eye'||!!wallWork}/><div className="rd-editor-viewport"><Editor disablePostFx={!!wallWork} viewerSceneSlot={<><FurnitureViewCamera readPose={readFurniturePose} mode={viewMode}/><CameraCapture/><FloorSurfaces/>{viewMode==='3d'&&!wallWork&&<WallProximity/>}<WallFinishScene active={viewMode==='eye'||!!wallWork} plan={document}/>{wallWork&&<WallWorkCamera context={wallWork} handoff={cameraHandoff}/>}<WalkCamera active={viewMode==='eye'&&!wallWork} plan={document} onError={setError} onPose={wallWorkspace?sendWalkPose:undefined} handoff={wallWorkspace?cameraHandoff:undefined}/></>} key={key} viewBar={false} layoutVersion="v2" projectId={'linked:'+session} onLoad={onLoad} onSave={onSave} onLoaderChange={ready} actionMenuPlacement="top"/></div></>:!error&&<p className="linked-room-planner-wait">Подготавливаем текущий лист…</p>}</div>;
+ return <div className={`linked-room-planner ${viewMode==='eye'?'is-walkthrough':''} ${wallWork?'rd-wall-work-mode':''} ${wallWorkspace?'rd-wall-docked':''}`}>{demo&&scene&&<div className="rd-cabinet-preview-tools"><button type="button" onClick={openCabinet}>Настроить комоды</button></div>}{warnings.length>0&&<details className="linked-room-planner-assumptions"><summary>Особенности 3D · {warnings.length}</summary>{warnings.map((w,i)=><p key={i}>{w}</p>)}<p>Исходные размеры в 2D сохраняются. Временное значение станет размером плана только при его изменении в 3D.</p></details>}{error&&<p role="alert">{error}</p>}{scene?<><FurnitureSurfaceMenu specificationScope={cabinetSpecificationScope} resolvePlacement={resolveFurniturePlacement} requestCatalog={requestCatalogModel} onOpenChange={textureEditorChanged}/><EditorShortcuts/>{!wallWork&&<DragControls keyboard={viewMode==='3d'}/>}{viewMode==='eye'&&<WalkHud/>}<WallRegionIndicator/><WallFinishPanel docked={wallWorkspace} active={viewMode==='eye'||!!wallWork}/><MouldingPaintBadge active={viewMode==='eye'||!!wallWork}/><div className="rd-editor-viewport"><Editor disablePostFx={!!wallWork} viewerSceneSlot={<><FurnitureViewCamera readPose={readFurniturePose} mode={viewMode}/><CameraCapture/><FloorSurfaces/>{viewMode==='3d'&&!wallWork&&<WallProximity/>}<WallFinishScene active={viewMode==='eye'||!!wallWork} plan={document}/>{wallWork&&<WallWorkCamera context={wallWork} handoff={cameraHandoff}/>}<WalkCamera active={viewMode==='eye'&&!wallWork} plan={document} onError={setError} onPose={wallWorkspace?sendWalkPose:undefined} handoff={wallWorkspace?cameraHandoff:undefined}/></>} key={key} viewBar={false} layoutVersion="v2" projectId={'linked:'+session} onLoad={onLoad} onSave={onSave} onLoaderChange={ready} actionMenuPlacement="top"/></div></>:!error&&<p className="linked-room-planner-wait">Подготавливаем текущий лист…</p>}</div>;
 }
 createRoot(document.getElementById('root')!,{
  onUncaughtError(error){

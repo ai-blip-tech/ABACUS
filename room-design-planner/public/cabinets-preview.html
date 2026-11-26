@@ -13,9 +13,9 @@ window.addEventListener('message',event=>{
   let previousScene=null;try{previousScene=JSON.parse(localStorage.getItem(storage)||'null');}catch{}
   send({type:'roomdesign:open',document:plan,previousScene,mode:'3d'});
  }
- if(data.type==='pascal:loaded')document.querySelector('#status').remove();
+ if(data.type==='pascal:loaded')document.querySelector('#status')?.remove();
  if(data.type==='pascal:changed')localStorage.setItem(storage,JSON.stringify(data.scene));
- if(data.type==='pascal:error')document.querySelector('#status').textContent=data.error;
+ if(data.type==='pascal:error'){const status=document.querySelector('#status');if(status)status.textContent=data.error;}
 });
 frame.src=base+'planning-bridge.html?cabinets=1&session='+session+'&parentOrigin='+encodeURIComponent(location.origin);
 </script></html>

@@ -60,77 +60,10 @@ html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}.linked-room-pla
 
 .rd-furniture-texture-status { flex-wrap: wrap; }
 .rd-furniture-texture-status button[aria-pressed='true'] { border-color: #92132f; background: #92132f; color: white; }
-.rd-cabinet-controls { padding: 12px 16px 0; font: 13px Arial,sans-serif; }
-.rd-cabinet-modules,.rd-cabinet-settings { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px; }
-.rd-cabinet-controls label { display:flex; align-items:center; gap:6px; }
-.rd-cabinet-controls select { padding:8px 12px; border:1px solid #e4dcd3; border-radius:18px; background:white; color:#352b27; }
-.rd-furniture-surface-editor .rd-cabinet-controls button,.rd-furniture-surface-editor:has(.rd-cabinet-controls) button { border-radius:22px; }
-.rd-cabinet-controls button[aria-pressed=true] { background:#92132f; color:white; border-color:#92132f; }
-.rd-cabinet-settings>span { margin-left:auto; color:#887d74; }
 .rd-cabinet-preview-tools { position:fixed; top:16px; left:16px; z-index:80; display:flex; gap:8px; }
 .rd-cabinet-preview-tools button { cursor:pointer; background:#92132f; color:white; border:0; border-radius:24px; padding:12px 18px; font:14px Arial,sans-serif; }
 .rd-furniture-texture-workspace { display:flex; flex-direction:column; flex:1; min-height:0; }
 .rd-furniture-texture-workspace>aside { flex:none; }
-.rd-cabinet-workspace { display:grid; grid-template-columns:minmax(0,1fr) 360px; flex:1; min-height:0; }
-.rd-cabinet-sidebar { grid-column:2; grid-row:1; overflow:auto; padding:18px; border-left:1px solid #e8e1d9; background:#faf8f5; font:13px Arial,sans-serif; }
-.rd-cabinet-workspace>.rd-furniture-texture-viewport { grid-column:1; grid-row:1; }
-.rd-cabinet-sidebar .rd-cabinet-controls { padding:0; }
-.rd-cabinet-summary { display:grid; gap:6px; margin-bottom:14px; }
-.rd-cabinet-summary strong { font-size:18px; }
-.rd-cabinet-summary small { color:#8a7c70; }
-.rd-cabinet-sidebar .rd-cabinet-modules { display:flex; flex-wrap:nowrap; overflow-x:auto; padding:3px; gap:6px; }
-.rd-cabinet-modules button { display:grid; justify-items:center; flex:0 0 110px; padding:5px; gap:3px; }
-.rd-cabinet-modules img { width:94px; height:68px; object-fit:contain; border-radius:12px; }
-.rd-cabinet-modules b,.rd-cabinet-modules span { font-size:11px; }
-.rd-cabinet-editor .rd-cabinet-sidebar button { border-radius:18px; }
-.rd-cabinet-editor .rd-cabinet-sidebar .rd-cabinet-remove { width:100%; margin-bottom:16px; color:#92132f; }
-.rd-cabinet-catalog-actions { display:flex; gap:6px; margin:12px 0; }
-.rd-cabinet-catalog-actions button { flex:1; font-size:11px; padding:9px 5px; }
-.rd-cabinet-model-cards { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:20px; }
-.rd-cabinet-model-cards button { display:grid; gap:4px; justify-items:center; padding:5px 5px 9px; }
-.rd-cabinet-model-cards img { width:100%; height:100px; object-fit:contain; border-radius:12px; }
-.rd-cabinet-model-cards small { color:#8a7c70; font-size:10px; }
-.rd-cabinet-sidebar .rd-cabinet-settings { display:flex; gap:6px; padding-top:15px; border-top:1px solid #e4dcd3; }
-.rd-cabinet-settings>button { flex:1; font-size:12px; padding:8px 5px; }
-.rd-cabinet-settings>select { width:100%; margin-top:5px; }
-.rd-cabinet-sidebar .rd-furniture-texture-samples { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:10px 0; overflow:visible; }
-.rd-cabinet-sidebar .rd-furniture-texture-samples button { min-width:0; padding:7px; }
-.rd-cabinet-sidebar .rd-furniture-texture-samples img { width:100%; height:72px; object-fit:cover; border-radius:11px; }
-.rd-cabinet-sidebar .rd-furniture-texture-samples span { font-size:10px; line-height:1.4; }
-.rd-cabinet-sidebar .rd-furniture-texture-status { padding:12px 0; font-size:11px; line-height:1.5; }
-.rd-cabinet-support { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
-.rd-cabinet-support-card { display:grid; justify-items:center; align-content:start; gap:7px; }
-.rd-cabinet-support-card img,.rd-cabinet-support-card svg { width:100%; height:90px; object-fit:contain; border-radius:12px; }
-.rd-cabinet-support-card span { display:flex; align-items:center; gap:5px; font-size:11px; }
-.rd-cabinet-support-card i { width:12px; height:12px; border-radius:50%; }
-.rd-cabinet-support>small,.rd-cabinet-support>label { grid-column:1/-1; font-size:11px; }
-@media(max-width:750px) {
- .rd-cabinet-workspace { grid-template-columns:minmax(0,1fr) 290px; }
- .rd-cabinet-sidebar { padding:12px; }
-}
-.rd-cabinet-model-cards .rd-cabinet-card-dimensions { font-size:12px; color:#655b54; }
-.rd-cabinet-size-filters { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding-top:16px; margin-top:5px; border-top:1px solid #e4dcd3; }
-.rd-cabinet-size-filters label { display:grid; gap:6px; font-size:12px; }
-.rd-cabinet-size-filters .rd-cabinet-height-filter { grid-column:1/-1; font-weight:600; font-size:14px; }
-.rd-cabinet-size-filters select { min-width:0; width:100%; box-sizing:border-box; }
-.rd-cabinet-model-cards button:disabled { opacity:1; }
-.rd-cabinet-model-cards button:disabled>span,.rd-cabinet-model-cards button:disabled>small { color:#82796f; }
-.rd-cabinet-model-cards em { font-style:normal; font-size:10px; color:#88786e; }
-.rd-cabinet-model-cards img { background:white; padding:5px; box-sizing:border-box; }
-.rd-cabinet-front-material { display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; margin:5px 0; }
-.rd-cabinet-front-material button { font-size:12px; }
-.rd-cabinet-editor .rd-cabinet-model-cards .rd-cabinet-model-ready { border:2px solid #a01432; box-shadow:0 0 0 2px #a0143210; background:#fffafa; }
-.rd-cabinet-3d-badge { display:inline-flex; align-items:center; justify-content:center; min-width:34px; padding:4px 8px; border-radius:20px; background:#a01432; color:white; font-size:11px; line-height:1; }
-.rd-cabinet-fixed-front { margin:8px 0; padding:12px; border-radius:16px; background:#f0ece7; font-size:12px; line-height:1.5; width:100%; }
-.rd-cabinet-transparent-badge { font-size:10px; color:#4b777c; }
-.rd-cabinet-support-card:disabled { opacity:1; }
-.rd-cabinet-support-card small { color:#88786e; font-size:10px; }
-.rd-cabinet-workspace>.rd-furniture-texture-viewport { position:relative; overflow:hidden; }
-.rd-cabinet-view-tools { position:absolute; z-index:40; top:16px; left:16px; display:flex; align-items:center; gap:12px; pointer-events:none; }
-.rd-cabinet-view-tools strong { font:600 17px Arial,sans-serif; color:#352b27; }
-.rd-cabinet-editor .rd-cabinet-ruler { width:44px; height:44px; padding:0; border:1px solid #ddd4ca; border-radius:50%; display:grid; place-items:center; pointer-events:auto; background:#fff; color:#352b27; cursor:pointer; box-shadow:0 2px 8px #352b270a; }
-.rd-cabinet-editor .rd-cabinet-ruler:hover,.rd-cabinet-editor .rd-cabinet-ruler[aria-pressed=true] { background:#98172f; border-color:#98172f; color:#fff; }
-.rd-cabinet-dimension-label { display:block; padding:4px 8px; border-radius:8px; background:#fffffff0; color:#24211f; white-space:nowrap; font:500 13px Arial,sans-serif; box-shadow:0 1px 5px #352b2710; }
 /* The wall workspace uses the same material tools in a controlled camera view. */
 .rd-wall-work-mode .rd-wall-panel-refined{width:270px;max-height:calc(100% - 24px);top:12px;right:12px;border-radius:24px}
 .rd-wall-work-mode .linked-room-planner-assumptions{display:none}

@@ -158,3 +158,73 @@ test('support heights and fixed transparent doors match the price-list',()=>{
  assert.equal(slabCut(glass,catalog).widthMm,2500);
  assert.throws(()=>slabCut({...glass,modules:Array(6).fill(null).map(()=>newCabinet('5041'))},catalog),/260/);
 });
+
+test('Sonorous prices apply the module discount before the support and the retail multiplier',async()=>{
+ const {default:priceList}=await import('../lib/planning-plan/sonorous-catalog.mjs');
+ const {cabinetRetailPrice}=await import('./cabinet-pricing.mjs');
+ const models=Object.entries(priceList).map(([id,model])=>({id,...model}));
+ const samples=[{id:'WHT',kind:'glass'},{id:'PG3-example',kind:'ceramic',priceGroup:3}];
+ const modules=Array.from({length:2},()=>({...newCabinet('5044'),glass:'PG3-example'}));
+ const configuration={modules,front:'PG3-example',support:{kind:'legs',legId:'PLN'}};
+ assert.deepEqual(cabinetRetailPrice(configuration,{models,samples}),{priceInCents:331925});
+ const fixed={modules:[newCabinet('ED71DR_DL')],support:{kind:'none'}};
+ assert.deepEqual(cabinetRetailPrice(fixed,{models,samples}),{priceInCents:204050});
+});
+
+test('the saved cabinet can repeat a sideboard but cannot combine bars or wall cabinets',async()=>{
+ const {validateModularCabinet}=await import('../lib/planning-plan/modular-cabinet.ts');
+ const make=(...ids)=>normalizeCabinetConfig({modules:ids.map(newCabinet)});
+ assert.doesNotThrow(()=>validateModularCabinet(make('5044','5044')));
+ assert.throws(()=>validateModularCabinet(make('5044','5063')),/одинаковой высоты и глубины/);
+ assert.throws(()=>validateModularCabinet(make('ED71DR_DL','ED71DR_DL')),/по одному/);
+ assert.throws(()=>validateModularCabinet(make('100121','100121')),/по одному/);
+ assert.throws(()=>validateModularCabinet(make(...Array(5).fill('6544'))),/260/);
+});
+
+test('glossy bodies get an exact price and mixed body finishes get an estimate',async()=>{
+ const {default:priceList}=await import('../lib/planning-plan/sonorous-catalog.mjs');
+ const {cabinetRetailPrice}=await import('./cabinet-pricing.mjs');
+ const models=['10082','13082'].map(id=>({id,...priceList[id]}));
+ const samples=[{id:'WHT',kind:'glass'},{id:'ceramic-0',kind:'ceramic',priceGroup:3}];
+ const modules=models.map(({id})=>({...newCabinet(id),finish:'gloss'}));
+ const config={modules,support:{kind:'legs',legId:'PLN'}};
+ assert.deepEqual(cabinetRetailPrice(config,{models,samples}),{priceInCents:712883});
+ const mixed={...config,modules:[modules[0],{...modules[1],finish:'matte'}]};
+ assert.deepEqual(cabinetRetailPrice(mixed,{models,samples}),{priceInCents:726990,estimated:true});
+});
+
+test('mixed cabinet fronts use their individual price rows and glaze groups',async()=>{
+ const {default:priceList}=await import('../lib/planning-plan/sonorous-catalog.mjs');
+ const {cabinetRetailPrice}=await import('./cabinet-pricing.mjs');
+ const {ceramicCabinetPriceGroup}=await import('./cabinet-front-finishes.mjs');
+ const modules=[{...newCabinet('5085'),frontFinishes:{1:{type:'glass',sample:'WHT',finish:'matte'}}}];
+ const samples=[{id:'WHT',kind:'glass'},{id:'ceramic-0',kind:'ceramic',priceGroup:ceramicCabinetPriceGroup('ELA')}];
+ const models=[{id:'5085',...priceList['5085']}];
+ const config=normalizeCabinetConfig({modules});
+ assert.deepEqual(cabinetRetailPrice(config,{models,samples}),{priceInCents:217800});
+ assert.equal(ceramicCabinetPriceGroup('ANT'),2);
+ assert.equal(ceramicCabinetPriceGroup('DCR'),4);
+ assert.equal(ceramicCabinetPriceGroup('UNLISTED'),undefined);
+ const legacy=normalizeCabinetConfig({...config,top:{sample:'ceramic-0',finish:'matte'}});
+ assert.deepEqual(legacy.top,{sample:'WHT',finish:'gloss'});
+});
+
+test('cabinet specification keeps supplier articles for mixed and previously saved finishes',async()=>{
+ const {default:priceList}=await import('../lib/planning-plan/sonorous-catalog.mjs');
+ const {cabinetFingerprint,cabinetSpecificationFinishes,restoreCabinetSpecificationFinishes}=await import('./cabinet-specification.ts');
+ const modules=[
+  {...newCabinet('10082'),glass:'BLK',finish:'matte',frontFinishes:{0:{type:'glass',sample:'CSH',finish:'matte'}}},
+  {...newCabinet('13082'),glass:'BLK',finish:'matte'},
+ ];
+ const setup=normalizeCabinetConfig({modules});
+ const data={models:modules.map(({model:id})=>({id,...priceList[id]})),samples:catalog.samples};
+ const first=cabinetSpecificationFinishes(setup,data)[0];
+ assert.deepEqual(first.map(({surface,article})=>[surface,article]),[
+  ['Корпус и столешница','BLKC'],['Фасад 1','CSHC'],['Фасады 2, 3, 4','SPA6-ELA-SHN'],
+ ]);
+ const saved={fingerprint:cabinetFingerprint(setup),modules:modules.map(module=>({article:module.model}))};
+ const old=restoreCabinetSpecificationFinishes(saved,data);
+ assert.deepEqual(old.modules[0].finishes,first);
+ assert.equal(old.modules[1].finishes.find(finish=>finish.surface==='Все фасады').article,'SPA6-ELA-SHN');
+ assert.equal(catalog.samples.filter(sample=>sample.kind==='glass').length,15);
+});

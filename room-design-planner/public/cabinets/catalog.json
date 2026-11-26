@@ -966,44 +966,92 @@
   "samples": [
     {
       "id": "BLK",
-      "label": "Чёрный",
-      "color": "#222222",
-      "image": "./cabinets/BLK.jpg",
-      "kind": "glass"
-    },
-    {
-      "id": "WHT",
-      "label": "Белый",
-      "color": "#eeeeea",
-      "image": "./cabinets/WHT.jpg",
-      "kind": "glass"
-    },
-    {
-      "id": "GRY",
-      "label": "Серый",
-      "color": "#858581",
-      "image": "./cabinets/GRY.jpg",
-      "kind": "glass"
-    },
-    {
-      "id": "CGR",
-      "label": "Светло-серый",
-      "color": "#b2b2ac",
-      "image": "./cabinets/CGR.jpg",
+      "label": "BLACK",
+      "image": "./cabinets/glass/BLK.webp",
       "kind": "glass"
     },
     {
       "id": "GRP",
-      "label": "Графит",
-      "color": "#45464a",
-      "image": "./cabinets/GRP.jpg",
+      "label": "GRAPHITE",
+      "image": "./cabinets/glass/GRP.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "GRY",
+      "label": "GREY",
+      "image": "./cabinets/glass/GRY.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "CGR",
+      "label": "CEMENT GREY",
+      "image": "./cabinets/glass/CGR.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "WHT",
+      "label": "WHITE",
+      "image": "./cabinets/glass/WHT.webp",
       "kind": "glass"
     },
     {
       "id": "BRD",
-      "label": "Бордовый",
-      "color": "#6b484d",
-      "image": "./cabinets/BRD.jpg",
+      "label": "BORDEAUX",
+      "image": "./cabinets/glass/BRD.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "CBR",
+      "label": "COPPER BROWN",
+      "image": "./cabinets/glass/CBR.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "PBL",
+      "label": "PEBBLE",
+      "image": "./cabinets/glass/PBL.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "AGR",
+      "label": "ANTRACITE GREY",
+      "image": "./cabinets/glass/AGR.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "GRN",
+      "label": "GRANITE",
+      "image": "./cabinets/glass/GRN.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "OYS",
+      "label": "OYSTER WHITE",
+      "image": "./cabinets/glass/OYS.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "CSH",
+      "label": "CASHMERE",
+      "image": "./cabinets/glass/CSH.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "VMS",
+      "label": "VERDE MUSCHIO",
+      "image": "./cabinets/glass/VMS.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "DBR",
+      "label": "DARK BROWN",
+      "image": "./cabinets/glass/DBR.webp",
+      "kind": "glass"
+    },
+    {
+      "id": "BRW",
+      "label": "BROWN",
+      "image": "./cabinets/glass/BRW.webp",
       "kind": "glass"
     },
     {

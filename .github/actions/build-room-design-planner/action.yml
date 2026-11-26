@@ -17,7 +17,7 @@ runs:
       run: |
         npm ci --ignore-scripts
         npx --yes pnpm@11.25.0 --dir room-design-planner install --frozen-lockfile
-        node --test room-design-planner/tests/*.test.mjs
+        node --test room-design-planner/tests/*.test.mjs room-design-planner/modular-cabinets.test.mjs
         node --max-old-space-size=4096 scripts/build-room-design-planner.mjs
         sh scripts/room-design-planner-archive-tool.sh
         node scripts/room-design-planner-converter-smoke.mjs
@@ -26,7 +26,7 @@ runs:
       shell: bash
       run: |
         git rev-parse HEAD > .next/room-design-planner-tools/SOURCE_SHA
-        tar -C .next -czf planner-build.tar.gz static/room-design-planner room-design-planner-tools/catalog-model-convert.mjs room-design-planner-tools/SOURCE_SHA
+        tar -C .next -czf planner-build.tar.gz static/room-design-planner room-design-planner-tools/catalog-model-convert.mjs room-design-planner-tools/import-cabinet-supplier.mjs room-design-planner-tools/SOURCE_SHA
         echo "digest=$(sha256sum planner-build.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
     - id: upload
       uses: actions/upload-artifact@v4
