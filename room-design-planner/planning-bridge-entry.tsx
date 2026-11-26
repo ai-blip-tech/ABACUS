@@ -7,7 +7,7 @@ import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Group} from 'three';
 import {registerTileProduct,tileProducts} from './tile-products.mjs';
 const catalogModelJobs=new Map<string,{resolve:(x:any)=>void;reject:(e:Error)=>void;timer:any}>();
-import {FurnitureSurfaceMenu} from './furniture-surface-editor.tsx';
+import {FurnitureSurfaceMenu,StandaloneCabinetConfigurator} from './furniture-surface-editor.tsx';
 import {WallRegionIndicator} from './wall-region-indicator.tsx';
 import {FloorSurfaces} from './floor-surfaces.tsx';
 import {CameraCapture} from './camera-capture.tsx';
@@ -182,9 +182,10 @@ function App(){const [wallWorkspace,setWallWorkspace]=useState(false);const [wal
  }
  return <div className={`linked-room-planner ${viewMode==='eye'?'is-walkthrough':''} ${wallWork?'rd-wall-work-mode':''} ${wallWorkspace?'rd-wall-docked':''}`}>{demo&&scene&&<div className="rd-cabinet-preview-tools"><button type="button" onClick={openCabinet}>Настроить комоды</button></div>}{warnings.length>0&&<details className="linked-room-planner-assumptions"><summary>Особенности 3D · {warnings.length}</summary>{warnings.map((w,i)=><p key={i}>{w}</p>)}<p>Исходные размеры в 2D сохраняются. Временное значение станет размером плана только при его изменении в 3D.</p></details>}{error&&<p role="alert">{error}</p>}{scene?<><FurnitureSurfaceMenu specificationScope={cabinetSpecificationScope} resolvePlacement={resolveFurniturePlacement} requestCatalog={requestCatalogModel} onOpenChange={textureEditorChanged}/><EditorShortcuts/>{!wallWork&&<DragControls keyboard={viewMode==='3d'}/>}{viewMode==='eye'&&<WalkHud/>}<WallRegionIndicator/><WallFinishPanel docked={wallWorkspace} active={viewMode==='eye'||!!wallWork}/><MouldingPaintBadge active={viewMode==='eye'||!!wallWork}/><div className="rd-editor-viewport"><Editor disablePostFx={!!wallWork} viewerSceneSlot={<><FurnitureViewCamera readPose={readFurniturePose} mode={viewMode}/><CameraCapture/><FloorSurfaces/>{viewMode==='3d'&&!wallWork&&<WallProximity/>}<WallFinishScene active={viewMode==='eye'||!!wallWork} plan={document}/>{wallWork&&<WallWorkCamera context={wallWork} handoff={cameraHandoff}/>}<WalkCamera active={viewMode==='eye'&&!wallWork} plan={document} onError={setError} onPose={wallWorkspace?sendWalkPose:undefined} handoff={wallWorkspace?cameraHandoff:undefined}/></>} key={key} viewBar={false} layoutVersion="v2" projectId={'linked:'+session} onLoad={onLoad} onSave={onSave} onLoaderChange={ready} actionMenuPlacement="top"/></div></>:!error&&<p className="linked-room-planner-wait">Подготавливаем текущий лист…</p>}</div>;
 }
+const cabinetKind=params.get('cabinet');
 createRoot(document.getElementById('root')!,{
  onUncaughtError(error){
   console.error('Room Design 3D runtime error',error);
   send({type:'pascal:error',error:'Не удалось отобразить сцену в 3D.'});
  },
-}).render(<App/>);
+}).render(cabinetKind==='dresser'||cabinetKind==='tv_stand'?<StandaloneCabinetConfigurator kind={cabinetKind}/>:<App/>);

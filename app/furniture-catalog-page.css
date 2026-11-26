@@ -34,6 +34,8 @@
 .room-catalog-variants { display: grid; gap: 3px; margin: 4px 0 8px 10px; padding-left: 8px; border-left: 1px solid #e5dcd6; }
 .room-catalog-variants > button { width: 100%; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: #75665d; font: 400 10px/1.4 var(--font-manrope),Arial,sans-serif; text-align: left; cursor: pointer; }
 .room-catalog-category button:hover { color: var(--catalog-burgundy); background: #f7f0f2; }
+.room-catalog-variants > .room-catalog-custom-cabinet { padding: 7px 8px; border-radius: 6px; color: var(--catalog-burgundy); font: 600 10px/1.4 var(--font-manrope),Arial,sans-serif; text-decoration: none; }
+.room-catalog-custom-cabinet:is(:hover,:focus-visible) { background: #f7f0f2; text-decoration: underline; }
 .room-catalog-colors .room-catalog-variants { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; }
 .room-catalog-colors .room-catalog-variants > small { padding: 8px; color: #8b7b72; line-height: 1.5; }
 .room-catalog-search-note { margin: 0 0 12px; color: #8b7b72; font-size: 11px; line-height: 1.5; }

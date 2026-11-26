@@ -20,6 +20,7 @@ const brandLogos:Record<string,string> = {"brand:fuga":"/catalog-brands/fuga.png
 
 export default function FurnitureCatalogPage({projectName,roomName,selectedIds=[],onClose,onSelect,initialCategory="sofa",requiredFormat="",actionLabel,surfaceDetails=false,surfaceOnly=false,planning3D=false,prefer3D=false,onCustomCabinet}:{projectName?:string;roomName?:string;selectedIds?:string[];onClose?:()=>void;onSelect?:(product:CatalogProduct,category:string)=>void;initialCategory?:string;requiredFormat?:string;actionLabel?:string;surfaceDetails?:boolean;surfaceOnly?:boolean;planning3D?:boolean;prefer3D?:boolean;onCustomCabinet?:(kind:"dresser"|"tv_stand")=>void}) {
   const browseOnly = !onClose;
+  const showIndividualCabinets = !surfaceOnly && (browseOnly || !!onCustomCabinet);
   const categories = browseOnly ? furnitureCatalogCategories.filter(({ type }) => !["technical_light", "porcelain", "sanitary"].includes(type)) : furnitureCatalogCategories;
   const [filters,setFilters]=useState<Filters>(()=>({...initialFilters,format:requiredFormat,sort:surfaceOnly&&surfaceDetails?"price_asc":prefer3D?"model3d_first":"",type:furnitureCatalogCategories.some(c=>c.type===initialCategory)?initialCategory:"sofa"}));
   const coveringHistory=useCoveringHistory();
@@ -32,7 +33,8 @@ export default function FurnitureCatalogPage({projectName,roomName,selectedIds=[
   const [categorySubtypes,setCategorySubtypes]=useState<Record<string,string[]>>({});
   const [categoryColors,setCategoryColors]=useState<Record<string,string[]>>({});
   const [categoryCounts,setCategoryCounts]=useState<Record<string,number>>({});
-  const [expandedCategory,setExpandedCategory]=useState<string|null>(null);
+  const cabinetCategory = browseOnly && (initialCategory === "dresser" || initialCategory === "tv_stand") ? initialCategory : null;
+  const [expandedCategory,setExpandedCategory]=useState<string|null>(cabinetCategory);
   const [total,setTotal]=useState(0);const [tileFormats,setTileFormats]=useState<string[]>([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
@@ -106,15 +108,17 @@ export default function FurnitureCatalogPage({projectName,roomName,selectedIds=[
         <div className="room-catalog-filter-head"><span>ФИЛЬТРЫ</span>{filterCount>0&&<button type="button" onClick={reset}>Сбросить всё</button>}</div>
         <label className="room-catalog-available"><input type="checkbox" role="switch" checked={filters.available} onChange={event=>update({available:event.target.checked})}/><span className="room-catalog-switch-track" aria-hidden="true"/><span>В наличии</span></label>
         {planning3D&&<label className="room-catalog-available"><input type="checkbox" role="switch" checked={filters.model3d} onChange={e=>update({model3d:e.target.checked})}/><span className="room-catalog-switch-track" aria-hidden="true"/><span>Есть 3D-модель</span></label>}
-        <details className="room-catalog-types"><summary>Тип товара <span>{selectedCategory?.name}{filters.subtype?` · ${filters.subtype}`:""}</span></summary>
-          <div className="room-catalog-category-list">{categories.filter(item=>!!onCustomCabinet&&["dresser","tv_stand"].includes(item.type)||filters.brands.length!==1||categoryCounts[item.type]===undefined||categoryCounts[item.type]>0).map(item=>{
+        <details className="room-catalog-types" open={cabinetCategory ? true : undefined}><summary>Тип товара <span>{selectedCategory?.name}{filters.subtype?` · ${filters.subtype}`:""}</span></summary>
+          <div className="room-catalog-category-list">{categories.filter(item=>showIndividualCabinets&&["dresser","tv_stand"].includes(item.type)||filters.brands.length!==1||categoryCounts[item.type]===undefined||categoryCounts[item.type]>0).map(item=>{
             const expanded=expandedCategory===item.type;
+            const cabinetKind = item.type === "dresser" || item.type === "tv_stand" ? item.type : null;
             return <div className="room-catalog-category" key={item.type}>
               <button type="button" className={filters.type===item.type?"active":""} aria-expanded={expanded} aria-controls={`catalog-variants-${item.type}`} onClick={()=>{setExpandedCategory(expanded?null:item.type);if(filters.type!==item.type)update({type:item.type,subtype:""});}}>{item.name}<span aria-hidden="true">{expanded?"−":"+"}</span></button>
               {expanded&&<div className="room-catalog-variants" id={`catalog-variants-${item.type}`} role="group" aria-label={`Варианты: ${item.name}`}>
                 <button type="button" className={filters.type===item.type&&!filters.subtype?"active":""} aria-pressed={filters.type===item.type&&!filters.subtype} onClick={()=>update({type:item.type,subtype:""})}>Все варианты</button>
+                {browseOnly&&showIndividualCabinets&&cabinetKind&&<Link className="room-catalog-custom-cabinet" href={`/catalog/configurator/${cabinetKind}`}>Индивидуальный вариант</Link>}
                 {(categorySubtypes[item.type]||[]).map(value=><button type="button" key={value} className={filters.type===item.type&&filters.subtype===value?"active":""} aria-pressed={filters.type===item.type&&filters.subtype===value} onClick={()=>update({type:item.type,subtype:value})}>{value}</button>)}
-                {onCustomCabinet&&(item.type==="tv_stand"||item.type==="dresser")&&<button type="button" onClick={()=>onCustomCabinet(item.type as "dresser"|"tv_stand")}>{item.type==="tv_stand"?"Индивидуальная":"Индивидуальный вариант"}</button>}
+                {onCustomCabinet&&cabinetKind&&<button type="button" onClick={()=>onCustomCabinet(cabinetKind)}>{cabinetKind==="tv_stand"?"Индивидуальная":"Индивидуальный вариант"}</button>}
               </div>}
             </div>;
           })}</div>

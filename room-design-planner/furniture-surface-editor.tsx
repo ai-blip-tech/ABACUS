@@ -34,6 +34,7 @@ type CatalogRequest = (productId:string, options:{surfaceEditing:true})=>Promise
 const catalogId = (node:any) => node?.metadata?.catalogProductId || node?.metadata?.roomDesignFurniture?.catalog?.id;
 
 type CabinetCreation={kind:'dresser'|'tv_stand';pose:FurnitureViewPose};
+type StandaloneCabinet={category:'sideboards'|'tv';draft?:CabinetConfig;save:(configuration:CabinetConfig)=>void};
 type FurniturePlacement=(item:FurnitureItem,pose:FurnitureViewPose)=>{item:FurnitureItem;plan:MeasureDoc};
 
 export function FurnitureSurfaceMenu({requestCatalog,onOpenChange,resolvePlacement,specificationScope}:{requestCatalog:CatalogRequest;onOpenChange:(active:boolean)=>void;resolvePlacement:FurniturePlacement;specificationScope:string}) {
@@ -67,13 +68,32 @@ export function FurnitureSurfaceMenu({requestCatalog,onOpenChange,resolvePlaceme
  </>;
 }
 
-function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onClose,specificationScope}:{id:string;creation?:CabinetCreation;resolvePlacement:FurniturePlacement;requestCatalog:CatalogRequest;onClose:()=>void;specificationScope:string}) {
+export function StandaloneCabinetConfigurator({kind}:{kind:'dresser'|'tv_stand'}) {
+ const storageKey='roomdesign:catalog-cabinet:'+kind;
+ const [draft]=useState<CabinetConfig|undefined>(()=>{
+  try{
+   const stored=localStorage.getItem(storageKey);
+   if(!stored)return;
+   const configuration=JSON.parse(stored);
+   if(!Array.isArray(configuration.modules))return;
+   return configuration.modules.length?normalizeCabinetConfig(configuration):configuration;
+  }catch{return;}
+ });
+ return <FurnitureSurfaceEditor id="catalog-cabinet" specificationScope="catalog"
+  catalogSession={{category:kind==='tv_stand'?'tv':'sideboards',draft,save:configuration=>localStorage.setItem(storageKey,JSON.stringify(configuration))}}
+  onClose={()=>window.top?.location.assign('/catalog?type='+kind)}/>;
+}
+
+function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,requestCatalog,onClose,specificationScope}:{id:string;creation?:CabinetCreation;catalogSession?:StandaloneCabinet;resolvePlacement?:FurniturePlacement;requestCatalog?:CatalogRequest;onClose:()=>void;specificationScope:string}) {
  const createKind=creation?.kind;
  const dialog=useRef<HTMLDialogElement>(null);
- const node=(createKind?{name:createKind==='tv_stand'?'Индивидуальная ТВ-тумба':'Индивидуальный комод',metadata:{catalogProductId:CABINET_PRODUCT}}:useScene.getState().nodes[id as any]) as any;
+ const node=(createKind||catalogSession?{name:createKind==='tv_stand'||catalogSession?.category==='tv'?'Индивидуальная ТВ-тумба':'Индивидуальный комод',metadata:{catalogProductId:CABINET_PRODUCT}}:useScene.getState().nodes[id as any]) as any;
  const cabinet=catalogId(node)===CABINET_PRODUCT;
  const [cabinetData,setCabinetData]=useState<CabinetCatalog|null>(null);
- const [configuration,setConfiguration]=useState<CabinetConfig>(()=>normalizeCabinetConfig(node?.metadata?.modularCabinet||{modules:[newCabinet()]}));
+ const [configuration,setConfiguration]=useState<CabinetConfig>(()=>{
+  const initial=normalizeCabinetConfig(node?.metadata?.modularCabinet||{modules:[newCabinet()]});
+  return catalogSession?catalogSession.draft||{...initial,modules:[]}:initial;
+ });
  const [activeModule,setActiveModule]=useState<string|undefined>(configuration.modules[0]?.id);
  const [cabinetPanel,setCabinetPanel]=useState<CabinetPanel>('modules');
  const cabinetPanelContent=useRef<HTMLDivElement>(null);
@@ -86,7 +106,7 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
  const [catalogHeight,setCatalogHeight]=useState(390),[catalogWidth,setCatalogWidth]=useState('all'),[catalogDepth,setCatalogDepth]=useState(450);
  const [showDimensions,setShowDimensions]=useState(false);
  const dimensionControls=useRef<any>(null);
- const [category,setCategory]=useState('sideboards');
+ const [category,setCategory]=useState<string>(catalogSession?.category||'sideboards');
  const [moduleAction,setModuleAction]=useState<'add'|'replace'>('add');
  const [samples,setSamples]=useState<Sample[]>([]);
  const [model,setModel]=useState<Group|null>(null);
@@ -95,6 +115,7 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
  const [selected,setSelected]=useState<string|null>(null);
  const [error,setError]=useState('');
  const [pending,setPending]=useState(false);
+ const [savedDraft,setSavedDraft]=useState(false);
  const [specification,setSpecification]=useState<CabinetSpecification[]|null>(null);
  const [savingSpecification,setSavingSpecification]=useState(false);
  const [removingSpecification,setRemovingSpecification]=useState(false);
@@ -118,8 +139,31 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
  useEffect(()=>{
   let active=true;
   async function load() {
-   if(cabinet){const data=await cabinetCatalog();if(active){setCabinetData(data);setSamples(data.samples);const first=data.models.find(item=>item.id===configuration.modules[0]?.model);if(first){setCatalogHeight(first.heightMm);setCatalogDepth(first.depthMm);setCategory(cabinetInCategory(first,'sideboards')?'sideboards':first.categories?.[0]||'sideboards');if(isStandaloneCabinet(first))setModuleAction('replace');}}return;}
-   if(!node?.metadata?.roomDesignModelAsset)throw Error('Сначала дождитесь загрузки 3D-модели TETRA.');
+   if(cabinet){
+    const data=await cabinetCatalog();
+    if(!active)return;
+    setCabinetData(data);
+    setSamples(data.samples);
+    let first=data.models.find(item=>item.id===configuration.modules[0]?.model);
+    if(catalogSession&&!first){
+     const candidates=data.models.filter(item=>cabinetInCategory(item,catalogSession.category));
+     const available=candidates.find(item=>item.available3D);
+     first=available||candidates[0];
+     if(available&&!catalogSession.draft){
+      const module=newCabinet(available.id);
+      setConfiguration(normalizeCabinetConfig({modules:[module]}));
+      setActiveModule(module.id);
+     }
+    }
+    if(first){
+     setCatalogHeight(first.heightMm);
+     setCatalogDepth(first.depthMm);
+     setCategory(cabinetInCategory(first,'sideboards')?'sideboards':first.categories?.[0]||'sideboards');
+     if(isStandaloneCabinet(first))setModuleAction('replace');
+    }
+    return;
+   }
+   if(!node?.metadata?.roomDesignModelAsset||!requestCatalog)throw Error('Сначала дождитесь загрузки 3D-модели TETRA.');
    const baseRef=node.metadata.surfaceTextureBase||node.metadata.roomDesignModelAsset;
    const [url,result]=await Promise.all([loadAssetUrl(baseRef),requestCatalog(TETRA_PRODUCT,{surfaceEditing:true})]);
    if(!url)throw Error('Исходная модель недоступна. Откройте лист заново.');
@@ -167,6 +211,7 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
     if(missing)throw Error('Для модуля '+missing.model+' ещё не подключена 3D-модель.');
    }
    setConfiguration(next);
+   setSavedDraft(false);
    setError('');
    return true;
   }catch(reason){setError((reason as Error).message);return false;}
@@ -387,6 +432,11 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
 
  async function confirm() {
   if(pending)return;
+  if(catalogSession){
+   try{catalogSession.save(configuration);setSavedDraft(true);setError('');}
+   catch{setError('Не удалось сохранить черновик в этом браузере.');}
+   return;
+  }
   if(emptyCabinet&&!creation){
    runAsSingleSceneHistoryStep(useScene,()=>useScene.getState().deleteNodes([id as any]));
    onClose();
@@ -416,7 +466,7 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
    }
    let newCabinetNode:ReturnType<typeof plannerFurnitureNode>|undefined;
    if(creation){
-    if(!dimensions)throw Error('Не удалось определить габариты комода');
+    if(!dimensions||!resolvePlacement)throw Error('Не удалось определить место для комода.');
     const kind=creation.kind,name=cabinetTitles[firstModel?.categories?.[0]||'']||(kind==='tv_stand'?'Индивидуальная ТВ-тумба':'Индивидуальный комод');
     const furniture:FurnitureItem={id:crypto.randomUUID(),kind,name,position:[0,0],
      width:dimensions[0]*1000,height:dimensions[1]*1000,depth:dimensions[2]*1000,rotation:0,
@@ -488,7 +538,8 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
  const supportLabel=cabinetData?.supports?.find(support=>support.id===supportId)?.label;
  const fingerprint=cabinet&&!emptyCabinet?cabinetFingerprint(configuration):'';
  const isFavorite=!!specification?.some(item=>item.fingerprint===fingerprint);
- const cabinetStatus=pending?'Сохраняем композицию…':savingSpecification?'Добавляем в спецификацию…':preparingSpecification?'Готовим PowerPoint…':assembling?'Обновляем 3D-модель…':'';
+ const noCategoryModels=catalogSession&&cabinetData&&!catalogueModels.some(item=>item.available3D);
+ const cabinetStatus=pending?'Сохраняем композицию…':savingSpecification?'Добавляем в спецификацию…':preparingSpecification?'Готовим PowerPoint…':assembling?'Обновляем 3D-модель…':savedDraft?'Черновик сохранён в этом браузере.':noCategoryModels?'Для этого типа товара пока нет 3D-моделей. Можно посмотреть модули.':'';
  async function addToSpecification(){
   if(!specification||isFavorite||specificationBusy||pending||assembling||!model||!capturePhoto.current||!cabinetData||!firstModel||!price)return;
   setSavingSpecification(true);
@@ -577,12 +628,12 @@ function FurnitureSurfaceEditor({id,creation,resolvePlacement,requestCatalog,onC
  }} onCancel={event=>{event.preventDefault();if(!pending)onClose();}}>
   <header className={cabinet?'rd-cabinet-bar':undefined}>
    {cabinet&&<><span className="rd-cabinet-wordmark">ROOM DESIGN</span><h2>Конфигуратор мебели</h2></>}
-   <button type="button" disabled={pending} onClick={onClose}>Назад к плану</button>
+   <button type="button" disabled={pending} onClick={onClose}>{catalogSession?'Назад в каталог':'Назад к плану'}</button>
    {cabinet&&<CabinetFavorites items={specification} busy={specificationBusy} onRemove={removeFromSpecification}/>}
    {cabinet?<div className="rd-cabinet-category"><span>Тип товара</span><CabinetSelect label="Тип товара" value={category}
     onChange={browseCategory} options={Object.entries(cabinetCategoryLabels).map(([value,label])=>({value,label}))}/></div>:<h2>{node?.name||'TETRA'}</h2>}
    {cabinet&&<button type="button" className="rd-cabinet-print" aria-label="Скачать коммерческое предложение PowerPoint" title={specification?.length?'Скачать PowerPoint':'Добавьте комод в спецификацию'} disabled={!specification?.length||specificationBusy} onClick={()=>void downloadSpecification()}>▤</button>}
-   <button type="button" disabled={pending||assembling||(emptyCabinet?!!creation:!model)} onClick={()=>void confirm()}>{emptyCabinet&&!creation?'Удалить изделие':cabinet?'Сохранить':'ОК'}</button>
+   <button type="button" disabled={pending||assembling||(emptyCabinet?!!creation||!!noCategoryModels:!model)} onClick={()=>void confirm()}>{emptyCabinet&&!creation&&!catalogSession?'Удалить изделие':cabinet?'Сохранить':'ОК'}</button>
   </header>
   <div className={cabinet?'rd-cabinet-workspace':'rd-furniture-texture-workspace'}>
   <aside className={cabinet?'rd-cabinet-sidebar':undefined}>
