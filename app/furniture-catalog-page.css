@@ -60,3 +60,35 @@
 .room-catalog-page.room-catalog-surfaces .room-catalog-range input{min-width:0;width:100%;height:30px;padding:5px 9px;font-size:11px;border:1px solid #ded6ce;border-radius:999px}
 .room-catalog-page.room-catalog-surfaces .room-catalog-results{min-width:0;width:100%}
 @media(max-width:520px){.room-catalog-page.room-catalog-surfaces .room-catalog-filters{grid-template-columns:80px minmax(0,1fr) minmax(0,1fr);gap:8px;padding:9px}.room-catalog-page.room-catalog-surfaces .room-catalog-available{font-size:10px}.room-catalog-page.room-catalog-surfaces .room-catalog-range input{padding:5px;font-size:10px}}
+
+.room-catalog-browse .room-catalog-header {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.room-catalog-home {
+  justify-self: start;
+  padding: 9px 14px;
+  border: 1px solid #ddd0c7;
+  border-radius: 999px;
+  color: inherit;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.room-catalog-home:hover,
+.room-catalog-home:focus-visible {
+  border-color: var(--catalog-burgundy);
+  color: var(--catalog-burgundy);
+}
+
+@media (max-width: 640px) {
+  .room-catalog-browse .room-catalog-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .room-catalog-browse .room-catalog-header > div {
+    text-align: left;
+  }
+}

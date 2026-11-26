@@ -2,9 +2,9 @@ import {tileDesigns,matchesTileDesign,prioritizeRecent} from '@/lib/tile-design'
 import {floorTileFromProduct} from "@/lib/floor-tile-product";
 import { catalogHasModel3D, catalogModelUrl } from "@/lib/catalog-model3d";
 import { matchesCatalogType } from "@/lib/catalog-filter";
-import { FURNITURE_CATALOG_SOURCES } from "@/lib/furniture-catalog";
+import { FURNITURE_CATALOG_SOURCES, loadFurnitureCatalog } from "@/lib/furniture-catalog";
 import {loadSurfaceCatalog,surfaceCatalogNotice} from "@/lib/surface-catalog";
-import { loadStudioCatalog } from "@/lib/studio-catalog";
+import { catalogProductHasPhoto, loadStudioCatalog } from "@/lib/studio-catalog";
 import { matchesCatalogSearch, catalogDiscount } from "@/lib/catalog-search";
 import { matchesCatalogFeature } from "@/lib/catalog-features";
 import { furnitureCatalogNavigation, matchesFurnitureBrand, matchesCatalogColor } from "@/lib/furniture-catalog-navigation";
@@ -12,6 +12,7 @@ const normalize = (value = "") => value.toLocaleLowerCase("ru-RU").replace(/ё/g
 
 export async function GET(request: Request) {
   const search = new URL(request.url).searchParams;
+  const scope = search.get("scope");
   const ids = new Set((search.get("ids") || "").split(",").map((id) => id.trim()).filter(Boolean));
   const type = search.get("type") || "sofa";
   const query = normalize(search.get("q") || "");
@@ -42,7 +43,14 @@ export async function GET(request: Request) {
   const limit = Math.min(30, Math.max(6, Number(search.get("limit")) || 18));
 
   try {
-    const { products:loadedProducts, unavailableSources } = await ((search.get("scope")==="surfaces"||type==="porcelain"&&!query&&!ids.size)?loadSurfaceCatalog().then(products=>({products,unavailableSources:[]})):loadStudioCatalog());
+    const { products:sourceProducts, unavailableSources } = await (scope === "furniture"
+      ? loadFurnitureCatalog()
+      : (scope === "surfaces" || (type === "porcelain" && !query && !ids.size))
+        ? loadSurfaceCatalog().then(products => ({ products, unavailableSources: [] }))
+        : loadStudioCatalog());
+    const loadedProducts = scope === "furniture" ? sourceProducts.filter(product =>
+      catalogProductHasPhoto(product) && !matchesCatalogType(product, "porcelain", product._trail || "") &&
+      !matchesCatalogType(product, "sanitary", product._trail || "")) : sourceProducts;
     const products=search.get("covering")==="1"?loadedProducts.map(p=>{if(!matchesCatalogType(p,'porcelain',p._trail||''))return p;try{const tile=floorTileFromProduct(p);return{...p,catalogImage:p.image,widthMm:tile.widthMm,depthMm:tile.heightMm,heightMm:tile.thicknessMm||null,price:tile.price||0,oldPrice:0};}catch{return p;}}):loadedProducts;
     const navigation = furnitureCatalogNavigation(products,{type,brands:selectedSources,query});
     // Facets describe the full available assortment, independent of pagination or active filters.
@@ -86,8 +94,8 @@ export async function GET(request: Request) {
     const pageProducts = selectedProducts.map(({ _trail, _updatedAt, ...product }) => ({ ...product, canonicalUrl: product.url, updatedAt: _updatedAt, provenance: product.source === "gomoon" ? "gomoon_yml" : product.source === "leve-home" ? "leve_home_yml" : "norrmobler_yml" }));
     return Response.json({
       products: pageProducts, tileFormats, tileDesigns:tileDesignOptions, total: matched.length, page, limit, subtypes, ...navigation,
-      brands: [...FURNITURE_CATALOG_SOURCES, {id:"gomoon",name:"GoMoon"}].map(({ id, name }) => ({ id, name, available: !unavailableSources.includes(id) })),
-      unavailableSources, catalogNotice:surfaceCatalogNotice(),
+      brands: (scope === "furniture" ? FURNITURE_CATALOG_SOURCES : [...FURNITURE_CATALOG_SOURCES, {id:"gomoon",name:"GoMoon"}]).map(({ id, name }) => ({ id, name, available: !unavailableSources.includes(id) })),
+      unavailableSources, catalogNotice:scope === "furniture" ? "" : surfaceCatalogNotice(),
     });
   } catch {
     return Response.json({ error: "Каталог временно недоступен. Попробуйте ещё раз." }, { status: 502 });

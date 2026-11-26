@@ -17,14 +17,18 @@ test("Ono stays off the video landing and remains floating on application pages"
   }
 });
 
-test("3D preview actions stay inert and the first navigation action opens project entry", async ({ page }) => {
+test("homepage has one text-only 3D action after the how-it-works link and opens project entry", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".home-model3d-cta").click();
-  await page.locator(".home-model3d-nav").click();
+  const navigation = page.getByRole("navigation", {name:"Главная навигация"});
+  const modelAction = page.getByRole("button", {name:/Создать 3D[ -]модель/});
+  await expect(modelAction).toHaveCount(1);
+  await expect(navigation.getByRole("button", {name:"Создать 3D модель", exact:true})).toBeVisible();
+  await expect(modelAction.locator("xpath=preceding-sibling::*[1]")).toHaveText("Как это работает");
+  await expect(modelAction).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await modelAction.click();
   await expect(page).toHaveURL("/");
   await expect(page.getByRole("heading", {name:"Создайте аккаунт"})).toHaveCount(0);
-  await expect(page.locator(".templates-nav nav > :first-child")).toHaveText("Начать проект");
-  await page.locator(".home-nav-start").click();
+  await navigation.getByRole("button", {name:"Начать проект", exact:true}).click();
   await expect(page.getByRole("heading", {name:"Создайте аккаунт"})).toBeVisible();
 });
 
@@ -84,7 +88,7 @@ test("homepage keeps one compact project action and no audience switch on mobile
   await expect(page.locator(".home-project-action>button")).toBeVisible();
   await expect(page.locator(".home-project-copy")).toBeHidden();
   await expect(page.locator(".home-audience-switch")).toHaveCount(0);
-  await expect(page.locator(".templates-nav nav")).toBeHidden();
+  await expect(page.getByRole("navigation", {name:"Главная навигация"}).getByRole("button", {name:"Создать 3D модель", exact:true})).toBeVisible();
 });
 
 test("homepage hero stays inside the viewport at the five acceptance sizes", async ({ page }) => {

@@ -65,7 +65,6 @@ function Model3DHomepageHero() {
         <p className="home-model3d-eyebrow">От фотографии — к объёму</p>
         <h1 id="home-hero-title">Создай 3D модель<br />по фото</h1>
         <p className="home-model3d-description">Один референс. Новый ракурс.<br />Преврати идею в модель, которую можно рассмотреть со всех сторон.</p>
-        <button type="button" className="home-model3d-cta home-primary-cta">Создать 3D модель <span aria-hidden="true">→</span></button>
       </div>
       <button type="button" className="home-model3d-playback" onClick={togglePlayback} aria-label={paused ? 'Продолжить видео' : 'Приостановить видео'}>
         {paused ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z" /></svg> : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14" /></svg>}
@@ -116,9 +115,13 @@ export default function TemplatesHome({ accountControl, onStartProject }: { acco
         <Link className="templates-wordmark room-design-wordmark" href="/" aria-label="ROOM DESIGN — на главную">ROOM DESIGN</Link>
         <i aria-hidden="true" />
         <nav aria-label="Главная навигация">
-          <button type="button" className="home-nav-start" onClick={onStartProject}>Начать проект</button><Link href="/templates">Шаблоны</Link><a href="#templates">Возможности</a><a href="#как-это-работает">Как это работает</a>
+          <Link href="/catalog" className="home-nav-catalog">Каталог</Link>
+          <Link href="/templates">Шаблоны</Link>
+          <button type="button" className="home-nav-start" onClick={onStartProject}>Начать проект</button>
+          <a href="#как-это-работает">Как это работает</a>
+          <button type="button" className="home-model3d-nav">Создать 3D модель</button>
         </nav>
-        <div className="templates-nav-actions"><button type="button" className="home-model3d-nav"><span className="home-model3d-new">NEW</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z" /><path d="m3 7 9 5 9-5M12 12v10" /></svg><span>Создать 3D-модель</span></button>{accountControl}</div>
+        <div className="templates-nav-actions">{accountControl}</div>
       </header>
 
       <Model3DHomepageHero />
