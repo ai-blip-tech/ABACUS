@@ -1,0 +1,89 @@
+:root {
+  color-scheme: light;
+  color: #30251f;
+  background: #f5f2ed;
+  font: 14px/1.4 Arial, sans-serif;
+}
+
+body { margin: 0; }
+
+.proposal-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px clamp(16px, 5vw, 64px);
+  background: #fffdf9;
+  border-bottom: 1px solid #e1dbd1;
+}
+
+.proposal-toolbar h1 {
+  margin: 0;
+  font: 400 clamp(20px, 3vw, 27px)/1.1 Georgia, serif;
+}
+
+.proposal-download {
+  padding: 10px 16px;
+  border-radius: 24px;
+  background: #92142d;
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.proposal-download:hover { background: #711024; }
+
+.proposal-status {
+  margin: 24px auto;
+  padding: 0 16px;
+  text-align: center;
+}
+
+.proposal-status[role="alert"] { color: #92142d; }
+
+.proposal-slides {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px 16px 40px;
+}
+
+.proposal-slide {
+  position: relative;
+  container-type: inline-size;
+  width: min(100%, 1040px);
+  aspect-ratio: 11.6929 / 8.2677;
+  margin-inline: auto;
+  overflow: hidden;
+  box-shadow: 0 2px 14px #30251f20;
+}
+
+.proposal-slide > * { position: absolute; }
+
+.proposal-slide-text {
+  display: grid;
+  align-content: center;
+  overflow: hidden;
+  white-space: pre-line;
+  line-height: 1.14;
+}
+
+.proposal-slide-table {
+  table-layout: fixed;
+  border-collapse: collapse;
+  color: #1a1917;
+  line-height: 1.1;
+}
+
+.proposal-slide-table :is(td, th) {
+  padding: .12cqw;
+  overflow-wrap: anywhere;
+  border: 1px solid #ddd6cb;
+  text-align: left;
+}
+
+.proposal-slide-table th { background: #f7f5f1; }

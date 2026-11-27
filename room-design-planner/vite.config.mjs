@@ -39,6 +39,6 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'esnext',
     license: {fileName: 'THIRD-PARTY-LICENSES.md'},
-    rollupOptions: {input: path('./planning-bridge.html')},
+    rollupOptions: {input: [path('./planning-bridge.html'), path('./cabinet-proposal.html')]},
   },
 });

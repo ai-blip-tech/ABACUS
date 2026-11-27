@@ -19,7 +19,8 @@ import {CabinetDimensions} from './cabinet-dimensions';
 import {CabinetCompositionModule} from './cabinet-composition-module';
 import {CabinetOrder} from './cabinet-order';
 import type {CabinetOrderProduct} from '../lib/cabinet-order';
-import {cabinetEuro,cabinetRateLabel,cabinetRubles,fetchCabinetEuroRate,useCabinetEuroRate} from './cabinet-currency';
+import {cabinetEuro,cabinetRateLabel,cabinetRubles,useCabinetEuroRate} from './cabinet-currency';
+import {openCabinetProposal} from './cabinet-proposal-window';
 import {CabinetFavorites} from './cabinet-favorites';
 import {CabinetPhoto} from './cabinet-photo';
 import {cabinetFingerprint,cabinetSpecificationFinishes,loadCabinetSpecification,removeCabinetSpecification,restoreCabinetSpecificationFinishes,saveCabinetSpecification,type CabinetSpecification} from './cabinet-specification';
@@ -632,21 +633,19 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
   try{await removeFromSpecification(favoriteItem);}
   catch{setError('Не удалось удалить товар из избранного. Попробуйте ещё раз.');}
  }
- async function downloadSpecification(){
+ async function previewSpecification(){
   if(!specification?.length||specificationBusy)return;
   setError('');
   setPreparingSpecification(true);
   try{
-   const legacy=specification.some(item=>item.modules.some(module=>!module.finishes));
-   const catalog=legacy?(cabinetData||await cabinetCatalog().catch(()=>null)):null;
-   const items=catalog?specification.map(item=>restoreCabinetSpecificationFinishes(item,catalog)):specification;
-   const [{downloadCabinetSpecification},rate]=await Promise.all([
-    import('./cabinet-specification-pptx'),
-    fetchCabinetEuroRate().catch(()=>euroRate?{...euroRate,stale:true}:null),
-   ]);
-   await downloadCabinetSpecification(items,rate);
+   await openCabinetProposal(async()=>{
+    const legacy=specification.some(item=>item.modules.some(module=>!module.finishes));
+    const catalog=legacy?(cabinetData||await cabinetCatalog().catch(()=>null)):null;
+    const items=catalog?specification.map(item=>restoreCabinetSpecificationFinishes(item,catalog)):specification;
+    return {items,rate:euroRate};
+   });
   }catch(cause){
-   setError((cause as Error).message||'Не удалось подготовить коммерческое предложение PowerPoint.');
+   setError((cause as Error).message||'Не удалось открыть предпросмотр PowerPoint.');
   }finally{
    setPreparingSpecification(false);
   }
@@ -689,7 +688,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
    {cabinet&&<CabinetFavorites items={specification} rate={euroRate} busy={specificationBusy} onRemove={removeFromSpecification}/>}
    {cabinet?<div className="rd-cabinet-category"><span>Тип товара</span><CabinetSelect label="Тип товара" value={category}
     onChange={browseCategory} options={Object.entries(cabinetCategoryLabels).map(([value,label])=>({value,label}))}/></div>:<h2>{node?.name||'TETRA'}</h2>}
-   {cabinet&&<button type="button" className="rd-cabinet-print" aria-label="Скачать коммерческое предложение PowerPoint" title={specification?.length?'Скачать PowerPoint':'Добавьте комод в спецификацию'} disabled={!specification?.length||specificationBusy} onClick={()=>void downloadSpecification()}>▤</button>}
+   {cabinet&&<button type="button" className="rd-cabinet-print" aria-label="Открыть предпросмотр PowerPoint" title={specification?.length?'Открыть PowerPoint в новой вкладке':'Добавьте товар в спецификацию'} disabled={!specification?.length||specificationBusy} onClick={()=>void previewSpecification()}>▤</button>}
    <button type="button" disabled={pending||assembling||(emptyCabinet?!!creation||!!noCategoryModels:!model)} onClick={()=>void confirm()}>{emptyCabinet&&!creation&&!catalogSession?'Удалить изделие':cabinet?'Сохранить':'ОК'}</button>
   </header>
   <div className={cabinet?'rd-cabinet-workspace':'rd-furniture-texture-workspace'}>
