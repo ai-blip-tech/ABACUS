@@ -1,4 +1,5 @@
 export const MAX_CABINET_WIDTH_MM = 2600;
+export const CABINET_SIZE_CONFLICT = 'Объединять можно только модули одинаковой высоты и глубины.';
 export const CABINET_BASE_HEIGHT_MM = 35;
 export const CABINET_BASE_COLOR = '#45464a';
 export const CABINET_GLASS_THICKNESS_MM = 4;
@@ -29,7 +30,7 @@ export function cabinetCombinationConflict(first,second) {
   return 'ТВ-модули и модули комодов собираются в отдельные композиции.';
  }
  if(first.heightMm!==second.heightMm||first.depthMm!==second.depthMm){
-  return 'Объединять можно только модули одинаковой высоты и глубины.';
+  return CABINET_SIZE_CONFLICT;
  }
 }
 

@@ -2,7 +2,7 @@ import {plannerFurnitureNode} from '../lib/planning-plan/planner-adapter';
 import type {FurnitureViewPose} from '../lib/planning-plan/furniture-view-placement';
 import type {FurnitureItem} from '../lib/planning-plan/furniture';
 import type {MeasureDoc} from '../lib/measured-plan/measure-model';
-import React, {useEffect,useMemo,useRef,useState} from 'react';
+import React, {useEffect,useId,useMemo,useRef,useState} from 'react';
 import {Canvas, type ThreeEvent} from '@react-three/fiber';
 import {Environment,Lightformer,OrbitControls} from '@react-three/drei';
 import {loadAssetUrl, saveAsset, useScene, emitter, nodeRegistry, runAsSingleSceneHistoryStep} from '@pascal-app/core';
@@ -11,7 +11,7 @@ import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {Box3, Color, Group, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3} from 'three';
 import {CABINET_PRODUCT,CABINET_GEOMETRY_VERSION,cabinetCatalog,assembleCabinets,newCabinet,cabinetBounds,cabinetURL,normalizeCabinetConfig,cabinetWidthMm,type CabinetConfig,type CabinetCatalog,type GlassPart} from './modular-cabinets';
 import type {CabinetFrontFinish} from '../lib/planning-plan/modular-cabinet';
-import {MAX_CABINET_WIDTH_MM,cabinetCategoryLabels,cabinetCombinationConflict,cabinetInCategory,isStandaloneCabinet,slabCut} from './cabinet-layout.mjs';
+import {CABINET_SIZE_CONFLICT,MAX_CABINET_WIDTH_MM,cabinetCategoryLabels,cabinetCombinationConflict,cabinetInCategory,isStandaloneCabinet,slabCut} from './cabinet-layout.mjs';
 import {cabinetFrontFinish,glassCabinetArticle,isFixedCabinetFront} from './cabinet-front-finishes.mjs';
 import {cabinetMetalFinishId} from './cabinet-metal-finishes.mjs';
 import {cabinetRetailPrice,cabinetSupportPrice} from './cabinet-pricing.mjs';
@@ -101,6 +101,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  const [activeModule,setActiveModule]=useState<string|undefined>(configuration.modules[0]?.id);
  const [cabinetPanel,setCabinetPanel]=useState<CabinetPanel>('modules');
  const cabinetPanelContent=useRef<HTMLDivElement>(null);
+ const sizeWarningId=useId();
  const emptyCabinet=cabinet&&!configuration.modules.length;
  const [partialFront,setPartialFront]=useState(false);
  const [frontIndex,setFrontIndex]=useState<number|null>(null);
@@ -539,6 +540,20 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  const price=cabinetData&&!emptyCabinet&&cabinetRetailPrice(configuration,cabinetData);
  const rublePrice=price&&'priceInCents' in price?cabinetRubles(price.priceInCents,euroRate):undefined;
  const replacing=!emptyCabinet&&(moduleAction==='replace'||standalone||browsingStandalone);
+ const catalogCards=cabinetPanel==='modules'?shownModels.map(item=>{
+  const replacedWidth=replacing?(activeModel?.widthMm||0):0;
+  const tooWide=width-replacedWidth+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,configuration.frontType==='glass'||standalone||browsingStandalone||item.fixedFront?MAX_CABINET_WIDTH_MM:cabinetData?.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM);
+  let conflict;
+  for(const module of configuration.modules){
+   if(replacing&&module.id===activeModule)continue;
+   const existing=cabinetData?.models.find(model=>model.id===module.model);
+   if(existing)conflict=cabinetCombinationConflict(existing,item);
+   if(conflict)break;
+  }
+  const missing=item.available3D===false;
+  return {item,tooWide,conflict,missing,sizeConflict:!missing&&conflict===CABINET_SIZE_CONFLICT};
+ }):[];
+ const showSizeWarning=catalogCards.some(card=>card.sizeConflict);
  const metalFinish=cabinetMetalFinishId(configuration.support?.color);
  const supportKind=configuration.support?.kind;
  const supportId=supportKind==='legs'?configuration.support?.legId:supportKind==='base'?'BS':supportKind;
@@ -717,25 +732,23 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
     <button type="button" aria-pressed={moduleAction==='add'} onClick={()=>setModuleAction('add')}>Добавить</button>
    </div>}
    {browsingStandalone&&configuration.modules.length>1&&<p>Оставьте один модуль, чтобы заменить его настенным шкафом или баром.</p>}
+   {showSizeWarning&&<div className="rd-cabinet-size-warning" id={sizeWarningId} role="alert">
+    <strong>{CABINET_SIZE_CONFLICT}</strong>
+    <span className="rd-cabinet-size-warning-keyboard">В разделе «Состав» по очереди выделите текущие модули и нажмите <kbd>Delete</kbd>.</span>
+    <span className="rd-cabinet-size-warning-touch">В разделе «Состав» выделите модуль, удерживайте его и нажмите «Удалить модуль». Повторите для остальных модулей.</span>
+   </div>}
    <div className="rd-cabinet-model-cards">
-    {shownModels.map(item=>{
-     const replacedWidth=replacing?(activeModel?.widthMm||0):0;
-     const tooWide=width-replacedWidth+item.widthMm>Math.min(MAX_CABINET_WIDTH_MM,configuration.frontType==='glass'||standalone||browsingStandalone||item.fixedFront?MAX_CABINET_WIDTH_MM:cabinetData.samples.find(sample=>sample.id===configuration.front)?.slabWidthMm||MAX_CABINET_WIDTH_MM);
-     let conflict;
-     for(const module of configuration.modules){
-      if(replacing&&module.id===activeModule)continue;
-      const existing=cabinetData?.models.find(model=>model.id===module.model);
-      if(existing)conflict=cabinetCombinationConflict(existing,item);
-      if(conflict)break;
-     }
-     const missing=item.available3D===false;
-     return <button type="button" key={item.id} disabled={pending||tooWide||!!conflict||missing} aria-label={(!replacing?'Добавить':'Заменить на')+' модуль '+item.id} title={conflict||(missing?'Ожидается 3D-модель по этой схеме':tooWide?'Достигнута максимальная ширина композиции':undefined)} onClick={()=>chooseModule(item.id)}>
+    {catalogCards.map(({item,tooWide,conflict,missing,sizeConflict})=>(
+     <button type="button" key={item.id} disabled={pending||tooWide||!!conflict||missing}
+      className={sizeConflict?'rd-cabinet-size-blocked':undefined} aria-describedby={sizeConflict?sizeWarningId:undefined}
+      aria-label={(!replacing?'Добавить':'Заменить на')+' модуль '+item.id}
+      title={conflict||(missing?'Ожидается 3D-модель по этой схеме':tooWide?'Достигнута максимальная ширина композиции':undefined)} onClick={()=>chooseModule(item.id)}>
       {item.thumbnail&&<img src={cabinetURL(item.thumbnail)} alt="" loading="lazy"/>}
       <b>{item.fixedFront==='transparent-glass'?'Прозрачная дверца':'Модуль '+item.widthMm/10+' см'}</b><small>{item.widthMm/10} × {item.heightMm/10} × {item.depthMm/10} см</small><small>арт. {item.id}</small>
       {category==='tv'&&<small>{item.categories?.includes('tv')?'ТВ-модуль':'Модуль комода'}</small>}
       {missing&&<small>Ожидается 3D</small>}
-     </button>;
-    })}
+     </button>
+    ))}
    </div>
    </div>
   </section>}

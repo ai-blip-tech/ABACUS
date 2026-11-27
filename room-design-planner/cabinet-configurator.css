@@ -534,6 +534,44 @@
   margin-top: 10px;
 }
 
+.rd-cabinet-size-warning {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--cabinet-ruby);
+  border-inline-start-width: 4px;
+  border-radius: 8px;
+  background: var(--cabinet-paper);
+  font-size: 13px;
+}
+
+.rd-cabinet-size-warning strong {
+  color: var(--cabinet-ruby);
+}
+
+.rd-cabinet-size-warning kbd {
+  padding: 0 4px;
+  border: 1px solid var(--cabinet-rule);
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 700;
+}
+
+.rd-cabinet-size-warning-touch {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .rd-cabinet-size-warning-keyboard {
+    display: none;
+  }
+
+  .rd-cabinet-size-warning-touch {
+    display: block;
+  }
+}
+
 .rd-cabinet-finish-field {
   display: flex;
   align-items: center;
@@ -599,6 +637,11 @@
     border-color: var(--cabinet-ruby-hover);
     background-color: var(--cabinet-ruby-hover);
     color: white;
+  }
+
+  .rd-cabinet-editor .rd-cabinet-model-cards .rd-cabinet-size-blocked:disabled:hover {
+    border-color: var(--cabinet-ruby);
+    background-color: var(--cabinet-paper);
   }
 }
 
