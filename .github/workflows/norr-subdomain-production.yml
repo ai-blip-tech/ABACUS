@@ -186,8 +186,10 @@ jobs:
 
             if [ "$NORR_HOSTNAME" = "configurator.norrmobler.ru" ]; then
               curl --fail --silent --show-error --max-time 20 \
+                --retry 6 --retry-delay 1 --retry-all-errors \
+                --noproxy "$NORR_HOSTNAME" \
                 --resolve "$NORR_HOSTNAME:443:127.0.0.1" \
-                "https://$NORR_HOSTNAME/" > "$staging_dir/configurator.html"
+                --output "$staging_dir/configurator.html" "https://$NORR_HOSTNAME/"
               grep -F '/room-design-planner/view?cabinet=dresser' "$staging_dir/configurator.html" >/dev/null
             else
               curl --fail --silent --show-error --max-time 20 \
