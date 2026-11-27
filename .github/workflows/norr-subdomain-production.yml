@@ -261,8 +261,8 @@ jobs:
           asset=$(sed -nE 's#.*src="(/_next/static/room-design-planner/assets/[^"]+\.js)".*#\1#p' /tmp/norr-configurator-view.html)
           test -n "$asset"
           curl -fsS --max-time 30 "$base$asset" > /dev/null
-          for path in /cabinets/catalog.json /api/cabinet-library/current/manifest.json /api/cabinet-euro-rate /proposal/cover-brand-official.svg; do
-            curl -fsS --max-time 20 "$base$path" >/dev/null
+          for asset_path in /_next/static/room-design-planner/cabinets/catalog.json /api/cabinet-library/current/manifest.json /api/cabinet-euro-rate /proposal/cover-brand-official.svg; do
+            curl -fsS --max-time 20 "$base$asset_path" >/dev/null
           done
           test "$(curl -sS --max-time 20 -o /dev/null -w '%{redirect_url}' "$base/catalog")" = "https://norrmobler.ru/catalog/mebel/komody/"
           test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/projects")" = "404"
