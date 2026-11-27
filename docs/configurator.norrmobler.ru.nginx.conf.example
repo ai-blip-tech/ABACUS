@@ -1,0 +1,89 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name configurator.norrmobler.ru;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://configurator.norrmobler.ru$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name configurator.norrmobler.ru;
+
+    ssl_certificate /etc/letsencrypt/live/configurator.norrmobler.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/configurator.norrmobler.ru/privkey.pem;
+
+    client_max_body_size 3m;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-Port 443;
+
+    location = / {
+        proxy_pass http://127.0.0.1:3000/catalog/configurator/dresser;
+    }
+
+    location = /catalog {
+        return 302 https://norrmobler.ru/catalog/mebel/komody/;
+    }
+
+    location = /room-design-planner/view {
+        if ($arg_cabinet != dresser) { return 404; }
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location = /api/it/config {
+        default_type application/json;
+        return 200 '{"enabled":false}';
+    }
+
+    location = /api/cabinet-euro-rate {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location = /api/cabinet-order {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location /api/cabinet-library/ {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location ~ ^/_next/static/room-design-planner/[^/]+\.html$ {
+        return 404;
+    }
+
+    location /_next/static/ {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location /cabinets/ {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location = /proposal/cover-brand-official.svg {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location = /proposal/norr-circle.svg {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location ~ ^/(favicon[^/]*|apple-touch-icon\.png|site\.webmanifest)$ {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location / {
+        return 404;
+    }
+}

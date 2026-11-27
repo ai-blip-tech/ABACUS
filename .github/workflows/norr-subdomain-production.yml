@@ -11,6 +11,13 @@ on:
         description: "Full SHA that must already be running in production"
         required: true
         type: string
+      subdomain:
+        description: "NORR endpoint to configure"
+        type: choice
+        default: roomdesign
+        options:
+          - roomdesign
+          - configurator
 
 permissions:
   contents: read
@@ -32,13 +39,30 @@ jobs:
       - name: Check out approved server configuration
         uses: actions/checkout@v4
 
+      - name: Select NORR hostname
+        id: site
+        env:
+          NORR_SUBDOMAIN: ${{ inputs.subdomain }}
+        run: |
+          case "$NORR_SUBDOMAIN" in
+            roomdesign|"")
+              echo "hostname=roomdesign.norrmobler.ru" >> "$GITHUB_OUTPUT"
+              echo "nginx_site=roomdesign-norr-subdomain" >> "$GITHUB_OUTPUT"
+              ;;
+            configurator)
+              echo "hostname=configurator.norrmobler.ru" >> "$GITHUB_OUTPUT"
+              echo "nginx_site=roomdesign-norr-configurator" >> "$GITHUB_OUTPUT"
+              ;;
+            *) exit 1 ;;
+          esac
+
       - name: Upload staged Nginx configurations
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docs/roomdesign.norrmobler.ru.nginx.bootstrap.conf.example,docs/roomdesign.norrmobler.ru.nginx.conf.example"
+          source: "docs/${{ steps.site.outputs.hostname }}.nginx.bootstrap.conf.example,docs/${{ steps.site.outputs.hostname }}.nginx.conf.example"
           target: "/tmp/roomdesign-norr-${{ github.run_id }}"
           strip_components: 1
 
@@ -47,37 +71,39 @@ jobs:
         env:
           EXPECTED_PRODUCTION_SHA: ${{ env.EXPECTED_PRODUCTION_SHA }}
           SERVER_SETUP_RUN_ID: ${{ github.run_id }}
+          NORR_HOSTNAME: ${{ steps.site.outputs.hostname }}
+          NORR_NGINX_SITE: ${{ steps.site.outputs.nginx_site }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           command_timeout: 15m
-          envs: EXPECTED_PRODUCTION_SHA,SERVER_SETUP_RUN_ID
+          envs: EXPECTED_PRODUCTION_SHA,SERVER_SETUP_RUN_ID,NORR_HOSTNAME,NORR_NGINX_SITE
           script: |
             set -eu
             umask 077
 
             app_dir="$HOME/ABACUS"
             staging_dir="/tmp/roomdesign-norr-${SERVER_SETUP_RUN_ID}"
-            bootstrap_source="$staging_dir/roomdesign.norrmobler.ru.nginx.bootstrap.conf.example"
-            final_source="$staging_dir/roomdesign.norrmobler.ru.nginx.conf.example"
+            bootstrap_source="$staging_dir/$NORR_HOSTNAME.nginx.bootstrap.conf.example"
+            final_source="$staging_dir/$NORR_HOSTNAME.nginx.conf.example"
             available_dir="/etc/nginx/sites-available"
             enabled_dir="/etc/nginx/sites-enabled"
-            target="$available_dir/roomdesign-norr-subdomain"
-            enabled="$enabled_dir/roomdesign-norr-subdomain"
-            backup_dir="$HOME/room-design-server-backups/norr-subdomain-${SERVER_SETUP_RUN_ID}"
-            certificate_dir="/etc/letsencrypt/live/roomdesign.norrmobler.ru"
+            target="$available_dir/$NORR_NGINX_SITE"
+            enabled="$enabled_dir/$NORR_NGINX_SITE"
+            backup_dir="$HOME/room-design-server-backups/$NORR_NGINX_SITE-${SERVER_SETUP_RUN_ID}"
+            certificate_dir="/etc/letsencrypt/live/$NORR_HOSTNAME"
             previous_target="absent"
             previous_enabled="absent"
             certbot_command=""
-            committed="0"
+            rollback_armed="0"
 
             rollback() {
               result=$?
               trap - EXIT INT TERM
-              if [ "$committed" != "1" ]; then
+              if [ "$rollback_armed" = "1" ]; then
                 if [ "$previous_target" = "present" ]; then
-                  sudo install -m 0644 "$backup_dir/roomdesign-norr-subdomain" "$target"
+                  sudo install -m 0644 "$backup_dir/$NORR_NGINX_SITE" "$target"
                 else
                   sudo rm -f "$target"
                 fi
@@ -125,8 +151,8 @@ jobs:
 
             mkdir -p "$backup_dir"
             if sudo test -f "$target"; then
-              sudo cp "$target" "$backup_dir/roomdesign-norr-subdomain"
-              sudo chown "$(id -u):$(id -g)" "$backup_dir/roomdesign-norr-subdomain"
+              sudo cp "$target" "$backup_dir/$NORR_NGINX_SITE"
+              sudo chown "$(id -u):$(id -g)" "$backup_dir/$NORR_NGINX_SITE"
               previous_target="present"
             fi
             if sudo test -L "$enabled"; then
@@ -137,6 +163,7 @@ jobs:
               exit 1
             fi
 
+            rollback_armed="1"
             sudo mkdir -p /var/www/html/.well-known/acme-challenge
             sudo install -m 0644 "$bootstrap_source" "$target"
             sudo ln -sfn "$target" "$enabled"
@@ -146,7 +173,7 @@ jobs:
             if ! sudo test -f "$certificate_dir/fullchain.pem" || ! sudo test -f "$certificate_dir/privkey.pem"; then
               sudo "$certbot_command" certonly --webroot \
                 --webroot-path /var/www/html \
-                --domain roomdesign.norrmobler.ru \
+                --domain "$NORR_HOSTNAME" \
                 --non-interactive --agree-tos --keep-until-expiring
             fi
             sudo test -f "$certificate_dir/fullchain.pem"
@@ -157,19 +184,27 @@ jobs:
             sudo nginx -t
             sudo systemctl reload nginx
 
-            curl --fail --silent --show-error --max-time 20 \
-              --resolve roomdesign.norrmobler.ru:443:127.0.0.1 \
-              https://roomdesign.norrmobler.ru/api/health >/dev/null
+            if [ "$NORR_HOSTNAME" = "configurator.norrmobler.ru" ]; then
+              curl --fail --silent --show-error --max-time 20 \
+                --resolve "$NORR_HOSTNAME:443:127.0.0.1" \
+                "https://$NORR_HOSTNAME/" > "$staging_dir/configurator.html"
+              grep -F '/room-design-planner/view?cabinet=dresser' "$staging_dir/configurator.html" >/dev/null
+            else
+              curl --fail --silent --show-error --max-time 20 \
+                --resolve "$NORR_HOSTNAME:443:127.0.0.1" \
+                "https://$NORR_HOSTNAME/api/health" >/dev/null
+            fi
+            curl --fail --silent --show-error --max-time 15 https://roomdesign.com.ru/api/health >/dev/null
             test "$(git -C "$app_dir" rev-parse HEAD)" = "$EXPECTED_PRODUCTION_SHA"
             test -f "$app_dir/data/room-design.sqlite"
 
-            committed="1"
+            rollback_armed="0"
             trap - EXIT INT TERM
             rm -rf "$staging_dir"
             {
               echo "status=PASSED"
               echo "production_sha=$EXPECTED_PRODUCTION_SHA"
-              echo "hostname=roomdesign.norrmobler.ru"
+              echo "hostname=$NORR_HOSTNAME"
               echo "upstream=http://127.0.0.1:3000"
               echo "nginx_config=$target"
               echo "certificate=$certificate_dir/fullchain.pem"
@@ -179,6 +214,7 @@ jobs:
             echo "SERVER_CONFIGURATION_REPORT=$backup_dir/REPORT.txt"
 
       - name: Verify public HTTPS and both Room Design domains
+        if: ${{ inputs.subdomain != 'configurator' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -212,3 +248,25 @@ jobs:
           echo "PUBLIC_HTTPS=passed"
           echo "MAIN_DOMAIN_REGRESSION=passed"
           echo "AUTH_ROUTE_VALIDATION=passed"
+
+      - name: Verify the public NORR cabinet configurator
+        if: ${{ inputs.subdomain == 'configurator' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://configurator.norrmobler.ru"
+          curl -fsS --max-time 20 "$base/" > /tmp/norr-configurator.html
+          grep -F '/room-design-planner/view?cabinet=dresser' /tmp/norr-configurator.html >/dev/null
+          curl -fsS --max-time 20 "$base/room-design-planner/view?cabinet=dresser" > /tmp/norr-configurator-view.html
+          asset=$(sed -nE 's#.*src="(/_next/static/room-design-planner/assets/[^"]+\.js)".*#\1#p' /tmp/norr-configurator-view.html)
+          test -n "$asset"
+          curl -fsS --max-time 30 "$base$asset" > /dev/null
+          for path in /cabinets/catalog.json /api/cabinet-library/current/manifest.json /api/cabinet-euro-rate /proposal/cover-brand-official.svg; do
+            curl -fsS --max-time 20 "$base$path" >/dev/null
+          done
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{redirect_url}' "$base/catalog")" = "https://norrmobler.ru/catalog/mebel/komody/"
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/projects")" = "404"
+          curl -fsS --max-time 20 https://roomdesign.com.ru/api/health >/dev/null
+          curl -fsS --max-time 20 https://roomdesign.norrmobler.ru/api/health >/dev/null
+          echo "NORR_CONFIGURATOR_HTTPS=passed"
+          echo "EXISTING_ROOM_DESIGN_DOMAINS=passed"
