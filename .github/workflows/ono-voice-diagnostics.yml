@@ -1,35 +1,37 @@
-name: Diagnose Ono production voice
+name: Check Room Design production health
 
 on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type DIAGNOSE_ONO_VOICE"
+        description: "Type CHECK_ROOMDESIGN_HEALTH"
         required: true
         type: string
 
 permissions:
   contents: read
 
-concurrency:
-  group: roomdesign-production-diagnostics
-  cancel-in-progress: false
-
 jobs:
-  diagnose:
-    name: Read-only voice diagnostics
+  public:
+    if: ${{ inputs.confirmation == 'CHECK_ROOMDESIGN_HEALTH' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check public HTTP and TLS from another network
+        run: |
+          for url in http://roomdesign.com.ru/ https://roomdesign.com.ru/ https://roomdesign.com.ru/api/health https://configurator.norrmobler.ru/; do
+            curl -sS --connect-timeout 6 --max-time 12 -o /dev/null \
+              -w 'code=%{http_code} ip=%{remote_ip} connect=%{time_connect} tls=%{time_appconnect} total=%{time_total} %{url_effective}\n' "$url" || true
+          done
+
+  origin:
+    if: ${{ inputs.confirmation == 'CHECK_ROOMDESIGN_HEALTH' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: production-backup
     steps:
-      - name: Validate manual confirmation
-        shell: bash
-        env:
-          CONFIRMATION: ${{ inputs.confirmation }}
-        run: test "$CONFIRMATION" = "DIAGNOSE_ONO_VOICE"
-
-      - name: Inspect voice provider failures without changing production
-        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+      - name: Inspect Nginx and Room Design on the production server
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -37,24 +39,20 @@ jobs:
           command_timeout: 3m
           script: |
             set -eu
+            date -u '+%Y-%m-%dT%H:%M:%SZ'
             cd "$HOME/ABACUS"
-            test -f .env
-            test -d data
-            test -f data/room-design.sqlite
-
             echo "PRODUCTION_SHA=$(git rev-parse HEAD)"
-            echo "SITE_HEALTH=$(curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null && echo ok)"
-            if grep -q '^OPENAI_TRANSCRIBE_MODEL=' .env; then
-              sed -n 's/^OPENAI_TRANSCRIBE_MODEL=/TRANSCRIBE_MODEL=/p' .env
-            else
-              echo "TRANSCRIBE_MODEL=gpt-4o-mini-transcribe (application default)"
-            fi
-            grep -q '^OPENAI_API_KEY=.' .env && echo "OPENAI_API_KEY_PRESENT=yes" || echo "OPENAI_API_KEY_PRESENT=no"
-
-            echo "VOICE_FAILURE_LOGS_BEGIN"
-            pm2 logs roomdesign --nostream --lines 1000 2>&1 \
-              | grep -E '\[It\] Audio transcription failed|status:|code:|type:|param:|message:' \
-              | tail -n 80 \
-              | sed -E 's/(sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]*/\1[REDACTED]/g' || true
-            echo "VOICE_FAILURE_LOGS_END"
-            echo "PRODUCTION_MODIFIED=no"
+            uptime
+            free -m
+            df -h . /
+            df -i . /
+            systemctl is-active nginx || true
+            sudo -n nginx -t || true
+            ss -lnt | awk 'NR==1||$4~ /:(80|443|3000)$/'
+            pm2 jlist | node -e 'let s=""; process.stdin.on("data",x=>s+=x); process.stdin.on("end",()=>{for(const p of JSON.parse(s).filter(x=>x.name==="roomdesign"))console.log(JSON.stringify({name:p.name,pid:p.pid,state:p.pm2_env.status,restarts:p.pm2_env.restart_time,uptime:p.pm2_env.pm_uptime,memory:p.monit.memory,cpu:p.monit.cpu}));});'
+            for url in http://127.0.0.1:3000/api/health https://roomdesign.com.ru/api/health https://roomdesign.com.ru/ https://configurator.norrmobler.ru/; do
+              curl -sS --noproxy '*' --resolve roomdesign.com.ru:443:127.0.0.1 --resolve configurator.norrmobler.ru:443:127.0.0.1 \
+                --connect-timeout 5 --max-time 10 -o /dev/null \
+                -w 'code=%{http_code} ip=%{remote_ip} connect=%{time_connect} tls=%{time_appconnect} total=%{time_total} %{url_effective}\n' "$url" || true
+            done
+            sudo -n journalctl -u nginx --since '-2 hours' --no-pager -n 25 || true
