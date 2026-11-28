@@ -666,13 +666,52 @@
 }
 
 .rd-cabinet-editor .rd-cabinet-composition-module .rd-cabinet-remove-module {
+  display: none;
   position: absolute;
+  z-index: 1;
   inset: auto 7px 7px;
   min-height: 42px;
   padding: 6px;
   background: var(--cabinet-paper);
   color: var(--cabinet-ruby);
   font-weight: 600;
+}
+
+.rd-cabinet-editor .rd-cabinet-composition-module .rd-cabinet-remove-module[data-revealed='true'] {
+  display: block;
+}
+
+.rd-cabinet-remove-module svg {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rd-cabinet-editor .rd-cabinet-composition-module .rd-cabinet-remove-module {
+    display: grid;
+    place-items: center;
+    inset: 6px 6px auto auto;
+    width: 28px;
+    min-height: 28px;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .rd-cabinet-editor .rd-cabinet-composition-module:hover .rd-cabinet-remove-module:enabled,
+  .rd-cabinet-editor .rd-cabinet-composition-module .rd-cabinet-remove-module:focus-visible,
+  .rd-cabinet-editor .rd-cabinet-composition-module .rd-cabinet-remove-module[data-revealed='true'] {
+    display: grid;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .rd-cabinet-remove-module svg {
+    display: block;
+  }
+
+  .rd-cabinet-remove-module span {
+    display: none;
+  }
 }
 
 .rd-cabinet-editor .rd-furniture-texture-samples button[aria-pressed='true'] {

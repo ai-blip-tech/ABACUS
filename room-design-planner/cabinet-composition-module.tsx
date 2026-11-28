@@ -64,6 +64,12 @@ export function CabinetCompositionModule({selected,disabled,onSelect,onRemove,ch
    }}>
    {children}
   </button>
-  {selected&&showRemove&&<button type="button" className="rd-cabinet-remove-module" onClick={onRemove}>Удалить модуль</button>}
+  <button type="button" className="rd-cabinet-remove-module" data-revealed={selected&&showRemove}
+   aria-label="Удалить модуль" disabled={disabled} onClick={onRemove}>
+   <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+    <path d="m4 4 8 8m0-8-8 8"/>
+   </svg>
+   <span>Удалить модуль</span>
+  </button>
  </div>;
 }

@@ -331,11 +331,12 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
    if(individual)setModuleAction('replace');
   }
  }
- function removeActiveModule(){
-  if(pending||!activeCabinet)return;
-  const modules=configuration.modules.filter(module=>module.id!==activeModule);
+ function removeModule(moduleId:string|undefined){
+  if(pending||!moduleId)return;
+  const modules=configuration.modules.filter(module=>module.id!==moduleId);
+  if(modules.length===configuration.modules.length)return;
   if(setCabinetConfiguration({...configuration,modules})){
-   setActiveModule(modules[0]?.id);
+   if(moduleId===activeModule)setActiveModule(modules[0]?.id);
    setFrontIndex(null);
    setPartialFront(false);
    setModuleAction('add');
@@ -677,10 +678,10 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
  }
  return <dialog ref={dialog} className={'rd-furniture-surface-editor'+(cabinet?' rd-cabinet-editor':'')} aria-label="Редактор текстур мебели" onKeyDownCapture={event=>{
   const deleteKey=event.key==='Delete'||event.key==='Backspace';
-  if(!cabinet||!deleteKey||event.altKey||event.ctrlKey||event.metaKey||(event.target instanceof Element&&event.target.closest('.rd-order-page,.rd-cabinet-favorites,input,textarea,select,[role="combobox"],[role="listbox"],[contenteditable="true"]')))return;
+  if(!cabinet||!deleteKey||event.altKey||event.ctrlKey||event.metaKey||(event.target instanceof Element&&event.target.closest('.rd-order-page,.rd-cabinet-favorites,.rd-cabinet-remove-module,input,textarea,select,[role="combobox"],[role="listbox"],[contenteditable="true"]')))return;
   event.preventDefault();
   event.stopPropagation();
-  if(!event.repeat)removeActiveModule();
+  if(!event.repeat)removeModule(activeModule);
  }} onCancel={event=>{event.preventDefault();if(!pending)onClose();}}>
   <header className={cabinet?'rd-cabinet-bar':undefined}>
    {cabinet&&<><span className="rd-cabinet-wordmark">ROOM DESIGN</span><h2>Конфигуратор мебели</h2></>}
@@ -707,7 +708,7 @@ function FurnitureSurfaceEditor({id,creation,catalogSession,resolvePlacement,req
    <div className="rd-cabinet-modules">
     {configuration.modules.map((module,index)=>{
      const dimensions=cabinetData?.models.find(item=>item.id===module.model);
-     return <CabinetCompositionModule key={module.id} selected={module.id===activeModule} disabled={pending} onRemove={removeActiveModule}
+     return <CabinetCompositionModule key={module.id} selected={module.id===activeModule} disabled={pending} onRemove={()=>removeModule(module.id)}
       onSelect={()=>{setActiveModule(module.id);setFrontIndex(null);setSelected(null);setAllModules(false);}}>
       {dimensions?.thumbnail&&<img src={cabinetURL(dimensions.thumbnail)} alt="" draggable={false}/>}
       <b>Модуль {index+1}</b><small>{dimensions?dimensions.widthMm/10+' см · ':''}арт. {module.model}</small>
